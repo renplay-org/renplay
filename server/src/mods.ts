@@ -105,20 +105,20 @@ export class Overlays {
     return files.length || deleted.length ? h.digest('hex').slice(0, 16) : ''
   }
 
-  /** Copies overlay files into an extracted project (re-applying mods after an update). */
-  async copyInto(slug: string, projectDir: string, onFile?: (rel: string) => void): Promise<number> {
+  /**
+   * The overlay as build input: changed files (relative to game/) and hidden
+   * ones (a hidden script takes its compiled .rpyc along).
+   */
+  async forBuild(slug: string): Promise<{ files: Map<string, Buffer>; hidden: Set<string> }> {
     const { files, deleted } = await this.list(slug)
-    for (const f of files) {
-      const dest = safeJoin(projectDir, f.path)
-      await mkdir(dirname(dest), { recursive: true })
-      await copyFile(join(this.filesDir(slug), f.path), dest)
-      onFile?.(f.path)
-    }
+    const out = new Map<string, Buffer>()
+    for (const f of files) out.set(f.path.slice(5), await readFile(join(this.filesDir(slug), f.path)))
+    const hidden = new Set<string>()
     for (const d of deleted) {
-      await rm(safeJoin(projectDir, d), { force: true })
-      if (d.endsWith('.rpy')) await rm(safeJoin(projectDir, d + 'c'), { force: true })
+      hidden.add(d.slice(5))
+      if (d.endsWith('.rpy')) hidden.add(d.slice(5) + 'c')
     }
-    return files.length + deleted.length
+    return { files: out, hidden }
   }
 
   /** Moves the overlay aside instead of deleting it, so nothing is lost on update. */

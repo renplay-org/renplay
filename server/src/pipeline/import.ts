@@ -16,6 +16,7 @@ import { extractWithBsdtar, openDir, openZip, readAll, sniffArchive, type Archiv
 import { assemble } from './assemble.js'
 import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource } from './detect.js'
 import { defaultImagePolicy, imageConcurrency, makeCover } from './optimize.js'
+import { PackReader, PackWriter, writeIndex, type PackIndex } from './pack.js'
 import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
 import { detectLayout, extractProject } from './project.js'
 import { readRpaIndex, splitRpa } from './rpa.js'
@@ -106,12 +107,36 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
     }
     const policy = { ...defaultImagePolicy(options.imageQuality), enabled: options.optimizeImages !== false }
     const staging = join(work, 'build')
+    await mkdir(staging, { recursive: true })
     // A progressive_download.txt shipped by the developer replaces the defaults.
     const shipped = src.entries.find((e) => e.path === `${layout.root}progressive_download.txt`)
     const baseRules = shipped ? (await readAll(await shipped.open(), 1 << 20)).toString('utf-8') : DEFAULT_PROGRESSIVE_RULES
     if (shipped) ctx.log('Using the game’s own progressive_download.txt')
-    const rulesText = buildRules(settings.keep, baseRules)
-    const res = await extractProject(src, layout.root, staging, policy, imageConcurrency(cfg.imageConcurrency), ctx, parseRules(rulesText), excluder(settings.exclude))
+    const rules = parseRules(buildRules(settings.keep, baseRules))
+
+    // Recipe patches and re-applied mods replace game files; hidden files are left out.
+    const existingForMods = p.reapplyMods ? (p.game ? db.getGame(p.game) : match ? db.gameByRecipe(match.recipe.id) : null) : null
+    const extra = match ? await catalog.patches(match.recipe, ctx) : new Map<string, Buffer>()
+    const skip = new Set<string>(extra.keys())
+    if (existingForMods) {
+      const mods = await deps.overlays.forBuild(existingForMods.id)
+      for (const [rel, data] of mods.files) {
+        extra.set(rel, data)
+        skip.add(rel)
+      }
+      for (const h of mods.hidden) skip.add(h)
+      if (mods.files.size + mods.hidden.size) ctx.log(`Re-applying ${mods.files.size} modded and ${mods.hidden.size} hidden files`)
+    }
+
+    // 5. Extract and optimize, straight into the packs.
+    const assets = new PackWriter(join(staging, 'assets.pack'))
+    const zipPack = new PackWriter(join(work, 'zip.pack'))
+    let res
+    try {
+      res = await extractProject(src, layout.root, staging, policy, imageConcurrency(cfg.imageConcurrency), ctx, rules, { assets, zip: zipPack, skip }, excluder(settings.exclude))
+    } finally {
+      await Promise.allSettled([assets.close(), zipPack.close()])
+    }
     src.close()
     src = null
     await rm(join(staging, 'progressive_download.txt'), { force: true })
@@ -132,18 +157,21 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
     const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(p.title || match?.recipe.title || meta.title || basename(archivePath).replace(/\.[^.]+$/, '')))
     if (!isSlug(id)) throw new Error(`Invalid game id ${id}`)
 
-    // 7. Recipe patches and re-applied mods go into game.zip.
-    const forceZip = new Set<string>()
-    if (match) for (const f of await catalog.applyPatches(match.recipe, staging, ctx)) forceZip.add(f)
-    if (p.reapplyMods && existing) {
-      const n = await deps.overlays.copyInto(existing.id, staging, (rel) => forceZip.add(rel.replace(/^game\//, '')))
-      if (n) ctx.log(`Re-applied ${n} modded files`)
-    }
-
-    // 8. Assemble the web build (the cover is picked first: menu art moves into game.zip).
-    const cover = await findCover(staging, res.coverCandidates)
+    // 7. Cover (from the packs), then game.zip.
+    const cover = await findCover(staging, join(work, 'zip.pack'), assets.index, zipPack.index, res.coverCandidates)
     ctx.progress('Packing game.zip', 0)
-    const asm = await assemble({ dir: staging, renpyZip: join(engineDir, 'renpy.zip'), rules: parseRules(rulesText), placeholders: res.placeholders, forceZip, ctx })
+    const asm = await assemble({
+      dir: staging,
+      renpyZip: join(engineDir, 'renpy.zip'),
+      zipPack: { path: join(work, 'zip.pack'), index: zipPack.index },
+      assets: assets.index,
+      rules,
+      placeholders: res.placeholders,
+      extra,
+      ctx,
+    })
+    await writeIndex(join(staging, 'assets.json'), assets.index)
+    await rm(join(work, 'zip.pack'), { force: true })
     ctx.log(`game.zip ${(asm.zipBytes / 1e6).toFixed(0)} MB (${asm.zipped} files), ${asm.streamed.files} files stream (${(asm.streamed.bytes / 1e9).toFixed(2)} GB)`)
 
     // 9. Install: rename the staging folder into place (same filesystem).
@@ -212,23 +240,38 @@ async function modsInfo(deps: ImportDeps, id: string): Promise<BuildInfo['mods']
   return s.files + s.deleted ? { hash: s.hash, files: s.files + s.deleted } : null
 }
 
-async function findCover(project: string, candidates: string[]): Promise<Buffer | null> {
-  const scored: Array<[string, number]> = []
-  for (const c of candidates) {
-    const full = c.startsWith('../') ? join(project, c.slice(3)) : join(project, 'game', c)
+async function findCover(
+  dir: string,
+  zipPackPath: string,
+  assets: PackIndex,
+  zipIndex: PackIndex,
+  candidates: Array<['assets' | 'zip' | 'root', string]>,
+): Promise<Buffer | null> {
+  const scored = candidates.map(([where, name]) => {
+    const size = where === 'assets' ? (assets.get(name)?.[1] ?? 0) : where === 'zip' ? (zipIndex.get(name)?.[1] ?? 0) : 1
+    const bonus = /main_menu\./i.test(name) ? 4 : /main_menu/i.test(name) ? 2 : /presplash/i.test(name) ? 1 : 0
+    return { where, name, score: bonus * 1e9 + size }
+  })
+  scored.sort((a, b) => b.score - a.score)
+  for (const c of scored.slice(0, 4)) {
     try {
-      const st = await stat(full)
-      const bonus = /main_menu\./i.test(c) ? 4 : /main_menu/i.test(c) ? 2 : /presplash/i.test(c) ? 1 : 0
-      scored.push([full, bonus * 1e9 + st.size])
-    } catch {}
-  }
-  scored.sort((a, b) => b[1] - a[1])
-  for (const [full] of scored) {
-    try {
-      return await makeCover(await readFile(full))
+      let data: Buffer | null
+      if (c.where === 'root') data = await readFile(join(dir, c.name))
+      else {
+        const reader = new PackReader(c.where === 'assets' ? join(dir, 'assets.pack') : zipPackPath, '')
+        const entry = (c.where === 'assets' ? assets : zipIndex).get(c.name)
+        data = entry ? await readEntry(reader, entry) : null
+      }
+      if (data) return await makeCover(data)
     } catch {}
   }
   return null
+}
+
+async function readEntry(reader: PackReader, entry: [number, number]): Promise<Buffer> {
+  const chunks: Buffer[] = []
+  for await (const c of reader.stream(entry)) chunks.push(c as Buffer)
+  return Buffer.concat(chunks)
 }
 
 export async function saveCover(cfg: Config, id: string, data: Buffer): Promise<string> {

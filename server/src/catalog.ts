@@ -5,8 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { Config } from './config.js'
 import type { Db } from './db.js'
 import type { JobContext } from './jobs.js'
-import { writeFileAtomic } from './util/fsx.js'
-import { cleanRelPath, safeJoin } from './util/paths.js'
+import { cleanRelPath } from './util/paths.js'
 
 export interface RecipeArchive {
   name: string
@@ -187,8 +186,9 @@ export class Catalog {
     }
   }
 
-  async applyPatches(recipe: Recipe, projectDir: string, ctx: JobContext): Promise<string[]> {
-    const applied: string[] = []
+  /** Downloads a recipe's patches: path relative to game/ -> content. */
+  async patches(recipe: Recipe, ctx: JobContext): Promise<Map<string, Buffer>> {
+    const out = new Map<string, Buffer>()
     for (const p of recipe.build?.patches ?? []) {
       const rel = cleanRelPath(p.path)
       if (!rel.startsWith('game/')) throw new Error(`Recipe patch outside game/: ${rel}`)
@@ -197,10 +197,9 @@ export class Catalog {
       if (!res.ok) throw new Error(`Recipe patch download failed: ${url} (${res.status})`)
       const data = Buffer.from(await res.arrayBuffer())
       if (createHash('sha256').update(data).digest('hex') !== p.sha256.toLowerCase()) throw new Error(`Recipe patch checksum mismatch: ${rel}`)
-      await writeFileAtomic(safeJoin(projectDir, rel), data)
-      applied.push(rel.slice(5))
-      ctx.log(`Applied recipe patch ${rel}`)
+      out.set(rel.slice(5), data)
+      ctx.log(`Recipe patch ${rel}`)
     }
-    return applied
+    return out
   }
 }

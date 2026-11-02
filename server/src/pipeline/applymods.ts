@@ -1,5 +1,5 @@
 import { createWriteStream } from 'node:fs'
-import { mkdir, readFile, rename, rm } from 'node:fs/promises'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import yazl from 'yazl'
@@ -8,10 +8,10 @@ import type { Config } from '../config.js'
 import type { Db } from '../db.js'
 import type { JobContext } from '../jobs.js'
 import type { Overlays } from '../mods.js'
-import { exists, walkFiles } from '../util/fsx.js'
-import { safeJoin } from '../util/paths.js'
+import { exists } from '../util/fsx.js'
 import { readAll, openZip } from './archive.js'
 import { copyZipEntries } from './assemble.js'
+import { PackReader } from './pack.js'
 
 const STORED = /\.(png|jpe?g|webp|avif|gif|ogg|opus|mp3|webm|mp4|ogv|zip|rpa|rpyc|rpymc|rpyb)$/i
 
@@ -110,11 +110,16 @@ export async function applyMods(ctx: JobContext<{ game: string }>, deps: ModDeps
   }
 }
 
-/** Files of the base build a player can browse in the mod editor. */
-export async function baseFiles(builds: Builds, id: string, build: string): Promise<Map<string, { size: number; where: 'zip' | 'dir' }>> {
-  const out = new Map<string, { size: number; where: 'zip' | 'dir' }>()
+/** The streamed assets of a build (mod builds use their base build's). */
+export function assetsOf(builds: Builds, id: string, build: string): PackReader {
   const dir = builds.dir(id, baseOf(build))
-  const src = await openZip(join(dir, 'game.zip'))
+  return new PackReader(join(dir, 'assets.pack'), join(dir, 'assets.json'))
+}
+
+/** Files of the base build a player can browse in the mod editor. */
+export async function baseFiles(builds: Builds, id: string, build: string): Promise<Map<string, { size: number; where: 'zip' | 'pack' }>> {
+  const out = new Map<string, { size: number; where: 'zip' | 'pack' }>()
+  const src = await openZip(join(builds.dir(id, baseOf(build)), 'game.zip'))
   try {
     for (const e of src.entries) {
       if (e.path.startsWith('game/') && e.path !== 'game/renpyweb_remote_files.txt') out.set(e.path, { size: e.size, where: 'zip' })
@@ -122,15 +127,16 @@ export async function baseFiles(builds: Builds, id: string, build: string): Prom
   } finally {
     src.close()
   }
-  for (const f of await walkFiles(join(dir, 'game'))) out.set(`game/${f.rel}`, { size: f.size, where: 'dir' })
+  for (const [rel, [, size]] of await assetsOf(builds, id, build).index()) out.set(`game/${rel}`, { size, where: 'pack' })
   return out
 }
 
 export async function readBaseFile(builds: Builds, id: string, build: string, path: string): Promise<Buffer | null> {
-  const dir = builds.dir(id, baseOf(build))
-  const streamed = safeJoin(dir, path)
-  if (path.startsWith('game/') && (await exists(streamed))) return readFile(streamed)
-  const src = await openZip(join(dir, 'game.zip'))
+  if (path.startsWith('game/')) {
+    const data = await assetsOf(builds, id, build).read(path.slice(5))
+    if (data) return data
+  }
+  const src = await openZip(join(builds.dir(id, baseOf(build)), 'game.zip'))
   try {
     const e = src.entries.find((x) => x.path === path)
     return e ? await readAll(await e.open(), 256 << 20) : null

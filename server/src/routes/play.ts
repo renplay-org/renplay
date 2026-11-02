@@ -1,9 +1,11 @@
 import { readdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import { Router } from 'express'
 import { BUILD_RE, baseOf, type Builds } from '../builds.js'
 import type { Db } from '../db.js'
 import type { EngineStore } from '../engines.js'
-import { HttpError, assertSlug } from '../util/paths.js'
+import { PackReader } from '../pipeline/pack.js'
+import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
 
 /**
  * Serves a game page: the engine's page template with renplay's runtime wired
@@ -38,7 +40,91 @@ export function createPlayRouter(db: Db, builds: Builds, engines: EngineStore, r
     res.type('html').send(html)
   })
 
+  /**
+   * Streamed assets of a build, from its pack (mod builds use their base's).
+   * Supports byte ranges: browsers seek in videos with them.
+   */
+  router.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m[a-z0-9]+)?\/game\/(.+)$/, async (req, res) => {
+    const [id, base, raw] = [req.params[0], req.params[1], req.params[2]] as string[]
+    const name = safeName(raw)
+    if (!name || !isSlug(id)) throw new HttpError(404, 'Not found')
+    const reader = new PackReader(join(builds.dir(id, base), 'assets.pack'), join(builds.dir(id, base), 'assets.json'))
+    let entry: [number, number] | null
+    try {
+      entry = await reader.entry(name)
+    } catch {
+      entry = null
+    }
+    if (!entry) throw new HttpError(404, 'Not found')
+    const size = entry[1]
+    res.setHeader('Content-Type', mimeOf(name))
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    res.setHeader('Accept-Ranges', 'bytes')
+    res.setHeader('ETag', `"${base}-${entry[0].toString(36)}"`)
+    let from = 0
+    let to = size - 1
+    const range = req.headers.range?.match(/^bytes=(\d*)-(\d*)$/)
+    if (range && size > 0) {
+      if (range[1]) {
+        from = Number(range[1])
+        if (range[2]) to = Math.min(size - 1, Number(range[2]))
+      } else if (range[2]) from = Math.max(0, size - Number(range[2]))
+      if (from > to || from >= size) {
+        res.status(416).setHeader('Content-Range', `bytes */${size}`).end()
+        return
+      }
+      res.status(206).setHeader('Content-Range', `bytes ${from}-${to}/${size}`)
+    }
+    res.setHeader('Content-Length', String(size ? to - from + 1 : 0))
+    if (req.method === 'HEAD' || !size) {
+      res.end()
+      return
+    }
+    const s = reader.stream(entry, from, to)
+    s.on('error', () => res.destroy())
+    req.on('close', () => s.destroy())
+    s.pipe(res)
+  })
+
   return router
+}
+
+/** Decodes and validates an asset path from a URL. */
+function safeName(raw: string): string | null {
+  let name = raw
+  try {
+    if (/%[0-9a-f]{2}/i.test(raw)) name = decodeURIComponent(raw)
+  } catch {
+    return null
+  }
+  try {
+    return cleanRelPath(name)
+  } catch {
+    return null
+  }
+}
+
+const MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  avif: 'image/avif',
+  svg: 'image/svg+xml',
+  gif: 'image/gif',
+  ogg: 'audio/ogg',
+  opus: 'audio/ogg',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  webm: 'video/webm',
+  mp4: 'video/mp4',
+  ogv: 'video/ogg',
+  mkv: 'video/x-matroska',
+  avi: 'video/x-msvideo',
+}
+
+function mimeOf(name: string): string {
+  return MIME[name.slice(name.lastIndexOf('.') + 1).toLowerCase()] ?? 'application/octet-stream'
 }
 
 async function findPresplash(dir: string): Promise<string | null> {

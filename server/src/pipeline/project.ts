@@ -1,14 +1,15 @@
-import { createWriteStream, type WriteStream } from 'node:fs'
-import { copyFile, mkdir, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { createWriteStream } from 'node:fs'
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
+import type { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { JobContext } from '../jobs.js'
 import { Limiter } from '../util/limit.js'
-import { safeJoin } from '../util/paths.js'
 import { readAll, type ArchiveSource, type SourceEntry } from './archive.js'
 import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, type GameMeta } from './detect.js'
 import { isOptimizableImage, transcodeImage, type ImagePolicy } from './optimize.js'
-import { makePlaceholder, streamsImage, type Placeholder, type ProgressiveRule } from './progressive.js'
+import type { PackWriter } from './pack.js'
+import { classify, makePlaceholder, streamsImage, type Placeholder, type ProgressiveRule } from './progressive.js'
 import { rangeKey, readRpaFile, readRpaIndex, splitRpa, type RpaSink } from './rpa.js'
 
 export type Layout = { kind: 'project'; root: string } | { kind: 'web'; root: string }
@@ -64,10 +65,18 @@ export interface ExtractStats {
 export interface ExtractResult {
   meta: GameMeta
   stats: ExtractStats
-  /** Paths (relative to game/) of the main-menu-like images seen, for covers. */
-  coverCandidates: string[]
+  /** Main-menu-like images seen, for covers: [pack, name] or ['root', file]. */
+  coverCandidates: Array<['assets' | 'zip' | 'root', string]>
   /** Placeholders for streamed images, keyed by path relative to game/. */
   placeholders: Map<string, Placeholder>
+}
+
+/** Where extracted files go: streamed files and the rest (for game.zip). */
+export interface ExtractTargets {
+  assets: PackWriter
+  zip: PackWriter
+  /** Paths (relative to game/) supplied separately (recipe patches, re-applied mods). */
+  skip: Set<string>
 }
 
 const SKIP_GAME = [/^cache\//i, /^saves\//i, /\.rpyb$/i, /(^|\/)\.ds_store$/i, /(^|\/)thumbs\.db$/i, /\.bak$/i]
@@ -75,8 +84,10 @@ const KEEP_ROOT = /^(progressive_download\.txt|web-presplash\.(png|jpe?g|webp)|w
 const COVER_RE = /(^|\/)(main_menu|mainmenu|main_menu_background|menu_bg|title)[^/]*\.(png|jpe?g|webp)$/i
 
 /**
- * Writes the parts of a Ren'Py game that a web build needs into `dest`:
- * game/ (with RPA archives split into loose files) plus web-specific root files.
+ * Extracts the parts of a Ren'Py game a web build needs. Files under game/
+ * (RPA archives split on the fly) go into the assets pack when they stream
+ * and into the zip pack otherwise; a few root files (web presplash, the
+ * developer's progressive_download.txt) are written to `dest`.
  */
 export async function extractProject(
   src: ArchiveSource,
@@ -86,6 +97,7 @@ export async function extractProject(
   concurrency: number,
   ctx: JobContext,
   rules: ProgressiveRule[],
+  targets: ExtractTargets,
   isExcluded: (rel: string) => boolean = () => false,
 ): Promise<ExtractResult> {
   const stats: ExtractStats = {
@@ -99,19 +111,21 @@ export async function extractProject(
     archivesKept: [],
   }
   const meta: GameMeta = {}
-  const coverCandidates: string[] = []
+  const coverCandidates: ExtractResult['coverCandidates'] = []
   const written = new Set<string>()
-  const ranges = new Map<string, string>()
+  /** RPA byte range -> [pack, name], to store shared entries once. */
+  const ranges = new Map<string, ['assets' | 'zip', string]>()
   const limiter = new Limiter(concurrency)
   const placeholders = new Map<string, Placeholder>()
-  const gameDir = join(dest, 'game')
-  await mkdir(gameDir, { recursive: true })
+  const packs = { assets: targets.assets, zip: targets.zip }
+  await mkdir(dest, { recursive: true })
 
   const inRoot = src.entries.filter((e) => e.path.startsWith(root) && !e.path.includes('__MACOSX/'))
   const gameEntries: Array<{ rel: string; e: SourceEntry }> = []
   const rpas: Array<{ rel: string; e: SourceEntry }> = []
   const rpycs: Array<{ rel: string; e: SourceEntry }> = []
   let total = 0
+  const skipped = (g: string) => SKIP_GAME.some((r) => r.test(g)) || isExcluded(g) || targets.skip.has(g) || written.has(g.toLowerCase())
 
   for (const e of inRoot) {
     const rel = e.path.slice(root.length)
@@ -122,7 +136,7 @@ export async function extractProject(
     if (!rel.startsWith('game/')) {
       if (KEEP_ROOT.test(rel)) {
         await pipeline(await e.open(), createWriteStream(join(dest, rel)))
-        if (/^web-presplash/i.test(rel)) coverCandidates.push(`../${rel}`)
+        if (/^web-presplash/i.test(rel)) coverCandidates.push(['root', rel])
       }
       continue
     }
@@ -135,7 +149,7 @@ export async function extractProject(
       } catch {}
       continue
     }
-    if (SKIP_GAME.some((r) => r.test(g)) || isExcluded(g)) continue
+    if (SKIP_GAME.some((r) => r.test(g)) || isExcluded(g) || targets.skip.has(g)) continue
     if (/\.rpa$/i.test(g)) {
       rpas.push({ rel: g, e })
       total += e.size
@@ -152,35 +166,57 @@ export async function extractProject(
     ctx.progress('Unpacking game files', total ? done / total : 0, what)
   }
 
-  const writeBuffer = async (g: string, data: Buffer) => {
-    const out = safeJoin(gameDir, g)
-    await mkdir(dirname(out), { recursive: true })
-    await writeFile(out, data)
+  /** Streamed (non-image) files go to the assets pack; images decide after their placeholder. */
+  const packFor = (g: string): 'assets' | 'zip' => {
+    const kind = classify(g, rules)
+    return kind && kind !== 'image' ? 'assets' : 'zip'
+  }
+
+  const put = async (pack: 'assets' | 'zip', g: string, data: Buffer) => {
+    await packs[pack].add(g, data)
     stats.bytesOut += data.length
+    if (COVER_RE.test(g)) coverCandidates.push([pack, g])
+    return pack
   }
 
   const needsPlaceholder = (g: string) => streamsImage(g, rules)
   const wantsImageTask = (g: string, size: number) =>
     size < 256 << 20 && ((policy.enabled && isOptimizableImage(g)) || needsPlaceholder(g))
 
-  const handleImage = async (g: string, data: Buffer) => {
+  const handleImage = async (g: string, data: Buffer, key?: string) => {
     const r = await transcodeImage(data, g, policy)
     if (r.changed) {
       stats.imagesConverted++
       stats.imageBytesBefore += data.length
       stats.imageBytesAfter += r.data.length
     }
-    await writeBuffer(g, r.data)
+    let pack: 'assets' | 'zip' = 'zip'
     if (needsPlaceholder(g)) {
       const ph = await makePlaceholder(r.data)
-      if (ph) placeholders.set(g, ph)
+      if (ph) {
+        placeholders.set(g, ph)
+        pack = 'assets'
+      }
     }
+    await put(pack, g, r.data)
+    if (key) ranges.set(key, [pack, g])
+  }
+
+  const streamInto = async (g: string, s: Readable, size: number) => {
+    const pack = packFor(g)
+    const w = await packs[pack].begin(g)
+    try {
+      for await (const c of s) await w.write(c as Buffer)
+    } finally {
+      await w.end()
+    }
+    stats.bytesOut += size
+    return pack
   }
 
   const noteFile = (g: string) => {
     written.add(g.toLowerCase())
     stats.files++
-    if (COVER_RE.test(g)) coverCandidates.push(g)
   }
 
   // Phase A: loose files. They take precedence over archive contents.
@@ -191,20 +227,13 @@ export async function extractProject(
     if (/\.rpy$/i.test(g) && e.size < 4 << 20) {
       const buf = await readAll(await e.open())
       inspectSource(buf.toString('utf-8'), meta)
-      await writeBuffer(g, buf)
-      tick(e.size, g)
-      continue
-    }
-    if (wantsImageTask(g, e.size)) {
+      await put(packFor(g), g, buf)
+    } else if (wantsImageTask(g, e.size)) {
       const buf = await readAll(await e.open())
       await limiter.run(() => handleImage(g, buf))
-      tick(e.size, g)
-      continue
+    } else {
+      await streamInto(g, await e.open(), e.size)
     }
-    const out = safeJoin(gameDir, g)
-    await mkdir(dirname(out), { recursive: true })
-    await pipeline(await e.open(), createWriteStream(out))
-    stats.bytesOut += e.size
     tick(e.size, g)
   }
 
@@ -221,9 +250,7 @@ export async function extractProject(
     if (!index) {
       ctx.log(`Keeping ${archiveRel} as-is (unknown archive format, it will not stream progressively)`)
       stats.archivesKept.push(archiveRel)
-      const out = safeJoin(gameDir, archiveRel)
-      await mkdir(dirname(out), { recursive: true })
-      await pipeline(await e.open(), createWriteStream(out))
+      await streamInto(archiveRel, await e.open(), e.size)
       tick(e.size, archiveRel)
       continue
     }
@@ -236,50 +263,55 @@ export async function extractProject(
         reported = bytes
       },
       open: async (name, size, key) => {
-        // Archive paths are relative to the game directory, regardless of where the .rpa sits.
+        // Archive paths are relative to the game directory, wherever the .rpa sits.
         const g = name
-        if (SKIP_GAME.some((r) => r.test(g)) || isExcluded(g) || written.has(g.toLowerCase())) return null
+        if (skipped(g)) return null
         noteFile(g)
         stats.bytesIn += size
-        if (/\.rpy$/i.test(g) && size < 4 << 20) return bufferSink(async (buf) => {
-          inspectSource(buf.toString('utf-8'), meta)
-          await writeBuffer(g, buf)
-          ranges.set(key, g)
-        })
-        if (/\.rpyc$/i.test(g) && size < 16 << 20) return bufferSink(async (buf) => {
-          if (!meta.saveDir && /options/i.test(g)) meta.saveDir = saveDirFromRpyc(buf) ?? undefined
-          await writeBuffer(g, buf)
-          ranges.set(key, g)
-        })
+        if (/\.rpy$/i.test(g) && size < 4 << 20)
+          return bufferSink(async (buf) => {
+            inspectSource(buf.toString('utf-8'), meta)
+            ranges.set(key, [await put(packFor(g), g, buf), g])
+          })
+        if (/\.rpyc$/i.test(g) && size < 16 << 20)
+          return bufferSink(async (buf) => {
+            if (!meta.saveDir && /options/i.test(g)) meta.saveDir = saveDirFromRpyc(buf) ?? undefined
+            ranges.set(key, [await put(packFor(g), g, buf), g])
+          })
         if (wantsImageTask(g, size)) {
           // Waiting for a slot here throttles the archive stream; the encode itself
           // runs in the background so the next file can be read meanwhile.
           await limiter.acquire()
-          ranges.set(key, g)
-          return bufferSink(async (buf) => limiter.spawn(() => handleImage(g, buf)))
+          return bufferSink(async (buf) => limiter.spawn(() => handleImage(g, buf, key)))
         }
-        ranges.set(key, g)
-        return fileSink(safeJoin(gameDir, g), (n) => (stats.bytesOut += n))
+        const pack = packFor(g)
+        const w = await packs[pack].begin(g)
+        ranges.set(key, [pack, g])
+        return {
+          write: (c) => w.write(c),
+          end: async () => {
+            await w.end()
+            stats.bytesOut += size
+          },
+        }
       },
       deferred: async (file) => {
-        // Shared entries copy an earlier output; make sure its encode finished.
+        // Shared entries point at an earlier output; make sure its encode finished.
         await limiter.drain()
         const g = file.name
-        if (SKIP_GAME.some((r) => r.test(g)) || isExcluded(g) || written.has(g.toLowerCase())) return
+        if (skipped(g)) return
+        noteFile(g)
         const seg = file.segments.length === 1 ? file.segments[0]! : null
         const same = seg ? ranges.get(rangeKey(seg.offset, seg.length, seg.prefix)) : undefined
-        noteFile(g)
-        if (same) {
-          await mkdir(dirname(safeJoin(gameDir, g)), { recursive: true })
-          await copyFile(safeJoin(gameDir, same), safeJoin(gameDir, g))
-          const ph = placeholders.get(same)
+        if (same && packs[same[0]].alias(g, same[1])) {
+          const ph = placeholders.get(same[1])
           if (ph && needsPlaceholder(g)) placeholders.set(g, ph)
           return
         }
         ctx.log(`Re-reading ${g} from ${archiveRel} (shared or overlapping data)`)
         const data = await readRpaFile(e, file)
         if (wantsImageTask(g, data.length)) await handleImage(g, data)
-        else await writeBuffer(g, data)
+        else await put(packFor(g), g, data)
       },
     })
     tick(e.size - reported, archiveRel)
@@ -324,31 +356,5 @@ function bufferSink(done: (buf: Buffer) => Promise<void>): RpaSink {
       chunks.push(Buffer.from(c))
     },
     end: () => done(Buffer.concat(chunks)),
-  }
-}
-
-function fileSink(path: string, onBytes: (n: number) => void): RpaSink {
-  let ws: WriteStream | null = null
-  let ready: Promise<void> | null = null
-  const open = () => {
-    ready ??= mkdir(dirname(path), { recursive: true }).then(() => {
-      ws = createWriteStream(path)
-    })
-    return ready
-  }
-  return {
-    async write(c) {
-      await open()
-      onBytes(c.length)
-      // Copy: the source chunk buffer may be reused by the decompressor.
-      if (!ws!.write(Buffer.from(c))) await new Promise<void>((r) => ws!.once('drain', () => r()))
-    },
-    async end() {
-      await open()
-      await new Promise<void>((resolve, reject) => {
-        ws!.once('error', reject)
-        ws!.end(() => resolve())
-      })
-    },
   }
 }
