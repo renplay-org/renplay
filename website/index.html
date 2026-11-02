@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>renplay — Ren’Py games in the browser, self-hosted</title>
+  <meta name="description" content="A self-hosted library that plays Ren’Py visual novels in the browser, with saves on your server.">
+  <meta property="og:title" content="renplay">
+  <meta property="og:description" content="Ren’Py games in the browser, self-hosted. Saves on your server.">
+  <meta property="og:image" content="https://renplay-web.github.io/logo.png">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <style>
+    :root { color-scheme: dark; --ink: #07070a; --fg: #e7e7ee; --dim: #9b9bab; --accent: #fb7aa8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg);
+      background: radial-gradient(1000px 500px at 10% -10%, rgb(244 80 138 / .14), transparent 60%),
+                  radial-gradient(800px 500px at 100% 0%, rgb(124 92 255 / .12), transparent 55%), var(--ink); min-height: 100vh; }
+    main { max-width: 860px; margin: 0 auto; padding: 72px 24px 96px; }
+    header { display: flex; align-items: center; gap: 18px; }
+    header img { width: 64px; height: 64px; border-radius: 18px; box-shadow: 0 12px 40px -12px rgb(244 80 138 / .6); }
+    h1 { font-size: 40px; letter-spacing: -.02em; margin: 0; }
+    .lead { font-size: 20px; color: var(--fg); margin: 28px 0 8px; }
+    p { color: var(--dim); }
+    ul { padding: 0; list-style: none; display: grid; gap: 12px; margin: 32px 0; }
+    li { padding: 16px 18px; border-radius: 16px; background: rgb(255 255 255 / .03); border: 1px solid rgb(255 255 255 / .07); }
+    li b { color: var(--fg); }
+    .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
+    .links a { color: var(--fg); text-decoration: none; padding: 10px 16px; border-radius: 12px; border: 1px solid rgb(255 255 255 / .12); background: rgb(255 255 255 / .04); }
+    .links a.primary { background: linear-gradient(#f4508a, #e0306f); border-color: transparent; }
+    .links a:hover { filter: brightness(1.15); }
+    code { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; background: rgb(255 255 255 / .06); padding: 2px 6px; border-radius: 6px; }
+    pre { background: rgb(0 0 0 / .35); border: 1px solid rgb(255 255 255 / .07); border-radius: 14px; padding: 16px; overflow-x: auto; }
+    footer { margin-top: 64px; color: var(--dim); font-size: 14px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="logo.svg" alt="">
+    <h1>renplay</h1>
+  </header>
+  <p class="lead">Your Ren’Py visual novels, playable in any browser, from your own server.</p>
+  <p>Drop in a game’s normal PC download. renplay unpacks it, optimizes it, builds it for the web and keeps your saves on the server, so you continue on any device right where you left off.</p>
+  <ul>
+    <li><b>Saves on your server.</b> Every save, autosave and persistent change is stored as the game writes it, with history. Sequels find earlier seasons’ saves like on desktop.</li>
+    <li><b>One-click installs.</b> zip, 7z or rar; archives split while streaming, images converted to WebP, built with the official Ren’Py web engine. No SDK, and game code never runs on the server.</li>
+    <li><b>Fast.</b> Paced to the display refresh, engine and game data cached in the browser, everything else streamed on demand.</li>
+    <li><b>Mods.</b> Edit scripts in the browser or install a mod zip; your changes stay a separate layer.</li>
+  </ul>
+  <pre><code>docker run -d -p 8080:8080 -v ./games:/games -v ./data:/data ghcr.io/renplay-web/renplay:edge</code></pre>
+  <div class="links">
+    <a class="primary" href="https://github.com/renplay-web/renplay">renplay on GitHub</a>
+    <a href="https://github.com/renplay-web/catalog">Game catalog</a>
+    <a href="https://github.com/renplay-web/engines">Engines</a>
+  </div>
+  <footer>renplay is not affiliated with Ren’Py. Ren’Py is © Tom Rothamel and contributors, MIT-licensed. The catalog lists games and where to get them; it hosts no game files.</footer>
+</main>
+</body>
+</html>
