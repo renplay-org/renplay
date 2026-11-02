@@ -1,10 +1,11 @@
 {
  "schema": 1,
- "generated": "2026-11-02T13:35:46.468Z",
+ "generated": "2026-11-02T14:25:08.979Z",
  "games": [
   {
    "id": "pale-carnations",
    "title": "Pale Carnations",
+   "developer": "Team Mutt and Jeff",
    "nsfw": true,
    "saveDir": "PaCaGame-1554919452",
    "description": "Episodic visual novel. Large game (~15 GB download, 33k images and ~1,000 animated scenes).",

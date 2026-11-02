@@ -103,7 +103,8 @@ export class SdkManager {
 
   async webBuild(sdk: string, project: string, dest: string, ctx: JobContext, opts: { placeholders?: string } = {}): Promise<void> {
     await mkdir(join(this.cfg.internalDir, 'home'), { recursive: true })
-    const env = opts.placeholders ? { RENPLAY_PLACEHOLDERS: opts.placeholders } : {}
+    const env: NodeJS.ProcessEnv = { RENPLAY_SKIP_WEB_ZIP: '1' }
+    if (opts.placeholders) env['RENPLAY_PLACEHOLDERS'] = opts.placeholders
     await this.run(sdk, [join(sdk, 'launcher'), 'web_build', project, '--destination', dest], ctx, 'Building for web', env)
     if (!(await exists(join(dest, 'index.html'))) || !(await exists(join(dest, 'game.zip')))) {
       throw new Error('The Ren’Py web build did not produce index.html and game.zip (see log)')

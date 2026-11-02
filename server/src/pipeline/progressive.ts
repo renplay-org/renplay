@@ -108,4 +108,29 @@ init 100 python:
         return _orig(self)
 
     ProgressiveFilter.finalize = _renplay_finalize
+
+    # build_web() finishes by zipping the whole build again into <dest>.zip for
+    # itch.io uploads. renplay serves the folder, so skip writing that copy.
+    class _RenplayNullZip(object):
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+        def write(self, *args, **kwargs):
+            pass
+        def writestr(self, *args, **kwargs):
+            pass
+        def close(self):
+            pass
+
+    class _RenplayZipfile(object):
+        def __getattr__(self, name):
+            return getattr(_rp_zipfile, name)
+        def ZipFile(self, file, mode="r", *args, **kwargs):
+            if (_rp_os.environ.get("RENPLAY_SKIP_WEB_ZIP") and mode == "w" and isinstance(file, str)
+                    and file.endswith(".zip") and not file.endswith("game.zip")):
+                return _RenplayNullZip()
+            return _rp_zipfile.ZipFile(file, mode, *args, **kwargs)
+
+    zipfile = _RenplayZipfile()
 `
