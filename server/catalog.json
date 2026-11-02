@@ -1,0 +1,45 @@
+{
+ "schema": 2,
+ "generated": "2026-11-02T20:57:09.742Z",
+ "games": [
+  {
+   "id": "pale-carnations",
+   "title": "Pale Carnations",
+   "developer": "Team Mutt and Jeff",
+   "tags": [
+    "mystery",
+    "drama"
+   ],
+   "nsfw": true,
+   "saveDir": "PaCaGame-1554919452",
+   "match": [
+    "PaleCarnations-*-pc.zip"
+   ],
+   "engine": "8.5.3",
+   "releases": [
+    {
+     "version": "Ch4Up7Public",
+     "renpy": "8.3.4",
+     "status": "verified",
+     "archives": [
+      {
+       "name": "PaleCarnations-Ch4Up7Public-pc.zip",
+       "size": 15420810372,
+       "sha256": "aacb5dab2595ecb0363b7de101c6619f14823e4aa069575b91020abfb52ba2d4",
+       "platform": "pc"
+      }
+     ],
+     "verified": {
+      "date": "2026-11-02",
+      "renplay": "2.1.0",
+      "browsers": [
+       "chromium",
+       "webkit"
+      ],
+      "notes": "Large game (33k images, ~1,000 animated scenes). Images are WebP already."
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -8,6 +8,6 @@
 
 ## Checklist
 
-- [ ] I tested the change locally with `make dev`
-- [ ] The server (`server/`) and UI (`selector/`) compile with no TypeScript errors
+- [ ] I tested the change locally (`make dev`, or the server and `npm run dev` in `selector/`)
+- [ ] `make test` passes (server tests, UI type check)
 - [ ] I updated the README if the change affects setup or usage

@@ -1,0 +1,399 @@
+import { createWriteStream } from 'node:fs'
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { basename, join, relative } from 'node:path'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+import { baseOf, newBuildId, type BuildInfo, type Builds } from '../builds.js'
+import type { Catalog, RecipeMatch } from '../catalog.js'
+import type { Config } from '../config.js'
+import { parseJson, type BuildOptions, type Db, type GameRow, type GameSource } from '../db.js'
+import type { EngineStore } from '../engines.js'
+import type { JobContext } from '../jobs.js'
+import type { Overlays } from '../mods.js'
+import { dirSize, exists } from '../util/fsx.js'
+import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
+import { extractWithBsdtar, openDir, openZip, readAll, sniffArchive, type ArchiveSource } from './archive.js'
+import { assemble } from './assemble.js'
+import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource } from './detect.js'
+import { defaultImagePolicy, imageConcurrency, makeCover } from './optimize.js'
+import { PackReader, PackWriter, writeIndex, type PackIndex } from './pack.js'
+import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
+import { detectLayout, extractProject } from './project.js'
+import { readRpaIndex, splitRpa } from './rpa.js'
+
+export interface ImportParams {
+  source: { kind: 'archive'; path: string } | { kind: 'url'; url: string; filename?: string }
+  /** Install into this game (update or reinstall). */
+  game?: string
+  title?: string
+  recipeId?: string
+  engine?: string
+  optimizeImages?: boolean
+  imageQuality?: number
+  reapplyMods?: boolean
+}
+
+export interface ImportDeps {
+  cfg: Config
+  db: Db
+  builds: Builds
+  engines: EngineStore
+  overlays: Overlays
+  catalog: Catalog
+}
+
+export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<unknown> {
+  const { cfg, db, builds, engines, catalog } = deps
+  const p = ctx.params
+  const work = join(cfg.workDir, ctx.id)
+  await rm(work, { recursive: true, force: true })
+  await mkdir(work, { recursive: true })
+  let src: ArchiveSource | null = null
+  try {
+    // 1. Source archive.
+    let archivePath: string
+    const source: GameSource = {}
+    if (p.source.kind === 'url') {
+      archivePath = await downloadToArchives(p.source.url, p.source.filename, cfg, ctx)
+      source.url = p.source.url
+    } else {
+      archivePath = safeJoin(cfg.archivesDir, cleanRelPath(p.source.path))
+      if (!(await exists(archivePath))) throw new Error(`Archive not found: ${p.source.path}`)
+    }
+    source.archive = relative(cfg.archivesDir, archivePath)
+    const st = await stat(archivePath)
+    source.size = st.size
+    const known = db.getArchive(source.archive)
+    if (known?.sha256 && known.size === st.size && known.mtime_ms === Math.floor(st.mtimeMs)) source.sha256 = known.sha256
+    ctx.log(`Source: ${source.archive} (${(st.size / 1e9).toFixed(2)} GB)`)
+
+    // 2. Recipe.
+    let match: RecipeMatch | null = null
+    if (p.recipeId) {
+      const recipe = catalog.recipe(p.recipeId)
+      if (!recipe) throw new Error(`Recipe ${p.recipeId} is not in the catalog`)
+      const auto = catalog.match({ name: source.archive, size: source.size, sha256: source.sha256 })
+      match = auto?.recipe.id === recipe.id ? auto : { recipe, release: null, exact: false }
+    } else {
+      match = catalog.match({ name: source.archive, size: source.size, sha256: source.sha256 })
+    }
+    if (match) ctx.log(`Recipe: ${match.recipe.id}${match.release ? ` (${match.release.version}, ${match.release.status})` : ' (unlisted version)'}`)
+    const settings = match ? catalog.settings(match.recipe, match.release) : {}
+
+    // 3. Open.
+    ctx.progress('Opening archive')
+    const type = await sniffArchive(archivePath)
+    if (type === 'zip') src = await openZip(archivePath)
+    else if (type === '7z' || type === 'rar' || type === 'tar') {
+      ctx.progress('Unpacking archive', 0, `${type} archives are unpacked to scratch space first`)
+      await extractWithBsdtar(archivePath, join(work, 'raw'), ctx.signal, (l) => ctx.log(l))
+      src = await openDir(join(work, 'raw'))
+    } else throw new Error('Unsupported archive format (expected zip, 7z, rar or tar)')
+    const layout = detectLayout(src.entries)
+    if (!layout) throw new Error('No Ren’Py game found in the archive (no game/ folder with scripts)')
+    if (layout.kind === 'web') throw new Error('This is a web build. Use the game’s PC download; renplay builds the web version itself.')
+
+    // 4. Engine, from the recipe or the game's own Ren'Py version.
+    const vc = src.entries.find((e) => e.path === `${layout.root}renpy/vc_version.py`)
+    const gameRenpy = vc ? renpyVersionFromVc((await readAll(await vc.open(), 1 << 20)).toString('utf-8')) : undefined
+    const engine = await engines.pick(p.engine ?? settings.engine, gameRenpy ?? match?.release?.renpy)
+    ctx.log(`Game made with Ren'Py ${gameRenpy ?? 'unknown'}; building with engine ${engine}`)
+    const engineDir = await engines.ensure(engine, ctx)
+
+    // 5. Extract and optimize.
+    const options: BuildOptions = {
+      optimizeImages: p.optimizeImages ?? settings.optimize ?? true,
+      imageQuality: p.imageQuality ?? settings.quality ?? cfg.imageQuality,
+    }
+    const policy = { ...defaultImagePolicy(options.imageQuality), enabled: options.optimizeImages !== false }
+    const staging = join(work, 'build')
+    await mkdir(staging, { recursive: true })
+    // A progressive_download.txt shipped by the developer replaces the defaults.
+    const shipped = src.entries.find((e) => e.path === `${layout.root}progressive_download.txt`)
+    const baseRules = shipped ? (await readAll(await shipped.open(), 1 << 20)).toString('utf-8') : DEFAULT_PROGRESSIVE_RULES
+    if (shipped) ctx.log('Using the game’s own progressive_download.txt')
+    const rules = parseRules(buildRules(settings.keep, baseRules))
+
+    // Recipe patches and re-applied mods replace game files; hidden files are left out.
+    const existingForMods = p.reapplyMods ? (p.game ? db.getGame(p.game) : match ? db.gameByRecipe(match.recipe.id) : null) : null
+    const extra = match ? await catalog.patches(match.recipe, ctx) : new Map<string, Buffer>()
+    const skip = new Set<string>(extra.keys())
+    if (existingForMods) {
+      const mods = await deps.overlays.forBuild(existingForMods.id)
+      for (const [rel, data] of mods.files) {
+        extra.set(rel, data)
+        skip.add(rel)
+      }
+      for (const h of mods.hidden) skip.add(h)
+      if (mods.files.size + mods.hidden.size) ctx.log(`Re-applying ${mods.files.size} modded and ${mods.hidden.size} hidden files`)
+    }
+
+    // 5. Extract and optimize, straight into the packs.
+    const assets = new PackWriter(join(staging, 'assets.pack'))
+    const zipPack = new PackWriter(join(work, 'zip.pack'))
+    let res
+    try {
+      res = await extractProject(src, layout.root, staging, policy, imageConcurrency(cfg.imageConcurrency), ctx, rules, { assets, zip: zipPack, skip }, excluder(settings.exclude))
+    } finally {
+      await Promise.allSettled([assets.close(), zipPack.close()])
+    }
+    src.close()
+    src = null
+    await rm(join(staging, 'progressive_download.txt'), { force: true })
+    const s = res.stats
+    ctx.log(
+      `Extracted ${s.files} files, split ${s.archivesSplit} archives` +
+        (s.imagesConverted ? `, converted ${s.imagesConverted} images ${(s.imageBytesBefore / 1e9).toFixed(2)} GB -> ${(s.imageBytesAfter / 1e9).toFixed(2)} GB` : ''),
+    )
+    const meta = res.meta
+    const saveDir = meta.saveDir ?? match?.recipe.saveDir
+
+    // 6. Game id: the existing game, the recipe, or the title.
+    const existing =
+      (p.game ? db.getGame(p.game) : null) ??
+      (match ? db.gameByRecipe(match.recipe.id) : null) ??
+      (saveDir ? db.gameBySaveDir(saveDir) : null)
+    if (p.game && !existing) throw new HttpError(404, `Game ${p.game} not found`)
+    const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(p.title || match?.recipe.title || meta.title || basename(archivePath).replace(/\.[^.]+$/, '')))
+    if (!isSlug(id)) throw new Error(`Invalid game id ${id}`)
+
+    // 7. Cover (from the packs), then game.zip.
+    const cover = await findCover(staging, join(work, 'zip.pack'), assets.index, zipPack.index, res.coverCandidates)
+    ctx.progress('Packing game.zip', 0)
+    const asm = await assemble({
+      dir: staging,
+      renpyZip: join(engineDir, 'renpy.zip'),
+      zipPack: { path: join(work, 'zip.pack'), index: zipPack.index },
+      assets: assets.index,
+      rules,
+      placeholders: res.placeholders,
+      extra,
+      ctx,
+    })
+    await writeIndex(join(staging, 'assets.json'), assets.index)
+    await rm(join(work, 'zip.pack'), { force: true })
+    ctx.log(`game.zip ${(asm.zipBytes / 1e6).toFixed(0)} MB (${asm.zipped} files), ${asm.streamed.files} files stream (${(asm.streamed.bytes / 1e9).toFixed(2)} GB)`)
+
+    // 9. Install: rename the staging folder into place (same filesystem).
+    ctx.progress('Installing')
+    const build = newBuildId()
+    const info: BuildInfo = {
+      schema: 1,
+      game: id,
+      build,
+      engine,
+      renpyVersion: gameRenpy,
+      title: meta.title,
+      version: meta.version,
+      saveDir,
+      screen: meta.screen,
+      createdAt: new Date().toISOString(),
+      images: { converted: s.imagesConverted, before: s.imageBytesBefore, after: s.imageBytesAfter },
+      streamed: asm.streamed,
+      zipBytes: asm.zipBytes,
+      mods: p.reapplyMods && existing ? await modsInfo(deps, existing.id) : null,
+    }
+    await builds.writeInfo(staging, info)
+    await mkdir(builds.gameDir(id), { recursive: true })
+    await rename(staging, builds.dir(id, build))
+    const size = await dirSize(builds.dir(id, build))
+
+    const previous = existing?.build ? baseOf(existing.build) : undefined
+    if (existing && !p.reapplyMods && (await deps.overlays.summary(existing.id)).files) {
+      await deps.overlays.archive(existing.id)
+      ctx.log('Previous mods were moved aside (not re-applied to this version)')
+    }
+    const row: Partial<GameRow> = {
+      status: 'installed',
+      recipe_id: match?.recipe.id ?? existing?.recipe_id ?? '',
+      version: meta.version ?? match?.release?.version ?? '',
+      renpy_version: gameRenpy ?? '',
+      engine,
+      build,
+      size_bytes: size.bytes,
+      file_count: size.files,
+      source: JSON.stringify(source),
+      build_options: JSON.stringify(options),
+      installed_at: new Date().toISOString(),
+    }
+    if (saveDir && !existing?.save_dir_locked) row.save_dir = saveDir
+    if (meta.screen) {
+      row.screen_w = meta.screen[0]
+      row.screen_h = meta.screen[1]
+    }
+    if (!existing?.cover && cover) row.cover = await saveCover(cfg, id, cover)
+    if (existing) db.updateGame(id, row)
+    else db.insertGame({ id, title: p.title || match?.recipe.title || meta.title || id, tags: JSON.stringify(match?.recipe.tags ?? []), ...row })
+
+    await builds.prune(id, previous)
+    await engines.prune(new Set(db.allGames().map((g) => g.engine).filter(Boolean)))
+    ctx.log(`Installed ${id} (build ${build}, engine ${engine}, ${(size.bytes / 1e9).toFixed(2)} GB)`)
+    return { game: id, build, engine, size: size.bytes, zipBytes: asm.zipBytes, saveDir, title: meta.title, version: meta.version, images: info.images, recipe: match?.recipe.id ?? null }
+  } finally {
+    src?.close()
+    await rm(work, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+async function modsInfo(deps: ImportDeps, id: string): Promise<BuildInfo['mods']> {
+  const s = await deps.overlays.summary(id)
+  return s.files + s.deleted ? { hash: s.hash, files: s.files + s.deleted } : null
+}
+
+async function findCover(
+  dir: string,
+  zipPackPath: string,
+  assets: PackIndex,
+  zipIndex: PackIndex,
+  candidates: Array<['assets' | 'zip' | 'root', string]>,
+): Promise<Buffer | null> {
+  const scored = candidates.map(([where, name]) => {
+    const size = where === 'assets' ? (assets.get(name)?.[1] ?? 0) : where === 'zip' ? (zipIndex.get(name)?.[1] ?? 0) : 1
+    const bonus = /main_menu\./i.test(name) ? 4 : /main_menu/i.test(name) ? 2 : /presplash/i.test(name) ? 1 : 0
+    return { where, name, score: bonus * 1e9 + size }
+  })
+  scored.sort((a, b) => b.score - a.score)
+  for (const c of scored.slice(0, 4)) {
+    try {
+      let data: Buffer | null
+      if (c.where === 'root') data = await readFile(join(dir, c.name))
+      else {
+        const reader = new PackReader(c.where === 'assets' ? join(dir, 'assets.pack') : zipPackPath, '')
+        const entry = (c.where === 'assets' ? assets : zipIndex).get(c.name)
+        data = entry ? await readEntry(reader, entry) : null
+      }
+      if (data) return await makeCover(data)
+    } catch {}
+  }
+  return null
+}
+
+async function readEntry(reader: PackReader, entry: [number, number]): Promise<Buffer> {
+  const chunks: Buffer[] = []
+  for await (const c of reader.stream(entry)) chunks.push(c as Buffer)
+  return Buffer.concat(chunks)
+}
+
+export async function saveCover(cfg: Config, id: string, data: Buffer): Promise<string> {
+  await mkdir(cfg.coversDir, { recursive: true })
+  const name = `${id}-${Date.now().toString(36)}.webp`
+  await writeFile(join(cfg.coversDir, name), data)
+  return name
+}
+
+async function downloadToArchives(url: string, filename: string | undefined, cfg: Config, ctx: JobContext): Promise<string> {
+  const u = new URL(url)
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('Only http(s) URLs are supported')
+  await mkdir(cfg.uploadsDir, { recursive: true })
+  const part = join(cfg.uploadsDir, `${ctx.id}.download`)
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const have = (await stat(part).catch(() => null))?.size ?? 0
+      const res = await fetch(url, { signal: ctx.signal, headers: have ? { range: `bytes=${have}-` } : {}, redirect: 'follow' })
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+      const resumed = have > 0 && res.status === 206
+      const total = (resumed ? have : 0) + (Number(res.headers.get('content-length')) || 0)
+      filename ??= contentDispositionName(res.headers.get('content-disposition')) ?? (basename(u.pathname) || 'download.zip')
+      let got = resumed ? have : 0
+      const body = Readable.fromWeb(res.body as any)
+      body.on('data', (c: Buffer) => {
+        got += c.length
+        ctx.progress('Downloading', total ? got / total : 0, `${(got / 1e9).toFixed(2)} GB`)
+      })
+      await pipeline(body, createWriteStream(part, { flags: resumed ? 'a' : 'w' }))
+      break
+    } catch (e) {
+      if (ctx.signal.aborted || attempt === 4) throw e
+      ctx.log(`Download interrupted (${(e as Error).message}), resuming…`)
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
+    }
+  }
+  const name = (filename || 'download.zip').replace(/[^\w.() -]+/g, '_').slice(0, 180)
+  await mkdir(cfg.archivesDir, { recursive: true })
+  let dest = join(cfg.archivesDir, name)
+  let i = 1
+  while (await exists(dest)) dest = join(cfg.archivesDir, name.replace(/(\.[^.]+)?$/, `-${++i}$1`))
+  await rename(part, dest)
+  return dest
+}
+
+function contentDispositionName(h: string | null): string | undefined {
+  if (!h) return undefined
+  const star = h.match(/filename\*=UTF-8''([^;]+)/i)
+  if (star) return decodeURIComponent(star[1]!)
+  return h.match(/filename="?([^";]+)"?/i)?.[1]
+}
+
+// ---- Archive inspection (fast, no extraction) ------------------------------
+
+export interface ArchiveInfo {
+  type: string
+  layout: 'project' | 'web' | null
+  title?: string
+  version?: string
+  saveDir?: string
+  renpyVersion?: string
+  files: number
+}
+
+/** Reads metadata from a zip without extracting it. */
+export async function inspectArchive(path: string): Promise<ArchiveInfo> {
+  const type = await sniffArchive(path)
+  if (type !== 'zip') return { type, layout: null, files: 0 }
+  const src = await openZip(path)
+  try {
+    const layout = detectLayout(src.entries)
+    const info: ArchiveInfo = { type, layout: layout?.kind ?? null, files: src.entries.length }
+    if (!layout || layout.kind === 'web') return info
+    const root = layout.root
+    const byPath = new Map(src.entries.map((e) => [e.path, e]))
+    const bi = byPath.get(root + 'game/cache/build_info.json')
+    if (bi) {
+      const j = parseJson<{ name?: string; version?: string }>((await readAll(await bi.open(), 1 << 20)).toString('utf-8'), {})
+      info.title = j.name
+      info.version = j.version
+    }
+    const vc = byPath.get(root + 'renpy/vc_version.py')
+    if (vc) info.renpyVersion = renpyVersionFromVc((await readAll(await vc.open(), 1 << 20)).toString('utf-8'))
+    const consider = (name: string, data: Buffer) => {
+      if (name.endsWith('.rpy')) {
+        const text = data.toString('utf-8')
+        info.saveDir ??= saveDirFromSource(text) ?? undefined
+        const nv = nameVersionFromSource(text)
+        info.title ??= nv.name
+        info.version ??= nv.version
+      } else if (name.endsWith('.rpyc')) info.saveDir ??= saveDirFromRpyc(data) ?? undefined
+    }
+    for (const e of src.entries) {
+      if (e.path.startsWith(root + 'game/') && /options\.rpyc?$/i.test(e.path) && e.size < 4 << 20) consider(e.path, await readAll(await e.open()))
+    }
+    if (!info.saveDir) {
+      const rpas = src.entries.filter((e) => e.path.startsWith(root + 'game/') && e.path.endsWith('.rpa') && e.size < 512 << 20)
+      rpas.sort((a, b) => Number(!/script/i.test(a.path)) - Number(!/script/i.test(b.path)) || a.size - b.size)
+      for (const e of rpas.slice(0, 4)) {
+        const idx = await readRpaIndex(e).catch(() => null)
+        const want = idx?.files.filter((f) => /(^|\/)options\.rpyc?$/i.test(f.name)) ?? []
+        if (!want.length) continue
+        const got = new Map<string, Buffer>()
+        await splitRpa(e, want, {
+          open: async (name) => {
+            const chunks: Buffer[] = []
+            return { write: (c) => void chunks.push(Buffer.from(c)), end: async () => void got.set(name, Buffer.concat(chunks)) }
+          },
+        })
+        for (const [n, d] of got) consider(n, d)
+        if (info.saveDir) break
+      }
+    }
+    return info
+  } finally {
+    src.close()
+  }
+}
+
+/** Removes leftovers from interrupted jobs. */
+export async function cleanWorkDir(cfg: Config): Promise<void> {
+  try {
+    for (const n of await readdir(cfg.workDir)) await rm(join(cfg.workDir, n), { recursive: true, force: true })
+  } catch {}
+}

@@ -1,0 +1,157 @@
+worker_processes auto;
+pid /tmp/nginx/nginx.pid;
+error_log /dev/stderr warn;
+
+events {
+  worker_connections 4096;
+}
+
+http {
+  client_body_temp_path /tmp/nginx/client_body;
+  proxy_temp_path /tmp/nginx/proxy;
+  fastcgi_temp_path /tmp/nginx/fastcgi;
+  uwsgi_temp_path /tmp/nginx/uwsgi;
+  scgi_temp_path /tmp/nginx/scgi;
+
+  include /etc/nginx/mime.types;
+  default_type application/octet-stream;
+  types {
+    application/octet-stream data rpa rpyc;
+    text/plain rpy;
+  }
+
+  sendfile on;
+  tcp_nopush on;
+  tcp_nodelay on;
+  server_tokens off;
+  keepalive_requests 10000;
+
+  # Game assets live on NFS: keep file metadata and descriptors cached and do
+  # reads in a thread pool so a slow NAS never blocks the event loop.
+  aio threads;
+  # Short-lived: open handles keep deleted files alive on NFS.
+  open_file_cache max=200000 inactive=2m;
+  open_file_cache_valid 1m;
+  open_file_cache_min_uses 1;
+  open_file_cache_errors on;
+  output_buffers 2 512k;
+
+  gzip on;
+  gzip_static on;
+  # Requests arrive through proxies (Via header).
+  gzip_proxied any;
+  gzip_vary on;
+  gzip_comp_level 5;
+  gzip_min_length 1024;
+  gzip_types text/plain text/css application/javascript application/json image/svg+xml application/wasm;
+
+  log_format compact '$remote_addr "$request" $status $body_bytes_sent ${request_time}s';
+  map $uri $loggable {
+    ~^/g/      0;
+    ~^/engine/ 0;
+    default    1;
+  }
+  access_log /dev/stdout compact if=$loggable;
+
+  upstream renplay {
+    server 127.0.0.1:3000;
+    keepalive 32;
+  }
+
+  server {
+    listen 8080;
+    root /app/web;
+    absolute_redirect off;
+
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # Library UI (hashed assets are immutable).
+    location /assets/ {
+      add_header Cache-Control "public, max-age=31536000, immutable" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      try_files $uri =404;
+    }
+    location / {
+      add_header Cache-Control "no-cache" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      try_files $uri /index.html;
+    }
+
+    # In-game runtime (versioned by query string).
+    location = /renplay/runtime.js {
+      alias /app/runtime/renplay-runtime.js;
+      add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    # Shared Ren'Py web engines, precompressed. Always send the .gz: the
+    # gateway in front may strip Accept-Encoding (Envoy's compressor does) and
+    # does not compress wasm itself; every browser that runs wasm takes gzip.
+    location /engine/ {
+      alias ${RENPLAY_DIR}/engines/;
+      gzip_static always;
+      add_header Cache-Control "public, max-age=31536000, immutable" always;
+      add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    # Game pages are rendered by the server (engine template + runtime).
+    location ~ ^/g/[a-z0-9][a-z0-9._-]*/[a-z0-9]+(\.m[a-z0-9]+)?/(index\.html)?$ {
+      proxy_pass http://127.0.0.1:3000;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+    }
+
+    # Streamed game files live in one pack per build (NFS handles one big file
+    # far better than tens of thousands of small ones); the server serves them
+    # with byte ranges.
+    location ~ ^/g/[a-z0-9][a-z0-9._-]*/[a-z0-9]+(\.m[a-z0-9]+)?/game/ {
+      proxy_pass http://renplay;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      proxy_set_header Host $host;
+      proxy_buffering off;
+    }
+
+    # Everything else of a build. Build ids change with every install, so
+    # files are cached forever. A mod build (<build>.m<hash>) holds only its
+    # own game.zip and caches; the rest comes from the base build.
+    location ~ ^/g/(?<game>[a-z0-9][a-z0-9._-]*)/(?<base>[a-z0-9]+)(?:\.m(?<mod>[a-z0-9]+))?/(?<asset>.+)$ {
+      root ${GAMES_DIR};
+      try_files /$game/$base.m$mod/$asset /$game/$base/$asset =404;
+      add_header Cache-Control "public, max-age=31536000, immutable" always;
+      add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    location /api/covers/ {
+      alias ${DATA_DIR}/covers/;
+      add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location /api/walkthroughs/ {
+      alias ${DATA_DIR}/walkthroughs/;
+      add_header Cache-Control "public, max-age=86400" always;
+    }
+
+    # Chunked archive uploads stream straight through to the server. (No
+    # trailing slash: "/api/uploads" itself must not get nginx's redirect.)
+    location ^~ /api/uploads {
+      proxy_pass http://127.0.0.1:3000;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_request_buffering off;
+      client_max_body_size 40m;
+      proxy_read_timeout 300s;
+      proxy_send_timeout 300s;
+    }
+
+    location /api/ {
+      proxy_pass http://127.0.0.1:3000;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      client_max_body_size 600m;
+      proxy_read_timeout 300s;
+      proxy_buffering off;
+    }
+  }
+}
