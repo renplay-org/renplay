@@ -1,5 +1,5 @@
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import YAML from 'yaml'
@@ -14,11 +14,24 @@ import { saveCover } from '../pipeline/import.js'
 import { readSaveScreenshot } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
-import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/paths.js'
+import { HttpError, assertSlug, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
 
 const images = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 << 20, files: 1 } })
 const pdfs = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 << 20, files: 1 } })
 const CACHE_RE = /^(bytecode-\d+|py3analysis|screens)\.rpyb$/
+
+/**
+ * Cache files a game may store: Python bytecode and analysis caches, and
+ * scripts Ren'Py recompiled (rpyc/<path relative to game/>). Games made with
+ * an older Ren'Py are recompiled by the newer engine on every start
+ * otherwise, which takes seconds to tens of seconds.
+ */
+function cacheName(raw: unknown): string {
+  const name = cleanRelPath(raw)
+  if (CACHE_RE.test(name)) return name
+  if (name.startsWith('rpyc/') && /\.rpyc$/i.test(name)) return name
+  throw new HttpError(400, 'Not a cache file')
+}
 
 export interface GameDeps {
   cfg: Config
@@ -170,15 +183,14 @@ export function createGamesRouter(deps: GameDeps): Router {
    * Python bytecode caches compiled by the browser on a game's first start.
    * Stored with the current build, they spare later starts the compile.
    */
-  router.put('/:id/cache/:name', express.raw({ type: () => true, limit: '64mb' }), async (req, res) => {
+  router.put('/:id/cache', express.raw({ type: () => true, limit: '64mb' }), async (req, res) => {
     const g = get(req)
-    const name = String(req.params.name)
-    if (!CACHE_RE.test(name)) throw new HttpError(400, 'Not a cache file')
+    const name = cacheName(req.query['name'])
     if (req.query['build'] !== g.build || !g.build) throw new HttpError(409, 'Build changed')
     if (!Buffer.isBuffer(req.body) || req.body.length < 16) throw new HttpError(400, 'Empty cache')
-    const dir = join(builds.dir(g.id, g.build), 'cache')
-    await mkdir(dir, { recursive: true })
-    await writeFileAtomic(join(dir, name), req.body)
+    const path = safeJoin(join(builds.dir(g.id, g.build), 'cache'), name)
+    await mkdir(dirname(path), { recursive: true })
+    await writeFileAtomic(path, req.body)
     res.json({ ok: true })
   })
 

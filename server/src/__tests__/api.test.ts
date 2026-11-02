@@ -110,11 +110,15 @@ describe('HTTP API', () => {
   })
 
   it('stores bytecode caches for the current build only', async () => {
-    await request(app.app).put('/api/games/fixture-game/cache/bytecode-312.rpyb?build=b1').set('content-type', 'application/octet-stream').send(Buffer.alloc(64, 1)).expect(200)
-    await request(app.app).put('/api/games/fixture-game/cache/bytecode-312.rpyb?build=old').set('content-type', 'application/octet-stream').send(Buffer.alloc(64, 1)).expect(409)
-    await request(app.app).put('/api/games/fixture-game/cache/evil.py?build=b1').send(Buffer.alloc(64, 1)).expect(400)
+    const put = (name: string, build = 'b1') => request(app.app).put(`/api/games/fixture-game/cache?build=${build}&name=${encodeURIComponent(name)}`).set('content-type', 'application/octet-stream').send(Buffer.alloc(64, 1))
+    await put('bytecode-312.rpyb').expect(200)
+    await put('rpyc/chapters/week1.rpyc').expect(200)
+    await put('bytecode-312.rpyb', 'old').expect(409)
+    await put('evil.py').expect(400)
+    await put('rpyc/../../b1/game.zip').expect(400)
     const page = await request(app.app).get('/g/fixture-game/b1/').expect(200)
-    expect(page.text).toMatch(/"caches":\[\{"name":"bytecode-312.rpyb","v":"[a-z0-9]+"\}\]/)
+    const caches = JSON.parse(page.text.match(/"caches":(\[[^\]]*\])/)![1]!).map((c: { name: string }) => c.name).sort()
+    expect(caches).toEqual(['bytecode-312.rpyb', 'rpyc/chapters/week1.rpyc'])
   })
 
   it('stores saves written by the game and serves them back at boot', async () => {

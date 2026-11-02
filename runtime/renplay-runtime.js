@@ -749,15 +749,18 @@
   }
 
   /*
-   * Python bytecode caches. Ren'Py compiles the game's Python on first start
-   * and writes game/cache/*.rpyb; renplay stores those with the build and puts
-   * them back before Ren'Py starts, so later starts skip the compile.
+   * Compiled caches. On first start Ren'Py compiles the game's Python
+   * (game/cache/*.rpyb) and, for games made with an older Ren'Py, recompiles
+   * every script (.rpyc) from source. renplay stores those with the build and
+   * puts them back on later starts: bytecode before Ren'Py starts, scripts
+   * right after game.zip is unpacked (it would overwrite them otherwise).
    */
   var CACHE_RE = /^(bytecode-\d+|py3analysis|screens)\.rpyb$/
+  var scriptsLoadedAt = 0
   var pyCaches = { files: {}, hashes: {} }
   var cachesReady = Promise.all(
     (cfg.caches || []).map(function (c) {
-      return origFetch('cache/' + encodeURIComponent(c.name) + '?v=' + encodeURIComponent(c.v))
+      return origFetch('cache/' + c.name.split('/').map(encodeURIComponent).join('/') + '?v=' + encodeURIComponent(c.v))
         .then(function (r) {
           return r.ok ? r.arrayBuffer() : null
         })
@@ -772,42 +775,109 @@
   )
 
   function restoreCaches() {
-    var names = Object.keys(pyCaches.files)
+    var names = Object.keys(pyCaches.files).filter(function (n) {
+      return CACHE_RE.test(n)
+    })
     if (!names.length) return
     mkdirp('/game/cache')
     names.forEach(function (n) {
       FS.writeFile('/game/cache/' + n, pyCaches.files[n])
+      delete pyCaches.files[n]
     })
-    pyCaches.files = {}
     log('restored', names.length, 'compiled caches')
   }
 
-  function uploadCaches() {
-    var names
+  function fileExists(path) {
     try {
-      names = FS.readdir('/game/cache')
+      FS.stat(path)
+      return true
     } catch (e) {
-      return
+      return false
     }
-    names.forEach(function (n) {
-      if (!CACHE_RE.test(n)) return
-      var data
+  }
+
+  /** Called as Ren'Py starts loading scripts, after game.zip is unpacked. */
+  function restoreScripts() {
+    scriptsLoadedAt = Date.now()
+    var restored = 0
+    Object.keys(pyCaches.files).forEach(function (n) {
+      if (n.indexOf('rpyc/') !== 0) return
+      var full = '/game/' + n.slice(5)
+      // Only scripts this build has (a mod may have removed some).
+      if (fileExists(full) || fileExists(full.slice(0, -1))) {
+        FS.writeFile(full, pyCaches.files[n])
+        restored++
+      }
+      delete pyCaches.files[n]
+    })
+    if (restored) log('restored', restored, 'compiled scripts')
+  }
+
+  function putCache(name, data) {
+    return origFetch('/api/games/' + encodeURIComponent(cfg.id) + '/cache?build=' + encodeURIComponent(cfg.build) + '&name=' + encodeURIComponent(name), {
+      method: 'PUT',
+      body: data,
+      headers: { 'content-type': 'application/octet-stream' },
+    })
+      .then(function (r) {
+        return r.ok
+      })
+      .catch(function () {
+        return false
+      })
+  }
+
+  /** Scripts Ren'Py (re)compiled during this start, as cache names. */
+  function compiledScripts() {
+    var out = []
+    var walk = function (dir, rel) {
+      var entries
       try {
-        data = FS.readFile('/game/cache/' + n)
+        entries = FS.readdir(dir)
       } catch (e) {
         return
       }
-      if (data.length < 16 || pyCaches.hashes[n] === hash(data)) return
-      pyCaches.hashes[n] = hash(data)
-      origFetch('/api/games/' + encodeURIComponent(cfg.id) + '/cache/' + encodeURIComponent(n) + '?build=' + encodeURIComponent(cfg.build), {
-        method: 'PUT',
-        body: data,
-        headers: { 'content-type': 'application/octet-stream' },
+      entries.forEach(function (n) {
+        if (n === '.' || n === '..' || (dir === '/game' && n === 'cache')) return
+        var full = dir + '/' + n
+        var st
+        try {
+          st = FS.stat(full)
+        } catch (e) {
+          return
+        }
+        if (FS.isDir(st.mode)) walk(full, rel + n + '/')
+        else if (/\.rpyc$/i.test(n) && +st.mtime >= scriptsLoadedAt) out.push(['rpyc/' + rel + n, full])
       })
-        .then(function (r) {
-          if (r.ok) log('stored', n, 'for faster starts')
-        })
-        .catch(function () {})
+    }
+    if (scriptsLoadedAt) walk('/game', '')
+    return out
+  }
+
+  function uploadCaches() {
+    var files = compiledScripts()
+    try {
+      FS.readdir('/game/cache').forEach(function (n) {
+        if (CACHE_RE.test(n)) files.push([n, '/game/cache/' + n])
+      })
+    } catch (e) {}
+    var puts = []
+    files.forEach(function (f) {
+      var data
+      try {
+        data = FS.readFile(f[1])
+      } catch (e) {
+        return
+      }
+      var h = hash(data)
+      if (data.length < 16 || pyCaches.hashes[f[0]] === h) return
+      pyCaches.hashes[f[0]] = h
+      puts.push(putCache(f[0], data))
+    })
+    if (!puts.length) return
+    Promise.all(puts).then(function (ok) {
+      var n = ok.filter(Boolean).length
+      if (n) log('stored', n, 'compiled files for faster starts')
     })
   }
 
@@ -1026,7 +1096,15 @@
     }
     var origPrint = Module.print
     Module.print = function (s) {
-      if (typeof s === 'string' && s.indexOf('Loading script') === 0) setTimeout(freeGameZip, 0)
+      if (typeof s === 'string' && s.indexOf('Loading script') === 0) {
+        // Synchronous: Ren'Py reads the scripts only after this returns.
+        try {
+          restoreScripts()
+        } catch (e) {
+          console.warn('[renplay] could not restore compiled scripts', e)
+        }
+        setTimeout(freeGameZip, 0)
+      }
       return origPrint ? origPrint.apply(this, arguments) : console.log(s)
     }
 
