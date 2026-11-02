@@ -36,6 +36,8 @@ export default function Player() {
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [ready, setReady] = useState(false)
   const [slow, setSlow] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [sync, setSync] = useState({ pending: 0, online: true, lastSync: 0 })
   const [toolbar, setToolbar] = useState(true)
@@ -93,6 +95,9 @@ export default function Player() {
           break
         case 'renplay:exited':
           navigate(`/game/${gameId}`)
+          break
+        case 'renplay:error':
+          if (typeof d.message === 'string') setFailed(d.message)
           break
       }
     }
@@ -198,6 +203,7 @@ export default function Player() {
         <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ top: padTop }}>
           <iframe
             ref={frameRef}
+            key={attempt}
             src={game.playUrl}
             title={game.title}
             allow="autoplay; fullscreen; gamepad; clipboard-read; clipboard-write"
@@ -220,8 +226,24 @@ export default function Player() {
           <p className="mt-2 text-sm text-zinc-400">
             {resume ? 'Loading your save…' : !progress ? 'Starting engine…' : loadPct >= 1 ? 'Starting game…' : 'Loading game…'}
           </p>
-          <Progress value={loadPct} indeterminate={!progress || !progress.total} className="mt-6 w-full" />
-          {slow && (
+          {failed ? (
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <p className="text-sm text-rose-300">{failed}</p>
+              <button
+                onClick={() => {
+                  setFailed(null)
+                  setProgress(null)
+                  setAttempt((n) => n + 1)
+                }}
+                className="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-zinc-100 ring-1 ring-white/15 hover:bg-white/15"
+              >
+                Try again
+              </button>
+            </div>
+          ) : (
+            <Progress value={loadPct} indeterminate={!progress || !progress.total} className="mt-6 w-full" />
+          )}
+          {slow && !failed && (
             <button onClick={() => setReady(true)} className="mt-6 text-xs text-zinc-400 underline-offset-4 hover:text-zinc-200 hover:underline">
               Taking long? Show the game’s own loading screen
             </button>

@@ -1,8 +1,8 @@
-import { readFile, readdir, stat } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Config } from './config.js'
 import type { Db } from './db.js'
-import { exists, writeFileAtomic } from './util/fsx.js'
+import { exists, walkFiles, writeFileAtomic } from './util/fsx.js'
 import { isSlug, slugify } from './util/paths.js'
 import type { Purger } from './util/purge.js'
 
@@ -81,20 +81,18 @@ export class Builds {
     return id
   }
 
-  /** Bytecode caches stored for a build, with content versions for cache-busting URLs. */
+  /** Caches stored for a build (a mod build adds its own), with versions for cache-busting URLs. */
   async caches(id: string, build: string): Promise<Array<{ name: string; v: string }>> {
-    const out: Array<{ name: string; v: string }> = []
+    const out = new Map<string, string>()
     for (const b of build === baseOf(build) ? [build] : [build, baseOf(build)]) {
-      try {
-        for (const n of await readdir(join(this.dir(id, b), 'cache'))) {
-          if (!out.some((c) => c.name === n) && /\.rpyb$/.test(n)) {
-            const st = await stat(join(this.dir(id, b), 'cache', n)).catch(() => null)
-            if (st) out.push({ name: n, v: `${st.size.toString(36)}${Math.floor(st.mtimeMs).toString(36)}` })
-          }
+      for (const f of await walkFiles(join(this.dir(id, b), 'cache'))) {
+        if (out.has(f.rel)) continue
+        if (/\.rpyb$/.test(f.rel) || (f.rel.startsWith('rpyc/') && f.rel.endsWith('.rpyc'))) {
+          out.set(f.rel, `${f.size.toString(36)}${Math.floor(f.mtimeMs).toString(36)}`)
         }
-      } catch {}
+      }
     }
-    return out
+    return [...out].map(([name, v]) => ({ name, v }))
   }
 
   /**
