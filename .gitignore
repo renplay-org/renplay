@@ -5,3 +5,4 @@ saves/
 **/dist/
 *.env
 *.log
+*.tsbuildinfo

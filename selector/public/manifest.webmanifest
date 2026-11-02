@@ -1,0 +1,10 @@
+{
+  "name": "renplay",
+  "short_name": "renplay",
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#07070a",
+  "theme_color": "#07070a",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

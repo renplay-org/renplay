@@ -1,192 +1,97 @@
-# Renplay
+# renplay
 
-**Self-hosted Ren'Py game library with browser play, cloud save sync, and progressive asset loading.**
+**A self-hosted library for Ren’Py games that play in the browser.** Drop in the normal PC
+download of a game; renplay unpacks it, optimizes it, builds it for the web and keeps your saves
+on the server, so you can continue on any device.
 
-Renplay lets you play your Ren'Py visual novels in any browser — on desktop, tablet, or phone — without installing each game. It manages the full lifecycle: preparing web builds, hosting them, syncing saves across devices, and providing a clean library UI.
+- **Saves live on the server.** Every save, autosave and persistent change is uploaded the moment
+  the game writes it. Previous versions are kept. All games share one save tree like desktop
+  Ren’Py does, so sequels can import the previous season’s saves. Import and export saves from
+  and to the desktop version, and copy a save from one game to another.
+- **One-click installs from archives.** zip, 7z or rar; RPA archives are split while streaming
+  (no extra scratch space), images are converted to WebP (same file names, typically 3–10×
+  smaller), and the game is built with the official Ren’Py SDK. Uninstall frees the space and
+  keeps saves and mods; reinstall rebuilds from the stored archive.
+- **Fast to play.** The Ren’Py engine is shared and downloaded once for all games, game data is
+  cached in the browser, every build has versioned URLs so assets are cached forever, and
+  everything else streams on demand. **Resume** loads your latest save straight away.
+- **Mods.** Browse a game’s files, edit scripts in the browser, upload files or a mod zip. Your
+  changes are kept as a separate layer, compiled and applied on top of the game; updates warn
+  you and can re-apply them.
+- **Curated catalog.** [renplay-web/catalog](https://github.com/renplay-web/catalog) lists games
+  known to work, with the exact archive checksum and the settings they need. No game files are
+  hosted there.
 
-> [!TIP]
-> Renplay is designed for large games (10 GB+). It uses Ren'Py's native progressive download system so players don't have to wait for multi-gigabyte downloads.
-
----
-
-## Quick Start
-
-```bash
-# 1. Build the Docker image
-make build
-
-# 2. Create directories
-mkdir -p games data
-
-# 3. Run
-make run
-```
-
-Open **http://localhost:8080**.
-
----
-
-## How It Works
-
-1. **Prepare** — convert a Ren'Py game to web using the SDK (one command)
-2. **Add** — drop the web build into your `games/` folder, scan from the admin panel
-3. **Play** — open your library, click a game, and it streams in your browser
-
----
-
-## Preparing a Game
-
-### Prerequisites
-
-- **Ren'Py SDK 8.5+** — download from [renpy.org](https://www.renpy.org/)
-- A Ren'Py game project (a folder containing `game/`, `renpy/`, etc.)
-
-### Basic Web Build
+## Run it
 
 ```bash
-/path/to/renpy.sh /path/to/launcher web_build /path/to/game/ --destination /path/to/output/
+docker run -d -p 8080:8080 \
+  -v /path/to/games:/games \
+  -v /path/to/data:/data \
+  ghcr.io/renplay-web/renplay:edge
 ```
 
-The output is a self-contained web distribution. Copy it to your `games/` folder:
+Open http://localhost:8080, copy a game’s PC download into `/path/to/games/_archives/` (or upload
+it in the UI) and press Install. The first install downloads the Ren’Py SDK (~170 MB) from
+renpy.org and verifies its checksum.
 
-```bash
-cp -r /path/to/output/* games/my-game/
-```
+| Path | Contents |
+|------|----------|
+| `/games/<game>/` | Installed web builds (served as static files) |
+| `/games/_archives/` | Original game archives (drop folder and reinstall source) |
+| `/games/_renplay/` | SDK, shared engines, build scratch space |
+| `/data/` | Database, saves and their history, mods, covers, walkthroughs |
 
-### Progressive Download (for Large Games)
+Back up `/data`; everything in `/games` can be rebuilt from the archives.
 
-For games over a few hundred megabytes, configure progressive asset loading so players only download what they need:
+### Configuration
 
-#### 1. Extract RPA archives
+| Variable | Default | |
+|---|---|---|
+| `GAMES_DIR` | `/games` | Game builds |
+| `DATA_DIR` | `/data` | Database, saves, mods |
+| `ARCHIVES_DIR` | `$GAMES_DIR/_archives` | Source archives |
+| `RENPLAY_DIR` | `$GAMES_DIR/_renplay` | SDK, engines, scratch (same filesystem as `GAMES_DIR`) |
+| `RENPY_SDK_VERSION` | `8.5.3` | SDK used for web builds |
+| `RENPLAY_IMAGE_QUALITY` | `88` | WebP quality |
+| `RENPLAY_IMAGE_CONCURRENCY` | CPU count | Parallel image conversions |
+| `RENPLAY_CATALOG_URLS` | `https://renplay-web.github.io/catalog/index.json` | Comma-separated catalog indexes |
+| `RENPLAY_KEEPALIVE_URL`, `RENPLAY_KEEPALIVE_HOST` | – | For scale-to-zero setups: while a job runs, the server holds a request open through this proxy URL so it is not scaled down |
 
-Ren'Py's progressive download system works on individual files, not files inside RPA archives. Extract all `.rpa` files **first**:
+The container runs as any non-root user and works with a read-only root filesystem (it writes to
+`/tmp`, `/data` and `/games`).
 
-```bash
-cd /path/to/game/game/
-
-# Extract each archive
-unrpa -p . archive.rpa
-unrpa -p . images.rpa
-unrpa -p . audio.rpa
-# ... repeat for every .rpa file
-```
-
-> [!WARNING]
-> **You must delete every `.rpa` archive after extraction.** The game will still work if you leave them, but the Ren'Py ProgressiveFilter cannot see inside archives — files hidden in a remaining `.rpa` will be baked into the boot zip instead of streamed on demand, defeating progressive download.
->
-> **Check carefully.** Archives can be deeply nested in the directory tree and there may be many of them. Some games split assets across dozens of archives (e.g., `ep1_images.rpa`, `ep2_images.rpa`, `gui.rpa`, `movies.rpa`, `music_ep1.rpa`, …). Verify none remain before proceeding:
-> ```bash
-> find /path/to/game/game/ -name '*.rpa'
-> # Should return nothing
-> ```
-
-#### 2. Create `progressive_download.txt`
-
-Place this file in your game project root (next to `game/`). It tells the build which files to keep in the boot zip vs. stream on demand:
+## How it works
 
 ```
-# Keep GUI in the boot zip
-- image game/gui/**
-# Stream everything else
-+ image game/images/**
-+ music game/music/**
-+ music game/audio/**
-+ voice game/voice/**
+browser ── nginx :8080 ── /            library UI (React)
+                     ├── /g/<game>/<build>/…   game files from /games (immutable)
+                     ├── /engine/<id>/…        shared Ren’Py web engine (gzip)
+                     └── /api/…                node server (127.0.0.1:3000)
 ```
 
-Valid types: `image`, `music`, `voice`. Videos are always streamed automatically.
-
-#### 3. Run the web build
-
-The SDK reads `progressive_download.txt`, excludes matched files from `game.zip`, copies them as individual files alongside the zip, and generates the metadata needed for on-demand download.
-
-#### 4. Deploy
-
-Copy the output to your `games/` folder and click **Scan for new games** in the admin panel (gear icon, top-right).
-
-> [!IMPORTANT]
-> Do **not** decompress `game.zip`. It is an Emscripten Virtual Filesystem archive read by the Ren'Py WASM engine at runtime — not a regular archive.
-
----
-
-## Features
-
-### Save Sync
-
-Saves are automatically synced between devices. Pick a profile name on the library page, and saves upload every few seconds while you play. Open the same game on another device (or after clearing your browser data) and your saves are restored.
-
-### Library Management
-
-- Upload custom **thumbnails** per game
-- Upload **walkthrough PDFs** — a button appears in the game view
-- Drag-and-drop reordering, tags, and search
-
----
-
-## Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GAMES_DIR` | `/games` | Directory with game web builds |
-| `DATA_DIR` | `/data` | Persistent data (database, thumbnails, walkthroughs, saves) |
-| `SAVES_DIR` | `$DATA_DIR/saves` | Save file storage |
-
----
-
-## Architecture
-
-```
-Browser                          Docker Container
-┌─────────────────┐               ┌──────────────────────────────┐
-│ Game Library     │  ───/───→   │ nginx (port 8080)            │
-│ (React SPA)      │             │  / → SPA                     │
-│  Admin panel     │             │  /play/* → games directory   │
-│  (CRUD + upload) │             │  /api/* → node backend       │
-│                  │             │                              │
-│ Ren'Py Game      │  ───/play──→│ node (127.0.0.1:3000)         │
-│ (WASM)           │             │  ├─ games CRUD (SQLite)      │
-│  save sync ──────┼──/api/saves→│  ├─ thumbnail upload         │
-└─────────────────┘             │  ├─ walkthrough upload       │
-                                  │  └─ save storage            │
-                                  │  DATA_DIR/                    │
-                                  │   ├── renplay.db             │
-                                  │   ├── thumbnails/            │
-                                  │   ├── walkthroughs/          │
-                                  │   └── saves/                 │
-                                  └──────────────────────────────┘
-```
-
----
+- **Import pipeline** (`server/src/pipeline`): `archive.ts` reads zips without extracting them,
+  `rpa.ts` splits Ren’Py archives in one sequential pass using a data-only pickle reader
+  (`util/pickle.ts`, nothing from the archive is executed while unpacking), `optimize.ts` converts
+  images with libvips, `progressive.ts` prepares the streaming placeholders in parallel, and
+  `sdk.ts` runs the Ren’Py launcher’s `web_build` headless.
+- **Runtime** (`runtime/renplay-runtime.js`) is injected into every game page. It keeps
+  `~/.renpy` in memory instead of IndexedDB, restores it from the server before Ren’Py starts,
+  uploads every change Ren’Py syncs, keeps a small offline outbox, caches `game.zip`, and talks to
+  the player UI (fullscreen, save & exit, resume).
+- Note that building a game for the web runs the game’s own init code inside the Ren’Py SDK, as
+  any Ren’Py build does. Only install games you trust.
 
 ## Development
 
 ```bash
-make dev
+cd server && npm ci && npm test && npm run build
+DATA_DIR=/tmp/rp/data GAMES_DIR=/tmp/rp/games PORT=3999 \
+  RENPLAY_RUNTIME_PATH=$PWD/../runtime/renplay-runtime.js node dist/index.js
+cd selector && npm ci && npm run dev   # proxies /api, /g, /engine to :3999
 ```
 
-Uses `docker compose up --build` with the local source mounted for hot-reload.
-
----
-
-## Project Structure
-
-```
-renplay/
-├── selector/          ← React + Vite game library UI
-├── server/            ← Node.js backend (Express + SQLite)
-├── deploy/nginx/      ← Docker image with nginx
-│   ├── Dockerfile
-│   ├── nginx.conf.template
-│   ├── entrypoint.sh
-│   └── sync-client.js
-├── games/             ← Your game web builds (mount here)
-├── data/              ← Persistent data (mount here)
-├── docker-compose.yml
-├── Makefile
-└── README.md
-```
-
----
+`make build` builds the image; `docker compose up --build` runs it with `./games` and `./data`.
 
 ## License
 

@@ -1,29 +1,26 @@
-.PHONY: build run stop logs shell dev clean
+.PHONY: build run stop logs dev test clean
 
 build:
-	docker build -t renplay:latest -f deploy/nginx/Dockerfile .
+	docker build -t renplay:latest .
 
 run:
-	docker run -d --name renplay -p 8080:8080 \
-		-e GAMES_DIR=/games \
-		-e DATA_DIR=/data \
-		-v $(PWD)/games:/games \
-		-v $(PWD)/data:/data \
-		renplay:latest
+	mkdir -p games data
+	docker run -d --name renplay -p 8080:8080 -v $(PWD)/games:/games -v $(PWD)/data:/data renplay:latest
 	@echo "Running at http://localhost:8080"
 
 stop:
-	docker stop renplay && docker rm renplay
+	docker rm -f renplay
 
 logs:
 	docker logs -f renplay
 
-shell:
-	docker exec -it renplay sh
-
 dev:
 	docker compose up --build
 
+test:
+	cd server && npm test
+	cd selector && npx tsc -b --noEmit
+
 clean:
 	docker rm -f renplay 2>/dev/null || true
-	rm -rf selector/dist selector/node_modules server/dist
+	rm -rf selector/dist server/dist
