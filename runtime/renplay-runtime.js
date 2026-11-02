@@ -25,6 +25,123 @@
     console.log.apply(console, a)
   }
 
+  // ---------------------------------------------------------------- frame pacing
+
+  /*
+   * Ren'Py expects swapping buffers to block until vsync. In a browser it does
+   * not, and the web build yields with emscripten_sleep(0) (a zero-delay
+   * setTimeout), so Ren'Py redraws as fast as it can. The browser then shows a
+   * frame only every 70-100 ms: the timer chain starves rendering and the GPU
+   * queue fills with frames nobody sees.
+   *
+   * Fix: once Ren'Py has drawn (any WebGL clear), its next short sleep resumes
+   * on the next animation frame instead. Ren'Py then draws at most once per
+   * display refresh, inside requestAnimationFrame, like a normal web game.
+   * Hidden pages keep plain timers so music and autosaves continue.
+   *
+   * Until Ren'Py draws its first frame, zero-delay yields go through a
+   * MessageChannel: browsers stretch chained setTimeout(0) to 4 ms, and
+   * unpacking game.zip (a yield every 25 files) and loading the script spent
+   * most of their time waiting. Afterwards plain timers are kept for work
+   * between frames, so it never competes with drawing.
+   */
+  var pacing = (function () {
+    var realSetTimeout = window.setTimeout.bind(window)
+    var realClearTimeout = window.clearTimeout.bind(window)
+    var drawn = false
+    var started = false
+    var waiting = []
+    var byId = new Map()
+    var raf = 0
+    var fallback = 0
+    var nextId = 0x40000000
+    var stats = { frames: 0, deferred: 0, immediate: 0 }
+    var immediate = []
+    var channel = new MessageChannel()
+    channel.port1.onmessage = function () {
+      var list = immediate
+      immediate = []
+      runList(list)
+    }
+
+    ;[window.WebGLRenderingContext, window.WebGL2RenderingContext].forEach(function (C) {
+      if (!C || !C.prototype.clear) return
+      var clear = C.prototype.clear
+      C.prototype.clear = function (mask) {
+        drawn = true
+        started = true
+        return clear.call(this, mask)
+      }
+    })
+
+    function run(fromRaf) {
+      if (fromRaf) {
+        if (fallback) realClearTimeout(fallback)
+      } else if (raf) cancelAnimationFrame(raf)
+      raf = 0
+      fallback = 0
+      drawn = false
+      stats.frames++
+      var list = waiting
+      waiting = []
+      runList(list)
+    }
+
+    function runList(list) {
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i]
+        byId.delete(e.id)
+        if (e.cancelled) continue
+        try {
+          e.fn.apply(window, e.args)
+        } catch (err) {
+          realSetTimeout(function () {
+            throw err
+          }, 0)
+        }
+      }
+    }
+
+    window.setTimeout = function (fn, ms) {
+      if (drawn && typeof fn === 'function' && !(ms > 4) && !document.hidden) {
+        var e = { id: nextId++, fn: fn, args: Array.prototype.slice.call(arguments, 2), cancelled: false }
+        waiting.push(e)
+        byId.set(e.id, e)
+        stats.deferred++
+        if (!raf) {
+          raf = requestAnimationFrame(function () {
+            run(true)
+          })
+          // rAF stops when the page is hidden mid-frame; never stall longer than this.
+          fallback = realSetTimeout(function () {
+            run(false)
+          }, 250)
+        }
+        return e.id
+      }
+      if (!started && typeof fn === 'function' && !(ms > 0)) {
+        var im = { id: nextId++, fn: fn, args: Array.prototype.slice.call(arguments, 2), cancelled: false }
+        byId.set(im.id, im)
+        stats.immediate++
+        if (immediate.push(im) === 1) channel.port2.postMessage(0)
+        return im.id
+      }
+      return realSetTimeout.apply(window, arguments)
+    }
+
+    window.clearTimeout = function (id) {
+      var e = byId.get(id)
+      if (e) {
+        e.cancelled = true
+        byId.delete(id)
+        return
+      }
+      return realClearTimeout(id)
+    }
+
+    return stats
+  })()
+
   var state = {
     saveDir: cfg.saveDir || null,
     known: new Map(), // path -> { mtime, size, hash }
@@ -519,7 +636,64 @@
     }
   }
 
+  /** Size of game.zip, known before renpy-pre.js streams it into the FS. */
+  var gameZipSize = 0
+
+  /**
+   * Faster file creation for unpacking game.zip (tens of thousands of files).
+   * Emscripten finds out that a new file does not exist yet by throwing and
+   * catching "not found" twice per file, which costs about 2 s for a big game.
+   * These versions check the name table directly and otherwise do exactly what
+   * Emscripten does. Only in-memory (MEMFS) directories are affected.
+   */
+  function speedUpFs() {
+    if (typeof MEMFS === 'undefined' || !MEMFS.ops_table || !FS.nameTable) return
+    var memDir = MEMFS.ops_table.dir.node
+    var find = function (dir, name) {
+      var hash = FS.hashName(dir.id, name)
+      for (var n = FS.nameTable[hash]; n; n = n.name_next) if (n.parent.id === dir.id && n.name === name) return n
+      return null
+    }
+    var mayCreate = FS.mayCreate
+    FS.mayCreate = function (dir, name) {
+      if (dir.node_ops !== memDir) return mayCreate.call(FS, dir, name)
+      return find(dir, name) ? 20 : FS.nodePermissions(dir, 'wx')
+    }
+    var open = FS.open
+    FS.open = function (path, flags, mode) {
+      var f = typeof flags === 'string' ? FS_modeStringToFlags(flags) : flags
+      // O_CREAT without O_EXCL on a plain path: create the node first, so the
+      // original open finds it instead of throwing to learn it is missing.
+      if (typeof path === 'string' && path && f & 64 && !(f & 128)) {
+        try {
+          var parent = FS.lookupPath(path, { parent: true }).node
+          var name = PATH.basename(PATH.normalize(path))
+          if (parent && parent.node_ops === memDir && name && name !== '.' && name !== '..' && !find(parent, name)) {
+            var m = typeof mode === 'undefined' ? 438 : mode
+            FS.mknod(path, (m & 4095) | 32768, 0)
+          }
+        } catch (e) {}
+      }
+      var stream = open.call(FS, path, flags, mode)
+      if (path === '/game.zip' && stream) gameZipNode = stream.node
+      return stream
+    }
+    // renpy-pre.js streams game.zip in chunks; MEMFS would grow the buffer in
+    // 12.5% steps, copying the whole archive each time. Grow it once, to size.
+    var gameZipNode = null
+    var expand = MEMFS.expandFileStorage
+    MEMFS.expandFileStorage = function (node, capacity) {
+      if (node === gameZipNode && gameZipSize > capacity) capacity = gameZipSize
+      return expand.call(MEMFS, node, capacity)
+    }
+  }
+
   function preRun() {
+    try {
+      speedUpFs()
+    } catch (e) {
+      console.warn('[renplay] FS speedups not applied', e)
+    }
     // Keep ~/.renpy in memory; renplay replaces IDBFS with the server.
     var origMount = FS.mount
     FS.mount = function (type, opts, mountpoint) {
@@ -561,9 +735,11 @@
           return cache.match(abs).then(function (hit) {
             if (hit) {
               log('game.zip from cache')
+              gameZipSize = Number(hit.headers.get('content-length')) || 0
               return hit
             }
             return origFetch(input, init).then(function (res) {
+              gameZipSize = Number(res.headers.get('content-length')) || 0
               if (res.ok) {
                 cache.keys().then(function (keys) {
                   keys.forEach(function (k) {
@@ -724,6 +900,20 @@
   window.__renplayLate = function () {
     Module.preRun.push(preRun)
 
+    // game.zip is only read by the unpacker; free its memory (often hundreds
+    // of MB) once Ren'Py moves on to loading the script.
+    var freeGameZip = function () {
+      try {
+        FS.unlink('/game.zip')
+        log('freed game.zip from memory')
+      } catch (e) {}
+    }
+    var origPrint = Module.print
+    Module.print = function (s) {
+      if (typeof s === 'string' && s.indexOf('Loading script') === 0) setTimeout(freeGameZip, 0)
+      return origPrint ? origPrint.apply(this, arguments) : console.log(s)
+    }
+
     var origPresplashEnd = window.presplashEnd
     window.presplashEnd = function () {
       if (origPresplashEnd) origPresplashEnd()
@@ -732,9 +922,14 @@
     }
 
     var origProgress = window.progress
+    var lastProgressPost = 0
     window.progress = function (done, total) {
       if (origProgress) origProgress(done, total)
-      post('progress', { done: done, total: total })
+      var now = Date.now()
+      if (now - lastProgressPost > 100 || done >= total) {
+        lastProgressPost = now
+        post('progress', { done: done, total: total })
+      }
     }
 
     var origAtExit = window.atExit
@@ -768,6 +963,7 @@
 
   window.__renplayRuntime = {
     state: state,
+    pacing: pacing,
     flush: flush,
     scan: scan,
     loadSlot: loadSlot,
