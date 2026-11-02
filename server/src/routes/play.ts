@@ -84,6 +84,8 @@ export function renderIndex(html: string, o: RenderOptions): string {
     screen: o.screen,
     title: o.title,
     engineBase: o.engine ? `/engine/${o.engine}/` : null,
+    // The runtime downloads the engine itself and starts renpy.js afterwards.
+    loadEngine: !!o.engine,
   }
   const boot =
     `<script>window.__renplay=${JSON.stringify(config).replace(/</g, '\\u003c')};</script>` +
@@ -98,7 +100,7 @@ export function renderIndex(html: string, o: RenderOptions): string {
   const pre = (o.engine ? `<script src="/engine/${o.engine}/renpy-pre.js"></script>` : '<script src="renpy-pre.js"></script>') + late
   if (preTag.test(out)) out = out.replace(preTag, boot + pre)
   else out = out.replace(/<\/head>/i, boot + '</head>')
-  if (o.engine) out = out.replace(/(<script[^>]*\ssrc=)["']renpy\.js["']/, `$1"/engine/${o.engine}/renpy.js"`)
+  if (o.engine) out = out.replace(/<script[^>]*\ssrc=["']renpy\.js["'][^>]*><\/script>/, '')
   out = out.replace(/<meta name="viewport"[^>]*>/i, '<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">')
   return out
 }
