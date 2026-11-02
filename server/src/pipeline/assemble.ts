@@ -1,26 +1,31 @@
-import { createReadStream, createWriteStream } from 'node:fs'
-import { readdir, rmdir, stat, unlink } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { open, stat, type FileHandle } from 'node:fs/promises'
 import { join } from 'node:path'
+import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import yauzl from 'yauzl'
 import yazl from 'yazl'
 import type { JobContext } from '../jobs.js'
-import { walkFiles } from '../util/fsx.js'
 import { readAll } from './archive.js'
-import { classify, type Placeholder, type ProgressiveRule, type StreamKind } from './progressive.js'
+import type { PackIndex } from './pack.js'
+import { classify, type Placeholder, type ProgressiveRule } from './progressive.js'
 
 /** Already-compressed formats are stored; the rest is deflated. */
 const STORED = /\.(png|jpe?g|webp|avif|gif|ogg|opus|mp3|webm|mp4|ogv|zip|rpa|rpyc|rpymc|rpyb|woff2?)$/i
 
 export interface AssembleOptions {
-  /** Folder with game/ (and optionally web-presplash.*), as extracted. */
+  /** Build folder: game.zip is written here. */
   dir: string
   /** The engine pack's renpy.zip: Ren'Py's Python package and main.py. */
   renpyZip: string
+  /** Files for game.zip, as extracted. */
+  zipPack: { path: string; index: PackIndex }
+  /** Streamed files (already in the build's assets pack). */
+  assets: PackIndex
   rules: ProgressiveRule[]
   placeholders: Map<string, Placeholder>
-  /** Files (relative to game/) that must go into game.zip even if they would stream. */
-  forceZip?: Set<string>
+  /** Files (relative to game/) supplied separately; they go into game.zip and never stream. */
+  extra?: Map<string, Buffer>
   ctx: JobContext
 }
 
@@ -28,35 +33,28 @@ export interface AssembleResult {
   zipBytes: number
   zipped: number
   streamed: { files: number; bytes: number }
-  remote: number
 }
 
 /**
- * Turns an extracted game into a Ren'Py web build, the way the launcher's
- * web_build does, without running the SDK (and so without running the game's
- * code on the server): streamed files stay in <dir>/game, everything else goes
- * into <dir>/game.zip with the engine's Python package, low-resolution
- * placeholders for streamed images and game/renpyweb_remote_files.txt.
+ * Writes game.zip the way Ren'Py's launcher web_build does, without the SDK
+ * (so without running the game's code): the engine's Python package, the
+ * non-streamed game files, folders and placeholders of streamed files, and
+ * game/renpyweb_remote_files.txt listing what streams.
  */
 export async function assemble(o: AssembleOptions): Promise<AssembleResult> {
-  const gameDir = join(o.dir, 'game')
-  const files = (await walkFiles(gameDir)).sort((a, b) => a.rel.localeCompare(b.rel))
+  const extra = o.extra ?? new Map<string, Buffer>()
   const remote: Array<[string, string]> = []
-  const zipFiles: typeof files = []
   let streamedBytes = 0
-  for (const f of files) {
-    let kind: StreamKind | null = o.forceZip?.has(f.rel) ? null : classify(f.rel, o.rules)
-    // An image only streams if it has a placeholder to show meanwhile.
-    if (kind === 'image' && !o.placeholders.has(f.rel)) kind = null
-    if (!kind) {
-      zipFiles.push(f)
-      continue
-    }
-    streamedBytes += f.size
+  for (const [rel, [, size]] of [...o.assets].sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (extra.has(rel)) continue
+    const kind = classify(rel, o.rules)
     if (kind === 'image') {
-      const ph = o.placeholders.get(f.rel)!
-      remote.push([f.rel, `image ${ph.width},${ph.height}`])
-    } else remote.push([f.rel, `${kind} -`])
+      const ph = o.placeholders.get(rel)
+      if (!ph) continue
+      remote.push([rel, `image ${ph.width},${ph.height}`])
+    } else if (kind) remote.push([rel, `${kind} -`])
+    else continue
+    streamedBytes += size
   }
 
   const zip = new yazl.ZipFile()
@@ -66,14 +64,7 @@ export async function assemble(o: AssembleOptions): Promise<AssembleResult> {
   // 1. Ren'Py's Python package (renpy/**, main.py), shared by all games of an engine.
   await copyZipEntries(o.renpyZip, zip)
 
-  // 2. Game files that do not stream.
-  let n = 0
-  for (const f of zipFiles) {
-    zip.addReadStream(createReadStream(f.full), `game/${f.rel}`, { compress: !STORED.test(f.rel), size: f.size, mtime: new Date(f.mtimeMs) })
-    if (++n % 500 === 0) o.ctx.progress('Packing game.zip', n / Math.max(1, zipFiles.length))
-  }
-
-  // 3. Folders of streamed files. The engine writes downloads into them and
+  // 2. Folders of streamed files. The engine writes downloads into them and
   //    does not create missing ones, so they must exist after unpacking.
   const dirs = new Set<string>()
   for (const [rel] of remote) {
@@ -82,21 +73,68 @@ export async function assemble(o: AssembleOptions): Promise<AssembleResult> {
   }
   for (const d of [...dirs].sort()) zip.addEmptyDirectory(`game/${d}/`)
 
-  // 4. Placeholders of streamed images and the list of streamed files.
-  const streamedImages = new Set(remote.filter(([, t]) => t.startsWith('image')).map(([r]) => r))
-  for (const [rel, ph] of o.placeholders) {
-    if (streamedImages.has(rel)) zip.addBuffer(ph.data, `_placeholders/${rel}`, { compress: false })
+  // 3. Game files that do not stream, read lazily from the pack.
+  let zipped = 0
+  for (const [rel, [offset, size]] of [...o.zipPack.index].sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (extra.has(rel)) continue
+    zip.addReadStream(new RangeStream(o.zipPack.path, offset, offset + size), `game/${rel}`, { compress: !STORED.test(rel), size })
+    zipped++
   }
-  const list = remote.map(([rel, t]) => `${rel}\n${t}\n`).join('')
-  zip.addBuffer(Buffer.from(list, 'utf-8'), 'game/renpyweb_remote_files.txt')
+  for (const [rel, data] of extra) {
+    zip.addBuffer(data, `game/${rel}`, { compress: !STORED.test(rel) })
+    zipped++
+  }
+
+  // 4. Placeholders of streamed images and the list of streamed files.
+  for (const [rel, t] of remote) if (t.startsWith('image')) zip.addBuffer(o.placeholders.get(rel)!.data, `_placeholders/${rel}`, { compress: false })
+  zip.addBuffer(Buffer.from(remote.map(([rel, t]) => `${rel}\n${t}\n`).join(''), 'utf-8'), 'game/renpyweb_remote_files.txt')
   zip.end()
+  o.ctx.progress('Packing game.zip', 0.5)
   await written
 
-  // Files now in game.zip leave the streamed folder.
-  for (const f of zipFiles) await unlink(f.full)
-  await removeEmptyDirs(gameDir)
+  return { zipBytes: (await stat(zipPath)).size, zipped, streamed: { files: remote.length, bytes: streamedBytes } }
+}
 
-  return { zipBytes: (await stat(zipPath)).size, zipped: zipFiles.length, streamed: { files: remote.length, bytes: streamedBytes }, remote: remote.length }
+/** Reads bytes [start, end) of a file, opening it only when first read. */
+export class RangeStream extends Readable {
+  private fh: FileHandle | null = null
+  private pos: number
+
+  constructor(
+    private readonly path: string,
+    start: number,
+    private readonly end: number,
+  ) {
+    super({ highWaterMark: 256 << 10 })
+    this.pos = start
+  }
+
+  override async _read(size: number): Promise<void> {
+    try {
+      this.fh ??= await open(this.path, 'r')
+      const n = Math.min(Math.max(size, 64 << 10), this.end - this.pos)
+      if (n <= 0) {
+        await this.fh.close()
+        this.fh = null
+        this.push(null)
+        return
+      }
+      const buf = Buffer.allocUnsafe(n)
+      const { bytesRead } = await this.fh.read(buf, 0, n, this.pos)
+      if (!bytesRead) throw new Error('Unexpected end of pack')
+      this.pos += bytesRead
+      this.push(bytesRead === n ? buf : buf.subarray(0, bytesRead))
+    } catch (e) {
+      this.destroy(e as Error)
+    }
+  }
+
+  override _destroy(err: Error | null, cb: (e?: Error | null) => void): void {
+    const fh = this.fh
+    this.fh = null
+    if (fh) fh.close().then(() => cb(err), () => cb(err))
+    else cb(err)
+  }
 }
 
 /** Copies every entry of a zip (folders too) into a yazl zip, keeping names and compression. */
@@ -138,21 +176,4 @@ export async function copyZipEntries(path: string, into: yazl.ZipFile, skip?: (n
     zip.close()
   }
   return names
-}
-
-async function removeEmptyDirs(dir: string): Promise<boolean> {
-  let entries
-  try {
-    entries = await readdir(dir, { withFileTypes: true })
-  } catch {
-    return false
-  }
-  let empty = true
-  for (const e of entries) {
-    if (e.isDirectory()) {
-      if (!(await removeEmptyDirs(join(dir, e.name)))) empty = false
-    } else empty = false
-  }
-  if (empty) await rmdir(dir).catch(() => {})
-  return empty
 }

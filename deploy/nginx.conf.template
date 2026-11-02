@@ -53,6 +53,11 @@ http {
   }
   access_log /dev/stdout compact if=$loggable;
 
+  upstream renplay {
+    server 127.0.0.1:3000;
+    keepalive 32;
+  }
+
   server {
     listen 8080;
     root /app/web;
@@ -95,8 +100,19 @@ http {
       proxy_set_header Host $host;
     }
 
+    # Streamed game files live in one pack per build (NFS handles one big file
+    # far better than tens of thousands of small ones); the server serves them
+    # with byte ranges.
+    location ~ ^/g/[a-z0-9][a-z0-9._-]*/[a-z0-9]+(\.m[a-z0-9]+)?/game/ {
+      proxy_pass http://renplay;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      proxy_set_header Host $host;
+      proxy_buffering off;
+    }
+
     # Everything else of a build. Build ids change with every install, so
-    # assets are cached forever. A mod build (<build>.m<hash>) holds only its
+    # files are cached forever. A mod build (<build>.m<hash>) holds only its
     # own game.zip and caches; the rest comes from the base build.
     location ~ ^/g/(?<game>[a-z0-9][a-z0-9._-]*)/(?<base>[a-z0-9]+)(?:\.m(?<mod>[a-z0-9]+))?/(?<asset>.+)$ {
       root ${GAMES_DIR};

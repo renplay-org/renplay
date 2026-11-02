@@ -97,14 +97,15 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   // Static fallbacks for development; nginx serves these paths in production.
   if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(opts.runtimePath!))
   app.use('/engine', express.static(cfg.enginesDir, { immutable: true, maxAge: '365d', setHeaders: gzipHeaders }))
+  // game.zip, caches and presplash of a build (mod builds fall back to their base).
   app.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m([a-z0-9]+))?\/(.+)$/, (req, res, next) => {
     const [game, base, mod, asset] = [req.params[0], req.params[1], req.params[2], req.params[3]] as string[]
+    if (asset.includes('..')) return next()
     const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
     const tryNext = (i: number): void => {
       if (i >= candidates.length) return next()
       res.sendFile(candidates[i]!, { immutable: true, maxAge: '365d' }, (err) => (err ? tryNext(i + 1) : undefined))
     }
-    if (asset.includes('..')) return next()
     tryNext(0)
   })
   app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version))

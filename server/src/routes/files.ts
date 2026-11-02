@@ -11,7 +11,7 @@ import { HttpError, assertSlug, cleanRelPath } from '../util/paths.js'
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 256 << 20, files: 500 } })
 const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|css|js)$/i
 
-type BaseIndex = Map<string, { size: number; where: 'zip' | 'dir' }>
+type BaseIndex = Map<string, { size: number; where: 'zip' | 'pack' }>
 
 export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jobs: JobManager): Router {
   const router = Router()

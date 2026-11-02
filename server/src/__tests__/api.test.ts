@@ -44,9 +44,10 @@ describe('HTTP API', () => {
     writeFileSync(join(engine, 'index.html'), TEMPLATE)
     writeFileSync(join(engine, '.ready'), '{}')
     const build = join(root, 'games', 'fixture-game', 'b1')
-    mkdirSync(join(build, 'game', 'images'), { recursive: true })
-    writeFileSync(join(build, 'game.zip'), await zipBuffer({ 'game/script.rpyc': 'x', 'game/renpyweb_remote_files.txt': 'images/a.png\nimage 1920,1080\n' }))
-    writeFileSync(join(build, 'game', 'images', 'a.png'), 'png')
+    mkdirSync(build, { recursive: true })
+    writeFileSync(join(build, 'game.zip'), await zipBuffer({ 'game/script.rpyc': 'x', 'game/renpyweb_remote_files.txt': 'images/a b.png\nimage 1920,1080\n' }))
+    writeFileSync(join(build, 'assets.pack'), 'xxpng0123456789')
+    writeFileSync(join(build, 'assets.json'), JSON.stringify({ 'images/a b.png': [2, 3], 'movies/m.webm': [5, 10] }))
     process.env['DATA_DIR'] = join(root, 'data')
     process.env['GAMES_DIR'] = join(root, 'games')
     process.env['RENPLAY_CATALOG_URLS'] = 'http://127.0.0.1:9/none'
@@ -89,10 +90,23 @@ describe('HTTP API', () => {
     app.db.updateGame('fixture-game', { build: 'b1.mabc' })
     try {
       expect((await request(app.app).get('/g/fixture-game/b1.mabc/game.zip').responseType('blob').expect(200)).body.toString()).toBe('modded')
-      expect((await request(app.app).get('/g/fixture-game/b1.mabc/game/images/a.png').responseType('blob').expect(200)).body.toString()).toBe('png')
+      expect((await request(app.app).get('/g/fixture-game/b1.mabc/game/images/a%20b.png').responseType('blob').expect(200)).body.toString()).toBe('png')
     } finally {
       app.db.updateGame('fixture-game', { build: 'b1' })
     }
+  })
+
+  it('serves streamed files from the pack, with byte ranges', async () => {
+    const r = await request(app.app).get('/g/fixture-game/b1/game/images/a%20b.png').responseType('blob').expect(200)
+    expect(r.body.toString()).toBe('png')
+    expect(r.headers['content-type']).toBe('image/png')
+    expect(r.headers['cache-control']).toContain('immutable')
+    const part = await request(app.app).get('/g/fixture-game/b1/game/movies/m.webm').set('Range', 'bytes=2-4').responseType('blob').expect(206)
+    expect(part.body.toString()).toBe('234')
+    expect(part.headers['content-range']).toBe('bytes 2-4/10')
+    await request(app.app).get('/g/fixture-game/b1/game/movies/m.webm').set('Range', 'bytes=20-').expect(416)
+    await request(app.app).get('/g/fixture-game/b1/game/missing.png').expect(404)
+    await request(app.app).get('/g/fixture-game/b1/game/..%2F..%2Fsecret').expect(404)
   })
 
   it('stores bytecode caches for the current build only', async () => {
