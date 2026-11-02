@@ -6,11 +6,7 @@ import { cx } from './ui'
 function Logo() {
   return (
     <NavLink to="/" className="flex items-center gap-2.5">
-      <span className="relative flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-accent-400 to-violet-500 shadow-[0_6px_20px_-6px_rgb(244_80_138/0.7)]">
-        <svg viewBox="0 0 24 24" className="size-4 fill-white" aria-hidden>
-          <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" />
-        </svg>
-      </span>
+      <img src="/favicon.svg" alt="" className="size-8 rounded-xl shadow-[0_6px_20px_-6px_rgb(244_80_138/0.7)]" />
       <span className="font-display text-[17px] font-semibold tracking-tight text-white">renplay</span>
     </NavLink>
   )

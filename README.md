@@ -1,4 +1,6 @@
-# renplay
+<p align="center"><img src="docs/logo.svg" width="96" alt=""></p>
+
+<h1 align="center">renplay</h1>
 
 **A self-hosted library for Ren’Py games that play in the browser.** Drop in the normal PC
 download of a game; renplay unpacks it, optimizes it, builds it for the web and keeps your saves
