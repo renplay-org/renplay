@@ -105,15 +105,19 @@ export class Overlays {
     return files.length || deleted.length ? h.digest('hex').slice(0, 16) : ''
   }
 
-  /** Copies overlay files into an extracted project (used when re-applying mods after an update). */
-  async copyInto(slug: string, projectDir: string): Promise<number> {
+  /** Copies overlay files into an extracted project (re-applying mods after an update). */
+  async copyInto(slug: string, projectDir: string, onFile?: (rel: string) => void): Promise<number> {
     const { files, deleted } = await this.list(slug)
     for (const f of files) {
       const dest = safeJoin(projectDir, f.path)
       await mkdir(dirname(dest), { recursive: true })
       await copyFile(join(this.filesDir(slug), f.path), dest)
+      onFile?.(f.path)
     }
-    for (const d of deleted) await rm(safeJoin(projectDir, d), { force: true })
+    for (const d of deleted) {
+      await rm(safeJoin(projectDir, d), { force: true })
+      if (d.endsWith('.rpy')) await rm(safeJoin(projectDir, d + 'c'), { force: true })
+    }
     return files.length + deleted.length
   }
 

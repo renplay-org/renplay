@@ -10,7 +10,7 @@ import { Badge, Button, Confirm, Empty, Menu, MenuItem, Modal, Spinner, cx, erro
 type Kind = 'all' | 'manual' | 'auto' | 'quick'
 
 export default function SaveGallery({ game }: { game: Game }) {
-  const { data, isLoading } = useSaves(game.slug)
+  const { data, isLoading } = useSaves(game.id)
   const qc = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
@@ -22,9 +22,9 @@ export default function SaveGallery({ game }: { game: Game }) {
   const [history, setHistory] = useState<SaveSlot | 'all' | null>(null)
 
   const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ['saves', game.slug] })
+    void qc.invalidateQueries({ queryKey: ['saves', game.id] })
     void qc.invalidateQueries({ queryKey: ['games'] })
-    void qc.invalidateQueries({ queryKey: ['game', game.slug] })
+    void qc.invalidateQueries({ queryKey: ['game', game.id] })
   }
 
   const onImport = async (files: FileList | null) => {
@@ -33,7 +33,7 @@ export default function SaveGallery({ game }: { game: Game }) {
     try {
       const fd = new FormData()
       for (const f of Array.from(files)) fd.append('files', f, f.name)
-      const res = await fetch(`/api/saves/${game.slug}/import`, { method: 'POST', body: fd })
+      const res = await fetch(`/api/saves/${game.id}/import`, { method: 'POST', body: fd })
       const r = await res.json()
       if (!res.ok) throw new Error(r.error || 'Import failed')
       const parts = [`Imported ${r.imported.length} file${r.imported.length === 1 ? '' : 's'}`]
@@ -75,7 +75,7 @@ export default function SaveGallery({ game }: { game: Game }) {
           <Button size="sm" icon={<Upload className="size-4" />} loading={importing} onClick={() => fileRef.current?.click()}>
             Import
           </Button>
-          <a href={`/api/saves/${game.slug}/export`}>
+          <a href={`/api/saves/${game.id}/export`}>
             <Button size="sm" icon={<FileArchive className="size-4" />}>
               Export all
             </Button>
@@ -98,7 +98,7 @@ export default function SaveGallery({ game }: { game: Game }) {
             <div key={s.file} className="group overflow-hidden rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08] transition hover:ring-white/20">
               <button
                 className="relative block aspect-video w-full overflow-hidden bg-ink-800"
-                onClick={() => game.playUrl && navigate(`/play/${game.slug}?resume=${encodeURIComponent(slotName(s.file))}`)}
+                onClick={() => game.playUrl && navigate(`/play/${game.id}?resume=${encodeURIComponent(slotName(s.file))}`)}
                 disabled={!game.playUrl}
                 title={game.playUrl ? 'Load this save' : 'Install the game to load saves'}
               >
@@ -137,7 +137,7 @@ export default function SaveGallery({ game }: { game: Game }) {
                 >
                   {(close) => (
                     <>
-                      <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.slug}/download?file=${encodeURIComponent(s.file)}`))}>
+                      <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.id}/download?file=${encodeURIComponent(s.file)}`))}>
                         Download
                       </MenuItem>
                       <MenuItem icon={<Copy />} onClick={() => (close(), setCopying(s))}>
@@ -149,7 +149,7 @@ export default function SaveGallery({ game }: { game: Game }) {
                         onClick={async () => {
                           close()
                           try {
-                            await post(`/api/games/${game.slug}/thumbnail/from-save`, { file: s.file })
+                            await post(`/api/games/${game.id}/thumbnail/from-save`, { file: s.file })
                             toast('Cover updated', 'success')
                             refresh()
                           } catch (e) {
@@ -188,7 +188,7 @@ export default function SaveGallery({ game }: { game: Game }) {
           const s = confirmDelete!
           setConfirmDelete(null)
           try {
-            await del(`/api/saves/${game.slug}/slot?file=${encodeURIComponent(s.file)}`)
+            await del(`/api/saves/${game.id}/slot?file=${encodeURIComponent(s.file)}`)
             toast('Save deleted. It can be restored from History.', 'success')
             refresh()
           } catch (e) {
@@ -209,7 +209,7 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
   const { data: games } = useGames()
   const toast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
-  const targets = (games ?? []).filter((g) => g.slug !== game.slug && g.saveDir)
+  const targets = (games ?? []).filter((g) => g.id !== game.id && g.saveDir)
   return (
     <Modal open onClose={onClose} title="Copy save to another game">
       <p className="mb-4 text-sm text-zinc-400">
@@ -219,12 +219,12 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
         {targets.length === 0 && <p className="text-sm text-zinc-500">No other game with a known save folder.</p>}
         {targets.map((g) => (
           <button
-            key={g.slug}
+            key={g.id}
             disabled={!!busy}
             onClick={async () => {
-              setBusy(g.slug)
+              setBusy(g.id)
               try {
-                const r = await post<{ file: string }>(`/api/saves/${game.slug}/copy`, { file: slot.file, target: g.slug })
+                const r = await post<{ file: string }>(`/api/saves/${game.id}/copy`, { file: slot.file, target: g.id })
                 toast(`Copied to ${g.title} as ${r.file}`, 'success')
                 onClose()
               } catch (e) {
@@ -236,7 +236,7 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
             className="flex w-full items-center justify-between rounded-xl bg-white/[0.04] px-4 py-3 text-left text-sm ring-1 ring-white/10 hover:bg-white/[0.08]"
           >
             <span>{g.title}</span>
-            {busy === g.slug ? <Spinner className="size-4" /> : <span className="text-xs text-zinc-500">{g.saveDir}</span>}
+            {busy === g.id ? <Spinner className="size-4" /> : <span className="text-xs text-zinc-500">{g.saveDir}</span>}
           </button>
         ))}
       </div>
@@ -247,8 +247,8 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
 function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?: string; onClose: () => void; onRestored: () => void }) {
   const toast = useToast()
   const { data, isLoading } = useQuery({
-    queryKey: ['history', game.slug, file],
-    queryFn: () => api<{ versions: Array<{ id: string; name: string; size: number; savedAt: number; reason: string }> }>(`/api/saves/${game.slug}/history${file ? `?file=${encodeURIComponent(file)}` : ''}`),
+    queryKey: ['history', game.id, file],
+    queryFn: () => api<{ versions: Array<{ id: string; name: string; size: number; savedAt: number; reason: string }> }>(`/api/saves/${game.id}/history${file ? `?file=${encodeURIComponent(file)}` : ''}`),
   })
   const reason = (r: string) =>
     ({ overwrite: 'Replaced in game', game: 'Replaced in game', 'game-delete': 'Deleted in game', 'user-delete': 'Deleted here', import: 'Replaced by import', restore: 'Before a restore', copy: 'Replaced by a copy' })[r] ?? r
@@ -272,7 +272,7 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
                 size="sm"
                 onClick={async () => {
                   try {
-                    await post(`/api/saves/${game.slug}/history/restore`, { id: v.id })
+                    await post(`/api/saves/${game.id}/history/restore`, { id: v.id })
                     toast(`Restored ${v.name}`, 'success')
                     onRestored()
                   } catch (e) {

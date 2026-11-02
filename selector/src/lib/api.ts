@@ -1,12 +1,11 @@
 export interface Game {
-  slug: string
+  id: string
   title: string
   tags: string[]
-  thumbnail: string | null
+  cover: string | null
   walkthrough: string | null
-  status: 'installed' | 'not_installed' | 'installing' | 'broken'
-  layout: 'legacy' | 'managed' | 'none'
-  buildId: string
+  status: 'installed' | 'not_installed' | 'installing'
+  build: string | null
   playUrl: string | null
   version: string | null
   renpyVersion: string | null
@@ -15,15 +14,14 @@ export interface Game {
   fileCount: number
   screen: [number, number] | null
   saveDir: string | null
-  saveDirSource: string | null
-  source: { kind: string; archive: string | null; filename: string | null; url: string | null }
+  saveDirLocked: boolean
+  source: { archive: string | null; url: string | null; size: number | null }
   canReinstall: boolean
-  catalogId: string | null
+  recipe: { id: string; links: Record<string, string>; continuesFrom: string[]; status: string | null } | null
   installedAt: string | null
   lastPlayedAt: string | null
-  sortOrder: number
   saves: { count: number; latest: number }
-  mods: { files: number; hash: string; state: string }
+  mods: { files: number; hash: string; applied: boolean }
   job: { id: string; type: string; status: string; stage: string; progress: number } | null
 }
 
@@ -53,13 +51,13 @@ export interface SavesResponse {
 export interface Job {
   id: string
   type: string
-  slug: string
+  game: string
   status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
   stage: string
   progress: number
   message: string
   error: string | null
-  params: { source?: { kind: string; path?: string; url?: string }; slug?: string; path?: string } | null
+  params: { source?: { kind: string; path?: string; url?: string }; game?: string; path?: string } | null
   result: any
   createdAt: string
   startedAt: string | null
@@ -84,30 +82,46 @@ export interface Archive {
   sha256: string | null
   info: ArchiveInfo | null
   installedAs: string | null
-  recipe: { id: string; title: string; version: string; status: string; exact: boolean } | null
+  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean } | null
   existingGame: string | null
+}
+
+export interface RecipeRelease {
+  version: string
+  date?: string
+  renpy?: string
+  engine?: string
+  status: 'verified' | 'playable' | 'broken' | 'untested'
+  archives: Array<{ name: string; size?: number; sha256?: string }>
+  verified?: { date?: string; renplay?: string; browsers?: string[]; notes?: string }
 }
 
 export interface Recipe {
   id: string
   title: string
   developer?: string
-  description?: string
   tags?: string[]
   nsfw?: boolean
   cover?: string
   links?: Record<string, string>
   saveDir?: string
-  releases: Array<{ version: string; date?: string; renpy?: string; status: string; archives: Array<{ name: string; size?: number; sha256?: string }> }>
-  local: { slug: string; status: string; version: string } | null
+  continuesFrom?: string[]
+  engine?: string
+  releases: RecipeRelease[]
+  local: { id: string; status: string; version: string } | null
 }
 
 export interface SystemInfo {
   version: string
-  sdk: { version: string; installed: string[] }
-  engines: string[]
+  engines: {
+    installed: Array<{ version: string; bytes: number; usedBy: string[] }>
+    available: Array<{ version: string; renpy: string; bytes: number }>
+    index: string
+  }
   disk: { games: { total: number; free: number } | null; data: { total: number; free: number } | null }
   library: { games: number; installed: number; bytes: number }
+  orphans: string[]
+  purging: number
   paths: { games: string; archives: string; data: string }
   busy: boolean
 }
@@ -127,7 +141,7 @@ export interface FilesResponse {
   dir: string
   dirs: FileEntry[]
   files: FileEntry[]
-  mods: { files: number; deleted: number; hash: string; state: string; job: boolean }
+  mods: { files: number; deleted: number; hash: string; applied: boolean; job: boolean }
 }
 
 export class ApiError extends Error {
@@ -161,8 +175,8 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 export const post = <T,>(path: string, json?: unknown) => api<T>(path, { method: 'POST', json: json ?? {} })
 export const del = <T,>(path: string) => api<T>(path, { method: 'DELETE' })
 
-export function thumbUrl(g: Pick<Game, 'thumbnail'>): string | null {
-  return g.thumbnail ? `/api/thumbnails/${encodeURIComponent(g.thumbnail)}` : null
+export function coverUrl(g: Pick<Game, 'cover'>): string | null {
+  return g.cover ? `/api/covers/${encodeURIComponent(g.cover)}` : null
 }
 
 export function slotName(file: string): string {
@@ -170,19 +184,13 @@ export function slotName(file: string): string {
 }
 
 export function jobTitle(j: Job, games: Game[]): string {
-  const game = games.find((g) => g.slug === j.slug)
-  const name = game?.title ?? j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? j.slug
+  const game = games.find((g) => g.id === j.game)
+  const name = game?.title ?? j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? j.game
   switch (j.type) {
     case 'import':
       return game && game.status === 'installed' && j.status !== 'done' ? `Updating ${name}` : `Installing ${name || 'game'}`
-    case 'analyze':
-      return `Analyzing ${name}`
-    case 'optimize':
-      return `Optimizing ${name}`
     case 'apply-mods':
       return `Applying mods to ${name}`
-    case 'install-sdk':
-      return 'Installing the Ren’Py SDK'
     case 'hash-archive':
       return `Checking ${name}`
     default:

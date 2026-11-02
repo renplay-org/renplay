@@ -29,8 +29,9 @@ http {
   # Game assets live on NFS: keep file metadata and descriptors cached and do
   # reads in a thread pool so a slow NAS never blocks the event loop.
   aio threads;
-  open_file_cache max=200000 inactive=10m;
-  open_file_cache_valid 5m;
+  # Short-lived: open handles keep deleted files alive on NFS.
+  open_file_cache max=200000 inactive=2m;
+  open_file_cache_valid 1m;
   open_file_cache_min_uses 1;
   open_file_cache_errors on;
   output_buffers 2 512k;
@@ -55,6 +56,7 @@ http {
   server {
     listen 8080;
     root /app/web;
+    absolute_redirect off;
 
     add_header X-Content-Type-Options "nosniff" always;
 
@@ -86,24 +88,25 @@ http {
       add_header X-Content-Type-Options "nosniff" always;
     }
 
-    # Game index pages are rendered by the server (runtime, engine, versions).
-    location ~ ^/g/[a-z0-9][a-z0-9._-]*/[A-Za-z0-9_-]+/(index\.html)?$ {
+    # Game pages are rendered by the server (engine template + runtime).
+    location ~ ^/g/[a-z0-9][a-z0-9._-]*/[a-z0-9]+(\.m[a-z0-9]+)?/(index\.html)?$ {
       proxy_pass http://127.0.0.1:3000;
       proxy_http_version 1.1;
       proxy_set_header Host $host;
     }
 
-    # Everything else of a game build. The build id in the URL changes with
-    # every install, so assets can be cached forever.
-    location ~ ^/g/(?<game>[a-z0-9][a-z0-9._-]*)/[A-Za-z0-9_-]+/(?<asset>.+)$ {
-      alias ${GAMES_DIR}/$game/$asset;
+    # Everything else of a build. Build ids change with every install, so
+    # assets are cached forever. A mod build (<build>.m<hash>) holds only its
+    # own game.zip and caches; the rest comes from the base build.
+    location ~ ^/g/(?<game>[a-z0-9][a-z0-9._-]*)/(?<base>[a-z0-9]+)(?:\.m(?<mod>[a-z0-9]+))?/(?<asset>.+)$ {
+      root ${GAMES_DIR};
+      try_files /$game/$base.m$mod/$asset /$game/$base/$asset =404;
       add_header Cache-Control "public, max-age=31536000, immutable" always;
       add_header X-Content-Type-Options "nosniff" always;
-      add_header Access-Control-Allow-Origin "*" always;
     }
 
-    location /api/thumbnails/ {
-      alias ${DATA_DIR}/thumbnails/;
+    location /api/covers/ {
+      alias ${DATA_DIR}/covers/;
       add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
 
@@ -112,8 +115,9 @@ http {
       add_header Cache-Control "public, max-age=86400" always;
     }
 
-    # Chunked archive uploads stream straight through to the server.
-    location /api/uploads/ {
+    # Chunked archive uploads stream straight through to the server. (No
+    # trailing slash: "/api/uploads" itself must not get nginx's redirect.)
+    location ^~ /api/uploads {
       proxy_pass http://127.0.0.1:3000;
       proxy_http_version 1.1;
       proxy_set_header Host $host;

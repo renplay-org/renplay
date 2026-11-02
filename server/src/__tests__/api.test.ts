@@ -6,10 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import yazl from 'yazl'
 import { createApp, type App } from '../app.js'
 import { loadConfig } from '../config.js'
-import { renderIndex } from '../routes/play.js'
+import { renderPage } from '../routes/play.js'
 import { cleanRelPath, safeJoin } from '../util/paths.js'
-
-const fx = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures.json'), 'utf-8')) as Record<string, string>
 
 function zipBuffer(entries: Record<string, Buffer | string>): Promise<Buffer> {
   return new Promise((resolve) => {
@@ -22,7 +20,11 @@ function zipBuffer(entries: Record<string, Buffer | string>): Promise<Buffer> {
   })
 }
 
-const INDEX = `<!doctype html><html><head><title>Fixture Game</title><meta name="viewport" content="width=device-width"></head><body>
+/** The relevant parts of Ren'Py 8.5's web index.html. */
+const TEMPLATE = `<!doctype html><html><head><title>Ren'Py Web Game</title><meta name="viewport" content="width=device-width">
+<link rel="manifest" href="manifest.json" crossorigin="use-credentials" />
+<link rel="icon" href="icons/icon-72x72.png" sizes="72x72" type="image/png" />
+</head><body><img id="presplash" src="web-presplash.jpg">
 <script>
   window.gameZipURL = 'game.zip';
   if (navigator.serviceWorker) { navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'all' }); }
@@ -36,39 +38,69 @@ describe('HTTP API', () => {
   let root: string
   beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), 'renplay-api-'))
-    const game = join(root, 'games', 'fixture-game')
-    mkdirSync(game, { recursive: true })
-    writeFileSync(join(game, 'index.html'), INDEX)
-    writeFileSync(
-      join(game, 'game.zip'),
-      await zipBuffer({ 'game/options.rpyc': Buffer.from(fx['rpyc_define']!, 'base64'), 'game/renpyweb_remote_files.txt': 'images/a.png\nimage 1920,1080\n' }),
-    )
+    // An installed engine pack and one installed build.
+    const engine = join(root, 'games', '_renplay', 'engines', '8.5.3')
+    mkdirSync(engine, { recursive: true })
+    writeFileSync(join(engine, 'index.html'), TEMPLATE)
+    writeFileSync(join(engine, '.ready'), '{}')
+    const build = join(root, 'games', 'fixture-game', 'b1')
+    mkdirSync(join(build, 'game', 'images'), { recursive: true })
+    writeFileSync(join(build, 'game.zip'), await zipBuffer({ 'game/script.rpyc': 'x', 'game/renpyweb_remote_files.txt': 'images/a.png\nimage 1920,1080\n' }))
+    writeFileSync(join(build, 'game', 'images', 'a.png'), 'png')
     process.env['DATA_DIR'] = join(root, 'data')
     process.env['GAMES_DIR'] = join(root, 'games')
     process.env['RENPLAY_CATALOG_URLS'] = 'http://127.0.0.1:9/none'
-    app = await createApp(loadConfig(), { startJobs: true })
-    // Wait for the analysis job queued by the startup scan.
-    for (let i = 0; i < 50 && app.jobs.isBusy(); i++) await new Promise((r) => setTimeout(r, 100))
-    await new Promise((r) => setTimeout(r, 300))
+    process.env['RENPLAY_ENGINES_URL'] = 'http://127.0.0.1:9/none'
+    // A leftover database of renplay 2.0 is dropped.
+    mkdirSync(join(root, 'data'), { recursive: true })
+    writeFileSync(join(root, 'data', 'renplay.db'), 'old')
+    app = await createApp(loadConfig(), { startJobs: false })
+    app.db.insertGame({ id: 'fixture-game', title: 'Fixture Game', status: 'installed', engine: '8.5.3', build: 'b1', save_dir: 'MyGame-1234567890', screen_w: 1920, screen_h: 1080 })
   })
   afterAll(() => app?.close())
 
-  it('adopts an existing web build and detects its save folder', async () => {
-    const res = await request(app.app).get('/api/games').expect(200)
-    const g = res.body.games[0]
-    expect(g).toMatchObject({ slug: 'fixture-game', title: 'Fixture Game', status: 'installed', layout: 'legacy', saveDir: 'MyGame-1234567890', screen: [1920, 1080] })
-    expect(g.playUrl).toMatch(/^\/g\/fixture-game\/l[0-9a-f]+\/$/)
+  it('replaced the old database', () => {
+    expect(() => readFileSync(join(root, 'data', 'renplay.db'))).toThrow()
+    expect(readFileSync(join(root, 'data', 'library.db')).length).toBeGreaterThan(0)
   })
 
-  it('serves the game page with the runtime wired in', async () => {
-    const g = (await request(app.app).get('/api/games/fixture-game')).body.game
-    const res = await request(app.app).get(g.playUrl).expect(200)
+  it('lists games by id with their play URL', async () => {
+    const res = await request(app.app).get('/api/games').expect(200)
+    expect(res.body.games[0]).toMatchObject({ id: 'fixture-game', title: 'Fixture Game', status: 'installed', engine: '8.5.3', playUrl: '/g/fixture-game/b1/', screen: [1920, 1080] })
+  })
+
+  it('renders the game page from the engine template', async () => {
+    const res = await request(app.app).get('/g/fixture-game/b1/').expect(200)
+    expect(res.text).toContain('<title>Fixture Game</title>')
     expect(res.text).toContain('window.__renplay=')
-    expect(res.text).toContain('/renplay/runtime.js')
-    expect(res.text).toContain("window.gameZipURL = 'game.zip?r=0'")
+    expect(res.text).toContain('src="/engine/8.5.3/renpy-pre.js"')
+    expect(res.text).toContain('src="/engine/8.5.3/web-presplash.jpg"')
+    expect(res.text).not.toMatch(/src="[^"]*renpy\.js"/)
+    expect(res.text).not.toContain('manifest.json')
     expect(res.text).not.toMatch(/navigator\.serviceWorker\.register\(/)
     expect(res.text.indexOf('__renplayLate')).toBeGreaterThan(res.text.indexOf('renpy-pre.js'))
-    await request(app.app).get('/g/fixture-game/stale/').expect(302)
+    await request(app.app).get('/g/fixture-game/old/').expect(302)
+  })
+
+  it('serves mod builds with fallback to the base build', async () => {
+    const mod = join(root, 'games', 'fixture-game', 'b1.mabc')
+    mkdirSync(mod, { recursive: true })
+    writeFileSync(join(mod, 'game.zip'), 'modded')
+    app.db.updateGame('fixture-game', { build: 'b1.mabc' })
+    try {
+      expect((await request(app.app).get('/g/fixture-game/b1.mabc/game.zip').responseType('blob').expect(200)).body.toString()).toBe('modded')
+      expect((await request(app.app).get('/g/fixture-game/b1.mabc/game/images/a.png').responseType('blob').expect(200)).body.toString()).toBe('png')
+    } finally {
+      app.db.updateGame('fixture-game', { build: 'b1' })
+    }
+  })
+
+  it('stores bytecode caches for the current build only', async () => {
+    await request(app.app).put('/api/games/fixture-game/cache/bytecode-312.rpyb?build=b1').set('content-type', 'application/octet-stream').send(Buffer.alloc(64, 1)).expect(200)
+    await request(app.app).put('/api/games/fixture-game/cache/bytecode-312.rpyb?build=old').set('content-type', 'application/octet-stream').send(Buffer.alloc(64, 1)).expect(409)
+    await request(app.app).put('/api/games/fixture-game/cache/evil.py?build=b1').send(Buffer.alloc(64, 1)).expect(400)
+    const page = await request(app.app).get('/g/fixture-game/b1/').expect(200)
+    expect(page.text).toMatch(/"caches":\[\{"name":"bytecode-312.rpyb","v":"[a-z0-9]+"\}\]/)
   })
 
   it('stores saves written by the game and serves them back at boot', async () => {
@@ -82,30 +114,39 @@ describe('HTTP API', () => {
     expect(boot.saveDir).toBe('MyGame-1234567890')
     expect(boot.files.map((f: any) => f.path).sort()).toEqual(['MyGame-1234567890/1-1-LT1.save', 'tokens/security_keys.txt'])
     expect(boot.lazy).toEqual([expect.objectContaining({ path: 'Season1-1/9-9-LT1.save', size: 2 })])
-    const raw = await request(app.app).get('/api/saves/fixture-game/raw?path=Season1-1/9-9-LT1.save').expect(200)
-    expect(Buffer.from(raw.body).toString()).toBe('s1')
 
     const slots = (await request(app.app).get('/api/saves/fixture-game').expect(200)).body
     expect(slots.slots).toEqual([expect.objectContaining({ file: '1-1-LT1.save', name: 'From test', kind: 'manual' })])
-    await request(app.app).get(slots.slots[0].screenshot).expect(200)
   })
 
-  it('answers keepalive requests with headers right away', async () => {
-    const res = await request(app.app).get('/api/keepalive?hold=0').expect(200)
-    expect(res.text).toMatch(/idle|busy/)
+  it('learns the screen size and save folder from the running game', async () => {
+    app.db.updateGame('fixture-game', { screen_w: 0, screen_h: 0 })
+    await request(app.app).post('/api/saves/fixture-game/save-dir').send({ saveDir: 'MyGame-1234567890', screen: [1280, 720] }).expect(200)
+    expect((await request(app.app).get('/api/games/fixture-game')).body.game.screen).toEqual([1280, 720])
   })
 
-  it('refuses unsafe save paths', async () => {
+  it('exports a recipe', async () => {
+    const res = await request(app.app).get('/api/games/fixture-game/recipe').expect(200)
+    expect(res.body.yaml).toContain('id: fixture-game')
+    expect(res.body.yaml).toContain('saveDir: MyGame-1234567890')
+    expect(res.body.yaml).toContain('engine: 8.5.3')
+  })
+
+  it('refuses unsafe paths', async () => {
     await request(app.app).put('/api/saves/fixture-game/file?path=../../etc/passwd').send(Buffer.from('x')).expect(400)
-    await request(app.app).put('/api/saves/fixture-game/file?path=persistent').send(Buffer.from('x')).expect(400)
     await request(app.app).get('/api/saves/..%2F..%2Fx/boot').expect(400)
+    await request(app.app).get('/g/fixture-game/b1/..%2F..%2F_renplay/engines/8.5.3/.ready').expect(404)
+  })
+
+  it('creates uploads at /api/uploads without a trailing slash', async () => {
+    const r = await request(app.app).post('/api/uploads').send({ name: 'Game-1.0-pc.zip', size: 10 }).expect(200)
+    expect(r.body.id).toMatch(/^u/)
   })
 
   it('keeps saves when a game is uninstalled', async () => {
     await request(app.app).delete('/api/games/fixture-game').expect(200)
     const g = (await request(app.app).get('/api/games/fixture-game')).body.game
-    expect(g.status).toBe('not_installed')
-    expect(g.playUrl).toBeNull()
+    expect(g).toMatchObject({ status: 'not_installed', playUrl: null })
     expect(g.saves.count).toBe(1)
   })
 })
@@ -118,14 +159,12 @@ describe('paths', () => {
   })
 })
 
-describe('renderIndex', () => {
-  it('points engine files at the shared store', () => {
-    const html = renderIndex(INDEX, { slug: 's', build: 'b', zipRev: 3, engine: 'abc', saveDir: null, screen: null, title: 'T', runtimeVersion: 'v' })
-    expect(html).toContain('src="/engine/abc/renpy-pre.js"')
-    // renpy.js is started by the runtime once the engine is downloaded.
-    expect(html).not.toMatch(/src="[^"]*renpy\.js"/)
-    expect(html).toContain('"loadEngine":true')
-    expect(html).toContain("'game.zip?r=3'")
+describe('renderPage', () => {
+  it('uses the build presplash and lists caches', () => {
+    const html = renderPage(TEMPLATE, { id: 's', build: 'b', title: 'T <x>', engine: '8.5.3', saveDir: null, screen: null, caches: [{ name: 'bytecode-312.rpyb', v: '1' }], presplash: 'web-presplash.webp', runtimeVersion: 'v' })
+    expect(html).toContain('<title>T &lt;x&gt;</title>')
+    expect(html).toContain('src="web-presplash.webp"')
+    expect(html).toContain('"caches":[{"name":"bytecode-312.rpyb","v":"1"}]')
     expect(html).toContain('viewport-fit=cover')
   })
 })

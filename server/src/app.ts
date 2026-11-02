@@ -1,19 +1,19 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { mkdir, stat } from 'node:fs/promises'
+import { mkdir, readdir, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
+import { Builds } from './builds.js'
 import { Catalog } from './catalog.js'
 import type { Config } from './config.js'
 import { Db } from './db.js'
+import { EngineStore } from './engines.js'
 import { JobManager } from './jobs.js'
-import { Library } from './library.js'
 import { Overlays } from './mods.js'
-import { cleanWorkDir, runImport } from './pipeline/import.js'
-import { analyzeBuild, applyMods, optimizeBuild } from './pipeline/maintain.js'
-import { SdkManager } from './pipeline/sdk.js'
+import { applyMods } from './pipeline/applymods.js'
+import { runImport } from './pipeline/import.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
 import { createLibraryRouter } from './routes/library.js'
@@ -21,8 +21,9 @@ import { createPlayRouter } from './routes/play.js'
 import { createSavesExportAll, createSavesRouter } from './routes/saves.js'
 import { createSystemRouter } from './routes/system.js'
 import { SaveStore } from './saves/store.js'
-import { emptyTrash, sha256File } from './util/fsx.js'
+import { sha256File } from './util/fsx.js'
 import { HttpError, cleanRelPath, safeJoin } from './util/paths.js'
+import { Purger } from './util/purge.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -46,39 +47,43 @@ export interface App {
   app: express.Express
   db: Db
   jobs: JobManager
-  library: Library
+  builds: Builds
+  engines: EngineStore
   saves: SaveStore
   catalog: Catalog
+  purger: Purger
   close(): void
 }
 
 export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
-  for (const d of [cfg.dataDir, cfg.savesDir, cfg.thumbnailsDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
-  for (const d of [cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir]) await mkdir(d, { recursive: true }).catch(() => {})
+  for (const d of [cfg.dataDir, cfg.savesDir, cfg.coversDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
+  for (const d of [cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
 
   const version = packageVersion()
   const db = Db.open(cfg.dataDir)
+  const purger = new Purger(cfg.purgeDir)
   const saves = new SaveStore(cfg.savesDir, cfg.saveHistoryDir, cfg.saveHistoryVersions)
   const jobs = new JobManager(db, cfg)
-  const library = new Library(db, cfg)
+  const builds = new Builds(cfg, db, purger)
+  const engines = new EngineStore(cfg, db, purger)
   const overlays = new Overlays(cfg)
-  const sdk = new SdkManager(cfg)
   const catalog = new Catalog(cfg, db)
   await catalog.init()
 
-  const deps = { cfg, db, library, sdk, overlays, catalog, saves, jobs }
+  const deps = { cfg, db, builds, engines, overlays, catalog, saves, jobs, version }
   jobs.register('import', (ctx) => runImport(ctx, deps))
-  jobs.register('analyze', (ctx) => analyzeBuild(ctx, deps))
-  jobs.register('optimize', (ctx) => optimizeBuild(ctx, deps))
   jobs.register('apply-mods', (ctx) => applyMods(ctx, deps))
-  jobs.register('install-sdk', async (ctx) => ({ path: await sdk.ensure(ctx) }))
   jobs.register('hash-archive', async (ctx) => {
     const rel = cleanRelPath(ctx.params.path)
     const full = safeJoin(cfg.archivesDir, rel)
     const st = await stat(full)
-    const sha256 = await sha256File(full, (n) => ctx.progress('Hashing archive', n / st.size))
+    const sha256 = await sha256File(full, (n) => ctx.progress('Computing checksum', n / st.size))
     const prev = db.getArchive(rel)
     db.upsertArchive({ path: rel, size: st.size, mtime_ms: Math.floor(st.mtimeMs), sha256, info: prev?.info })
+    for (const g of db.allGames()) {
+      const src = JSON.parse(g.source || '{}')
+      if (src.archive === rel && src.size === st.size && !src.sha256) db.updateGame(g.id, { source: JSON.stringify({ ...src, sha256 }) })
+    }
     const match = catalog.match({ name: rel, size: st.size, sha256 })
     return { sha256, recipe: match?.recipe.id ?? null, exact: match?.exact ?? false }
   })
@@ -88,26 +93,28 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.set('trust proxy', true)
   app.use(express.json({ limit: '2mb' }))
 
-  app.use(createPlayRouter(cfg, db, runtimeVersion(opts.runtimePath)))
+  app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath)))
   // Static fallbacks for development; nginx serves these paths in production.
   if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(opts.runtimePath!))
-  app.use('/engine', express.static(cfg.enginesDir, { immutable: true, maxAge: '365d' }))
-  app.use('/g/:slug/:build', (req, res, next) => {
-    const slug = req.params['slug'] as string
-    if (!/^[a-z0-9][a-z0-9._-]*$/.test(slug)) return next()
-    express.static(join(cfg.gamesDir, slug), { immutable: true, maxAge: '365d', index: false })(req, res, next)
+  app.use('/engine', express.static(cfg.enginesDir, { immutable: true, maxAge: '365d', setHeaders: gzipHeaders }))
+  app.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m([a-z0-9]+))?\/(.+)$/, (req, res, next) => {
+    const [game, base, mod, asset] = [req.params[0], req.params[1], req.params[2], req.params[3]] as string[]
+    const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
+    const tryNext = (i: number): void => {
+      if (i >= candidates.length) return next()
+      res.sendFile(candidates[i]!, { immutable: true, maxAge: '365d' }, (err) => (err ? tryNext(i + 1) : undefined))
+    }
+    if (asset.includes('..')) return next()
+    tryNext(0)
   })
-  app.use('/api', createSystemRouter(cfg, db, jobs, sdk, version))
+  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version))
   app.get('/api/saves-export', createSavesExportAll(saves, db))
   app.use('/api/saves', createSavesRouter(saves, db))
-  app.use('/api/games', createFilesRouter(db, library, overlays, jobs))
+  app.use('/api/games', createFilesRouter(db, builds, overlays, jobs))
   app.use('/api/games', createGamesRouter(deps))
   app.use('/api', createLibraryRouter(deps))
-
-  // Development fallback for static files nginx serves in production.
-  app.use('/api/thumbnails', express.static(cfg.thumbnailsDir, { maxAge: '1d', fallthrough: false }))
-  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { maxAge: '1h', fallthrough: false }))
-
+  app.use('/api/covers', express.static(cfg.coversDir, { maxAge: '365d', immutable: true, fallthrough: false }))
+  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { maxAge: '1d', fallthrough: false }))
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found')))
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
@@ -126,15 +133,20 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   }
   app.use(onError)
 
-  // Startup housekeeping: cheap scan, cleanup, resume jobs.
-  await cleanWorkDir(cfg)
-  await emptyTrash(cfg.trashDir)
-  const scan = await library.scan()
-  if (scan.added.length) console.log(`library: added ${scan.added.join(', ')}`)
-  if (opts.startJobs !== false) {
-    jobs.start()
-    for (const slug of scan.needsAnalysis) if (!jobs.activeFor(slug)) jobs.enqueue('analyze', slug, { slug })
-  }
+  // Startup housekeeping: interrupted work is deleted in the background.
+  try {
+    for (const n of await readdir(cfg.workDir)) await purger.purge(join(cfg.workDir, n))
+  } catch {}
+  await purger.resume()
+  const check = await builds.verify()
+  if (check.missing.length) console.log(`builds missing for: ${check.missing.join(', ')}`)
+  if (check.orphans.length) console.log(`folders in ${cfg.gamesDir} that belong to no game: ${check.orphans.join(', ')}`)
+  if (opts.startJobs !== false) jobs.start()
 
-  return { app, db, jobs, library, saves, catalog, close: () => db.close() }
+  return { app, db, jobs, builds, engines, saves, catalog, purger, close: () => db.close() }
+}
+
+/** Development server: serve *.gz engine files with their encoding, like nginx does. */
+function gzipHeaders(res: express.Response, path: string) {
+  if (path.endsWith('.wasm.gz')) res.setHeader('Content-Type', 'application/gzip')
 }

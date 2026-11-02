@@ -1,10 +1,10 @@
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
+import type { Builds } from '../builds.js'
 import type { Db, GameRow } from '../db.js'
 import type { JobManager } from '../jobs.js'
-import type { Library } from '../library.js'
 import { Overlays } from '../mods.js'
-import { baseFiles, readBaseFile } from '../pipeline/maintain.js'
+import { baseFiles, readBaseFile } from '../pipeline/applymods.js'
 import { isZip, readZipEntries } from '../saves/savefile.js'
 import { HttpError, assertSlug, cleanRelPath } from '../util/paths.js'
 
@@ -13,32 +13,32 @@ const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|c
 
 type BaseIndex = Map<string, { size: number; where: 'zip' | 'dir' }>
 
-export function createFilesRouter(db: Db, library: Library, overlays: Overlays, jobs: JobManager): Router {
+export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jobs: JobManager): Router {
   const router = Router()
   const cache = new Map<string, { key: string; files: BaseIndex }>()
 
   const game = (req: Request): GameRow => {
-    const g = db.getGame(assertSlug(req.params.slug))
+    const g = db.getGame(assertSlug(req.params.id))
     if (!g) throw new HttpError(404, 'Game not found')
     if (g.status !== 'installed') throw new HttpError(409, 'Install the game to browse its files')
     return g
   }
 
   const base = async (g: GameRow): Promise<BaseIndex> => {
-    const key = `${g.build_id}`
-    const c = cache.get(g.slug)
+    const key = g.build.split('.m')[0]!
+    const c = cache.get(g.id)
     if (c && c.key === key) return c.files
-    const files = await baseFiles(library.gameDir(g.slug))
-    cache.set(g.slug, { key, files })
+    const files = await baseFiles(builds, g.id, g.build)
+    cache.set(g.id, { key, files })
     return files
   }
 
-  router.get('/:slug/files', async (req, res) => {
+  router.get('/:id/files', async (req, res) => {
     const g = game(req)
     const dir = cleanRelPath(req.query['dir'] ?? 'game', { allowEmpty: true }) || 'game'
     const prefix = dir + '/'
     const files = await base(g)
-    const ov = await overlays.list(g.slug)
+    const ov = await overlays.list(g.id)
     const added = new Map(ov.files.map((f) => [f.path, f]))
     const deleted = new Set(ov.deleted)
     const dirs = new Map<string, { count: number; changed: boolean }>()
@@ -61,44 +61,44 @@ export function createFilesRouter(db: Db, library: Library, overlays: Overlays, 
       else consider(path, info.size, 'base')
     }
     for (const [path, f] of added) if (!files.has(path)) consider(path, f.size, 'added')
-    const summary = await overlays.summary(g.slug)
+    const summary = await overlays.summary(g.id)
     res.json({
       dir,
       dirs: [...dirs].map(([name, d]) => ({ name, path: `${prefix}${name}`, type: 'dir', count: d.count, changed: d.changed })).sort((a, b) => a.name.localeCompare(b.name)),
       files: entries.sort((a, b) => a.name.localeCompare(b.name)),
-      mods: { ...summary, state: g.mods_state || '', job: jobs.activeFor(g.slug)?.type === 'apply-mods' },
+      mods: { ...summary, applied: g.build.endsWith(`.m${summary.hash}`) || (!summary.hash && !g.build.includes('.m')), job: jobs.activeFor(g.id)?.type === 'apply-mods' },
     })
   })
 
-  router.get('/:slug/files/raw', async (req, res) => {
+  router.get('/:id/files/raw', async (req, res) => {
     const g = game(req)
     const path = Overlays.editablePath(req.query['path'])
-    const data = (await overlays.read(g.slug, path)) ?? (await readBaseFile(library.gameDir(g.slug), path))
+    const data = (await overlays.read(g.id, path)) ?? (await readBaseFile(builds, g.id, g.build, path))
     if (!data) throw new HttpError(404, 'File not found')
     if (req.query['download'] === '1') res.attachment(path.split('/').pop()!)
     res.setHeader('Cache-Control', 'no-store')
     res.type(TEXT_EXT.test(path) ? 'text/plain; charset=utf-8' : 'application/octet-stream').send(data)
   })
 
-  router.put('/:slug/files/raw', express.raw({ type: () => true, limit: '256mb' }), async (req, res) => {
+  router.put('/:id/files/raw', express.raw({ type: () => true, limit: '256mb' }), async (req, res) => {
     const g = game(req)
     const path = Overlays.editablePath(req.query['path'])
     if (!Buffer.isBuffer(req.body)) throw new HttpError(400, 'Expected file content')
-    await overlays.write(g.slug, path, req.body)
+    await overlays.write(g.id, path, req.body)
     res.json({ ok: true })
   })
 
-  router.delete('/:slug/files/raw', async (req, res) => {
+  router.delete('/:id/files/raw', async (req, res) => {
     const g = game(req)
     const path = Overlays.editablePath(req.query['path'])
     const files = await base(g)
-    await overlays.remove(g.slug, path, files.has(path))
+    await overlays.remove(g.id, path, files.has(path))
     res.json({ ok: true })
   })
 
-  router.post('/:slug/files/revert', async (req, res) => {
+  router.post('/:id/files/revert', async (req, res) => {
     const g = game(req)
-    await overlays.revert(g.slug, Overlays.editablePath(req.body?.path))
+    await overlays.revert(g.id, Overlays.editablePath(req.body?.path))
     res.json({ ok: true })
   })
 
@@ -106,7 +106,7 @@ export function createFilesRouter(db: Db, library: Library, overlays: Overlays, 
    * Adds files to the overlay. Plain files go into `dir`; zip files are
    * unpacked there (a top-level "game/" folder in the zip is honoured).
    */
-  router.post('/:slug/files/upload', upload.array('files'), async (req, res) => {
+  router.post('/:id/files/upload', upload.array('files'), async (req, res) => {
     const g = game(req)
     const dir = Overlays.editablePath(req.body?.dir || 'game')
     const relPaths: string[] = (() => {
@@ -136,31 +136,31 @@ export function createFilesRouter(db: Db, library: Library, overlays: Overlays, 
             rel = inner === 0 ? rel : `${dir}/${rel}`
           }
           const path = Overlays.editablePath(rel)
-          await overlays.write(g.slug, path, entries.get(n)!)
+          await overlays.write(g.id, path, entries.get(n)!)
           written.push(path)
         }
         continue
       }
       const rel = relPaths[i] ? cleanRelPath(relPaths[i]) : name
       const path = Overlays.editablePath(`${dir}/${rel}`)
-      await overlays.write(g.slug, path, f.buffer)
+      await overlays.write(g.id, path, f.buffer)
       written.push(path)
     }
     res.json({ ok: true, written })
   })
 
-  router.post('/:slug/files/apply', (req, res) => {
+  router.post('/:id/files/apply', (req, res) => {
     const g = game(req)
-    if (jobs.activeFor(g.slug)) throw new HttpError(409, 'A job is already running for this game')
-    res.json({ jobId: jobs.enqueue('apply-mods', g.slug, { slug: g.slug }) })
+    if (jobs.activeFor(g.id)) throw new HttpError(409, 'A job is already running for this game')
+    res.json({ jobId: jobs.enqueue('apply-mods', g.id, { game: g.id }) })
   })
 
   /** Drops all mods (moved aside, not deleted) and restores the original files. */
-  router.post('/:slug/files/reset', async (req, res) => {
+  router.post('/:id/files/reset', async (req, res) => {
     const g = game(req)
-    if (jobs.activeFor(g.slug)) throw new HttpError(409, 'A job is already running for this game')
-    await overlays.archive(g.slug)
-    res.json({ jobId: jobs.enqueue('apply-mods', g.slug, { slug: g.slug }) })
+    if (jobs.activeFor(g.id)) throw new HttpError(409, 'A job is already running for this game')
+    await overlays.archive(g.id)
+    res.json({ jobId: jobs.enqueue('apply-mods', g.id, { game: g.id }) })
   })
 
   return router

@@ -165,7 +165,7 @@ function InstallDialog({ archive, onClose }: { archive: Archive; onClose: () => 
   const toast = useToast()
   const { data: games } = useGames()
   const target = archive.installedAs ?? archive.existingGame ?? undefined
-  const targetGame = games?.find((g) => g.slug === target)
+  const targetGame = games?.find((g) => g.id === target)
   const [title, setTitle] = useState(archive.info?.title ?? archive.recipe?.title ?? '')
   const [optimize, setOptimize] = useState(true)
   const [quality, setQuality] = useState(() => Number(localStorage.getItem('renplay:quality')) || 88)
@@ -190,7 +190,7 @@ function InstallDialog({ archive, onClose }: { archive: Archive; onClose: () => 
               try {
                 await post('/api/imports', {
                   source: { kind: 'archive', path: archive.path },
-                  slug: target,
+                  game: target,
                   title: target ? undefined : title || undefined,
                   optimizeImages: optimize,
                   imageQuality: quality,
@@ -423,7 +423,6 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
           {latest && <Badge>{latest.version}</Badge>}
           {r.local && <Badge tone="accent">In your library</Badge>}
         </div>
-        {r.description && <p className="line-clamp-3 text-sm text-zinc-400">{r.description}</p>}
         <div className="flex flex-wrap gap-2">
           {Object.entries(r.links ?? {}).map(([k, v]) => (
             <a key={k} href={v} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/10">
@@ -431,7 +430,7 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
             </a>
           ))}
           {r.local && (
-            <Link to={`/game/${r.local.slug}`} className="inline-flex items-center rounded-lg bg-accent-500/15 px-2.5 py-1 text-xs text-accent-300">
+            <Link to={`/game/${r.local.id}`} className="inline-flex items-center rounded-lg bg-accent-500/15 px-2.5 py-1 text-xs text-accent-300">
               Open
             </Link>
           )}

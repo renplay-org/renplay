@@ -67,8 +67,8 @@ export default function Activity() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate font-medium text-zinc-100">{jobTitle(j, games ?? [])}</span>
-                      {j.slug && games?.some((g) => g.slug === j.slug) && (
-                        <Link to={`/game/${j.slug}`} className="text-xs text-zinc-500 hover:text-zinc-300">
+                      {j.game && games?.some((g) => g.id === j.game) && (
+                        <Link to={`/game/${j.game}`} className="text-xs text-zinc-500 hover:text-zinc-300">
                           open →
                         </Link>
                       )}

@@ -24,12 +24,12 @@ import { useGame, useSaves } from '../lib/queries'
 type Panel = null | 'saves' | 'walkthrough' | 'display'
 
 export default function Player() {
-  const { slug = '' } = useParams()
+  const { id: gameId = '' } = useParams()
   const [params] = useSearchParams()
   const resume = params.get('resume')
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { data: game, isLoading } = useGame(slug)
+  const { data: game, isLoading } = useGame(gameId)
 
   const shellRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -72,7 +72,7 @@ export default function Player() {
           break
         case 'renplay:ready':
           setReady(true)
-          void post(`/api/games/${slug}/played`).then(() => qc.invalidateQueries({ queryKey: ['games'] }))
+          void post(`/api/games/${gameId}/played`).then(() => qc.invalidateQueries({ queryKey: ['games'] }))
           if (resume && !resumed.current) {
             resumed.current = true
             send({ type: 'renplay:load', slot: resume })
@@ -92,14 +92,14 @@ export default function Player() {
           waiters.current.get(d.id)?.()
           break
         case 'renplay:exited':
-          navigate(`/game/${slug}`)
+          navigate(`/game/${gameId}`)
           break
       }
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, resume])
+  }, [gameId, resume])
 
   useEffect(() => {
     if (game?.screen && !screenSize) setScreenSize(game.screen)
@@ -167,10 +167,10 @@ export default function Player() {
       send({ type: ready ? 'renplay:save-and-exit' : 'renplay:flush', id })
     })
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
-    void qc.invalidateQueries({ queryKey: ['saves', slug] })
+    void qc.invalidateQueries({ queryKey: ['saves', gameId] })
     void qc.invalidateQueries({ queryKey: ['games'] })
-    navigate(`/game/${slug}`)
-  }, [navigate, qc, ready, send, slug])
+    navigate(`/game/${gameId}`)
+  }, [navigate, qc, ready, send, gameId])
 
   const padTop = fullscreen && prefs.avoidNotch && notch && coversNotch ? notch : 0
   const rect = frameRect(stage.w, stage.h - padTop, screenSize, prefs.fit)
@@ -185,7 +185,7 @@ export default function Player() {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-black text-zinc-300">
         <p>This game is not installed.</p>
-        <Button onClick={() => navigate(game ? `/game/${slug}` : '/')}>Go back</Button>
+        <Button onClick={() => navigate(game ? `/game/${gameId}` : '/')}>Go back</Button>
       </div>
     )
 
@@ -282,7 +282,7 @@ export default function Player() {
       {panel === 'saves' && (
         <SidePanel title="Saves" onClose={() => setPanel(null)} top={padTop}>
           <SavesPanel
-            slug={slug}
+            gameId={gameId}
             onLoad={(slot) => {
               send({ type: 'renplay:load', slot })
               setPanel(null)
@@ -354,8 +354,8 @@ function SidePanel({ title, onClose, children, top, narrow }: { title: string; o
   )
 }
 
-function SavesPanel({ slug, onLoad }: { slug: string; onLoad: (slot: string) => void }) {
-  const { data, isLoading, refetch } = useSaves(slug)
+function SavesPanel({ gameId, onLoad }: { gameId: string; onLoad: (slot: string) => void }) {
+  const { data, isLoading, refetch } = useSaves(gameId)
   useEffect(() => {
     void refetch()
   }, [refetch])

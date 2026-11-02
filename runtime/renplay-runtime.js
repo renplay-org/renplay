@@ -14,10 +14,10 @@
   'use strict'
   if (window.__renplayRuntime) return
   var cfg = window.__renplay || {}
-  if (!cfg.slug) return
+  if (!cfg.id) return
 
   var HOME = '/home/web_user/.renpy'
-  var API = '/api/saves/' + encodeURIComponent(cfg.slug)
+  var API = '/api/saves/' + encodeURIComponent(cfg.id)
   var inFrame = window.parent && window.parent !== window
   var log = function () {
     var a = Array.prototype.slice.call(arguments)
@@ -159,7 +159,7 @@
 
   function post(type, data) {
     if (!inFrame) return
-    var msg = { type: 'renplay:' + type, slug: cfg.slug }
+    var msg = { type: 'renplay:' + type, game: cfg.id }
     if (data) for (var k in data) msg[k] = data[k]
     try {
       window.parent.postMessage(msg, location.origin)
@@ -185,7 +185,6 @@
         var req = indexedDB.open('renplay', 1)
         req.onupgradeneeded = function () {
           var s = req.result.createObjectStore('files', { keyPath: 'key' })
-          s.createIndex('slug', 'slug')
         }
         req.onsuccess = function () {
           resolve(req.result)
@@ -219,7 +218,7 @@
   // Mirror entries are keyed by path only: ~/.renpy is shared by all games.
   function idbPut(path, data, mtime, synced) {
     return idbTx('readwrite', function (s) {
-      s.put({ key: path, slug: cfg.slug, path: path, data: data, mtime: mtime, synced: synced ? 1 : 0 })
+      s.put({ key: path, game: cfg.id, path: path, data: data, mtime: mtime, synced: synced ? 1 : 0 })
     }).catch(function () {})
   }
 
@@ -495,54 +494,6 @@
 
   // ---------------------------------------------------------------- boot
 
-  /** Saves left by the previous sync client in Ren'Py's own IndexedDB (IDBFS). */
-  function legacyIdbfs() {
-    if (!window.indexedDB) return Promise.resolve([])
-    var flag = 'renplay:legacy-migrated'
-    try {
-      if (localStorage.getItem(flag)) return Promise.resolve([])
-    } catch (e) {}
-    return new Promise(function (resolve) {
-      var req = indexedDB.open(HOME)
-      req.onupgradeneeded = function () {
-        // Database did not exist; do not create it.
-        req.transaction.abort()
-      }
-      req.onerror = function () {
-        resolve([])
-      }
-      req.onsuccess = function () {
-        var db = req.result
-        if (!db.objectStoreNames.contains('FILE_DATA')) {
-          db.close()
-          resolve([])
-          return
-        }
-        var out = []
-        var cur = db.transaction('FILE_DATA', 'readonly').objectStore('FILE_DATA').openCursor()
-        cur.onsuccess = function () {
-          var c = cur.result
-          if (!c) {
-            db.close()
-            try {
-              localStorage.setItem(flag, '1')
-            } catch (e) {}
-            resolve(out)
-            return
-          }
-          var v = c.value
-          if (typeof c.key === 'string' && c.key.indexOf(HOME + '/') === 0 && v && v.contents) {
-            out.push({ path: c.key.slice(HOME.length + 1), data: new Uint8Array(v.contents), mtime: +new Date(v.timestamp) })
-          }
-          c.continue()
-        }
-        cur.onerror = function () {
-          resolve(out)
-        }
-      }
-    })
-  }
-
   function boot() {
     var server = null
     return fetchJSON(API + '/boot', { cache: 'no-store' }, 3)
@@ -554,11 +505,9 @@
         state.online = false
       })
       .then(function () {
-        return Promise.all([idbAll(), legacyIdbfs()])
+        return idbAll()
       })
-      .then(function (res) {
-        var local = res[0]
-        var legacy = res[1]
+      .then(function (local) {
         var serverFiles = new Map()
         if (server) {
           if (server.saveDir) state.saveDir = server.saveDir
@@ -601,23 +550,6 @@
             state.queue.set(e.path, { data: null, mtime: e.mtime })
           }
         })
-        // 3. One-time migration of saves kept by the old IDBFS-based client.
-        var migrated = 0
-        legacy.forEach(function (e) {
-          if (!server) return
-          var top = e.path.split('/')[0]
-          if (top !== state.saveDir && top !== 'tokens' && top !== 'persistent') {
-            if (state.known.has(e.path) || state.lazy.has(e.path)) return
-          }
-          var srv = serverFiles.get(e.path)
-          var lzMeta = state.lazy.get(e.path)
-          if ((srv && srv.mtime >= e.mtime) || (lzMeta && lzMeta.mtime >= e.mtime)) return
-          if (isJunk(e.path)) return
-          if (top === state.saveDir || top === 'tokens' || top === 'persistent') writeLocal(e.path, e.data, e.mtime)
-          state.queue.set(e.path, { data: e.data, mtime: e.mtime })
-          migrated++
-        })
-        if (migrated) log('migrating', migrated, 'saves from the old browser storage')
         state.ready = true
         log('saves ready', { saveDir: state.saveDir, files: serverFiles.size, lazy: state.lazy.size, queued: state.queue.size })
         pump()
@@ -710,6 +642,15 @@
         callback(null)
       }, 0)
     }
+    Module.addRunDependency('renplay-caches')
+    cachesReady.then(function () {
+      try {
+        restoreCaches()
+      } catch (e) {
+        console.warn('[renplay] could not restore caches', e)
+      }
+      Module.removeRunDependency('renplay-caches')
+    })
     Module.addRunDependency('renplay-saves')
     boot()
       .catch(function (e) {
@@ -807,7 +748,70 @@
     )
   }
 
-  if (cfg.engineBase && cfg.loadEngine) {
+  /*
+   * Python bytecode caches. Ren'Py compiles the game's Python on first start
+   * and writes game/cache/*.rpyb; renplay stores those with the build and puts
+   * them back before Ren'Py starts, so later starts skip the compile.
+   */
+  var CACHE_RE = /^(bytecode-\d+|py3analysis|screens)\.rpyb$/
+  var pyCaches = { files: {}, hashes: {} }
+  var cachesReady = Promise.all(
+    (cfg.caches || []).map(function (c) {
+      return origFetch('cache/' + encodeURIComponent(c.name) + '?v=' + encodeURIComponent(c.v))
+        .then(function (r) {
+          return r.ok ? r.arrayBuffer() : null
+        })
+        .then(function (b) {
+          if (!b) return
+          var data = new Uint8Array(b)
+          pyCaches.files[c.name] = data
+          pyCaches.hashes[c.name] = hash(data)
+        })
+        .catch(function () {})
+    }),
+  )
+
+  function restoreCaches() {
+    var names = Object.keys(pyCaches.files)
+    if (!names.length) return
+    mkdirp('/game/cache')
+    names.forEach(function (n) {
+      FS.writeFile('/game/cache/' + n, pyCaches.files[n])
+    })
+    pyCaches.files = {}
+    log('restored', names.length, 'compiled caches')
+  }
+
+  function uploadCaches() {
+    var names
+    try {
+      names = FS.readdir('/game/cache')
+    } catch (e) {
+      return
+    }
+    names.forEach(function (n) {
+      if (!CACHE_RE.test(n)) return
+      var data
+      try {
+        data = FS.readFile('/game/cache/' + n)
+      } catch (e) {
+        return
+      }
+      if (data.length < 16 || pyCaches.hashes[n] === hash(data)) return
+      pyCaches.hashes[n] = hash(data)
+      origFetch('/api/games/' + encodeURIComponent(cfg.id) + '/cache/' + encodeURIComponent(n) + '?build=' + encodeURIComponent(cfg.build), {
+        method: 'PUT',
+        body: data,
+        headers: { 'content-type': 'application/octet-stream' },
+      })
+        .then(function (r) {
+          if (r.ok) log('stored', n, 'for faster starts')
+        })
+        .catch(function () {})
+    })
+  }
+
+  if (cfg.engineBase) {
     Module.instantiateWasm = function (imports, receive) {
       var plain = function () {
         return origFetch(cfg.engineBase + 'renpy.wasm', { credentials: 'same-origin' })
@@ -853,7 +857,7 @@
               if (res.ok) {
                 cache.keys().then(function (keys) {
                   keys.forEach(function (k) {
-                    if (k.url.indexOf('/g/' + cfg.slug + '/') !== -1 && k.url !== abs) cache.delete(k)
+                    if (k.url.indexOf('/g/' + cfg.id + '/') !== -1 && k.url !== abs) cache.delete(k)
                   })
                 })
                 cache.put(abs, res.clone()).catch(function () {})
@@ -898,14 +902,16 @@
     exec('result = [config.save_directory, config.screen_width, config.screen_height, config.name, config.version]', 20000)
       .then(function (r) {
         var sd = r && r[0]
-        post('info', { saveDir: sd, screen: [r[1], r[2]], name: r[3], version: r[4] })
-        if (!sd || sd === state.saveDir) return
-        log('save folder is', sd, '(server had', state.saveDir, ')')
-        return fetchJSON(API + '/save-dir', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ saveDir: sd }) }).then(function (res) {
+        var screen = [r[1], r[2]]
+        post('info', { saveDir: sd, screen: screen, name: r[3], version: r[4] })
+        var screenKnown = cfg.screen && cfg.screen[0] === screen[0] && cfg.screen[1] === screen[1]
+        if (!sd || (sd === state.saveDir && screenKnown)) return
+        if (sd !== state.saveDir) log('save folder is', sd, '(server had', state.saveDir, ')')
+        return fetchJSON(API + '/save-dir', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ saveDir: sd, screen: screen }) }).then(function (res) {
           state.saveDir = sd
           // The game's real folder was only listed lazily; reload once so its
           // saves and persistent data are restored before Ren'Py starts.
-          var key = 'renplay:reloaded:' + cfg.slug
+          var key = 'renplay:reloaded:' + cfg.id
           var hasFiles = false
           state.lazy.forEach(function (_v, p) {
             if (p.indexOf(sd + '/') === 0) hasFiles = true
@@ -1029,6 +1035,7 @@
       if (origPresplashEnd) origPresplashEnd()
       post('ready')
       setTimeout(verifySaveDir, 500)
+      setTimeout(uploadCaches, 10000)
     }
 
     var origProgress = window.progress

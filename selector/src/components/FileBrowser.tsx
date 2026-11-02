@@ -34,7 +34,7 @@ const stateBadge = {
 
 export default function FileBrowser({ game }: { game: Game }) {
   const [dir, setDir] = useState('game')
-  const { data, isLoading, error } = useFiles(game.slug, dir)
+  const { data, isLoading, error } = useFiles(game.id, dir)
   const { data: jobs } = useJobs()
   const qc = useQueryClient()
   const toast = useToast()
@@ -46,15 +46,15 @@ export default function FileBrowser({ game }: { game: Game }) {
   const [confirmReset, setConfirmReset] = useState(false)
 
   const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ['files', game.slug] })
-    void qc.invalidateQueries({ queryKey: ['game', game.slug] })
+    void qc.invalidateQueries({ queryKey: ['files', game.id] })
+    void qc.invalidateQueries({ queryKey: ['game', game.id] })
     void qc.invalidateQueries({ queryKey: ['games'] })
   }
-  const applyJob = jobs?.jobs.find((j) => j.slug === game.slug && j.type === 'apply-mods' && (j.status === 'running' || j.status === 'queued'))
-  const lastApply = jobs?.jobs.find((j) => j.slug === game.slug && j.type === 'apply-mods')
+  const applyJob = jobs?.jobs.find((j) => j.game === game.id && j.type === 'apply-mods' && (j.status === 'running' || j.status === 'queued'))
+  const lastApply = jobs?.jobs.find((j) => j.game === game.id && j.type === 'apply-mods')
   const mods = data?.mods
   const changed = (mods?.files ?? 0) + (mods?.deleted ?? 0)
-  const pending = !!mods && changed > 0 && mods.state !== 'applied'
+  const pending = !!mods && changed > 0 && !mods.applied
 
   const upload = async (files: FileList | null, extract: boolean) => {
     if (!files?.length) return
@@ -65,7 +65,7 @@ export default function FileBrowser({ game }: { game: Game }) {
       fd.append('extract', extract ? '1' : '0')
       fd.append('paths', JSON.stringify(Array.from(files).map((f) => (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name)))
       for (const f of Array.from(files)) fd.append('files', f, f.name)
-      const res = await fetch(`/api/games/${game.slug}/files/upload`, { method: 'POST', body: fd })
+      const res = await fetch(`/api/games/${game.id}/files/upload`, { method: 'POST', body: fd })
       const r = await res.json()
       if (!res.ok) throw new Error(r.error)
       toast(`Added ${r.written.length} file${r.written.length === 1 ? '' : 's'} to your mods`, 'success')
@@ -81,7 +81,7 @@ export default function FileBrowser({ game }: { game: Game }) {
 
   const apply = async () => {
     try {
-      await post(`/api/games/${game.slug}/files/apply`)
+      await post(`/api/games/${game.id}/files/apply`)
       toast('Applying mods…', 'info')
       void qc.invalidateQueries({ queryKey: ['jobs'] })
     } catch (e) {
@@ -225,7 +225,7 @@ export default function FileBrowser({ game }: { game: Game }) {
         onConfirm={async () => {
           setConfirmReset(false)
           try {
-            await post(`/api/games/${game.slug}/files/reset`)
+            await post(`/api/games/${game.id}/files/reset`)
             toast('Restoring the original files…', 'info')
             refresh()
           } catch (e) {
@@ -251,7 +251,7 @@ function FileRow({ game, file, onEdit, onChanged }: { game: Game; file: FileEntr
       toast(errorText(e), 'error')
     }
   }
-  const raw = `/api/games/${game.slug}/files/raw?path=${encodeURIComponent(file.path)}`
+  const raw = `/api/games/${game.id}/files/raw?path=${encodeURIComponent(file.path)}`
   return (
     <div className={cx('flex items-center gap-3 px-4 py-2 text-sm', file.state === 'deleted' && 'opacity-50')}>
       {file.text ? <FileText className="size-4 text-zinc-400" /> : <File className="size-4 text-zinc-500" />}
@@ -291,7 +291,7 @@ function FileRow({ game, file, onEdit, onChanged }: { game: Game; file: FileEntr
               Replace…
             </MenuItem>
             {file.state !== 'base' && (
-              <MenuItem icon={<Undo2 />} onClick={() => (close(), void run(() => post(`/api/games/${game.slug}/files/revert`, { path: file.path }), 'Reverted to the original'))}>
+              <MenuItem icon={<Undo2 />} onClick={() => (close(), void run(() => post(`/api/games/${game.id}/files/revert`, { path: file.path }), 'Reverted to the original'))}>
                 {file.state === 'added' ? 'Remove my file' : 'Revert to original'}
               </MenuItem>
             )}
@@ -300,7 +300,7 @@ function FileRow({ game, file, onEdit, onChanged }: { game: Game; file: FileEntr
                 Hide from game
               </MenuItem>
             ) : file.state === 'deleted' ? (
-              <MenuItem icon={<Eye />} onClick={() => (close(), void run(() => post(`/api/games/${game.slug}/files/revert`, { path: file.path }), 'File restored'))}>
+              <MenuItem icon={<Eye />} onClick={() => (close(), void run(() => post(`/api/games/${game.id}/files/revert`, { path: file.path }), 'File restored'))}>
                 Unhide
               </MenuItem>
             ) : null}
@@ -316,7 +316,7 @@ function EditorDialog({ game, path, isNew, onClose, onSaved }: { game: Game; pat
   const [text, setText] = useState<string | null>(isNew ? '' : null)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
-  const raw = `/api/games/${game.slug}/files/raw?path=${encodeURIComponent(path)}`
+  const raw = `/api/games/${game.id}/files/raw?path=${encodeURIComponent(path)}`
   if (text === null) {
     void fetch(raw)
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))

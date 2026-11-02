@@ -50,18 +50,18 @@ export class JobManager {
     void this.pump()
   }
 
-  enqueue(type: string, slug: string, params: unknown): string {
+  enqueue(type: string, game: string, params: unknown): string {
     if (!this.handlers.has(type)) throw new Error(`Unknown job type ${type}`)
     const id = newId('j')
-    this.db.insertJob({ id, type, slug, params: JSON.stringify(params ?? {}) })
+    this.db.insertJob({ id, type, game, params: JSON.stringify(params ?? {}) })
     this.notify()
     void this.pump()
     return id
   }
 
-  /** Returns an active (queued or running) job of the given type for a game. */
-  activeFor(slug: string): JobRow | null {
-    return this.db.listJobs(200).find((j) => j.slug === slug && (j.status === 'queued' || j.status === 'running')) ?? null
+  /** Returns the active (queued or running) job of a game. */
+  activeFor(game: string): JobRow | null {
+    return this.db.listJobs(200).find((j) => j.game === game && (j.status === 'queued' || j.status === 'running')) ?? null
   }
 
   cancel(id: string): boolean {
@@ -82,7 +82,7 @@ export class JobManager {
   retry(id: string): string | null {
     const job = this.db.getJob(id)
     if (!job || job.status === 'queued' || job.status === 'running') return null
-    return this.enqueue(job.type, job.slug, parseJson(job.params, {}))
+    return this.enqueue(job.type, job.game, parseJson(job.params, {}))
   }
 
   getLog(id: string): string {
