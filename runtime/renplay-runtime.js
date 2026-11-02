@@ -909,6 +909,73 @@
   // ---------------------------------------------------------------- game.zip cache
 
   var CACHE = 'renplay-gamezip-v1'
+
+  /*
+   * Downloads game.zip so that a dropped connection (seen with HTTP/3 through
+   * the gateway) resumes where it stopped instead of leaving the engine
+   * waiting forever. Builds never change, so a byte range is safe to append.
+   */
+  function downloadGameZip(url, init) {
+    return origFetch(url, init).then(function (res) {
+      var total = Number(res.headers.get('content-length')) || 0
+      if (!res.ok || !res.body || !total || res.headers.get('content-encoding')) return res
+      var reader = res.body.getReader()
+      var received = 0
+      var failures = 0
+      var reconnect = function (err) {
+        if (++failures > 8) throw err
+        log('game.zip download interrupted at', Math.round(received / 1e6), 'MB (' + (err && err.message) + '); resuming')
+        return new Promise(function (r) {
+          setTimeout(r, Math.min(15000, 1000 * failures))
+        })
+          .then(function () {
+            return origFetch(url, { headers: { Range: 'bytes=' + received + '-' }, cache: 'no-store' })
+          })
+          .then(function (r) {
+            var range = r.headers.get('content-range') || ''
+            if (r.status !== 206 || range.indexOf('bytes ' + received + '-') !== 0 || !r.body) throw new Error('HTTP ' + r.status + ' for the rest of game.zip')
+            reader = r.body.getReader()
+          })
+          .catch(function (e) {
+            return reconnect(e)
+          })
+      }
+      var next = function (controller) {
+        return reader.read().then(
+          function (r) {
+            if (r.done) {
+              if (received < total) return reconnect(new Error('connection closed early')).then(function () {
+                return next(controller)
+              })
+              controller.close()
+              return
+            }
+            received += r.value.length
+            failures = 0
+            controller.enqueue(r.value)
+          },
+          function (e) {
+            return reconnect(e).then(function () {
+              return next(controller)
+            })
+          },
+        )
+      }
+      var body = new ReadableStream({
+        pull: function (controller) {
+          return next(controller).catch(function (e) {
+            post('error', { message: 'Could not download the game (' + ((e && e.message) || e) + ').' })
+            throw e
+          })
+        },
+        cancel: function (reason) {
+          return reader.cancel(reason)
+        },
+      })
+      return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers })
+    })
+  }
+
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : input && input.url
     if (url && 'caches' in window && /(^|\/)game\.zip(\?|$)/.test(url)) {
@@ -922,7 +989,7 @@
               gameZipSize = Number(hit.headers.get('content-length')) || 0
               return hit
             }
-            return origFetch(input, init).then(function (res) {
+            return downloadGameZip(abs, init).then(function (res) {
               gameZipSize = Number(res.headers.get('content-length')) || 0
               if (res.ok) {
                 cache.keys().then(function (keys) {
@@ -937,7 +1004,7 @@
           })
         })
         .catch(function () {
-          return origFetch(input, init)
+          return downloadGameZip(abs, init)
         })
     }
     return origFetch(input, init)
