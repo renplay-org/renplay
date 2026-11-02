@@ -721,9 +721,119 @@
       })
   }
 
-  // ---------------------------------------------------------------- game.zip cache
+  // ---------------------------------------------------------------- engine
 
   var origFetch = window.fetch.bind(window)
+
+  /*
+   * The shared engine (renpy.wasm + renpy.data, ~37 MB) is fetched as the
+   * prebuilt .gz files and unpacked here with DecompressionStream. Proxies in
+   * front of renplay tend to strip Accept-Encoding or undo Content-Encoding,
+   * but leave a plain .gz download alone. Both files are kept in Cache Storage
+   * (immutable per engine id), and renpy.js is only started once renpy.data
+   * is in memory, which the engine's package loader needs synchronously.
+   */
+  var ENGINE_CACHE = 'renplay-engine-v1'
+  var engine = null
+
+  function cachedFile(name, type, onBytes) {
+    var url = new URL(cfg.engineBase + name, location.href).toString()
+    var gz = typeof DecompressionStream === 'function' && typeof TransformStream === 'function'
+    var cacheP = 'caches' in window ? caches.open(ENGINE_CACHE).catch(function () { return null }) : Promise.resolve(null)
+    return cacheP.then(function (cache) {
+      return (cache ? cache.match(url).catch(function () { return null }) : Promise.resolve(null)).then(function (hit) {
+        if (hit) {
+          onBytes(Number(hit.headers.get('content-length')) || 0, true)
+          return hit
+        }
+        var download = function (src, unzip) {
+          return origFetch(src, { credentials: 'same-origin' }).then(function (res) {
+            if (!res.ok || !res.body) throw new Error('HTTP ' + res.status + ' for ' + src)
+            var counted = res.body.pipeThrough(
+              new TransformStream({
+                transform: function (chunk, ctl) {
+                  onBytes(chunk.length, false)
+                  ctl.enqueue(chunk)
+                },
+              }),
+            )
+            var body = unzip ? counted.pipeThrough(new DecompressionStream('gzip')) : counted
+            var out = new Response(body, { headers: { 'content-type': type } })
+            if (cache) cache.put(url, out.clone()).catch(function () {})
+            return out
+          })
+        }
+        return (gz ? download(url + '.gz', true) : Promise.reject(new Error('no DecompressionStream'))).catch(function (e) {
+          if (gz) console.warn('[renplay] compressed engine download failed, using the plain file', e)
+          return download(url, false)
+        })
+      })
+    })
+  }
+
+  function loadEngine() {
+    var sizes = { 'renpy.wasm': 6.1e6, 'renpy.data': 5.5e6 }
+    var got = 0
+    var fromCache = 0
+    var onBytes = function (n, cached) {
+      if (cached) fromCache++
+      else got += n
+      if (typeof window.progress === 'function') window.progress(got, sizes['renpy.wasm'] + sizes['renpy.data'])
+    }
+    var wasm = cachedFile('renpy.wasm', 'application/wasm', onBytes)
+    var data = cachedFile('renpy.data', 'application/octet-stream', onBytes).then(function (r) {
+      return r.arrayBuffer()
+    })
+    engine = { wasm: wasm, data: data }
+    var t0 = Date.now()
+    data.then(
+      function (buf) {
+        Module.getPreloadedPackage = function () {
+          Module.getPreloadedPackage = null
+          return buf
+        }
+        log('engine ready in', Date.now() - t0, 'ms', fromCache ? '(cached)' : '')
+        var s = document.createElement('script')
+        s.src = cfg.engineBase + 'renpy.js'
+        s.async = true
+        document.body.appendChild(s)
+      },
+      function (e) {
+        console.error('[renplay] engine download failed', e)
+        var s = document.createElement('script')
+        s.src = cfg.engineBase + 'renpy.js'
+        document.body.appendChild(s)
+      },
+    )
+  }
+
+  if (cfg.engineBase && cfg.loadEngine) {
+    Module.instantiateWasm = function (imports, receive) {
+      var plain = function () {
+        return origFetch(cfg.engineBase + 'renpy.wasm', { credentials: 'same-origin' })
+          .then(function (r) { return r.arrayBuffer() })
+          .then(function (b) { return WebAssembly.instantiate(b, imports) })
+      }
+      engine.wasm
+        .then(function (res) {
+          return WebAssembly.instantiateStreaming(res, imports).catch(function (e) {
+            console.warn('[renplay] streaming compile failed, retrying', e)
+            return plain()
+          })
+        }, plain)
+        .then(function (r) {
+          receive(r.instance, r.module)
+        })
+        .catch(function (e) {
+          console.error('[renplay] could not start the engine', e)
+        })
+      return {}
+    }
+    loadEngine()
+  }
+
+  // ---------------------------------------------------------------- game.zip cache
+
   var CACHE = 'renplay-gamezip-v1'
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : input && input.url

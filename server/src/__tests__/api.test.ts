@@ -122,7 +122,9 @@ describe('renderIndex', () => {
   it('points engine files at the shared store', () => {
     const html = renderIndex(INDEX, { slug: 's', build: 'b', zipRev: 3, engine: 'abc', saveDir: null, screen: null, title: 'T', runtimeVersion: 'v' })
     expect(html).toContain('src="/engine/abc/renpy-pre.js"')
-    expect(html).toContain('src="/engine/abc/renpy.js"')
+    // renpy.js is started by the runtime once the engine is downloaded.
+    expect(html).not.toMatch(/src="[^"]*renpy\.js"/)
+    expect(html).toContain('"loadEngine":true')
     expect(html).toContain("'game.zip?r=3'")
     expect(html).toContain('viewport-fit=cover')
   })
