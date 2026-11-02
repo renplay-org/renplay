@@ -37,6 +37,9 @@ http {
 
   gzip on;
   gzip_static on;
+  # Requests arrive through proxies (Via header); without this nginx serves
+  # the 37 MB engine uncompressed instead of the prebuilt .gz files.
+  gzip_proxied any;
   gzip_vary on;
   gzip_comp_level 5;
   gzip_min_length 1024;
