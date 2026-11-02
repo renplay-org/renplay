@@ -17,8 +17,13 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: true } },
 })
 
-// Old builds registered Ren'Py service workers under /play/<game>/; they are no longer used.
+// renplay 1.x let Ren'Py register service workers (and their caches) under
+// /play/<game>/. They are no longer used; remove them.
 navigator.serviceWorker?.getRegistrations?.().then((regs) => regs.forEach((r) => void r.unregister())).catch(() => {})
+globalThis.caches
+  ?.keys()
+  .then((keys) => keys.filter((k) => !k.startsWith('renplay-')).forEach((k) => void caches.delete(k)))
+  .catch(() => {})
 
 const fallback = (
   <div className="flex h-[60vh] items-center justify-center">

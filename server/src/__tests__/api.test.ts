@@ -90,6 +90,11 @@ describe('HTTP API', () => {
     await request(app.app).get(slots.slots[0].screenshot).expect(200)
   })
 
+  it('answers keepalive requests with headers right away', async () => {
+    const res = await request(app.app).get('/api/keepalive?hold=0').expect(200)
+    expect(res.text).toMatch(/idle|busy/)
+  })
+
   it('refuses unsafe save paths', async () => {
     await request(app.app).put('/api/saves/fixture-game/file?path=../../etc/passwd').send(Buffer.from('x')).expect(400)
     await request(app.app).put('/api/saves/fixture-game/file?path=persistent').send(Buffer.from('x')).expect(400)

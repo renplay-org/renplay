@@ -194,7 +194,7 @@ function startKeepalive(cfg: Config): { stop: () => void } {
   let req: http.ClientRequest | null = null
   const loop = () => {
     if (stopped) return
-    const url = new URL('/api/keepalive?hold=100', cfg.keepaliveUrl)
+    const url = new URL('/api/keepalive?hold=120', cfg.keepaliveUrl)
     const mod = url.protocol === 'https:' ? https : http
     req = mod.request(
       url,

@@ -5,7 +5,9 @@ Thanks for your interest in contributing to Renplay!
 ## Bug Reports
 
 Open a [bug report](https://github.com/renplay-web/renplay/issues/new?template=bug_report.yml).
-For issues with progressive download / large game setup, please fill out the checklist — it helps narrow down the most common cause.
+For a game that fails to install, attach the job log from the Activity page.
+
+Games that work well belong in the [catalog](https://github.com/renplay-web/catalog), not in this repo.
 
 ## Feature Requests
 
@@ -13,8 +15,8 @@ Start a [discussion](https://github.com/renplay-web/renplay/discussions) first t
 
 ## Pull Requests
 
-1. Fork the repo and create a branch from `main`
+1. Fork the repo and create a branch from `dev`
 2. Run `make dev` to test your changes locally
-3. Make sure both `server/` and `selector/` compile cleanly (`npm run build` in each)
+3. Run `make test` (server tests and UI type check)
 4. Update the README if your change affects setup or usage
-5. Open a PR against `main`
+5. Open a PR against `dev`

@@ -2,7 +2,7 @@ import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import type { Db, GameRow } from '../db.js'
 import { readSaveMeta, readSaveScreenshot, slotInfo } from '../saves/savefile.js'
-import { SHARED_DIRS, type SaveStore } from '../saves/store.js'
+import type { SaveStore } from '../saves/store.js'
 import { sha1 } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/paths.js'
 
@@ -48,20 +48,19 @@ export function createSavesRouter(store: SaveStore, db: Db): Router {
     res.json({ saveDir: g.save_dir || null, files, lazy, serverTime: Date.now() })
   })
 
-  /** Resolves a ~/.renpy-relative path to (folder, name). Any folder is allowed. */
-  const resolvePath = (g: GameRow, raw: unknown): { dir: string; name: string } => {
+  /**
+   * Resolves a ~/.renpy-relative path to (folder, name). Any folder is allowed:
+   * games read and write each other's folders like on desktop. The game's own
+   * folder is only learned from config.save_directory (POST /save-dir), never
+   * guessed from paths, since a write may belong to another game's folder.
+   */
+  const resolvePath = (_g: GameRow, raw: unknown): { dir: string; name: string } => {
     const rel = cleanRelPath(raw)
     const slash = rel.indexOf('/')
     if (slash === -1) throw new HttpError(400, 'Path must be inside a save folder')
     const top = rel.slice(0, slash)
     const name = rel.slice(slash + 1)
     if (!isSaveDirName(top)) throw new HttpError(400, 'Invalid save folder')
-    if (!g.save_dir && !(SHARED_DIRS as readonly string[]).includes(top)) {
-      // First save of a game whose folder was not detected at install time;
-      // the runtime confirms it with config.save_directory shortly after.
-      db.updateGame(g.slug, { save_dir: top, save_dir_source: 'runtime' })
-      g.save_dir = top
-    }
     return { dir: top, name }
   }
 

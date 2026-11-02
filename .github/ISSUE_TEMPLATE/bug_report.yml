@@ -7,7 +7,8 @@ body:
       value: |
         Thanks for taking the time to fill out this bug report.
 
-        Before submitting, please make sure you've read the [preparing a game](https://github.com/renplay-web/renplay#preparing-a-game) section in the README.
+        If a game fails to install, attach the job log (Activity → Log). If it installs but misbehaves,
+        include the browser console output from the game page.
 
   - type: textarea
     id: description
@@ -43,29 +44,28 @@ body:
       description: Server logs, browser console errors, or screenshots.
       render: shell
 
-  - type: checkboxes
-    id: progressive
+  - type: input
+    id: game
     attributes:
-      label: Progressive Download / Large Game Setup
-      description: |
-        If your bug involves a game not loading assets correctly, or a `game.zip` that is unexpectedly large,
-        please confirm the following.
-      options:
-        - label: I extracted **all** `.rpa` archives before running the web build
-        - label: I deleted every `.rpa` file after extraction (`find game/ -name '*.rpa'` returns nothing)
-        - label: I checked for archives that may be nested in subdirectories (e.g., `game/archive.rpa`, `game/images.rpa`, …)
-        - label: I re-ran the web build after extraction (not using a stale build)
+      label: Game and archive
+      description: Game title, version and the archive file name you installed from (if the bug is game-specific)
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      description: e.g., Safari 26 on iPad, Chrome on macOS
 
   - type: input
     id: version
     attributes:
       label: Renplay Version
-      description: Git commit hash or tag (run `git log --oneline -1`)
+      description: Shown at the bottom of Settings, or the image tag you run
     validations:
       required: true
 
   - type: input
     id: renpy-version
     attributes:
-      label: Ren'Py SDK Version
-      description: e.g., 8.5.3
+      label: Ren'Py version of the game
+      description: Shown on the game's Details tab, e.g., 8.3.4

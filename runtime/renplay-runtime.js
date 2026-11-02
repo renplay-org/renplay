@@ -321,10 +321,6 @@
     var data = bytes ? new Uint8Array(bytes) : null
     state.queue.set(path, { data: data, mtime: mtime })
     idbPut(path, data, mtime, false)
-    if (!state.saveDir) {
-      var top = path.split('/')[0]
-      if (top !== 'tokens' && top !== 'persistent') state.saveDir = top
-    }
     pump()
   }
 

@@ -22,11 +22,24 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, sdk: S
     res.json({ ok: true, uptime: process.uptime(), version })
   })
 
-  /** Held open by the job runner (through the scale-to-zero proxy) to keep the pod alive. */
-  router.get('/keepalive', async (req, res) => {
-    const hold = Math.min(120, Math.max(0, Number(req.query['hold']) || 0))
-    await new Promise((r) => setTimeout(r, hold * 1000))
-    res.json({ ok: true, busy: jobs.isBusy() })
+  /**
+   * Held open by the job runner (through the scale-to-zero proxy) to keep the
+   * pod alive. Headers go out immediately: proxies give up on responses whose
+   * headers take longer than their header timeout, but stream bodies fine.
+   */
+  router.get('/keepalive', (req, res) => {
+    const hold = Math.min(150, Math.max(0, Number(req.query['hold']) || 0))
+    res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' })
+    res.flushHeaders()
+    const tick = setInterval(() => res.write('.'), 10_000)
+    const done = setTimeout(() => {
+      clearInterval(tick)
+      res.end(jobs.isBusy() ? 'busy\n' : 'idle\n')
+    }, hold * 1000)
+    req.on('close', () => {
+      clearInterval(tick)
+      clearTimeout(done)
+    })
   })
 
   router.get('/system', async (_req, res) => {
