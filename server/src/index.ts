@@ -1,53 +1,26 @@
-import express from 'express'
-import { createSavesRouter } from './routes/saves.js'
-import { createGamesRouter } from './routes/games.js'
-import { createV1Router } from './routes/v1.js'
-import { mkdir } from 'node:fs/promises'
-import { FsStorage } from './saves/fs.js'
-import { Database } from './db/index.js'
+import { availableParallelism } from 'node:os'
+import { createApp } from './app.js'
+import { loadConfig } from './config.js'
 
-const PORT = parseInt(process.env['PORT'] || '3000', 10)
-const SAVES_DIR = process.env['SAVES_DIR'] || '/data/saves'
-const DATA_DIR = process.env['DATA_DIR'] || '/data'
-const GAMES_DIR = process.env['GAMES_DIR'] || '/games'
+// sharp and zlib run on libuv's thread pool, which defaults to 4 threads.
+process.env['UV_THREADPOOL_SIZE'] ??= String(Math.max(8, Math.min(32, availableParallelism() + 2)))
 
 async function main() {
-  const db = await Database.open(DATA_DIR)
-
-  await mkdir(`${DATA_DIR}/thumbnails`, { recursive: true })
-  await mkdir(`${DATA_DIR}/walkthroughs`, { recursive: true })
-
-  const app = express()
-  app.use(express.json({ limit: '50mb' }))
-
-  const saveStorage = new FsStorage(SAVES_DIR)
-  app.use('/api/saves', createSavesRouter(saveStorage, db))
-
-  app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, uptime: process.uptime() })
+  const cfg = loadConfig()
+  const { app, close } = await createApp(cfg, { runtimePath: process.env['RENPLAY_RUNTIME_PATH'] })
+  const server = app.listen(cfg.port, '127.0.0.1', () => {
+    console.log(`renplay server listening on 127.0.0.1:${cfg.port}`)
+    console.log(`  games=${cfg.gamesDir} archives=${cfg.archivesDir} data=${cfg.dataDir} internal=${cfg.internalDir}`)
   })
-
-  app.use('/api/games', createGamesRouter(db))
-
-  app.use('/api/v1', createV1Router(db, `${DATA_DIR}/thumbnails`, GAMES_DIR))
-
-  app.get('/api/saves/sync-client.js', (_req, res) => {
-    res.type('text/javascript').send('// served by nginx directly')
-  })
-
-  // Scan games on startup
-  const scanResult = await db.scanLibrary(GAMES_DIR)
-  if (scanResult.created.length > 0) {
-    console.log(`Auto-scanned ${scanResult.created.length} new game(s): ${scanResult.created.join(', ')}`)
+  server.requestTimeout = 0
+  server.headersTimeout = 65_000
+  const stop = () => {
+    server.close()
+    close()
+    process.exit(0)
   }
-  await db.save()
-
-  app.listen(PORT, () => {
-    console.log(`server listening on port ${PORT}`)
-    console.log(`  SAVES_DIR=${SAVES_DIR}`)
-    console.log(`  DATA_DIR=${DATA_DIR}`)
-    console.log(`  GAMES_DIR=${GAMES_DIR}`)
-  })
+  process.on('SIGTERM', stop)
+  process.on('SIGINT', stop)
 }
 
 main().catch((err) => {

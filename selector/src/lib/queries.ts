@@ -1,0 +1,75 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
+import { api, type Archive, type FilesResponse, type Game, type Job, type Recipe, type SavesResponse, type SystemInfo } from './api'
+
+export function useGames() {
+  return useQuery({
+    queryKey: ['games'],
+    queryFn: () => api<{ games: Game[] }>('/api/games').then((r) => r.games),
+    refetchInterval: (q) => (q.state.data?.some((g) => g.job) ? 2000 : false),
+  })
+}
+
+export function useGame(slug: string | undefined) {
+  return useQuery({
+    queryKey: ['game', slug],
+    queryFn: () => api<{ game: Game }>(`/api/games/${slug}`).then((r) => r.game),
+    enabled: !!slug,
+    refetchInterval: (q) => (q.state.data?.job ? 2000 : false),
+  })
+}
+
+export function useSaves(slug: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['saves', slug],
+    queryFn: () => api<SavesResponse>(`/api/saves/${slug}`),
+    enabled: !!slug && enabled,
+  })
+}
+
+export function useJobs() {
+  const qc = useQueryClient()
+  const q = useQuery({
+    queryKey: ['jobs'],
+    queryFn: () => api<{ jobs: Job[]; busy: boolean }>('/api/jobs?limit=40'),
+    refetchInterval: (q) => (q.state.data?.jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 1500 : 15000),
+  })
+  // Refresh game data when a job finishes.
+  const active = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const now = new Set((q.data?.jobs ?? []).filter((j) => j.status === 'running' || j.status === 'queued').map((j) => j.id))
+    let finished = false
+    for (const id of active.current) if (!now.has(id)) finished = true
+    active.current = now
+    if (finished) {
+      void qc.invalidateQueries({ queryKey: ['games'] })
+      void qc.invalidateQueries({ queryKey: ['game'] })
+      void qc.invalidateQueries({ queryKey: ['archives'] })
+      void qc.invalidateQueries({ queryKey: ['files'] })
+      void qc.invalidateQueries({ queryKey: ['system'] })
+    }
+  }, [q.data, qc])
+  return q
+}
+
+export function useArchives() {
+  return useQuery({ queryKey: ['archives'], queryFn: () => api<{ dir: string; archives: Archive[] }>('/api/archives') })
+}
+
+export function useCatalog() {
+  return useQuery({
+    queryKey: ['catalog'],
+    queryFn: () => api<{ status: { fetchedAt: number; urls: string[]; errors: string[]; count: number }; games: Recipe[] }>('/api/catalog'),
+  })
+}
+
+export function useSystem() {
+  return useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('/api/system') })
+}
+
+export function useFiles(slug: string, dir: string) {
+  return useQuery({
+    queryKey: ['files', slug, dir],
+    queryFn: () => api<FilesResponse>(`/api/games/${slug}/files?dir=${encodeURIComponent(dir)}`),
+  })
+}
