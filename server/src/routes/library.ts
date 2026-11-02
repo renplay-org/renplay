@@ -5,9 +5,8 @@ import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
 import type { Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
-import { parseJson, type Db } from '../db.js'
+import { parseJson, type Db, type GameSource } from '../db.js'
 import type { JobManager } from '../jobs.js'
-import { gameSource, type Library } from '../library.js'
 import { inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
 import { exists, newId } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
@@ -19,7 +18,6 @@ export interface LibraryDeps {
   cfg: Config
   db: Db
   jobs: JobManager
-  library: Library
   catalog: Catalog
 }
 
@@ -47,14 +45,8 @@ async function listArchiveFiles(root: string): Promise<Array<{ rel: string; size
 }
 
 export function createLibraryRouter(deps: LibraryDeps): Router {
-  const { cfg, db, jobs, library, catalog } = deps
+  const { cfg, db, jobs, catalog } = deps
   const router = Router()
-
-  router.post('/library/scan', async (_req, res) => {
-    const r = await library.scan()
-    for (const slug of r.needsAnalysis) if (!jobs.activeFor(slug)) jobs.enqueue('analyze', slug, { slug })
-    res.json(r)
-  })
 
   // ---- archives -------------------------------------------------------------
 
@@ -62,8 +54,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     const files = await listArchiveFiles(cfg.archivesDir)
     const installedBy = new Map<string, string>()
     for (const g of db.allGames()) {
-      const s = gameSource(g)
-      if (s.archive) installedBy.set(s.archive, g.slug)
+      const s = parseJson<GameSource>(g.source, {})
+      if (s.archive) installedBy.set(s.archive, g.id)
     }
     const known = new Map(db.allArchives().map((a) => [a.path, a]))
     for (const k of known.keys()) if (!files.some((f) => f.rel === k)) db.deleteArchive(k)
@@ -83,8 +75,10 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
           sha256,
           info,
           installedAs: installedBy.get(f.rel) ?? null,
-          recipe: match ? { id: match.recipe.id, title: match.recipe.title, version: match.release.version, status: match.release.status, exact: match.exact } : null,
-          existingGame: info?.saveDir ? (db.gameBySaveDir(info.saveDir)?.slug ?? null) : null,
+          recipe: match
+            ? { id: match.recipe.id, title: match.recipe.title, version: match.release?.version ?? null, status: match.release?.status ?? 'untested', exact: match.exact }
+            : null,
+          existingGame: (match ? db.gameByRecipe(match.recipe.id)?.id : null) ?? (info?.saveDir ? (db.gameBySaveDir(info.saveDir)?.id ?? null) : null),
         }
       }),
     })
@@ -104,7 +98,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
       sha256: prev && prev.size === st.size && prev.mtime_ms === Math.floor(st.mtimeMs) ? prev.sha256 : '',
       info: JSON.stringify(info),
     })
-    res.json({ info, existingGame: info.saveDir ? (db.gameBySaveDir(info.saveDir)?.slug ?? null) : null })
+    res.json({ info, existingGame: info.saveDir ? (db.gameBySaveDir(info.saveDir)?.id ?? null) : null })
   })
 
   router.post('/archives/hash', (req, res) => {
@@ -129,16 +123,17 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     if (!source || (source.kind !== 'archive' && source.kind !== 'url')) throw new HttpError(400, 'source must be {kind:"archive",path} or {kind:"url",url}')
     if (source.kind === 'archive') cleanRelPath(source.path)
     if (source.kind === 'url' && !/^https?:\/\//i.test(String(source.url))) throw new HttpError(400, 'Invalid URL')
-    if (b.slug !== undefined && b.slug !== null && !isSlug(b.slug)) throw new HttpError(400, 'Invalid slug')
-    if (b.slug && jobs.activeFor(b.slug)) throw new HttpError(409, 'A job is already running for this game')
-    const id = jobs.enqueue('import', b.slug ?? '', {
+    if (b.game !== undefined && b.game !== null && !isSlug(b.game)) throw new HttpError(400, 'Invalid game id')
+    if (b.game && jobs.activeFor(b.game)) throw new HttpError(409, 'A job is already running for this game')
+    const id = jobs.enqueue('import', b.game ?? '', {
       source,
-      slug: b.slug || undefined,
-      title: typeof b.title === 'string' ? b.title : undefined,
+      game: b.game || undefined,
+      title: typeof b.title === 'string' && b.title.trim() ? b.title.trim() : undefined,
+      recipeId: typeof b.recipeId === 'string' ? b.recipeId : undefined,
+      engine: typeof b.engine === 'string' && b.engine ? b.engine : undefined,
       optimizeImages: b.optimizeImages !== false,
       imageQuality: typeof b.imageQuality === 'number' ? Math.min(100, Math.max(50, b.imageQuality)) : undefined,
       reapplyMods: !!b.reapplyMods,
-      recipeId: typeof b.recipeId === 'string' ? b.recipeId : undefined,
     })
     res.json({ jobId: id })
   })
@@ -218,8 +213,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     res.json({
       status: catalog.status(),
       games: catalog.list().map((r) => {
-        const local = games.find((g) => g.catalog_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
-        return { ...r, _base: undefined, local: local ? { slug: local.slug, status: local.status, version: local.version } : null }
+        const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
+        return { ...r, _base: undefined, local: local ? { id: local.id, status: local.status, version: local.version } : null }
       }),
     })
   })

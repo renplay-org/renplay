@@ -15,21 +15,23 @@ export interface Config {
   dataDir: string
   savesDir: string
   saveHistoryDir: string
-  gamesDir: string
-  /** Renplay-managed internals on the games volume: sdk, engines, work, trash. */
-  internalDir: string
-  /** Original game archives (zip/7z/rar). Drop folder and install source. */
-  archivesDir: string
-  workDir: string
-  trashDir: string
-  sdkDir: string
-  enginesDir: string
-  uploadsDir: string
-  overlaysDir: string
-  thumbnailsDir: string
+  coversDir: string
   walkthroughsDir: string
-  sdkVersion: string
+  overlaysDir: string
+  /** Installed games: <gamesDir>/<id>/<build>/. */
+  gamesDir: string
+  /** renplay internals on the games volume: engines, work, purge, uploads. */
+  internalDir: string
+  /** Original game archives (zip/7z/rar): drop folder and reinstall source. */
+  archivesDir: string
+  enginesDir: string
+  workDir: string
+  purgeDir: string
+  uploadsDir: string
+  enginesUrl: string
   catalogUrls: string[]
+  /** Pin every build to this engine version instead of the latest 8.x. */
+  defaultEngine: string
   /** Optional URL that routes back to this pod through the scale-to-zero proxy. */
   keepaliveUrl: string
   keepaliveHost: string
@@ -47,22 +49,22 @@ export function loadConfig(): Config {
     dataDir,
     savesDir: env('SAVES_DIR', join(dataDir, 'saves')),
     saveHistoryDir: env('SAVE_HISTORY_DIR', join(dataDir, 'save-history')),
+    coversDir: join(dataDir, 'covers'),
+    walkthroughsDir: join(dataDir, 'walkthroughs'),
+    overlaysDir: env('OVERLAYS_DIR', join(dataDir, 'overlays')),
     gamesDir,
     internalDir,
     archivesDir: env('ARCHIVES_DIR', join(gamesDir, '_archives')),
-    workDir: join(internalDir, 'work'),
-    trashDir: join(internalDir, 'trash'),
-    sdkDir: join(internalDir, 'sdk'),
     enginesDir: join(internalDir, 'engines'),
+    workDir: join(internalDir, 'work'),
+    purgeDir: join(internalDir, 'purge'),
     uploadsDir: join(internalDir, 'uploads'),
-    overlaysDir: env('OVERLAYS_DIR', join(dataDir, 'overlays')),
-    thumbnailsDir: join(dataDir, 'thumbnails'),
-    walkthroughsDir: join(dataDir, 'walkthroughs'),
-    sdkVersion: env('RENPY_SDK_VERSION', '8.5.3'),
+    enginesUrl: env('RENPLAY_ENGINES_URL', 'https://renplay-web.github.io/engines/index.json'),
     catalogUrls: env('RENPLAY_CATALOG_URLS', 'https://renplay-web.github.io/catalog/index.json')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
+    defaultEngine: env('RENPLAY_ENGINE', ''),
     keepaliveUrl: env('RENPLAY_KEEPALIVE_URL', ''),
     keepaliveHost: env('RENPLAY_KEEPALIVE_HOST', ''),
     imageQuality: envInt('RENPLAY_IMAGE_QUALITY', 88),

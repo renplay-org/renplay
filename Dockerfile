@@ -13,10 +13,10 @@ COPY server/ server/
 RUN cd server && npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim
-# nginx: static files from the games volume; libarchive-tools (bsdtar): 7z/rar
-# archives and the Ren'Py SDK tarball; the Ren'Py SDK itself needs glibc.
+# nginx serves the games volume; libarchive-tools (bsdtar) unpacks 7z/rar
+# archives. Ren'Py engines come prebuilt from renplay-web/engines.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools bzip2 curl ca-certificates \
+ && apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools curl ca-certificates \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled /var/log/nginx \
  && mkdir -p /app
 

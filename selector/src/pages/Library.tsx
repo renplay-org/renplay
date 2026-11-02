@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Gamepad2, Play, Plus, RotateCcw, Search, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import GameCard, { Cover } from '../components/GameCard'
 import { Button, Empty, cx } from '../components/ui'
@@ -13,8 +13,8 @@ type Filter = 'all' | 'installed' | 'not_installed'
 function ContinueHero({ game }: { game: Game }) {
   const navigate = useNavigate()
   const { data } = useQuery({
-    queryKey: ['saves', game.slug],
-    queryFn: () => api<SavesResponse>(`/api/saves/${game.slug}`),
+    queryKey: ['saves', game.id],
+    queryFn: () => api<SavesResponse>(`/api/saves/${game.id}`),
     enabled: game.saves.count > 0,
   })
   const latest = data?.slots.find((s) => s.kind !== 'internal' && s.valid)
@@ -46,14 +46,14 @@ function ContinueHero({ game }: { game: Game }) {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {latest ? (
-              <Button variant="primary" size="lg" icon={<RotateCcw className="size-5" />} onClick={() => navigate(`/play/${game.slug}?resume=${encodeURIComponent(slotName(latest.file))}`)}>
+              <Button variant="primary" size="lg" icon={<RotateCcw className="size-5" />} onClick={() => navigate(`/play/${game.id}?resume=${encodeURIComponent(slotName(latest.file))}`)}>
                 Resume
               </Button>
             ) : null}
-            <Button variant={latest ? 'glass' : 'primary'} size="lg" icon={<Play className="size-5" />} onClick={() => navigate(`/play/${game.slug}`)}>
+            <Button variant={latest ? 'glass' : 'primary'} size="lg" icon={<Play className="size-5" />} onClick={() => navigate(`/play/${game.id}`)}>
               {latest ? 'Main menu' : 'Play'}
             </Button>
-            <Link to={`/game/${game.slug}`}>
+            <Link to={`/game/${game.id}`}>
               <Button variant="glass" size="lg">
                 Details
               </Button>
@@ -70,8 +70,34 @@ function ContinueHero({ game }: { game: Game }) {
   )
 }
 
+const COUNT_KEY = 'renplay:library-size'
+
+/**
+ * Placeholders while the library loads: as many as there were games last
+ * time (none for an empty library), and only if loading takes a moment.
+ */
+function LoadingGrid() {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), 250)
+    return () => clearTimeout(t)
+  }, [])
+  const n = Math.min(12, Number(localStorage.getItem(COUNT_KEY) ?? 4) || 0)
+  if (!show || !n) return null
+  return (
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} className="skeleton aspect-video animate-fade-in rounded-2xl" />
+      ))}
+    </div>
+  )
+}
+
 export default function Library() {
   const { data: games, isLoading, error } = useGames()
+  useEffect(() => {
+    if (games) localStorage.setItem(COUNT_KEY, String(games.length))
+  }, [games])
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [tag, setTag] = useState<string | null>(null)
@@ -146,11 +172,7 @@ export default function Library() {
       )}
 
       {isLoading ? (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="skeleton aspect-video rounded-2xl" />
-          ))}
-        </div>
+        <LoadingGrid />
       ) : !games?.length ? (
         <Empty
           icon={<Gamepad2 className="size-10" />}
@@ -170,7 +192,7 @@ export default function Library() {
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {shown.map((g, i) => (
-            <GameCard key={g.slug} game={g} index={i} />
+            <GameCard key={g.id} game={g} index={i} />
           ))}
         </div>
       )}

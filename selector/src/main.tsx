@@ -38,10 +38,10 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <Suspense fallback={fallback}>
             <Routes>
-              <Route path="/play/:slug" element={<Player />} />
+              <Route path="/play/:id" element={<Player />} />
               <Route element={<AppShell />}>
                 <Route path="/" element={<Library />} />
-                <Route path="/game/:slug" element={<GamePage />} />
+                <Route path="/game/:id" element={<GamePage />} />
                 <Route path="/add" element={<AddGames />} />
                 <Route path="/activity" element={<Activity />} />
                 <Route path="/settings" element={<Settings />} />

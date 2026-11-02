@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Download, FolderSearch, HardDrive, Package, RefreshCw } from 'lucide-react'
+import { Download, HardDrive, Package, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Button, Progress, Spinner, errorText, useToast } from '../components/ui'
 import { post } from '../lib/api'
@@ -27,7 +27,6 @@ export default function Settings() {
   const { data: catalog } = useCatalog()
   const qc = useQueryClient()
   const toast = useToast()
-  const [scanning, setScanning] = useState(false)
   const [persisted, setPersisted] = useState<boolean | null>(null)
   if (isLoading || !sys) return <Spinner />
   const run = async (fn: () => Promise<unknown>, ok: string) => {
@@ -63,33 +62,41 @@ export default function Settings() {
               Data <code className="text-zinc-400">{sys.paths.data}</code>
             </div>
           </div>
-          <Button
-            size="sm"
-            icon={<FolderSearch className="size-4" />}
-            loading={scanning}
-            onClick={async () => {
-              setScanning(true)
-              await run(() => post('/api/library/scan'), 'Library rescanned')
-              setScanning(false)
-            }}
-          >
-            Rescan games folder
-          </Button>
+          {sys.purging > 0 && <p className="text-xs text-zinc-500">Deleting {sys.purging} removed item{sys.purging === 1 ? '' : 's'} in the background.</p>}
+          {sys.orphans.length > 0 && (
+            <p className="text-xs text-amber-300/90">
+              Folders in the games folder that belong to no game: {sys.orphans.join(', ')}. renplay leaves them alone.
+            </p>
+          )}
         </section>
 
         <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
           <h2 className="flex items-center gap-2 font-semibold text-white">
-            <Package className="size-4" /> Ren’Py
+            <Package className="size-4" /> Ren’Py engines
           </h2>
           <p className="text-sm text-zinc-400">
-            Games are built with the Ren’Py {sys.sdk.version} SDK. It is downloaded from renpy.org (checksum-verified) the first time it is needed.
+            Games run on the official Ren’Py web engine of a matching version, downloaded the first time a game needs it and shared by all games that use it. Unused engines are removed automatically.
           </p>
-          <p className="text-sm text-zinc-300">
-            Installed: {sys.sdk.installed.length ? sys.sdk.installed.join(', ') : 'not yet'} · shared engines: {sys.engines.length}
+          <div className="divide-y divide-white/[0.06] text-sm">
+            {sys.engines.installed.length === 0 && <p className="py-2 text-zinc-500">None installed yet.</p>}
+            {sys.engines.installed.map((e) => (
+              <div key={e.version} className="flex items-center justify-between gap-4 py-2">
+                <span className="text-zinc-100">Ren’Py {e.version}</span>
+                <span className="truncate text-right text-xs text-zinc-500">
+                  {bytes(e.bytes)} · {e.usedBy.length ? e.usedBy.join(', ') : 'unused'}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-zinc-500">
+            Available: {sys.engines.available.map((e) => e.version).join(', ') || 'index unreachable'} ·{' '}
+            <a className="hover:text-zinc-300" href="https://github.com/renplay-web/engines" target="_blank" rel="noreferrer">
+              renplay-web/engines
+            </a>
           </p>
-          {!sys.sdk.installed.includes(sys.sdk.version) && (
-            <Button size="sm" onClick={() => run(() => post('/api/system/sdk'), 'Downloading the SDK in the background')}>
-              Download SDK now
+          {sys.engines.installed.some((e) => !e.usedBy.length) && (
+            <Button size="sm" onClick={() => run(() => post('/api/system/prune'), 'Unused engines removed')}>
+              Remove unused engines
             </Button>
           )}
         </section>

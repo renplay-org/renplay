@@ -8,7 +8,7 @@ import { safeJoin } from '../util/paths.js'
 import { readAll, type ArchiveSource, type SourceEntry } from './archive.js'
 import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, type GameMeta } from './detect.js'
 import { isOptimizableImage, transcodeImage, type ImagePolicy } from './optimize.js'
-import { makePlaceholder, streamsImage, type ProgressiveRule } from './progressive.js'
+import { makePlaceholder, streamsImage, type Placeholder, type ProgressiveRule } from './progressive.js'
 import { rangeKey, readRpaFile, readRpaIndex, splitRpa, type RpaSink } from './rpa.js'
 
 export type Layout = { kind: 'project'; root: string } | { kind: 'web'; root: string }
@@ -66,6 +66,8 @@ export interface ExtractResult {
   stats: ExtractStats
   /** Paths (relative to game/) of the main-menu-like images seen, for covers. */
   coverCandidates: string[]
+  /** Placeholders for streamed images, keyed by path relative to game/. */
+  placeholders: Map<string, Placeholder>
 }
 
 const SKIP_GAME = [/^cache\//i, /^saves\//i, /\.rpyb$/i, /(^|\/)\.ds_store$/i, /(^|\/)thumbs\.db$/i, /\.bak$/i]
@@ -83,7 +85,8 @@ export async function extractProject(
   policy: ImagePolicy,
   concurrency: number,
   ctx: JobContext,
-  placeholders?: { dir: string; rules: ProgressiveRule[] },
+  rules: ProgressiveRule[],
+  isExcluded: (rel: string) => boolean = () => false,
 ): Promise<ExtractResult> {
   const stats: ExtractStats = {
     files: 0,
@@ -100,7 +103,7 @@ export async function extractProject(
   const written = new Set<string>()
   const ranges = new Map<string, string>()
   const limiter = new Limiter(concurrency)
-  const dims: Record<string, [number, number]> = {}
+  const placeholders = new Map<string, Placeholder>()
   const gameDir = join(dest, 'game')
   await mkdir(gameDir, { recursive: true })
 
@@ -132,7 +135,7 @@ export async function extractProject(
       } catch {}
       continue
     }
-    if (SKIP_GAME.some((r) => r.test(g))) continue
+    if (SKIP_GAME.some((r) => r.test(g)) || isExcluded(g)) continue
     if (/\.rpa$/i.test(g)) {
       rpas.push({ rel: g, e })
       total += e.size
@@ -156,7 +159,7 @@ export async function extractProject(
     stats.bytesOut += data.length
   }
 
-  const needsPlaceholder = (g: string) => !!placeholders && streamsImage(`game/${g}`, placeholders.rules)
+  const needsPlaceholder = (g: string) => streamsImage(g, rules)
   const wantsImageTask = (g: string, size: number) =>
     size < 256 << 20 && ((policy.enabled && isOptimizableImage(g)) || needsPlaceholder(g))
 
@@ -168,14 +171,9 @@ export async function extractProject(
       stats.imageBytesAfter += r.data.length
     }
     await writeBuffer(g, r.data)
-    if (placeholders && needsPlaceholder(g)) {
+    if (needsPlaceholder(g)) {
       const ph = await makePlaceholder(r.data)
-      if (ph) {
-        const out = safeJoin(join(placeholders.dir, 'files'), g)
-        await mkdir(dirname(out), { recursive: true })
-        await writeFile(out, ph.png)
-        dims[g] = [ph.width, ph.height]
-      }
+      if (ph) placeholders.set(g, ph)
     }
   }
 
@@ -240,7 +238,7 @@ export async function extractProject(
       open: async (name, size, key) => {
         // Archive paths are relative to the game directory, regardless of where the .rpa sits.
         const g = name
-        if (SKIP_GAME.some((r) => r.test(g)) || written.has(g.toLowerCase())) return null
+        if (SKIP_GAME.some((r) => r.test(g)) || isExcluded(g) || written.has(g.toLowerCase())) return null
         noteFile(g)
         stats.bytesIn += size
         if (/\.rpy$/i.test(g) && size < 4 << 20) return bufferSink(async (buf) => {
@@ -267,17 +265,21 @@ export async function extractProject(
         // Shared entries copy an earlier output; make sure its encode finished.
         await limiter.drain()
         const g = file.name
-        if (SKIP_GAME.some((r) => r.test(g)) || written.has(g.toLowerCase())) return
+        if (SKIP_GAME.some((r) => r.test(g)) || isExcluded(g) || written.has(g.toLowerCase())) return
         const seg = file.segments.length === 1 ? file.segments[0]! : null
         const same = seg ? ranges.get(rangeKey(seg.offset, seg.length, seg.prefix)) : undefined
         noteFile(g)
         if (same) {
           await mkdir(dirname(safeJoin(gameDir, g)), { recursive: true })
           await copyFile(safeJoin(gameDir, same), safeJoin(gameDir, g))
+          const ph = placeholders.get(same)
+          if (ph && needsPlaceholder(g)) placeholders.set(g, ph)
           return
         }
         ctx.log(`Re-reading ${g} from ${archiveRel} (shared or overlapping data)`)
-        await writeBuffer(g, await readRpaFile(e, file))
+        const data = await readRpaFile(e, file)
+        if (wantsImageTask(g, data.length)) await handleImage(g, data)
+        else await writeBuffer(g, data)
       },
     })
     tick(e.size - reported, archiveRel)
@@ -285,11 +287,7 @@ export async function extractProject(
   }
 
   await limiter.drain()
-  if (placeholders) {
-    await mkdir(placeholders.dir, { recursive: true })
-    await writeFile(join(placeholders.dir, 'index.json'), JSON.stringify(dims))
-    ctx.log(`Prepared ${Object.keys(dims).length} streaming placeholders`)
-  }
+  ctx.log(`Prepared ${placeholders.size} streaming placeholders`)
 
   // save_directory from compiled scripts if sources were not shipped.
   if (!meta.saveDir) {
@@ -303,11 +301,15 @@ export async function extractProject(
       }
     }
   }
-  return { meta, stats, coverCandidates }
+  return { meta, stats, coverCandidates, placeholders }
 }
 
 function inspectSource(src: string, meta: GameMeta): void {
   if (!meta.saveDir) meta.saveDir = saveDirFromSource(src) ?? undefined
+  if (!meta.screen) {
+    const m = src.match(/\bgui\.init\(\s*(\d{3,5})\s*,\s*(\d{3,5})\s*\)/)
+    if (m) meta.screen = [Number(m[1]), Number(m[2])]
+  }
   if (!meta.title || !meta.version) {
     const nv = nameVersionFromSource(src)
     meta.title ??= nv.name
@@ -350,14 +352,3 @@ function fileSink(path: string, onBytes: (n: number) => void): RpaSink {
     },
   }
 }
-
-/** Default progressive download rules: GUI and short UI sounds stay in game.zip, everything else streams. */
-export const DEFAULT_PROGRESSIVE_RULES = `# Written by renplay. First matching rule wins.
-# '+' streams on demand, '-' keeps the file in game.zip.
-- image game/gui/**
-+ image game/**
-- music game/gui/**
-- music game/voice/**
-+ music game/**
-+ voice game/**
-`

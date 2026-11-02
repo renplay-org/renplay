@@ -1,54 +1,54 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, rmSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 
-export type GameStatus = 'installed' | 'not_installed' | 'installing' | 'broken'
-export type GameLayout = 'legacy' | 'managed' | 'none'
+export type GameStatus = 'installed' | 'not_installed' | 'installing'
 
 export interface GameSource {
-  kind: 'archive' | 'upload' | 'url' | 'legacy'
   /** Path relative to the archives dir. */
   archive?: string
-  archiveSha256?: string
-  archiveSize?: number
+  size?: number
+  sha256?: string
   url?: string
-  filename?: string
+}
+
+export interface BuildOptions {
+  optimizeImages?: boolean
+  imageQuality?: number
 }
 
 export interface GameRow {
-  slug: string
+  id: string
   title: string
-  tags: string
-  thumbnail: string
-  walkthrough: string
-  sort_order: number
-  created_at: string
-  updated_at: string
-  save_dir: string
-  save_dir_source: string
-  status: GameStatus
-  layout: GameLayout
-  build_id: string
+  recipe_id: string
   version: string
   renpy_version: string
   engine: string
+  /** Current build directory name, `<build>` or `<build>.m<modhash>`. */
+  build: string
+  status: GameStatus
   size_bytes: number
   file_count: number
   screen_w: number
   screen_h: number
+  save_dir: string
+  /** Set when the save folder was entered by hand; detection leaves it alone. */
+  save_dir_locked: number
   source: string
-  options: string
-  catalog_id: string
+  build_options: string
+  tags: string
+  cover: string
+  walkthrough: string
+  created_at: string
   installed_at: string
   last_played_at: string
-  mods_state: string
-  notes: string
+  updated_at: string
 }
 
 export interface JobRow {
   id: string
   type: string
-  slug: string
+  game: string
   status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
   stage: string
   progress: number
@@ -62,7 +62,74 @@ export interface JobRow {
   finished_at: string
 }
 
+export interface ArchiveRow {
+  path: string
+  size: number
+  mtime_ms: number
+  sha256: string
+  info: string
+  scanned_at: string
+}
+
 const now = () => new Date().toISOString()
+
+const SCHEMA = `
+  CREATE TABLE games (
+    id              TEXT PRIMARY KEY,
+    title           TEXT NOT NULL,
+    recipe_id       TEXT NOT NULL DEFAULT '',
+    version         TEXT NOT NULL DEFAULT '',
+    renpy_version   TEXT NOT NULL DEFAULT '',
+    engine          TEXT NOT NULL DEFAULT '',
+    build           TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'not_installed',
+    size_bytes      INTEGER NOT NULL DEFAULT 0,
+    file_count      INTEGER NOT NULL DEFAULT 0,
+    screen_w        INTEGER NOT NULL DEFAULT 0,
+    screen_h        INTEGER NOT NULL DEFAULT 0,
+    save_dir        TEXT NOT NULL DEFAULT '',
+    save_dir_locked INTEGER NOT NULL DEFAULT 0,
+    source          TEXT NOT NULL DEFAULT '{}',
+    build_options   TEXT NOT NULL DEFAULT '{}',
+    tags            TEXT NOT NULL DEFAULT '[]',
+    cover           TEXT NOT NULL DEFAULT '',
+    walkthrough     TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL,
+    installed_at    TEXT NOT NULL DEFAULT '',
+    last_played_at  TEXT NOT NULL DEFAULT '',
+    updated_at      TEXT NOT NULL
+  );
+  CREATE INDEX games_save_dir ON games(save_dir);
+  CREATE TABLE jobs (
+    id          TEXT PRIMARY KEY,
+    type        TEXT NOT NULL,
+    game        TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL,
+    stage       TEXT NOT NULL DEFAULT '',
+    progress    REAL NOT NULL DEFAULT 0,
+    message     TEXT NOT NULL DEFAULT '',
+    params      TEXT NOT NULL DEFAULT '{}',
+    result      TEXT NOT NULL DEFAULT '{}',
+    error       TEXT NOT NULL DEFAULT '',
+    log         TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    started_at  TEXT NOT NULL DEFAULT '',
+    finished_at TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX jobs_status ON jobs(status);
+  CREATE TABLE archives (
+    path       TEXT PRIMARY KEY,
+    size       INTEGER NOT NULL,
+    mtime_ms   INTEGER NOT NULL,
+    sha256     TEXT NOT NULL DEFAULT '',
+    info       TEXT NOT NULL DEFAULT '{}',
+    scanned_at TEXT NOT NULL DEFAULT ''
+  );
+  CREATE TABLE settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`
 
 export class Db {
   readonly raw: DatabaseSync
@@ -73,182 +140,72 @@ export class Db {
     this.raw.exec('PRAGMA journal_mode = WAL')
     this.raw.exec('PRAGMA synchronous = NORMAL')
     this.raw.exec('PRAGMA busy_timeout = 5000')
-    this.raw.exec('PRAGMA foreign_keys = ON')
-    this.migrate()
+    const v = (this.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+    if (v === 0) {
+      this.raw.exec(SCHEMA)
+      this.raw.exec('PRAGMA user_version = 1')
+    }
   }
 
+  /**
+   * Opens library.db. The database of renplay 1.x / 2.0 (renplay.db) described
+   * the old build layout and is dropped; saves live in files and are untouched.
+   */
   static open(dataDir: string): Db {
-    return new Db(join(dataDir, 'renplay.db'))
-  }
-
-  private version(): number {
-    const row = this.raw.prepare('PRAGMA user_version').get() as { user_version: number }
-    return row.user_version
-  }
-
-  private columns(table: string): Set<string> {
-    const rows = this.raw.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
-    return new Set(rows.map((r) => r.name))
-  }
-
-  private migrate(): void {
-    const v = this.version()
-    if (v < 4) {
-      // Fresh database, or one created by the original sql.js schema.
-      this.raw.exec(`
-        CREATE TABLE IF NOT EXISTS games (
-          slug        TEXT PRIMARY KEY,
-          title       TEXT NOT NULL,
-          tags        TEXT DEFAULT '[]',
-          thumbnail   TEXT DEFAULT '',
-          sort_order  INTEGER DEFAULT 0,
-          created_at  TEXT DEFAULT (datetime('now')),
-          updated_at  TEXT DEFAULT (datetime('now'))
-        )`)
-      const cols = this.columns('games')
-      if (!cols.has('walkthrough')) this.raw.exec("ALTER TABLE games ADD COLUMN walkthrough TEXT DEFAULT ''")
-      if (!cols.has('save_dir')) this.raw.exec("ALTER TABLE games ADD COLUMN save_dir TEXT DEFAULT ''")
-      if (!cols.has('thumbnail')) this.raw.exec("ALTER TABLE games ADD COLUMN thumbnail TEXT DEFAULT ''")
+    for (const old of ['renplay.db', 'renplay.db-wal', 'renplay.db-shm']) {
+      const p = join(dataDir, old)
+      if (existsSync(p)) {
+        rmSync(p, { force: true })
+        if (old === 'renplay.db') console.log('removed the old library database (renplay.db)')
+      }
     }
-    if (v < 5) {
-      const cols = this.columns('games')
-      const add: Array<[string, string]> = [
-        ['save_dir_source', "TEXT DEFAULT ''"],
-        ['status', "TEXT DEFAULT 'installed'"],
-        ['layout', "TEXT DEFAULT 'legacy'"],
-        ['build_id', "TEXT DEFAULT ''"],
-        ['version', "TEXT DEFAULT ''"],
-        ['renpy_version', "TEXT DEFAULT ''"],
-        ['engine', "TEXT DEFAULT ''"],
-        ['size_bytes', 'INTEGER DEFAULT 0'],
-        ['file_count', 'INTEGER DEFAULT 0'],
-        ['screen_w', 'INTEGER DEFAULT 0'],
-        ['screen_h', 'INTEGER DEFAULT 0'],
-        ['source', "TEXT DEFAULT '{}'"],
-        ['options', "TEXT DEFAULT '{}'"],
-        ['catalog_id', "TEXT DEFAULT ''"],
-        ['installed_at', "TEXT DEFAULT ''"],
-        ['last_played_at', "TEXT DEFAULT ''"],
-        ['mods_state', "TEXT DEFAULT ''"],
-        ['notes', "TEXT DEFAULT ''"],
-      ]
-      for (const [name, type] of add) if (!cols.has(name)) this.raw.exec(`ALTER TABLE games ADD COLUMN ${name} ${type}`)
-      // The original scanner stored build.directory_name as save_dir, which is not
-      // config.save_directory. Forget it so detection runs again.
-      this.raw.exec("UPDATE games SET save_dir = '' WHERE save_dir_source = ''")
-      this.raw.exec(`
-        CREATE TABLE IF NOT EXISTS jobs (
-          id          TEXT PRIMARY KEY,
-          type        TEXT NOT NULL,
-          slug        TEXT DEFAULT '',
-          status      TEXT NOT NULL,
-          stage       TEXT DEFAULT '',
-          progress    REAL DEFAULT 0,
-          message     TEXT DEFAULT '',
-          params      TEXT DEFAULT '{}',
-          result      TEXT DEFAULT '{}',
-          error       TEXT DEFAULT '',
-          log         TEXT DEFAULT '',
-          created_at  TEXT NOT NULL,
-          started_at  TEXT DEFAULT '',
-          finished_at TEXT DEFAULT ''
-        );
-        CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
-        CREATE TABLE IF NOT EXISTS archives (
-          path        TEXT PRIMARY KEY,
-          size        INTEGER NOT NULL,
-          mtime_ms    INTEGER NOT NULL,
-          sha256      TEXT DEFAULT '',
-          info        TEXT DEFAULT '{}',
-          scanned_at  TEXT DEFAULT ''
-        );
-        CREATE TABLE IF NOT EXISTS settings (
-          key   TEXT PRIMARY KEY,
-          value TEXT
-        );
-        CREATE TABLE IF NOT EXISTS meta (
-          key   TEXT PRIMARY KEY,
-          value TEXT
-        );
-      `)
-      this.raw.exec('PRAGMA user_version = 5')
-    }
+    return new Db(join(dataDir, 'library.db'))
   }
 
   // ---- games -------------------------------------------------------------
 
   allGames(): GameRow[] {
-    return this.raw.prepare('SELECT * FROM games ORDER BY sort_order ASC, title COLLATE NOCASE ASC').all() as unknown as GameRow[]
+    return this.raw.prepare('SELECT * FROM games ORDER BY title COLLATE NOCASE').all() as unknown as GameRow[]
   }
 
-  getGame(slug: string): GameRow | null {
-    return (this.raw.prepare('SELECT * FROM games WHERE slug = ?').get(slug) as unknown as GameRow) ?? null
+  getGame(id: string): GameRow | null {
+    return (this.raw.prepare('SELECT * FROM games WHERE id = ?').get(id) as unknown as GameRow) ?? null
   }
 
-  insertGame(row: Partial<GameRow> & { slug: string; title: string }): void {
-    const next = this.raw.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM games').get() as { n: number }
-    const full: Record<string, SQLInputValue> = {
-      tags: '[]',
-      thumbnail: '',
-      walkthrough: '',
-      save_dir: '',
-      save_dir_source: '',
-      status: 'installed',
-      layout: 'none',
-      source: '{}',
-      options: '{}',
-      sort_order: next.n,
-      created_at: now(),
-      updated_at: now(),
-      ...(row as Record<string, SQLInputValue>),
-    }
+  insertGame(row: Partial<GameRow> & { id: string; title: string }): void {
+    const full: Record<string, SQLInputValue> = { created_at: now(), updated_at: now(), ...(row as Record<string, SQLInputValue>) }
     const keys = Object.keys(full)
-    this.raw
-      .prepare(`INSERT INTO games (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`)
-      .run(...keys.map((k) => full[k]!))
+    this.raw.prepare(`INSERT INTO games (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`).run(...keys.map((k) => full[k]!))
   }
 
-  updateGame(slug: string, updates: Partial<GameRow>): boolean {
-    const entries = Object.entries(updates).filter(([k, v]) => k !== 'slug' && v !== undefined)
-    if (!entries.length) return !!this.getGame(slug)
+  updateGame(id: string, updates: Partial<GameRow>): boolean {
+    const entries = Object.entries(updates).filter(([k, v]) => k !== 'id' && v !== undefined)
+    if (!entries.length) return !!this.getGame(id)
     entries.push(['updated_at', now()])
     const res = this.raw
-      .prepare(`UPDATE games SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE slug = ?`)
-      .run(...entries.map(([, v]) => v as SQLInputValue), slug)
+      .prepare(`UPDATE games SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`)
+      .run(...entries.map(([, v]) => v as SQLInputValue), id)
     return Number(res.changes) > 0
   }
 
-  deleteGame(slug: string): boolean {
-    return Number(this.raw.prepare('DELETE FROM games WHERE slug = ?').run(slug).changes) > 0
-  }
-
-  reorderGames(slugs: string[]): void {
-    const stmt = this.raw.prepare('UPDATE games SET sort_order = ? WHERE slug = ?')
-    this.tx(() => slugs.forEach((s, i) => stmt.run(i, s)))
+  deleteGame(id: string): boolean {
+    return Number(this.raw.prepare('DELETE FROM games WHERE id = ?').run(id).changes) > 0
   }
 
   gameBySaveDir(saveDir: string): GameRow | null {
     return (this.raw.prepare('SELECT * FROM games WHERE save_dir = ? LIMIT 1').get(saveDir) as unknown as GameRow) ?? null
   }
 
-  tx<T>(fn: () => T): T {
-    this.raw.exec('BEGIN')
-    try {
-      const r = fn()
-      this.raw.exec('COMMIT')
-      return r
-    } catch (e) {
-      this.raw.exec('ROLLBACK')
-      throw e
-    }
+  gameByRecipe(recipeId: string): GameRow | null {
+    return (this.raw.prepare('SELECT * FROM games WHERE recipe_id = ? LIMIT 1').get(recipeId) as unknown as GameRow) ?? null
   }
 
   // ---- jobs --------------------------------------------------------------
 
-  insertJob(job: Pick<JobRow, 'id' | 'type' | 'slug' | 'params'>): void {
+  insertJob(job: Pick<JobRow, 'id' | 'type' | 'game' | 'params'>): void {
     this.raw
-      .prepare("INSERT INTO jobs (id, type, slug, status, params, created_at) VALUES (?, ?, ?, 'queued', ?, ?)")
-      .run(job.id, job.type, job.slug, job.params, now())
+      .prepare("INSERT INTO jobs (id, type, game, status, params, created_at) VALUES (?, ?, ?, 'queued', ?, ?)")
+      .run(job.id, job.type, job.game, job.params, now())
   }
 
   getJob(id: string): JobRow | null {
@@ -257,18 +214,14 @@ export class Db {
 
   listJobs(limit = 50): JobRow[] {
     return this.raw
-      .prepare(
-        "SELECT * FROM jobs ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, created_at DESC LIMIT ?",
-      )
+      .prepare("SELECT * FROM jobs ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, created_at DESC LIMIT ?")
       .all(limit) as unknown as JobRow[]
   }
 
   updateJob(id: string, updates: Partial<JobRow>): void {
     const entries = Object.entries(updates).filter(([k, v]) => k !== 'id' && v !== undefined)
     if (!entries.length) return
-    this.raw
-      .prepare(`UPDATE jobs SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`)
-      .run(...entries.map(([, v]) => v as SQLInputValue), id)
+    this.raw.prepare(`UPDATE jobs SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...entries.map(([, v]) => v as SQLInputValue), id)
   }
 
   deleteFinishedJobs(): void {
@@ -277,8 +230,8 @@ export class Db {
 
   // ---- archives ----------------------------------------------------------
 
-  getArchive(path: string): { path: string; size: number; mtime_ms: number; sha256: string; info: string } | null {
-    return (this.raw.prepare('SELECT * FROM archives WHERE path = ?').get(path) as any) ?? null
+  getArchive(path: string): ArchiveRow | null {
+    return (this.raw.prepare('SELECT * FROM archives WHERE path = ?').get(path) as unknown as ArchiveRow) ?? null
   }
 
   upsertArchive(a: { path: string; size: number; mtime_ms: number; sha256?: string; info?: string }): void {
@@ -295,20 +248,15 @@ export class Db {
     this.raw.prepare('DELETE FROM archives WHERE path = ?').run(path)
   }
 
-  allArchives(): Array<{ path: string; size: number; mtime_ms: number; sha256: string; info: string }> {
-    return this.raw.prepare('SELECT * FROM archives ORDER BY path').all() as any
+  allArchives(): ArchiveRow[] {
+    return this.raw.prepare('SELECT * FROM archives ORDER BY path').all() as unknown as ArchiveRow[]
   }
 
   // ---- settings ----------------------------------------------------------
 
   getSetting<T>(key: string, fallback: T): T {
     const row = this.raw.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
-    if (!row) return fallback
-    try {
-      return JSON.parse(row.value) as T
-    } catch {
-      return fallback
-    }
+    return row ? parseJson<T>(row.value, fallback) : fallback
   }
 
   setSetting(key: string, value: unknown): void {

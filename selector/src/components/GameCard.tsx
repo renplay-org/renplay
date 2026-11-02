@@ -1,14 +1,14 @@
 import { CloudOff, Download, Play, Puzzle, Save } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { thumbUrl, type Game } from '../lib/api'
+import { coverUrl, type Game } from '../lib/api'
 import { ago, pct } from '../lib/format'
 import { Badge, Progress, cx } from './ui'
 
 export function Cover({ game, className, rounded = true }: { game: Game; className?: string; rounded?: boolean }) {
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const src = thumbUrl(game)
+  const src = coverUrl(game)
   return (
     <div className={cx('relative overflow-hidden bg-ink-800', rounded && 'rounded-2xl', className)}>
       {!loaded && !failed && src && <div className="skeleton absolute inset-0" />}
@@ -38,7 +38,7 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
   return (
     <div className="group animate-rise" style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}>
       <Link
-        to={`/game/${game.slug}`}
+        to={`/game/${game.id}`}
         className="relative block overflow-hidden rounded-2xl ring-1 ring-white/[0.07] transition-all duration-300 hover:-translate-y-1 hover:ring-white/20 hover:shadow-[0_24px_60px_-20px_rgb(0_0_0/0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
       >
         <Cover game={game} rounded={false} className={cx('aspect-video transition-transform duration-500 group-hover:scale-[1.03]', !installed && 'opacity-55 grayscale-[35%]')} />
@@ -59,7 +59,7 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
           <button
             onClick={(e) => {
               e.preventDefault()
-              navigate(`/play/${game.slug}`)
+              navigate(`/play/${game.id}`)
             }}
             className="absolute right-3 top-3 flex size-11 translate-y-1 items-center justify-center rounded-full bg-white text-black opacity-0 shadow-xl transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 hover:scale-105"
             aria-label={`Play ${game.title}`}

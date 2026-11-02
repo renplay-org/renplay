@@ -1,10 +1,12 @@
 import { readdir, statfs } from 'node:fs/promises'
 import { Router } from 'express'
+import type { Builds } from '../builds.js'
 import type { Config } from '../config.js'
 import type { Db } from '../db.js'
+import type { EngineStore } from '../engines.js'
 import type { JobManager } from '../jobs.js'
-import type { SdkManager } from '../pipeline/sdk.js'
 import { HttpError } from '../util/paths.js'
+import type { Purger } from '../util/purge.js'
 
 async function disk(path: string) {
   try {
@@ -15,7 +17,7 @@ async function disk(path: string) {
   }
 }
 
-export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, sdk: SdkManager, version: string): Router {
+export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string): Router {
   const router = Router()
 
   router.get('/health', (_req, res) => {
@@ -43,28 +45,40 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, sdk: S
   })
 
   router.get('/system', async (_req, res) => {
-    let engines: string[] = []
-    try {
-      engines = (await readdir(cfg.enginesDir)).filter((n) => !n.startsWith('.') && !n.includes('.tmp'))
-    } catch {}
     const games = db.allGames()
+    const used = new Map<string, string[]>()
+    for (const g of games) if (g.engine && g.status === 'installed') used.set(g.engine, [...(used.get(g.engine) ?? []), g.title])
+    const installed = await engines.installed()
+    const available = await engines.available().catch(() => [])
+    const { orphans } = await builds.verify()
     res.json({
       version,
-      sdk: { version: cfg.sdkVersion, installed: await sdk.installed() },
-      engines,
+      engines: {
+        installed: installed.map((e) => ({ ...e, usedBy: used.get(e.version) ?? [] })),
+        available: available.map((e) => ({ version: e.version, renpy: e.renpy, bytes: Object.values(e.files).reduce((n, f) => n + f.size, 0) })),
+        index: cfg.enginesUrl,
+      },
       disk: { games: await disk(cfg.gamesDir), data: await disk(cfg.dataDir) },
       library: {
         games: games.length,
         installed: games.filter((g) => g.status === 'installed').length,
         bytes: games.reduce((n, g) => n + (g.size_bytes || 0), 0),
       },
+      orphans,
+      purging: purger.pending(),
       paths: { games: cfg.gamesDir, archives: cfg.archivesDir, data: cfg.dataDir },
       busy: jobs.isBusy(),
     })
   })
 
-  router.post('/system/sdk', (_req, res) => {
-    res.json({ jobId: jobs.enqueue('install-sdk', '', {}) })
+  /** Removes engines no installed game uses. */
+  router.post('/system/prune', async (_req, res) => {
+    const used = new Set(db.allGames().filter((g) => g.status === 'installed' && g.engine).map((g) => g.engine))
+    res.json({ removed: await engines.prune(used) })
+  })
+
+  router.post('/system/engines/refresh', async (_req, res) => {
+    res.json({ engines: (await engines.available(true)).map((e) => e.version) })
   })
 
   // ---- jobs ---------------------------------------------------------------
@@ -75,7 +89,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, sdk: S
       jobs: db.listJobs(limit).map((j) => ({
         id: j.id,
         type: j.type,
-        slug: j.slug,
+        game: j.game,
         status: j.status,
         stage: j.stage,
         progress: j.progress,
@@ -127,5 +141,5 @@ function safeJson(s: string): unknown {
 function safeParams(s: string): unknown {
   const p = safeJson(s) as Record<string, any> | null
   if (!p) return null
-  return { source: p.source, slug: p.slug, path: p.path }
+  return { source: p.source, game: p.game, path: p.path }
 }

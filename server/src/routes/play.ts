@@ -1,106 +1,93 @@
-import { readFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { readdir } from 'node:fs/promises'
 import { Router } from 'express'
-import type { Config } from '../config.js'
+import { BUILD_RE, baseOf, type Builds } from '../builds.js'
 import type { Db } from '../db.js'
-import { readMarker } from '../library.js'
-import { engineReady } from '../pipeline/engine.js'
+import type { EngineStore } from '../engines.js'
 import { HttpError, assertSlug } from '../util/paths.js'
 
-interface Cached {
-  key: string
-  html: string
-}
-
 /**
- * Serves a game's index.html with renplay's runtime wired in. Everything else
- * under /g/ is static and served by nginx straight from the games volume.
+ * Serves a game page: the engine's page template with renplay's runtime wired
+ * in. Everything else under /g/ is static and served by nginx.
  */
-export function createPlayRouter(cfg: Config, db: Db, runtimeVersion: string): Router {
+export function createPlayRouter(db: Db, builds: Builds, engines: EngineStore, runtimeVersion: string): Router {
   const router = Router()
-  const cache = new Map<string, Cached>()
 
-  router.get(['/g/:slug/:build/', '/g/:slug/:build/index.html'], async (req, res) => {
-    const slug = assertSlug(req.params.slug)
-    const game = db.getGame(slug)
-    if (!game || game.status !== 'installed') throw new HttpError(404, 'Game not installed')
-    const dir = join(cfg.gamesDir, slug)
-    const indexPath = join(dir, 'index.html')
-    let st
-    try {
-      st = await stat(indexPath)
-    } catch {
-      throw new HttpError(404, 'Game files missing')
-    }
-    // Old build ids redirect to the current one, so bookmarks keep working.
-    if (req.params.build !== game.build_id) {
-      res.redirect(302, `/g/${slug}/${game.build_id}/`)
+  router.get(['/g/:id/:build/', '/g/:id/:build/index.html'], async (req, res) => {
+    const id = assertSlug(req.params.id)
+    const game = db.getGame(id)
+    if (!game || game.status !== 'installed' || !game.build) throw new HttpError(404, 'Game not installed')
+    if (req.params.build !== game.build || !BUILD_RE.test(req.params.build)) {
+      // Old build ids redirect to the current one, so bookmarks keep working.
+      res.redirect(302, `/g/${id}/${game.build}/`)
       return
     }
-    const marker = await readMarker(dir)
-    const engine = game.engine && (await engineReady(cfg.enginesDir, game.engine)) ? game.engine : null
-    const key = [st.mtimeMs, game.build_id, marker?.zipRev ?? 0, engine, game.save_dir, game.screen_w, runtimeVersion].join('|')
-    let entry = cache.get(slug)
-    if (!entry || entry.key !== key) {
-      const html = await readFile(indexPath, 'utf-8')
-      entry = {
-        key,
-        html: renderIndex(html, {
-          slug,
-          build: game.build_id,
-          zipRev: marker?.zipRev ?? 0,
-          engine,
-          saveDir: game.save_dir || null,
-          screen: game.screen_w ? [game.screen_w, game.screen_h] : null,
-          title: game.title,
-          runtimeVersion,
-        }),
-      }
-      cache.set(slug, entry)
-    }
+    const template = await engines.template(game.engine)
+    const presplash = await findPresplash(builds.dir(id, baseOf(game.build)))
+    const html = renderPage(template, {
+      id,
+      build: game.build,
+      title: game.title,
+      engine: game.engine,
+      saveDir: game.save_dir || null,
+      screen: game.screen_w ? [game.screen_w, game.screen_h] : null,
+      caches: await builds.caches(id, game.build),
+      presplash: presplash ?? `/engine/${game.engine}/web-presplash.jpg`,
+      runtimeVersion,
+    })
     res.setHeader('Cache-Control', 'no-cache')
-    res.type('html').send(entry.html)
+    res.type('html').send(html)
   })
 
   return router
 }
 
-export interface RenderOptions {
-  slug: string
+async function findPresplash(dir: string): Promise<string | null> {
+  try {
+    return (await readdir(dir)).find((n) => /^web-presplash\.(png|jpe?g|webp)$/i.test(n)) ?? null
+  } catch {
+    return null
+  }
+}
+
+export interface PageOptions {
+  id: string
   build: string
-  zipRev: number
-  engine: string | null
+  title: string
+  engine: string
   saveDir: string | null
   screen: [number, number] | null
-  title: string
+  caches: Array<{ name: string; v: string }>
+  presplash: string
   runtimeVersion: string
 }
 
-export function renderIndex(html: string, o: RenderOptions): string {
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+export function renderPage(template: string, o: PageOptions): string {
   const config = {
-    slug: o.slug,
+    id: o.id,
     build: o.build,
     saveDir: o.saveDir,
     screen: o.screen,
     title: o.title,
-    engineBase: o.engine ? `/engine/${o.engine}/` : null,
-    // The runtime downloads the engine itself and starts renpy.js afterwards.
-    loadEngine: !!o.engine,
+    engineBase: `/engine/${o.engine}/`,
+    caches: o.caches,
   }
   const boot =
     `<script>window.__renplay=${JSON.stringify(config).replace(/</g, '\\u003c')};</script>` +
-    `<script src="/renplay/runtime.js?v=${o.runtimeVersion}"></script>`
+    `<script src="/renplay/runtime.js?v=${o.runtimeVersion}"></script>` +
+    `<script src="/engine/${o.engine}/renpy-pre.js"></script>` +
+    `<script>window.__renplayLate && window.__renplayLate()</script>`
 
-  let out = html
-  // Ren'Py's service worker caches by URL and fights versioned builds; renplay handles caching.
+  let out = template
+  out = out.replace(/<title>[^<]*<\/title>/i, `<title>${esc(o.title)}</title>`)
+  // renplay is the app; the per-game PWA bits of Ren'Py's template do not apply.
+  out = out.replace(/<link[^>]+rel="(manifest|icon|apple-touch-icon)"[^>]*>\s*/gi, '')
   out = out.replace(/navigator\.serviceWorker\.register\(/g, '(function () { return Promise.resolve() })(')
-  out = out.replace(/window\.gameZipURL\s*=\s*(['"])([^'"]+)\1/, (_m, q: string, url: string) => `window.gameZipURL = ${q}${url}?r=${o.zipRev}${q}`)
-  const preTag = /<script[^>]*\ssrc=["']renpy-pre\.js["'][^>]*><\/script>/
-  const late = '<script>window.__renplayLate && window.__renplayLate()</script>'
-  const pre = (o.engine ? `<script src="/engine/${o.engine}/renpy-pre.js"></script>` : '<script src="renpy-pre.js"></script>') + late
-  if (preTag.test(out)) out = out.replace(preTag, boot + pre)
-  else out = out.replace(/<\/head>/i, boot + '</head>')
-  if (o.engine) out = out.replace(/<script[^>]*\ssrc=["']renpy\.js["'][^>]*><\/script>/, '')
+  out = out.replace(/(<img[^>]*id="presplash"[^>]*src=)"[^"]*"/i, `$1"${esc(o.presplash)}"`)
+  out = out.replace(/<script[^>]*\ssrc=["']renpy-pre\.js["'][^>]*><\/script>/, boot)
+  // renpy.js is started by the runtime once the engine is downloaded.
+  out = out.replace(/<script[^>]*\ssrc=["']renpy\.js["'][^>]*><\/script>/, '')
   out = out.replace(/<meta name="viewport"[^>]*>/i, '<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">')
   return out
 }

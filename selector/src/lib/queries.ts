@@ -10,20 +10,20 @@ export function useGames() {
   })
 }
 
-export function useGame(slug: string | undefined) {
+export function useGame(id: string | undefined) {
   return useQuery({
-    queryKey: ['game', slug],
-    queryFn: () => api<{ game: Game }>(`/api/games/${slug}`).then((r) => r.game),
-    enabled: !!slug,
+    queryKey: ['game', id],
+    queryFn: () => api<{ game: Game }>(`/api/games/${id}`).then((r) => r.game),
+    enabled: !!id,
     refetchInterval: (q) => (q.state.data?.job ? 2000 : false),
   })
 }
 
-export function useSaves(slug: string | undefined, enabled = true) {
+export function useSaves(id: string | undefined, enabled = true) {
   return useQuery({
-    queryKey: ['saves', slug],
-    queryFn: () => api<SavesResponse>(`/api/saves/${slug}`),
-    enabled: !!slug && enabled,
+    queryKey: ['saves', id],
+    queryFn: () => api<SavesResponse>(`/api/saves/${id}`),
+    enabled: !!id && enabled,
   })
 }
 
@@ -67,9 +67,9 @@ export function useSystem() {
   return useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('/api/system') })
 }
 
-export function useFiles(slug: string, dir: string) {
+export function useFiles(id: string, dir: string) {
   return useQuery({
-    queryKey: ['files', slug, dir],
-    queryFn: () => api<FilesResponse>(`/api/games/${slug}/files?dir=${encodeURIComponent(dir)}`),
+    queryKey: ['files', id, dir],
+    queryFn: () => api<FilesResponse>(`/api/games/${id}/files?dir=${encodeURIComponent(dir)}`),
   })
 }
