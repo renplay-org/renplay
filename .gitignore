@@ -1,6 +1,6 @@
-data/
-games/
-saves/
+/data/
+/games/
+/saves/
 **/node_modules/
 **/dist/
 *.env
