@@ -163,8 +163,9 @@ except screenshots.
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated
   `## [X.Y.Z] - YYYY-MM-DD` section, and is squash-merged into `main`. CI checks versions and the
   changelog; `release.yml` then tags `vX.Y.Z`, publishes the GitHub release with that changelog
-  section, and pushes the image as `X.Y.Z` and `latest`. Afterwards merge `main` back into `dev`
-  if they diverged.
+  section, and pushes the image as `X.Y.Z` and `latest`. Afterwards `dev` fast-forwards to the
+  release branch. (`main` only gets squashed releases, so it never shares history with `dev`; the
+  release branch records it with `git merge -s ours`.)
 - **Cadence:** release when a coherent set of changes is done and verified on a running instance,
   at least every few weeks while there are changes; patch releases for fixes any time.
 - **Versioning:** SemVer. Minor for features, patch for fixes, major when upgrading needs action

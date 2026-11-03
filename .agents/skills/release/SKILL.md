@@ -28,19 +28,22 @@ SemVer from the last tag (`git tag --sort=-v:refname | head -1`):
 ```sh
 git fetch origin
 git checkout -b release-X.Y.Z origin/dev
+# main only holds squashed releases, whose content dev already has. Record it as merged without
+# taking anything from it, or the release PR conflicts:
+git merge -s ours origin/main -m "Merge main (PREVIOUS) into release-X.Y.Z"
 # server/package.json and selector/package.json: "version": "X.Y.Z"
 # CHANGELOG.md: rename "## [Unreleased]" to "## [X.Y.Z] - YYYY-MM-DD" (today),
 #   add a fresh empty "## [Unreleased]" above it,
 #   and update the compare links at the bottom:
 #   [Unreleased]: …/compare/vX.Y.Z...dev
 #   [X.Y.Z]: …/compare/vPREVIOUS...vX.Y.Z
-(cd server && npm install --package-lock-only) && (cd selector && npm install --package-lock-only)
+# package-lock.json files: change only their two "version" fields (npm install would churn them)
 git commit -am "chore: release X.Y.Z"
 ```
 
 Push the branch and open a pull request into `main` titled `Release X.Y.Z`, with the changelog
-section as the body. Release branches require signed commits; if `main` has commits that `dev`
-lacks, merge them in on GitHub (`gh api repos/renplay-web/renplay/merges -f base=release-X.Y.Z -f head=main`).
+section as the body (`awk` it out of CHANGELOG.md as `release.yml` does). Release branches require
+signed commits.
 
 ## 4. Merge (maintainer)
 
@@ -54,8 +57,10 @@ gh release view vX.Y.Z --repo renplay-web/renplay                        # notes
 docker buildx imagetools inspect ghcr.io/renplay-web/renplay:X.Y.Z       # image exists; note the digest
 ```
 
-Then bring `main` back into `dev` so the next release starts from a common base:
-`gh api repos/renplay-web/renplay/merges -f base=dev -f head=main -f commit_message="Merge main (X.Y.Z) into dev"`.
+Then fast-forward `dev` to the release branch, so `dev` has the version bump and the dated
+changelog: `git push origin release-X.Y.Z:dev` (a fast-forward; `dev` only accepts it from an
+admin). Never leave release-only changes outside `dev`: the next release's `-s ours` merge would
+drop them.
 
 ## 6. Deployment
 
