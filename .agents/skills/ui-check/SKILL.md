@@ -22,8 +22,11 @@ Keep it that way in any ad-hoc Playwright script too, because the backend may ho
 ```sh
 cd server
 npx playwright install chromium webkit     # once
-npm run screenshots -- http://localhost:5199 /tmp/shots [game-id]
+npm run screenshots -- http://localhost:5199 /tmp/shots [game-id] [--sfw]
 ```
+
+`--sfw` turns on Renplay's blur for pictures of adult games. Use it for every screenshot that is
+published anywhere (docs, the website, issues, pull requests).
 
 It captures the library, a game page, details, catalog and settings on a 1440×900 desktop, the
 library and a game page on an iPhone 15 Pro in portrait, and the player in landscape. It exits

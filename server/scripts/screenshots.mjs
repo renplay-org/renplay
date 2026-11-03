@@ -1,14 +1,19 @@
 // Screenshots of a running Renplay, on a phone (WebKit, iPhone 15 Pro) and a desktop (Chromium).
 // Read-only: requests that would change anything on the server are answered locally.
 //
-//   node scripts/screenshots.mjs <base URL> <output dir> [game id]
+//   node scripts/screenshots.mjs <base URL> <output dir> [game id] [--sfw]
+//
+// --sfw blurs pictures of adult games (Renplay's own setting). Use it for
+// anything published: docs, the website, issues.
 //
 // Needs the browsers once: npx playwright install chromium webkit
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium, devices, webkit } from 'playwright'
 
-const [base = 'http://localhost:5199', out = 'screenshots', gameArg] = process.argv.slice(2)
+const args = process.argv.slice(2)
+const sfw = args.includes('--sfw')
+const [base = 'http://localhost:5199', out = 'screenshots', gameArg] = args.filter((a) => a !== '--sfw')
 mkdirSync(out, { recursive: true })
 const errors = []
 
@@ -17,6 +22,7 @@ async function open(browser, options, label) {
   const page = await ctx.newPage()
   await page.route('**/api/**', (r) => (r.request().method() === 'GET' ? r.continue() : r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })))
   page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`))
+  if (sfw) await page.addInitScript(() => localStorage.setItem('renplay:blur-adult-covers', '1'))
   return { ctx, page }
 }
 

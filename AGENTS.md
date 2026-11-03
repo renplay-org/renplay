@@ -36,8 +36,10 @@ These decide most review comments. Follow them without being asked.
   a capital letter too.
 - **Plain, short copy.** Full sentences, no jargon (say "save folder", not "config.save_directory",
   outside developer-facing places), no exclamation marks.
-- **Safe for work by default.** Covers and screenshots in docs must be safe for work, even though
-  many games are adult.
+- **Safe for work on GitHub.** Nothing published (docs, screenshots, the website, the catalog)
+  may show adult art, even though many games are adult. Covers of adult games are linked from the
+  developers' hosting, never copied; screenshots use `--sfw` (adult pictures blurred) or
+  safe-for-work art.
 
 ## Layout
 
@@ -133,8 +135,8 @@ cd selector && RENPLAY_BACKEND=https://renplay.example npm run dev   # UI agains
 # Container
 docker build -t renplay:dev . && docker run -p 8080:8080 -v $PWD/games:/games -v $PWD/data:/data renplay:dev
 
-# Screenshots (phone and desktop) of a running instance, read-only
-cd server && npx playwright install chromium webkit && npm run screenshots -- http://localhost:5199 /tmp/shots
+# Screenshots (phone and desktop) of a running instance, read-only; --sfw for anything published
+cd server && npx playwright install chromium webkit && npm run screenshots -- http://localhost:5199 /tmp/shots --sfw
 ```
 
 `node --check runtime/renplay-runtime.js` checks the runtime's syntax. CI runs all of the above
