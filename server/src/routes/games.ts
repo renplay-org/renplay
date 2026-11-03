@@ -75,7 +75,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     screen: row.screen_w ? ([row.screen_w, row.screen_h] as [number, number]) : null,
     saveDir: row.save_dir || null,
     source: { archive: source.archive ?? null, size: source.size ?? null },
-    canReinstall: !!source.archive,
+    canReinstall: !!source.archive && (await exists(join(deps.cfg.archivesDir, cleanRelPath(source.archive)))),
     recipe: recipe
       ? {
           id: recipe.id,
