@@ -7,6 +7,16 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- In fullscreen, Esc opens the game's menu (Chrome and Edge); hold Esc to leave fullscreen. Other
+  browsers keep Esc for leaving fullscreen, and right-click opens the menu.
+
+### Fixed
+
+- Menus and in-game screens with many small elements run smoothly. Ripples' main menu went from 15
+  to 60 frames per second: the browser no longer waits on the graphics card before every element.
+
 ### Removed
 
 - Installing from a download link. File hosts tie their links to the browser (and network) that
