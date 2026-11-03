@@ -86,5 +86,7 @@ describe('Ren\'Py version', () => {
     const init = 'vc_version = 0\nversion_tuple = (7, 3, 2, vc_version)\n'
     expect(renpyVersionFromVc('vc_version = 320', init)).toBe('7.3.2.320')
     expect(renpyVersionFromVc('vc_version = 320')).toBeUndefined()
+    const both = 'if PY2:\n    version_tuple = (7, 5, 3, vc_version)\nelse:\n    version_tuple = (8, 0, 3, vc_version)\n'
+    expect(renpyVersionFromVc('vc_version = 22090809', both)).toBe('8.0.3.22090809')
   })
 })

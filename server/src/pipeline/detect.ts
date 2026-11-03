@@ -113,10 +113,12 @@ export interface GameMeta {
 export function renpyVersionFromVc(vc: string, init?: string): string | undefined {
   const m = vc.match(/^version\s*=\s*['"]([^'"]+)['"]/m)
   if (m) return m[1]
-  const t = init?.match(/^version_tuple\s*=\s*\((\d+),\s*(\d+),\s*(\d+)/m)
-  if (!t) return undefined
+  // Ren'Py 7.5/8.0 define it twice, for Python 2 and 3: the higher one is the Python 3 build.
+  const tuples = [...(init ?? '').matchAll(/^\s*version_tuple\s*=\s*\((\d+),\s*(\d+),\s*(\d+)/gm)].map((t) => [+t[1]!, +t[2]!, +t[3]!])
+  if (!tuples.length) return undefined
+  const t = tuples.sort((a, b) => b[0]! - a[0]! || b[1]! - a[1]! || b[2]! - a[2]!)[0]!
   const n = vc.match(/^vc_version\s*=\s*(\d+)/m)
-  return `${t[1]}.${t[2]}.${t[3]}${n ? `.${n[1]}` : ''}`
+  return `${t.join('.')}${n ? `.${n[1]}` : ''}`
 }
 
 /** Whether a version string needs renpy/__init__.py to be read as well. */
