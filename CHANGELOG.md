@@ -14,6 +14,11 @@ release notes say what).
 - The catalog's games are not labeled Verified or Known issues any more: being in the catalog means
   a game works. A release that does not work still says so.
 
+### Fixed
+
+- A game installed from a catalog recipe uses the recipe's save folder; Renplay's own guess from the
+  game's options came first and could be wrong (Hero's Harem Guild).
+
 ## [2.7.1] - 2026-11-03
 
 ### Fixed
