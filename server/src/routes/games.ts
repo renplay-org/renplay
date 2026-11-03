@@ -10,6 +10,7 @@ import { parseJson, type Db, type GameRow, type GameSource } from '../db.js'
 import type { JobManager } from '../jobs.js'
 import type { Overlays } from '../mods.js'
 import type { SaveStore } from '../saves/store.js'
+import { playPath } from './play.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, safeJoin } from '../util/paths.js'
 
@@ -69,7 +70,10 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     walkthrough: row.walkthrough || null,
     status: row.status,
     build: row.build || null,
-    playUrl: row.status === 'installed' && row.build ? `/g/${row.id}/${row.build}/` : null,
+    playUrl: row.status === 'installed' && row.build ? playPath(row) : null,
+    family: row.family || 'renpy',
+    /** What made the game, for other engines ("SugarCube 2.36.1 (Twine)"). */
+    engineLabel: row.engine_label || null,
     version: row.version || null,
     renpyVersion: row.renpy_version || null,
     engine: row.engine || null,
@@ -190,7 +194,7 @@ export function createGamesRouter(deps: GameDeps): Router {
       saveDir: g.save_dir || undefined,
       continuesFrom: existing?.continuesFrom,
       match: existing?.match,
-      engine: existing?.engine ?? 'renpy',
+      engine: existing?.engine ?? ((g.family || 'renpy') as 'renpy'),
       runtime: existing?.runtime,
       build: existing?.build,
       releases: [

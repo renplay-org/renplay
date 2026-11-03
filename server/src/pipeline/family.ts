@@ -10,7 +10,7 @@ import { detectLayout, type Layout } from './project.js'
 export type Family = 'renpy' | 'html' | 'godot' | 'unity' | 'rpgmaker-rgss' | 'wolf' | 'kirikiri' | 'unreal' | 'gamemaker' | 'flash'
 
 /** Families this version of Renplay can install. */
-export const INSTALLABLE = new Set<Family>(['renpy'])
+export const INSTALLABLE = new Set<Family>(['renpy', 'html'])
 
 export interface EngineInfo {
   family: Family

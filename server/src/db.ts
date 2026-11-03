@@ -21,8 +21,16 @@ export interface GameRow {
   title: string
   recipe_id: string
   version: string
+  /** Version of the engine the game was made with (for Ren'Py games, the Ren'Py version). */
   renpy_version: string
+  /** Ren'Py runtime the game is built with; empty for other engines. */
   engine: string
+  /** What made the game: renpy, html… (family.ts). */
+  family: string
+  /** What made it, for people: "SugarCube 2.36.1 (Twine)"; empty for Ren'Py. */
+  engine_label: string
+  /** The page or file the game starts from, inside its build's game/; empty for Ren'Py. */
+  entry: string
   /** Current build directory name, `<build>` or `<build>.m<modhash>`. */
   build: string
   status: GameStatus
@@ -137,6 +145,12 @@ export class Db {
     // 2.2: title, tags and cover come from the catalog; nothing is set by hand.
     if (v === 1) this.raw.exec('ALTER TABLE games DROP COLUMN save_dir_locked; ALTER TABLE games DROP COLUMN tags; ALTER TABLE games DROP COLUMN cover;')
     if (v < 2) this.raw.exec('PRAGMA user_version = 2')
+    // 2.6: games of other engines (docs/engines.md). engine stays the Ren'Py runtime version.
+    if (v < 3) {
+      this.raw.exec(
+        "ALTER TABLE games ADD COLUMN family TEXT NOT NULL DEFAULT 'renpy'; ALTER TABLE games ADD COLUMN engine_label TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN entry TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 3",
+      )
+    }
   }
 
   /**

@@ -9,7 +9,7 @@ feature works for Ren'Py and not for another engine, that is fine.
 | Engine | Recognized | Installs | Notes |
 |---|---|---|---|
 | Ren'Py 8, and 7 on the 8 engine | yes | yes | Everything: saves on the server, streaming, phones, mods |
-| HTML: Twine (SugarCube, Harlowe), RPG Maker MV and MZ, TyranoScript, Construct, plain pages | yes | next (phase 2) | They are web pages already |
+| HTML: Twine (SugarCube, Harlowe), RPG Maker MV and MZ, TyranoScript, Construct, plain pages | yes | yes (2.6) | Web pages already. Tested with Twine (SugarCube); RPG Maker MV/MZ, TyranoScript and Construct take the same path but are untested |
 | Godot 4 | yes | phase 3 | Godot's own web export template loads the game's `.pck`. Native plugins (GDExtension) and C# do not run in browsers |
 | Unity WebGL builds | yes | phase 4 | Only builds the developer made for WebGL |
 | Unity PC builds | yes | never | Compiled for one system; a browser cannot run them |
@@ -88,8 +88,13 @@ with a `family` field; entries without one are Ren'Py.
 ## Plan
 
 1. **Recognize** (done in 2.6): detection, schema 3, Add games lists other engines with reasons.
-2. **HTML**: Twine and RPG Maker MV/MZ. Test game: College Daze (SugarCube 2.36.1, 4,100 videos).
-   Done when it installs, plays on a desktop and a phone, and its saves survive another browser.
+2. **HTML** (done in 2.6 for Twine): `pipeline/html.ts` packs the game's folder (images as WebP
+   under their own names); the page is served from the pack with `runtime/renplay-html.js` and the
+   stored `localStorage` (`<save folder>/localStorage.json`) inlined first; the player sandboxes the
+   frame and stores what the runtime sends. Tested with College Daze (SugarCube 2.36.1): plays in
+   Chromium and WebKit, a save made in one browser loads in another, the game cannot reach
+   Renplay's API. Next: an RPG Maker MV or MZ game (MZ keeps saves with localforage, which falls
+   back to `localStorage` when IndexedDB is missing).
 3. **Godot 4**: the single-threaded web template per version, picked from the pack header. Test
    game: Sexting sim stories (Godot 4.6.2, 1.2 GB pack, a native plugin). Its web template loads
    the whole pack into memory, so packs over about 1 GB may not fit on phones; the plugin will be

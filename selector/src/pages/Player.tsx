@@ -97,20 +97,29 @@ export default function Player() {
   const hideTimer = useRef<number | null>(null)
   const resumed = useRef(false)
   const waiters = useRef(new Map<string, () => void>())
+  // Other engines run their own JavaScript, so they play in a sandboxed frame
+  // (opaque origin, no access to Renplay) and their storage comes through here.
+  const sandboxed = !!game && game.family !== 'renpy'
+  const storageWrite = useRef<Promise<unknown>>(Promise.resolve())
 
   const setPrefs = (p: DisplayPrefs) => {
     setPrefsState(p)
     savePrefs(p)
   }
 
-  const send = useCallback((msg: Record<string, unknown>) => {
-    frameRef.current?.contentWindow?.postMessage(msg, location.origin)
-  }, [])
+  const send = useCallback(
+    (msg: Record<string, unknown>) => {
+      // An opaque origin cannot be named; the message goes to that frame only.
+      frameRef.current?.contentWindow?.postMessage(msg, sandboxed ? '*' : location.origin)
+    },
+    [sandboxed],
+  )
 
   // Messages from the in-game runtime.
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      if (e.origin !== location.origin || e.source !== frameRef.current?.contentWindow) return
+      if (e.source !== frameRef.current?.contentWindow) return
+      if (e.origin !== (sandboxed ? 'null' : location.origin)) return
       const d = e.data
       if (!d || typeof d.type !== 'string' || !d.type.startsWith('renplay:')) return
       switch (d.type) {
@@ -125,6 +134,7 @@ export default function Player() {
             send({ type: 'renplay:load', slot: resume })
           }
           send({ type: 'renplay:focus' })
+          send({ type: 'renplay:mute', value: muted })
           break
         case 'renplay:sync':
           setSync({ pending: d.pending, online: d.online, lastSync: d.lastSync })
@@ -136,7 +146,16 @@ export default function Player() {
           void toggleFullscreen(d.enable)
           break
         case 'renplay:flushed':
-          waiters.current.get(d.id)?.()
+          // After the storage that came before it is stored.
+          void storageWrite.current.finally(() => waiters.current.get(d.id)?.())
+          break
+        case 'renplay:storage':
+          if (sandboxed && typeof d.data === 'string' && game?.saveDir) {
+            const path = `${game.saveDir}/localStorage.json`
+            storageWrite.current = storageWrite.current
+              .catch(() => {})
+              .then(() => fetch(`/api/saves/${gameId}/file?path=${encodeURIComponent(path)}`, { method: 'PUT', body: d.data, headers: { 'content-type': 'application/octet-stream', 'x-mtime': String(Date.now()) } }))
+          }
           break
         case 'renplay:exited':
           navigate(`/game/${gameId}`)
@@ -152,7 +171,7 @@ export default function Player() {
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, resume])
+  }, [gameId, resume, sandboxed, game?.saveDir, muted])
 
   useEffect(() => {
     if (game?.screen && !screenSize) setScreenSize(game.screen)
@@ -349,6 +368,7 @@ export default function Player() {
             src={game.playUrl}
             title={game.title}
             allow="autoplay; fullscreen; gamepad; clipboard-read; clipboard-write"
+            sandbox={sandboxed ? 'allow-scripts allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms' : undefined}
             className="absolute border-0 bg-black outline-none"
             style={{ width: rect.width || '100%', height: rect.height || '100%', left: rect.left, top: rect.top }}
           />
@@ -366,7 +386,7 @@ export default function Player() {
           <Cover game={game} className="mb-8 aspect-[63/50] w-56 shadow-2xl ring-1 ring-white/15 sm:w-64" />
           <h1 className="font-display text-2xl font-semibold tracking-tight">{game.title}</h1>
           <p className="mt-2 text-sm text-zinc-400">
-            {resume ? 'Loading your save…' : !progress ? 'Starting engine…' : loadPct >= 1 ? 'Starting game…' : 'Loading game…'}
+            {sandboxed ? 'Loading game…' : resume ? 'Loading your save…' : !progress ? 'Starting engine…' : loadPct >= 1 ? 'Starting game…' : 'Loading game…'}
           </p>
           {failed ? (
             <div className="mt-6 flex flex-col items-center gap-3">
@@ -465,9 +485,11 @@ export default function Player() {
             <IconButton label={muted ? 'Unmute' : 'Mute'} active={muted} onClick={toggleMute}>
               {muted ? <VolumeX className="size-[18px]" /> : <Volume2 className="size-[18px]" />}
             </IconButton>
-            <IconButton label="Saves" active={panel === 'saves'} onClick={() => setPanel(panel === 'saves' ? null : 'saves')}>
-              <Save className="size-[18px]" />
-            </IconButton>
+            {!sandboxed && (
+              <IconButton label="Saves" active={panel === 'saves'} onClick={() => setPanel(panel === 'saves' ? null : 'saves')}>
+                <Save className="size-[18px]" />
+              </IconButton>
+            )}
             {game.walkthrough && (
               <IconButton label="Walkthrough" active={panel === 'walkthrough'} onClick={() => setPanel(panel === 'walkthrough' ? null : 'walkthrough')}>
                 <BookOpen className="size-[18px]" />
@@ -512,7 +534,7 @@ export default function Player() {
             area={area}
             fsMode={fsMode}
             onFullscreen={() => void toggleFullscreen()}
-            onDownloadLog={() => send({ type: 'renplay:download-log' })}
+            onDownloadLog={sandboxed ? undefined : () => send({ type: 'renplay:download-log' })}
           />
         </SidePanel>
       )}
@@ -699,7 +721,8 @@ function DisplayPanel({
   area: { w: number; h: number }
   fsMode: 'api' | 'home-screen' | 'none'
   onFullscreen: () => void
-  onDownloadLog: () => void
+  /** Ren'Py games only. */
+  onDownloadLog?: () => void
 }) {
   return (
     <div className="space-y-6">
@@ -763,14 +786,16 @@ function DisplayPanel({
           <HomeScreenHelp />
         </div>
       )}
-      <div className="flex items-center justify-between border-t border-white/[0.06] pt-4 text-xs text-zinc-500">
-        <button onClick={onDownloadLog} className="hover:text-zinc-300">
-          Download the game’s log
-        </button>
-        <a href="https://www.renpy.org/" target="_blank" rel="noreferrer" className="hover:text-zinc-300">
-          Powered by Ren’Py
-        </a>
-      </div>
+      {onDownloadLog && (
+        <div className="flex items-center justify-between border-t border-white/[0.06] pt-4 text-xs text-zinc-500">
+          <button onClick={onDownloadLog} className="hover:text-zinc-300">
+            Download the game’s log
+          </button>
+          <a href="https://www.renpy.org/" target="_blank" rel="noreferrer" className="hover:text-zinc-300">
+            Powered by Ren’Py
+          </a>
+        </div>
+      )}
     </div>
   )
 }

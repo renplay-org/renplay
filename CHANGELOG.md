@@ -9,11 +9,16 @@ release notes say what).
 
 ### Added
 
-- Add games recognizes downloads of other engines and lists them apart with what made them and why
-  they cannot be installed: Twine (SugarCube, Harlowe), RPG Maker, TyranoScript, Construct, plain
-  HTML games, Godot (with its version, and a warning about native plugins), Unity (WebGL and PC
-  builds), and engines that only make PC programs. Support for the ones a browser can run comes
-  next; `docs/engines.md` has the plan.
+- HTML games install and play: Twine stories (tested with SugarCube), and RPG Maker MV and MZ,
+  TyranoScript and Construct games, untested so far. They play in a sandboxed frame that cannot
+  reach Renplay, with their saves (the browser storage they use) kept on the server, so they
+  follow you to other devices. Mute, fullscreen and Save & exit work; save slots, mods and the
+  script cache are for Ren'Py games only.
+- Add games says what made each download. Downloads of engines Renplay cannot install are listed
+  apart with the reason: Godot (with its version, and a warning about native plugins), Unity (WebGL
+  and PC builds), and engines that only make PC programs. Godot and Unity WebGL support is planned;
+  `docs/engines.md` has the plan.
+- A game's Details tab says what made it.
 
 ### Changed
 

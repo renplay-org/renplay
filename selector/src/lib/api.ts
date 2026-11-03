@@ -11,6 +11,10 @@ export interface Game {
   status: 'installed' | 'not_installed' | 'installing'
   build: string | null
   playUrl: string | null
+  /** What made the game: renpy, or another engine (docs/engines.md). */
+  family: string
+  /** What made it, for other engines: "SugarCube 2.36.1 (Twine)". */
+  engineLabel: string | null
   version: string | null
   renpyVersion: string | null
   engine: string | null

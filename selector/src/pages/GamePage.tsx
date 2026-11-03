@@ -44,6 +44,7 @@ export default function GamePage() {
   if (error || !game) return <Empty title="Game not found">{error ? errorText(error) : null}</Empty>
 
   const installed = game.status === 'installed'
+  const renpy = game.family === 'renpy'
   const backdrop = game.cover
 
   return (
@@ -144,15 +145,20 @@ export default function GamePage() {
           value={tab}
           onChange={setTab}
           tabs={[
-            { id: 'saves', label: <><Save className="size-4" /> Saves</> },
-            { id: 'files', label: <><FolderCog className="size-4" /> Mods & files</> },
-            { id: 'details', label: <><Info className="size-4" /> Details</> },
+            // Save slots and mods are Ren'Py's; other engines' games keep their saves themselves.
+            ...(renpy
+              ? [
+                  { id: 'saves' as const, label: <><Save className="size-4" /> Saves</> },
+                  { id: 'files' as const, label: <><FolderCog className="size-4" /> Mods & files</> },
+                ]
+              : []),
+            { id: 'details' as const, label: <><Info className="size-4" /> Details</> },
           ]}
         />
       </div>
-      {tab === 'saves' && <SaveGallery game={game} />}
-      {tab === 'files' && <FileBrowser game={game} />}
-      {tab === 'details' && <Details game={game} />}
+      {renpy && tab === 'saves' && <SaveGallery game={game} />}
+      {renpy && tab === 'files' && <FileBrowser game={game} />}
+      {(tab === 'details' || !renpy) && <Details game={game} />}
     </div>
   )
 }
@@ -307,7 +313,7 @@ function Details({ game }: { game: Game }) {
             <Row label="Size">{bytes(game.sizeBytes)}</Row>
           )}
           {game.screen && <Row label="Resolution">{`${game.screen[0]} × ${game.screen[1]}`}</Row>}
-          {game.renpyVersion && <Row label="Made with">{`Ren’Py ${game.renpyVersion}`}</Row>}
+          {game.engineLabel ? <Row label="Made with">{game.engineLabel}</Row> : game.renpyVersion && <Row label="Made with">{`Ren’Py ${game.renpyVersion}`}</Row>}
           {game.engine && <Row label="Plays on">{`Ren’Py ${game.engine} web`}</Row>}
           {game.saveDir && (
             <Row label="Save folder">
