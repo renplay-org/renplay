@@ -70,6 +70,16 @@ describe('HTTP API', () => {
     expect(res.body.games[0]).toMatchObject({ id: 'fixture-game', title: 'Fixture Game', status: 'installed', engine: '8.5.3', playUrl: '/g/fixture-game/b1/', screen: [1920, 1080] })
   })
 
+  it('offers a reinstall only while the archive is in the archives folder', async () => {
+    mkdirSync(join(root, 'games', '_archives'), { recursive: true })
+    writeFileSync(join(root, 'games', '_archives', 'Fixture-1.0-pc.zip'), 'zip')
+    app.db.updateGame('fixture-game', { source: JSON.stringify({ archive: 'Fixture-1.0-pc.zip', size: 3 }) })
+    const canReinstall = async () => (await request(app.app).get('/api/games').expect(200)).body.games[0].canReinstall
+    expect(await canReinstall()).toBe(true)
+    await request(app.app).delete('/api/archives?path=Fixture-1.0-pc.zip').expect(200)
+    expect(await canReinstall()).toBe(false)
+  })
+
   it('renders the game page from the engine template', async () => {
     const res = await request(app.app).get('/g/fixture-game/b1/').expect(200)
     expect(res.text).toContain('<title>Fixture Game</title>')
@@ -145,7 +155,7 @@ describe('HTTP API', () => {
 
   it('exports a recipe', async () => {
     const res = await request(app.app).get('/api/games/fixture-game/recipe').expect(200)
-    expect(res.body.yaml).toContain('id: fixture-game')
+    expect(res.body.yaml).toMatch(/^# yaml-language-server: \$schema=https:\/\/renplay-web\.github\.io\/catalog\/recipe\.schema\.json\nid: fixture-game\n/)
     expect(res.body.yaml).toContain('saveDir: MyGame-1234567890')
     expect(res.body.yaml).toContain('engine: 8.5.3')
   })

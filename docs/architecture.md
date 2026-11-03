@@ -15,7 +15,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 
 | Path | Contents |
 |---|---|
-| `/games/_archives/` | Original game archives: the drop folder and the source for reinstalls |
+| `/games/_archives/` | Original game archives: the drop folder. Deleted after a successful install unless `RENPLAY_DELETE_ARCHIVES=false`, which keeps them as the source for reinstalls |
 | `/games/<id>/<build>/` | One web build: `game.zip`, `assets.pack`, `assets.json`, `build.json`, `cache/` |
 | `/games/<id>/<build>.m<hash>/` | A mod build: its own `game.zip` and caches; everything else from the base build |
 | `/games/_renplay/engines/<version>/` | Engine packs, downloaded on demand |
@@ -26,7 +26,8 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 | `/data/covers/` | Covers downloaded from the catalog (content-hashed names) |
 | `/data/walkthroughs/` | Walkthrough PDFs |
 
-`/data` is what to back up. Everything in `/games` except `_archives` can be rebuilt.
+`/data` is what to back up. Everything in `/games` except `_archives` can be rebuilt (from the
+archives, while they are kept).
 
 ## Installing a game
 
@@ -49,6 +50,8 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 7. **Write the build**: streamed files are appended to `assets.pack` (with an `assets.json`
    index); `game.zip` (`assemble.ts`) holds the engine's Python package, the game's scripts and
    small files, the placeholders and the streaming list. The finished folder appears atomically.
+8. **Delete the archive** once the archive is closed (on NFS, deleting an open file leaves a
+   hidden copy), unless `RENPLAY_DELETE_ARCHIVES=false`. Failed installs keep it.
 
 Builds never change after that. A reinstall or update makes a new build; the old one is deleted in
 the background by `util/purge.ts`.

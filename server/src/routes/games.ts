@@ -29,6 +29,9 @@ function cacheName(raw: unknown): string {
   throw new HttpError(400, 'Not a cache file')
 }
 
+/** The catalog's recipe schema, for editors that validate YAML (yaml-language-server). */
+export const RECIPE_SCHEMA_URL = 'https://renplay-web.github.io/catalog/recipe.schema.json'
+
 export interface GameDeps {
   cfg: Config
   db: Db
@@ -75,7 +78,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     screen: row.screen_w ? ([row.screen_w, row.screen_h] as [number, number]) : null,
     saveDir: row.save_dir || null,
     source: { archive: source.archive ?? null, size: source.size ?? null },
-    canReinstall: !!source.archive,
+    canReinstall: !!source.archive && (await exists(join(deps.cfg.archivesDir, cleanRelPath(source.archive)))),
     recipe: recipe
       ? {
           id: recipe.id,
@@ -200,7 +203,8 @@ export function createGamesRouter(deps: GameDeps): Router {
         ...(existing?.releases.filter((r) => r.version !== g.version) ?? []),
       ],
     }
-    res.json({ yaml: YAML.stringify(JSON.parse(JSON.stringify(recipe)), { lineWidth: 0 }), sha256Pending: !sha256, hashJob })
+    const yaml = `# yaml-language-server: $schema=${RECIPE_SCHEMA_URL}\n${YAML.stringify(JSON.parse(JSON.stringify(recipe)), { lineWidth: 0 })}`
+    res.json({ yaml, sha256Pending: !sha256, hashJob })
   })
 
   // ---- walkthroughs --------------------------------------------------------

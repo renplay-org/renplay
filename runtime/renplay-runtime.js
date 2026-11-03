@@ -181,6 +181,52 @@
     C.prototype.__renplayUploads = true
   })
 
+  // ---------------------------------------------------------------- mute
+
+  /**
+   * The player's mute button works like muting a browser tab: every audio
+   * output (Ren'Py's Web Audio, which videos also play through, and SDL's)
+   * goes through a gain node set to 0 while muted, so the game's own volume
+   * settings stay as they are. The choice is kept per browser.
+   */
+  var MUTE_KEY = 'renplay:muted'
+  var muted = false
+  try {
+    muted = localStorage.getItem(MUTE_KEY) === '1'
+  } catch (e) {}
+  var outputs = new Map()
+  if (typeof AudioNode !== 'undefined' && typeof AudioDestinationNode !== 'undefined') {
+    var nativeConnect = AudioNode.prototype.connect
+    var nativeDisconnect = AudioNode.prototype.disconnect
+    var outputFor = function (dest) {
+      var g = outputs.get(dest)
+      if (!g) {
+        g = dest.context.createGain()
+        g.gain.value = muted ? 0 : 1
+        nativeConnect.call(g, dest)
+        outputs.set(dest, g)
+      }
+      return g
+    }
+    var redirect = function (native) {
+      return function (target) {
+        if (!(target instanceof AudioDestinationNode)) return native.apply(this, arguments)
+        var args = Array.prototype.slice.call(arguments)
+        args[0] = outputFor(target)
+        return native.apply(this, args)
+      }
+    }
+    AudioNode.prototype.connect = redirect(nativeConnect)
+    AudioNode.prototype.disconnect = redirect(nativeDisconnect)
+  }
+
+  function setMuted(on) {
+    muted = !!on
+    outputs.forEach(function (g) {
+      g.gain.value = muted ? 0 : 1
+    })
+  }
+
   // ---------------------------------------------------------------- messaging
 
   function post(type, data) {
@@ -1166,6 +1212,9 @@
       case 'renplay:fullscreen-state':
         state.parentFullscreen = !!d.value
         break
+      case 'renplay:mute':
+        setMuted(d.value)
+        break
       case 'renplay:download-log':
         try {
           var blob = new Blob([FS.readFile('/log.txt')], { type: 'text/plain' })
@@ -1185,6 +1234,23 @@
         break
     }
   })
+
+  // In fullscreen with Keyboard Lock, holding Esc leaves fullscreen; the
+  // player shows for how long. Capture runs before the engine sees the key.
+  window.addEventListener(
+    'keydown',
+    function (e) {
+      if (e.key === 'Escape' && !e.repeat && state.parentFullscreen) post('escape', { down: true })
+    },
+    true,
+  )
+  window.addEventListener(
+    'keyup',
+    function (e) {
+      if (e.key === 'Escape' && state.parentFullscreen) post('escape', { down: false })
+    },
+    true,
+  )
 
   // Called after renpy-pre.js (see renderIndex), so this preRun runs first:
   // Emscripten runs preRun callbacks in reverse order of registration.
