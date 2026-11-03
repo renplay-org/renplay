@@ -95,10 +95,16 @@ with a `family` field; entries without one are Ren'Py.
    Chromium and WebKit, a save made in one browser loads in another, the game cannot reach
    Renplay's API. Next: an RPG Maker MV or MZ game (MZ keeps saves with localforage, which falls
    back to `localStorage` when IndexedDB is missing).
-3. **Godot 4**: the single-threaded web template per version, picked from the pack header. Test
-   game: Sexting sim stories (Godot 4.6.2, 1.2 GB pack, a native plugin). Its web template loads
-   the whole pack into memory, so packs over about 1 GB may not fit on phones; the plugin will be
-   missing, so expect parts of it to fail.
+3. **Godot 4**: the single-threaded web template per version, picked from the pack header.
+   Tried on 2026-11-03 with Godot's official 4.6.2 `web_nothreads_release` template and the
+   Windows `.pck` of Sexting sim stories (4.6.2, 1.2 GB), unchanged: the engine starts, renders
+   with the Compatibility renderer (WebGL 2) and loads the game's scenes, so a PC pack works as
+   it is. That game cannot run, though: its core is a native plugin (`phone_core`, class
+   `KpsPhoneCore`) with no web build, and the start crashes without it. The whole pack is held in
+   memory (1.3 GB of JavaScript heap for a 1.2 GB pack), so big packs will not fit on phones.
+   Needs a Godot game without native plugins to finish this phase; detection already warns
+   about plugins and C#. `web_dlink_nothreads_release` loads GDExtensions, but only ones
+   compiled for the web, which games do not ship.
 4. **Unity WebGL**: serve the build as it is. Needs a game that publishes a WebGL build.
 
 Later candidates, by how many adult games use them: TyranoScript and Construct (HTML, so phase 2
