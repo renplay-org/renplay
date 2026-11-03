@@ -32,7 +32,7 @@ nav .wrap { display: flex; align-items: center; gap: 28px; height: 68px; }
 .brand img { width: 34px; height: 34px; border-radius: 10px; box-shadow: 0 8px 26px -8px rgb(244 80 138 / .8); }
 nav .links { display: flex; gap: 24px; margin-left: 12px; font-size: 15px; }
 nav .links a { color: var(--dim); text-decoration: none; transition: color .2s; }
-nav .links a:hover { color: var(--fg); }
+nav .links a:hover, nav .links a[aria-current] { color: var(--fg); }
 nav .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
 
 /* Buttons */
@@ -108,7 +108,9 @@ h2 { font-size: clamp(32px, 4.6vw, 52px); letter-spacing: -.035em; line-height: 
 .phones { position: relative; display: flex; justify-content: center; align-items: flex-end; gap: 0; }
 .phone-port { width: 38%; border-radius: 38px; padding: 10px; background: #111116; border: 1px solid rgb(255 255 255 / .14); box-shadow: 0 40px 90px -30px rgb(0 0 0 / .95); position: relative; z-index: 1; flex: none; }
 .phone-port img { display: block; width: 100%; border-radius: 29px; }
-.phone-port::after { content: ""; position: absolute; top: 18px; left: 50%; width: 26%; height: 18px; transform: translateX(-50%); border-radius: 12px; background: #000; }
+.phone-port { border-radius: 44px; padding: 9px; }
+.phone-port img { border-radius: 36px; }
+
 .phones { padding-bottom: 4%; }
 .phones .phone-land { position: relative; width: 74%; margin-left: -14%; margin-bottom: -4%; z-index: 2; animation: none; flex: none; }
 
@@ -200,7 +202,8 @@ footer small { display: block; margin-top: 18px; line-height: 1.6; }
   .tile.wide { grid-column: auto; }
   .side { padding: 24px; }
   .num b { font-size: 34px; }
-  nav .right .gh-label { display: none; }
+  nav .right .lbl { display: none; }
+  nav .right .btn:not(.primary) { padding: 8px 10px; }
 }
 
 /* Interactivity */
