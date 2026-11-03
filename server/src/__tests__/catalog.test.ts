@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { Catalog } from '../catalog.js'
+import { Catalog, normalizeRecipe } from '../catalog.js'
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
 
@@ -128,5 +128,15 @@ describe('catalog', () => {
     expect(db.getGame('kept')?.title).toBe('Kept')
     expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(2)
     db.close()
+  })
+
+  it('reads recipes of catalog schema 2 and 3 alike', () => {
+    const v2 = normalizeRecipe({ id: 'a', title: 'A', engine: '8.5.3', releases: [{ version: '1', status: 'verified', archives: [], renpy: '7.3.2', engine: '8.4.0' }] })
+    const v3 = normalizeRecipe({ id: 'a', title: 'A', engine: 'renpy', runtime: '8.5.3', releases: [{ version: '1', status: 'verified', archives: [], madeWith: '7.3.2', runtime: '8.4.0' }] })
+    expect(v2).toEqual(v3)
+    expect(v3).toMatchObject({ engine: 'renpy', runtime: '8.5.3', releases: [{ madeWith: '7.3.2', runtime: '8.4.0' }] })
+    expect(v3.releases[0]).not.toHaveProperty('renpy')
+    expect(normalizeRecipe({ id: 'b', title: 'B', releases: [] })).toMatchObject({ engine: 'renpy', runtime: undefined })
+    expect(normalizeRecipe({ id: 'c', title: 'C', engine: 'godot', releases: [{ version: '0.17.0', status: 'untested', archives: [], madeWith: '4.6.2' }] })).toMatchObject({ engine: 'godot', releases: [{ madeWith: '4.6.2' }] })
   })
 })

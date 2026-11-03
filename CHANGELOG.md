@@ -7,6 +7,20 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Add games recognizes downloads of other engines and lists them apart with what made them and why
+  they cannot be installed: Twine (SugarCube, Harlowe), RPG Maker, TyranoScript, Construct, plain
+  HTML games, Godot (with its version, and a warning about native plugins), Unity (WebGL and PC
+  builds), and engines that only make PC programs. Support for the ones a browser can run comes
+  next; `docs/engines.md` has the plan.
+
+### Changed
+
+- Renplay reads the catalog's schema 3 (`index.v3.json`), where recipes say which engine made the
+  game (`engine`), the runtime to build with (`runtime`) and the engine version a release was made
+  with (`madeWith`). It still reads schema 2. Exported recipes use the new names.
+
 ## [2.5.0] - 2026-11-03
 
 ### Added

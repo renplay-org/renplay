@@ -15,6 +15,7 @@ import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFrom
 import { defaultImagePolicy, imageConcurrency } from './optimize.js'
 import { PackWriter, writeIndex } from './pack.js'
 import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
+import { detectEngine, type EngineInfo } from './family.js'
 import { detectLayout, extractProject } from './project.js'
 import { readRpaIndex, splitRpa } from './rpa.js'
 
@@ -102,12 +103,16 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
       src = await openDir(join(work, 'raw'))
     } else throw new Error('Unsupported archive format (expected zip, 7z, rar or tar)')
     const layout = detectLayout(src.entries)
-    if (!layout) throw new Error('No Ren’Py game found in the archive (no game/ folder with scripts)')
+    if (!layout) {
+      const other = await detectEngine(src.entries, null)
+      if (other) throw new Error(`This is a ${other.label} game. ${other.reason ?? ''}`.trim())
+      throw new Error('No game found in the archive (no Ren’Py game/ folder with scripts, no page or game pack)')
+    }
     if (layout.kind === 'web') throw new Error('This is a web build. Use the game’s PC download; renplay builds the web version itself.')
 
     // 4. Engine, from the recipe or the game's own Ren'Py version.
     const gameRenpy = await renpyVersionOf((p) => src!.entries.find((e) => e.path === layout.root + p))
-    const engine = await engines.pick(p.engine ?? settings.engine, gameRenpy ?? match?.release?.renpy)
+    const engine = await engines.pick(p.engine ?? settings.engine, gameRenpy ?? match?.release?.madeWith)
     ctx.log(`Game made with Ren'Py ${gameRenpy ?? 'unknown'}; building with engine ${engine}`)
     if (gameRenpy && Number(gameRenpy.split('.')[0]) < Number(engine.split('.')[0])) {
       ctx.log(`Made with an older Ren'Py: most such games work on the newer engine, but Python 2 code in the game can fail while playing. Report problems to the catalog.`)
@@ -262,12 +267,14 @@ export interface ArchiveInfo {
   saveDir?: string
   renpyVersion?: string
   files: number
+  /** What made the game (Ren'Py, Twine, Godot…), and whether it installs. */
+  engine?: EngineInfo
   /** INSPECT_VERSION of the inspection; older results are inspected again. */
   v?: number
 }
 
-/** Bump when inspectArchive learns to find more. 2: Ren'Py 7 versions. */
-export const INSPECT_VERSION = 2
+/** Bump when inspectArchive learns to find more. 2: Ren'Py 7 versions. 3: other engines. */
+export const INSPECT_VERSION = 3
 
 /**
  * Reads metadata from a zip without extracting it. Script archives (.rpa) are
@@ -280,7 +287,9 @@ export async function inspectArchive(path: string): Promise<ArchiveInfo> {
   const src = await openZip(path)
   try {
     const layout = detectLayout(src.entries)
-    const info: ArchiveInfo = { type, layout: layout?.kind ?? null, files: src.entries.length, v: INSPECT_VERSION }
+    const engine = await detectEngine(src.entries, layout)
+    const info: ArchiveInfo = { type, layout: layout?.kind ?? null, files: src.entries.length, engine: engine ?? undefined, v: INSPECT_VERSION }
+    if (engine && engine.family !== 'renpy') info.title = engine.title
     if (!layout || layout.kind === 'web') return info
     const root = layout.root
     const byPath = new Map(src.entries.map((e) => [e.path, e]))

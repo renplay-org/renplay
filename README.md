@@ -100,6 +100,8 @@ The container runs as any non-root user and with a read-only root filesystem.
 and only games with Python 2-only code have trouble. The
 [catalog](https://github.com/renplay-web/catalog) lists games that were tested; most others work
 too. If one does not, [tell the catalog](https://github.com/renplay-web/catalog/issues/new/choose).
+Downloads of other engines (Twine, RPG Maker, Godot, Unity) are recognized; support for the ones a
+browser can run is coming, see [docs/engines.md](docs/engines.md).
 
 **Where do I get games?** From their developers: itch.io, Patreon, Steam and so on. Renplay and
 its catalog never host game files.

@@ -190,12 +190,14 @@ export function createGamesRouter(deps: GameDeps): Router {
       saveDir: g.save_dir || undefined,
       continuesFrom: existing?.continuesFrom,
       match: existing?.match,
+      engine: existing?.engine ?? 'renpy',
+      runtime: existing?.runtime,
       build: existing?.build,
       releases: [
         {
           version: g.version || 'unknown',
-          renpy: g.renpy_version || undefined,
-          engine: g.engine || undefined,
+          madeWith: g.renpy_version || undefined,
+          runtime: g.engine || undefined,
           status: 'untested',
           archives: src.archive ? [{ name: src.archive.split('/').pop(), size: src.size, sha256: sha256 || 'pending' }] : [],
           verified: { date: new Date().toISOString().slice(0, 10), renplay: deps.version, browsers: [], notes: '' },
