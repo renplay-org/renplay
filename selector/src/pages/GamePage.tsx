@@ -58,7 +58,7 @@ export default function GamePage() {
             <ArrowLeft className="size-4" /> Library
           </Link>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-8">
-          <Cover game={game} className="aspect-video w-full max-w-xl shrink-0 shadow-[0_30px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-white/10 lg:w-[480px]" />
+          <Cover game={game} className="aspect-[63/50] w-full max-w-md shrink-0 shadow-[0_30px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-white/10 lg:w-[380px]" />
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">{game.title}</h1>
             {game.developer && <p className="mt-1 text-sm text-zinc-400">By {game.developer}</p>}

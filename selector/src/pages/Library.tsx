@@ -6,6 +6,7 @@ import GameCard, { Cover } from '../components/GameCard'
 import { Button, Empty, cx } from '../components/ui'
 import { api, slotName, type Game, type SavesResponse } from '../lib/api'
 import { ago, capitalize } from '../lib/format'
+import { useBlurAdultCovers } from '../lib/prefs'
 import { useGames } from '../lib/queries'
 
 type Filter = 'all' | 'installed' | 'not_installed'
@@ -19,11 +20,13 @@ function ContinueHero({ game }: { game: Game }) {
   })
   const latest = data?.slots.find((s) => s.kind !== 'internal' && s.valid)
   const backdrop = latest?.screenshot
+  const [blurAdult] = useBlurAdultCovers()
+  const hide = blurAdult && game.nsfw
   return (
     <section className="relative mb-10 animate-fade-in overflow-hidden rounded-[28px] ring-1 ring-white/[0.08]">
       <div className="absolute inset-0">
         {backdrop ? (
-          <img src={backdrop} alt="" className="size-full scale-105 object-cover blur-[2px]" />
+          <img src={backdrop} alt="" className={cx('size-full scale-105 object-cover', hide ? 'blur-2xl' : 'blur-[2px]')} />
         ) : (
           <Cover game={game} rounded={false} className="size-full" />
         )}
@@ -60,7 +63,7 @@ function ContinueHero({ game }: { game: Game }) {
             </Link>
           </div>
         </div>
-        {latest?.screenshot && (
+        {latest?.screenshot && !hide && (
           <div className="hidden w-80 shrink-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 lg:block">
             <img src={latest.screenshot} alt="" className="aspect-video w-full object-cover" />
           </div>
@@ -87,9 +90,12 @@ function LoadingGrid() {
   const n = Math.min(12, Number(localStorage.getItem(COUNT_KEY) ?? 4) || 0)
   if (!show || !n) return null
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
       {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className="skeleton aspect-video animate-fade-in rounded-2xl" />
+        <div key={i} className="animate-fade-in">
+          <div className="skeleton aspect-[63/50] rounded-2xl" />
+          <div className="skeleton mt-3 h-4 w-2/3 rounded" />
+        </div>
       ))}
     </div>
   )
@@ -192,7 +198,7 @@ export default function Library() {
       ) : !shown.length ? (
         <Empty title="No games match">Try a different search or filter.</Empty>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {shown.map((g, i) => (
             <GameCard key={g.id} game={g} index={i} />
           ))}

@@ -1,4 +1,4 @@
-import { Library, Loader2, Plus, Settings } from 'lucide-react'
+import { Heart, Library, Loader2, Plus, Settings } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { jobTitle } from '../lib/api'
 import { pct } from '../lib/format'
@@ -6,6 +6,7 @@ import { useGames, useJobs, useSystem } from '../lib/queries'
 import { cx } from './ui'
 
 export const REPO_URL = 'https://github.com/renplay-web/renplay'
+export const KOFI_URL = 'https://ko-fi.com/janpuc'
 
 export function GitHubMark({ className }: { className?: string }) {
   return (
@@ -47,11 +48,15 @@ function JobIndicator() {
 function Footer() {
   const { data } = useSystem()
   return (
-    <footer className="mx-auto flex max-w-[1600px] items-center justify-center gap-2 px-4 pb-28 pt-4 text-xs text-zinc-500 sm:px-8 sm:pb-8">
+    <footer className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 pb-28 pt-4 text-xs text-zinc-500 sm:px-8 sm:pb-8">
       <span>Renplay{data?.version ? ` ${data.version}` : ''}</span>
       <span aria-hidden="true">·</span>
       <a href={REPO_URL} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 transition-colors hover:text-zinc-300">
         <GitHubMark className="size-3.5" /> GitHub
+      </a>
+      <span aria-hidden="true">·</span>
+      <a href={KOFI_URL} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 transition-colors hover:text-accent-300">
+        <Heart className="size-3.5" /> Support on Ko-fi
       </a>
     </footer>
   )

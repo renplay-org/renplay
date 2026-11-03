@@ -239,13 +239,16 @@ export default function Player() {
     navigate(`/game/${gameId}`)
   }, [navigate, qc, ready, send, gameId])
 
-  // Space the game keeps clear of: a MacBook's notch in fullscreen, a phone's cutout and home indicator.
+  // Space the game keeps clear of: a MacBook's notch in fullscreen, a phone's
+  // camera cutout (the sides in landscape, the top in portrait). The home
+  // indicator is only a thin line over the game, so the game may run under it.
   const avoid = prefs.avoidNotch
+  const landscape = stage.w >= stage.h
   const pad = {
-    top: Math.max(fullscreen && avoid && notch && coversNotch ? notch : 0, avoid ? insets.top : 0),
-    right: avoid ? insets.right : 0,
-    bottom: avoid ? insets.bottom : 0,
-    left: avoid ? insets.left : 0,
+    top: Math.max(fullscreen && avoid && notch && coversNotch ? notch : 0, avoid && !landscape ? insets.top : 0),
+    right: avoid && landscape ? insets.right : 0,
+    bottom: 0,
+    left: avoid && landscape ? insets.left : 0,
   }
   const area = { w: Math.max(0, stage.w - pad.left - pad.right), h: Math.max(0, stage.h - pad.top - pad.bottom) }
   const rect = frameRect(area.w, area.h, screenSize, prefs.fit)
@@ -273,7 +276,7 @@ export default function Player() {
   const loadPct = progress && progress.total ? progress.done / progress.total : 0
 
   return (
-    <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white">
+    <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white outline-none">
       {/* Game stage */}
       <div ref={stageRef} className={cx('absolute inset-0 transition-[right] duration-300', panel === 'walkthrough' && !fullscreen && 'md:right-[42%]')}>
         <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
@@ -283,7 +286,7 @@ export default function Player() {
             src={game.playUrl}
             title={game.title}
             allow="autoplay; fullscreen; gamepad; clipboard-read; clipboard-write"
-            className="absolute border-0 bg-black"
+            className="absolute border-0 bg-black outline-none"
             style={{ width: rect.width || '100%', height: rect.height || '100%', left: rect.left, top: rect.top }}
           />
         </div>
@@ -297,7 +300,7 @@ export default function Player() {
         <Cover game={game} rounded={false} className="absolute inset-0 scale-110 opacity-40 blur-2xl" />
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative flex w-full max-w-md flex-col items-center px-8 text-center">
-          <Cover game={game} className="mb-8 aspect-video w-72 shadow-2xl ring-1 ring-white/15" />
+          <Cover game={game} className="mb-8 aspect-[63/50] w-56 shadow-2xl ring-1 ring-white/15 sm:w-64" />
           <h1 className="font-display text-2xl font-semibold tracking-tight">{game.title}</h1>
           <p className="mt-2 text-sm text-zinc-400">
             {resume ? 'Loading your save…' : !progress ? 'Starting engine…' : loadPct >= 1 ? 'Starting game…' : 'Loading game…'}
@@ -630,7 +633,7 @@ function DisplayPanel({
                 ? fullscreen && !coversNotch
                   ? 'Your browser already keeps the notch area black in fullscreen.'
                   : `In fullscreen the top ${notch}px strip below the camera stays black when this is on. Off uses the full screen height.`
-                : 'On keeps the game inside the screen’s safe area, clear of the camera and the home indicator. Off uses the whole screen.'
+                : 'On keeps the game clear of the camera cutout. Off uses the whole screen.'
             }
           />
         </div>

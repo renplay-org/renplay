@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { Config } from './config.js'
 import { parseJson, type Db, type GameSource } from './db.js'
 import type { JobContext } from './jobs.js'
+import sharp from 'sharp'
 import { exists, writeFileAtomic } from './util/fsx.js'
 import { cleanRelPath, isSlug } from './util/paths.js'
 
@@ -43,7 +44,12 @@ export interface Recipe {
   developer?: string
   tags?: string[]
   nsfw?: boolean
-  cover?: string
+  /**
+   * The game's official cover art: a file in the catalog (safe for work only)
+   * or a URL on the developer's own hosting. The published index gives an
+   * object with the image's sha256 and size.
+   */
+  cover?: string | RecipeCover
   links?: Record<string, string>
   saveDir?: string
   /** Games whose saves this one imports (an earlier season, a prequel). */
@@ -65,6 +71,13 @@ export interface Recipe {
   _base?: string
 }
 
+export interface RecipeCover {
+  url: string
+  sha256?: string
+  width?: number
+  height?: number
+}
+
 export interface BuildSettings {
   engine?: string
   quality?: number
@@ -84,20 +97,21 @@ export interface RecipeMatch {
 const CACHE_KEY = 'catalog_cache'
 const COVERS_KEY = 'catalog_covers'
 const MAX_AGE = 6 * 3600_000
-const MAX_COVER = 4 << 20
+const MAX_COVER = 16 << 20
+/** Covers are shown as thumbnails; wider art is scaled down to this. */
+const COVER_WIDTH = 960
 
 interface CoverFile {
   url: string
+  /** sha256 of the downloaded original, to notice when it changes. */
+  sha256: string
   file: string
   etag: string
 }
 
-/** File extension for an image's bytes, or null if it is not a WebP, PNG or JPEG. */
-function imageExt(b: Buffer): string | null {
-  if (b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP') return 'webp'
-  if (b[0] === 0x89 && b.subarray(1, 4).toString('latin1') === 'PNG') return 'png'
-  if (b[0] === 0xff && b[1] === 0xd8) return 'jpg'
-  return null
+function isImage(b: Buffer): boolean {
+  const head = b.subarray(0, 12).toString('latin1')
+  return (head.startsWith('RIFF') && head.slice(8) === 'WEBP') || head.startsWith('\x89PNG') || (b[0] === 0xff && b[1] === 0xd8) || head.startsWith('GIF8')
 }
 
 function globMatch(pattern: string, name: string): boolean {
@@ -194,27 +208,35 @@ export class Catalog {
     await mkdir(dir, { recursive: true })
     for (const r of this.recipes.values()) {
       if (!r.cover || !isSlug(r.id)) continue
+      const cover: RecipeCover = typeof r.cover === 'string' ? { url: r.cover } : r.cover
       const have = known[r.id]
       let url = ''
       try {
-        url = new URL(r.cover, r._base ?? this.cfg.catalogUrls[0]).toString()
+        url = new URL(cover.url, r._base ?? this.cfg.catalogUrls[0]).toString()
         if (!/^https?:/.test(url)) throw new Error('not an http(s) URL')
-        const cached = have?.url === url && (await exists(join(dir, have.file)))
-        const res = await fetch(url, { signal: AbortSignal.timeout(20_000), headers: cached && have.etag ? { 'if-none-match': have.etag } : {} })
+        const cached = have?.url === url && (!cover.sha256 || have.sha256 === cover.sha256) && (await exists(join(dir, have.file)))
+        const res = await fetch(url, { signal: AbortSignal.timeout(30_000), headers: cached && have.etag ? { 'if-none-match': have.etag } : {} })
         if (res.status === 304 && cached) {
           next[r.id] = have
           continue
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = Buffer.from(await res.arrayBuffer())
-        const ext = imageExt(data)
-        if (!ext || data.length > MAX_COVER) throw new Error('not a WebP, PNG or JPEG image under 4 MB')
-        const file = `${r.id}.${createHash('sha256').update(data).digest('hex').slice(0, 12)}.${ext}`
-        if (!(await exists(join(dir, file)))) await writeFileAtomic(join(dir, file), data)
-        next[r.id] = { url, file, etag: res.headers.get('etag') ?? '' }
+        if (!isImage(data) || data.length > MAX_COVER) throw new Error('not a WebP, PNG, JPEG or GIF image under 16 MB')
+        const sha256 = createHash('sha256').update(data).digest('hex')
+        if (cover.sha256 && cover.sha256.toLowerCase() !== sha256) throw new Error('the image changed since the catalog checked it')
+        if (cached && have.sha256 === sha256) {
+          next[r.id] = { ...have, etag: res.headers.get('etag') ?? '' }
+          continue
+        }
+        // Thumbnails: WebP, at most COVER_WIDTH wide, first frame of animations.
+        const webp = await sharp(data, { failOn: 'none' }).resize({ width: COVER_WIDTH, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
+        const file = `${r.id}.${createHash('sha256').update(webp).digest('hex').slice(0, 12)}.webp`
+        if (!(await exists(join(dir, file)))) await writeFileAtomic(join(dir, file), webp)
+        next[r.id] = { url, sha256, file, etag: res.headers.get('etag') ?? '' }
       } catch (e) {
         if (have) next[r.id] = have
-        this.errors.push(`cover of ${r.id} (${url || r.cover}): ${(e as Error).message}`)
+        this.errors.push(`cover of ${r.id} (${url || cover.url}): ${(e as Error).message}`)
       }
     }
     this.db.setSetting(COVERS_KEY, next)
