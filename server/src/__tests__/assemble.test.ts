@@ -69,6 +69,7 @@ describe('assemble', () => {
         '_placeholders/images/bg.png',
         'game/gui/button.png',
         'game/images/menu.png',
+        'game/renplay_web.rpy',
         'game/renpyweb_remote_files.txt',
         'game/script.rpyc',
         'game/zz_patch.rpy',
@@ -76,6 +77,8 @@ describe('assemble', () => {
         'renpy/__init__.pyc',
       ].sort(),
     )
+    const compat = (await readAll(await src.entries.find((e) => e.path === 'game/renplay_web.rpy')!.open())).toString()
+    expect(compat).toMatch(/^python early:$/m)
     const list = (await readAll(await src.entries.find((e) => e.path === 'game/renpyweb_remote_files.txt')!.open())).toString()
     expect(list).toBe('audio/theme.ogg\nmusic -\nimages/bg copy.png\nimage 1280,720\nimages/bg.png\nimage 1280,720\nmovies/intro.webm\nvideo -\n')
     expect((await readAll(await src.entries.find((e) => e.path === 'game/gui/button.png')!.open())).equals(png)).toBe(true)

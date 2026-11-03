@@ -116,3 +116,10 @@ body {
 input[type="range"] {
   accent-color: var(--color-accent-500);
 }
+
+/* The ring of the hold-Esc hint in the player (Player.tsx). */
+@keyframes escape-hold {
+  to {
+    stroke-dashoffset: 0;
+  }
+}

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, readdir, stat } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
@@ -95,7 +95,8 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
 
   app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath)))
   // Static fallbacks for development; nginx serves these paths in production.
-  if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(opts.runtimePath!))
+  // resolve(): sendFile refuses paths with "..", like the $PWD/../runtime one in AGENTS.md.
+  if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(resolve(opts.runtimePath!)))
   app.use('/engine', express.static(cfg.enginesDir, { immutable: true, maxAge: '365d', setHeaders: gzipHeaders }))
   // game.zip, caches and presplash of a build (mod builds fall back to their base).
   app.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m([a-z0-9]+))?\/(.+)$/, (req, res, next) => {

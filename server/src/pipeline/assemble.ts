@@ -9,6 +9,7 @@ import type { JobContext } from '../jobs.js'
 import { readAll } from './archive.js'
 import type { PackIndex } from './pack.js'
 import { classify, type Placeholder, type ProgressiveRule } from './progressive.js'
+import { WEB_COMPAT, WEB_COMPAT_PATH } from './webcompat.js'
 
 /** Already-compressed formats are stored; the rest is deflated. */
 const STORED = /\.(png|jpe?g|webp|avif|gif|ogg|opus|mp3|webm|mp4|ogv|zip|rpa|rpyc|rpymc|rpyb|woff2?)$/i
@@ -84,6 +85,7 @@ export async function assemble(o: AssembleOptions): Promise<AssembleResult> {
     zip.addBuffer(data, `game/${rel}`, { compress: !STORED.test(rel) })
     zipped++
   }
+  if (!o.zipPack.index.has(WEB_COMPAT_PATH) && !extra.has(WEB_COMPAT_PATH)) zip.addBuffer(Buffer.from(WEB_COMPAT, 'utf-8'), `game/${WEB_COMPAT_PATH}`)
 
   // 4. Placeholders of streamed images and the list of streamed files.
   for (const [rel, t] of remote) if (t.startsWith('image')) zip.addBuffer(o.placeholders.get(rel)!.data, `_placeholders/${rel}`, { compress: false })

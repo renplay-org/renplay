@@ -11,6 +11,12 @@ release notes say what).
 
 - Downloads are deleted once their game installs, to save space. Set `RENPLAY_DELETE_ARCHIVES=false`
   to keep them for reinstalls. A failed or cancelled install keeps the download.
+- A mute button in the player's toolbar. It mutes every game in this browser, like muting a tab, and
+  leaves the game's own volume settings alone.
+- In fullscreen, a hint says how to leave it, and holding Esc shows a ring that fills until
+  fullscreen ends (1.5 seconds, as in Chrome).
+- Games that go online for news or updates start: builds include stand-ins for Python's `ssl`
+  module and for threads, which browsers do not have. Moonripple Lake opened on an error before.
 
 ### Changed
 
