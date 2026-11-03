@@ -19,7 +19,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import FileBrowser from '../components/FileBrowser'
 import { Cover } from '../components/GameCard'
 import SaveGallery from '../components/SaveGallery'
-import { Badge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, Tabs, errorText, useToast } from '../components/ui'
+import { Badge, BetaBadge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, Tabs, errorText, useToast } from '../components/ui'
 import { del, post, slotName, type Game } from '../lib/api'
 import { ago, bytes, capitalize, pct } from '../lib/format'
 import { recipeLinks } from '../lib/links'
@@ -65,6 +65,7 @@ export default function GamePage() {
             {game.developer && <p className="mt-1 text-sm text-zinc-400">By {game.developer}</p>}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {game.version && <Badge>{game.version}</Badge>}
+              <BetaBadge engine={game.family} />
               {installed ? <Badge tone="green">Installed · {bytes(game.sizeBytes)}</Badge> : <Badge tone="amber">Not installed</Badge>}
               {game.saves.count > 0 && (
                 <Badge tone="accent">

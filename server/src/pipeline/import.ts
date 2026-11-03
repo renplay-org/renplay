@@ -106,7 +106,8 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     const layout = detectLayout(src.entries)
     if (!layout) {
       const other = await detectEngine(src.entries, null)
-      if (other?.family === 'html' && other.installable && other.entry) {
+      // HTML games and Unity and Godot web builds are web pages already: same path.
+      if ((other?.family === 'html' || other?.kind === 'unity-webgl' || other?.kind === 'godot-web') && other.installable && other.entry) {
         return await installHtml(ctx, deps, { src, engine: other, source, match, settings, work, archiveName: basename(archivePath) })
       }
       if (other) throw new Error(`This is a ${other.label} game. ${other.reason ?? ''}`.trim())

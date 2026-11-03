@@ -151,7 +151,7 @@ export default function Player() {
           break
         case 'renplay:storage':
           if (sandboxed && typeof d.data === 'string' && game?.saveDir) {
-            const path = `${game.saveDir}/localStorage.json`
+            const path = `${game.saveDir}/${d.kind === 'idb' ? 'indexedDB.json' : 'localStorage.json'}`
             storageWrite.current = storageWrite.current
               .catch(() => {})
               .then(() => fetch(`/api/saves/${gameId}/file?path=${encodeURIComponent(path)}`, { method: 'PUT', body: d.data, headers: { 'content-type': 'application/octet-stream', 'x-mtime': String(Date.now()) } }))
