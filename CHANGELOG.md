@@ -12,7 +12,9 @@ release notes say what).
 - Install logs show progress every half minute (how much is read, files written, images
   converted), and their times follow the server's time zone (`TZ`).
 - The catalog is refreshed every hour while Renplay runs, not only at startup.
-- Games made with Ren'Py 7 show their Ren'Py version instead of "unknown".
+- Games made with Ren'Py 7 install and play on the Ren'Py 8 engine instead of being refused, and
+  show their Ren'Py version instead of "unknown". Most work; Python 2-only code in a game can
+  fail while playing. Once in a Lifetime (Ren'Py 7.3.2) plays through without problems.
 
 ## [2.3.0] - 2026-11-03
 

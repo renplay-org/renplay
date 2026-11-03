@@ -87,6 +87,9 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
     const gameRenpy = await renpyVersionOf((p) => src!.entries.find((e) => e.path === layout.root + p))
     const engine = await engines.pick(p.engine ?? settings.engine, gameRenpy ?? match?.release?.renpy)
     ctx.log(`Game made with Ren'Py ${gameRenpy ?? 'unknown'}; building with engine ${engine}`)
+    if (gameRenpy && Number(gameRenpy.split('.')[0]) < Number(engine.split('.')[0])) {
+      ctx.log(`Made with an older Ren'Py: most such games work on the newer engine, but Python 2 code in the game can fail while playing. Report problems to the catalog.`)
+    }
     const engineDir = await engines.ensure(engine, ctx)
 
     // 5. Extract and optimize.
