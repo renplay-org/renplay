@@ -485,7 +485,7 @@ export default function Player() {
         </div>
       </div>
 
-      {fullscreen && escLocked && (escHeld || escHint) && <EscapeHint held={escHeld} top={Math.max(insets.top, pad.top) + 16} />}
+      {fullscreen && escLocked && (escHeld || escHint) && <EscapeHint held={escHeld} top={Math.max(insets.top, pad.top) + (toolbar || pinned ? 72 : 16)} />}
 
       {/* Panels */}
       {panel === 'saves' && (
