@@ -10,6 +10,12 @@
  *   stores it with the game's saves. SugarCube and RPG Maker keep saves there.
  * - sessionStorage and cookies: in memory, for this visit.
  *
+ * - indexedDB: in memory (runtime/vendor/fake-indexeddb.js), restored from
+ *   window.__renplay.idb before the game's scripts run and sent to the player
+ *   after every write. Unity, Godot and RPG Maker MZ keep saves there. Download
+ *   caches (Unity's) are refused: the game fetches again instead of holding
+ *   them in memory.
+ *
  * It also tells the player when the game is ready, mutes on request (media
  * elements and Web Audio), and reports Esc held in fullscreen.
  */
@@ -100,6 +106,10 @@
   define(window, 'sessionStorage', function () {
     return sessionStorageApi
   })
+  // Cache Storage throws in a sandboxed frame; absent, loaders (Unity's) just do not cache.
+  define(window, 'caches', function () {
+    return undefined
+  })
   var jar = {}
   define(
     Document.prototype,
@@ -122,6 +132,235 @@
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') sendStorage()
   })
+
+  // ------------------------------------------------------------- IndexedDB
+
+  var IDB = window.__renplayIDB
+  var idbDirty = false
+  var idbTimer = null
+  var flushIdb = function () {
+    return Promise.resolve()
+  }
+  if (IDB) {
+    var factory = new IDB.IDBFactory()
+    var realOpen = factory.open.bind(factory)
+    var CACHES = /^UnityCache$/
+    var restoring = 0
+
+    var bytes64 = function (u8) {
+      var s = ''
+      for (var i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000))
+      return btoa(s)
+    }
+    var unbytes64 = function (s) {
+      var b = atob(s)
+      var u = new Uint8Array(b.length)
+      for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i)
+      return u
+    }
+    // JSON for what IndexedDB stores: binary data, dates and the like keep their type.
+    var encode = function (v) {
+      if (v === undefined) return { $t: 'undef' }
+      if (typeof v === 'number' && !isFinite(v)) return { $t: 'num', v: String(v) }
+      if (v === null || typeof v !== 'object') return v
+      if (v instanceof Date) return { $t: 'date', v: v.getTime() }
+      if (v instanceof ArrayBuffer) return { $t: 'ab', b: bytes64(new Uint8Array(v)) }
+      if (ArrayBuffer.isView(v)) return { $t: 'view', c: v.constructor.name, b: bytes64(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)) }
+      if (Array.isArray(v)) return v.map(encode)
+      if (v instanceof Map) return { $t: 'map', v: Array.from(v, function (e) { return [encode(e[0]), encode(e[1])] }) }
+      if (v instanceof Set) return { $t: 'set', v: Array.from(v, encode) }
+      var o = {}
+      for (var k in v) if (has.call(v, k)) o[k] = encode(v[k])
+      return has.call(o, '$t') ? { $t: 'obj', v: o } : o
+    }
+    var decode = function (v) {
+      if (v === null || typeof v !== 'object') return v
+      if (Array.isArray(v)) return v.map(decode)
+      switch (v.$t) {
+        case 'undef':
+          return undefined
+        case 'num':
+          return Number(v.v)
+        case 'date':
+          return new Date(v.v)
+        case 'ab':
+          return unbytes64(v.b).buffer
+        case 'view': {
+          var u = unbytes64(v.b)
+          var C = window[v.c]
+          return v.c === 'DataView' ? new DataView(u.buffer) : C ? new C(u.buffer, 0, u.byteLength / (C.BYTES_PER_ELEMENT || 1)) : u
+        }
+        case 'map':
+          return new Map(v.v.map(function (e) { return [decode(e[0]), decode(e[1])] }))
+        case 'set':
+          return new Set(v.v.map(decode))
+        case 'obj':
+          v = v.v
+      }
+      var o = {}
+      for (var k in v) if (has.call(v, k)) o[k] = decode(v[k])
+      return o
+    }
+
+    var changedIdb = function () {
+      if (restoring) return
+      idbDirty = true
+      if (!idbTimer) idbTimer = setTimeout(function () { flushIdb() }, 2000)
+    }
+    // A cache refused like a browser without storage would: the open request fails.
+    var refused = function () {
+      var listeners = []
+      var req = { result: undefined, error: null, readyState: 'pending', source: null, transaction: null, onsuccess: null, onerror: null, onupgradeneeded: null, onblocked: null }
+      req.addEventListener = function (type, f) {
+        if (type === 'error') listeners.push(f)
+      }
+      req.removeEventListener = function () {}
+      setTimeout(function () {
+        req.readyState = 'done'
+        req.error = new DOMException('Not kept in Renplay', 'UnknownError')
+        var ev = { type: 'error', target: req, currentTarget: req, preventDefault: function () {}, stopPropagation: function () {} }
+        if (req.onerror) req.onerror(ev)
+        listeners.forEach(function (f) { f(ev) })
+      }, 0)
+      return req
+    }
+    factory.open = function (name) {
+      if (CACHES.test(String(name))) return refused()
+      var req = realOpen.apply(null, arguments)
+      req.addEventListener('upgradeneeded', changedIdb)
+      return req
+    }
+    var tx = IDB.IDBDatabase.prototype.transaction
+    IDB.IDBDatabase.prototype.transaction = function (stores, mode) {
+      var t = tx.apply(this, arguments)
+      if (mode === 'readwrite') t.addEventListener('complete', changedIdb)
+      return t
+    }
+
+    // The saved databases go in first; IndexedDB serves a database's open requests in order,
+    // so the game's own requests wait until these are done.
+    var saved = (cfg.idb && cfg.idb.databases) || []
+    saved.forEach(function (d) {
+      if (!d || !d.name) return
+      restoring++
+      var req = realOpen(d.name, d.version || 1)
+      req.onupgradeneeded = function () {
+        var db = req.result
+        ;(d.stores || []).forEach(function (s) {
+          var store = db.createObjectStore(s.name, s.keyPath == null ? { autoIncrement: !!s.autoIncrement } : { keyPath: s.keyPath, autoIncrement: !!s.autoIncrement })
+          ;(s.indexes || []).forEach(function (i) {
+            store.createIndex(i.name, i.keyPath, { unique: !!i.unique, multiEntry: !!i.multiEntry })
+          })
+          ;(s.records || []).forEach(function (r) {
+            if (s.keyPath == null) store.put(decode(r[1]), decode(r[0]))
+            else store.put(decode(r[1]))
+          })
+        })
+      }
+      var done = function () {
+        restoring--
+        try {
+          req.result.close()
+        } catch (e) {}
+      }
+      req.onsuccess = done
+      req.onerror = function () {
+        restoring--
+      }
+    })
+
+    var readDb = function (name) {
+      return new Promise(function (resolve) {
+        var req = realOpen(name)
+        req.onerror = function () {
+          resolve(null)
+        }
+        req.onsuccess = function () {
+          var db = req.result
+          db.onversionchange = function () {
+            db.close()
+          }
+          var out = { name: name, version: db.version, stores: [] }
+          var names = Array.prototype.slice.call(db.objectStoreNames)
+          if (!names.length) {
+            db.close()
+            return resolve(out)
+          }
+          var t = tx.call(db, names, 'readonly')
+          names.forEach(function (n) {
+            var st = t.objectStore(n)
+            var s = {
+              name: n,
+              keyPath: st.keyPath,
+              autoIncrement: st.autoIncrement,
+              indexes: Array.prototype.map.call(st.indexNames, function (i) {
+                var x = st.index(i)
+                return { name: x.name, keyPath: x.keyPath, unique: x.unique, multiEntry: x.multiEntry }
+              }),
+              records: [],
+            }
+            out.stores.push(s)
+            var keys = st.getAllKeys()
+            var values = st.getAll()
+            values.onsuccess = function () {
+              s.records = values.result.map(function (v, i) {
+                return [encode(keys.result[i]), encode(v)]
+              })
+            }
+          })
+          t.oncomplete = function () {
+            db.close()
+            resolve(out)
+          }
+          t.onerror = t.onabort = function () {
+            db.close()
+            resolve(out)
+          }
+        }
+      })
+    }
+    flushIdb = function () {
+      if (idbTimer) clearTimeout(idbTimer)
+      idbTimer = null
+      if (!idbDirty) return Promise.resolve()
+      idbDirty = false
+      return factory
+        .databases()
+        .then(function (list) {
+          return Promise.all(
+            list
+              .filter(function (d) {
+                return !CACHES.test(d.name)
+              })
+              .map(function (d) {
+                return readDb(d.name)
+              }),
+          )
+        })
+        .then(function (dbs) {
+          post('storage', { kind: 'idb', data: JSON.stringify({ databases: dbs.filter(Boolean) }) })
+        })
+        .catch(function (e) {
+          console.warn('[renplay] could not keep the game storage', e)
+        })
+    }
+
+    define(window, 'indexedDB', function () {
+      return factory
+    })
+    Object.keys(IDB).forEach(function (k) {
+      if (k === 'IDBFactory') return
+      try {
+        Object.defineProperty(window, k, { value: IDB[k], configurable: true, writable: true })
+      } catch (e) {}
+    })
+    window.addEventListener('pagehide', function () {
+      flushIdb()
+    })
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flushIdb()
+    })
+  }
 
   // ------------------------------------------------------------- mute
 
@@ -196,7 +435,9 @@
       case 'renplay:flush':
       case 'renplay:save-and-exit':
         sendStorage()
-        post('flushed', { ok: true, id: d.id })
+        flushIdb().then(function () {
+          post('flushed', { ok: true, id: d.id })
+        })
         break
       case 'renplay:focus':
         window.focus()

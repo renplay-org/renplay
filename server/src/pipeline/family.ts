@@ -119,14 +119,36 @@ export async function detectEngine(entries: SourceEntry[], layout: Layout | null
     if (native.length) warnings.push(`It uses a native plugin (${native.join(', ')}) that browsers cannot load, so parts of it, or all of it, may not work.`)
     if (files.some((e) => e.path.startsWith(root) && /\/GodotSharp\.dll$/i.test(e.path))) warnings.push('It is written in C#, which Godot cannot export to the web yet.')
     const name = nameFromFile(baseOf(pck.path).replace(/\.pck$/i, ''))
-    return info('godot', root, { label: version ? `Godot ${version}` : 'Godot', version, entry: baseOf(pck.path), title: name, warnings })
+    // The developer's own web export: the pack with its engine (.wasm) and the page that starts
+    // it. A web page already, installed like HTML games (pipeline/html.ts).
+    const stem = pck.path.replace(/\.pck$/i, '')
+    const page = files.find((e) => dirOf(e.path) === root && /\.html?$/i.test(e.path) && !/\.offline\.html$/i.test(e.path))
+    if (page && files.some((e) => e.path === `${stem}.wasm`) && !native.length) {
+      const html = page.size < 4 << 20 ? (await head(page, page.size)).toString('utf-8') : ''
+      if (/GODOT_CONFIG|new Engine\(/.test(html)) {
+        const label = version ? `Godot ${version} (web build)` : 'Godot (web build)'
+        if (/GODOT_THREADS_ENABLED\s*=\s*true/.test(html)) {
+          return { ...info('godot', root, { kind: 'godot-web', label, version, entry: baseOf(page.path), title: htmlTitle(html) ?? name }), installable: false, reason: 'This web build needs threads (SharedArrayBuffer), which Renplay cannot give it yet.' }
+        }
+        return { ...info('godot', root, { kind: 'godot-web', label, version, entry: baseOf(page.path), title: htmlTitle(html) ?? name }), installable: true, reason: undefined }
+      }
+    }
+    return {
+      ...info('godot', root, { label: version ? `Godot ${version}` : 'Godot', version, entry: baseOf(pck.path), title: name, warnings }),
+      reason: 'This is a PC build. Renplay installs Godot games from their web build (on itch.io, the version you can play in the browser); PC builds are planned.',
+    }
   }
 
   // Unity: a WebGL build runs in browsers; a PC build is a program for one system.
   const loader = all(/(^|\/)Build\/[^/]*\.loader\.js$|(^|\/)Build\/UnityLoader\.js$/i)[0]
   if (loader) {
     const root = dirOf(loader.path).replace(/Build\/$/i, '')
-    return info('unity', root, { kind: 'unity-webgl', label: 'Unity (WebGL build)', entry: 'index.html' })
+    // The page's loader config names the product: productName: "NaughtyPhone".
+    const page = files.find((e) => e.path === `${root}index.html`)
+    const html = page && page.size < 4 << 20 ? (await head(page, page.size)).toString('utf-8') : ''
+    const title = html.match(/productName\s*:\s*["']([^"']{1,120})["']/)?.[1] ?? htmlTitle(html)
+    // A web page already, installed like HTML games (pipeline/html.ts).
+    return { ...info('unity', root, { kind: 'unity-webgl', label: 'Unity (WebGL build)', entry: 'index.html', title }), installable: true, reason: undefined }
   }
   const ggm = all(/_Data\/globalgamemanagers$|_Data\/data\.unity3d$/i)[0]
   if (ggm || find(/(^|\/)UnityPlayer\.(dll|so)$/i)) {

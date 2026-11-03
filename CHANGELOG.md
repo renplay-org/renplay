@@ -7,6 +7,23 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-11-03
+
+### Added
+
+- Unity WebGL games and Godot web builds install and play, like HTML games: in a sandboxed frame,
+  with their saves on the server. Tested with NaughtyPhone (Unity 6) and Diggz for Vex (Godot 4.7).
+  On itch.io these are the versions that play in the browser.
+- Games of engines other than Ren'Py are marked Beta in the library, on their page and in Add
+  games: they work, with fewer features.
+- Games that keep their saves in IndexedDB (Unity, Godot, RPG Maker MZ, and others) keep them on the
+  server: the sandboxed frame gets an in-memory IndexedDB that is restored before the game starts
+  and stored after every write.
+
+### Changed
+
+- Godot PC downloads say to use the game's web build instead.
+
 ## [2.8.0] - 2026-11-03
 
 ### Changed
@@ -219,7 +236,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.8.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.9.0...dev
+[2.9.0]: https://github.com/renplay-web/renplay/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/renplay-web/renplay/compare/v2.7.1...v2.8.0
 [2.7.1]: https://github.com/renplay-web/renplay/compare/v2.7.0...v2.7.1
 [2.7.0]: https://github.com/renplay-web/renplay/compare/v2.6.0...v2.7.0

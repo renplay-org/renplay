@@ -3,7 +3,7 @@ import { CloudUpload, ExternalLink, FileArchive, Library, Pause, Play, RefreshCw
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Cover } from '../components/GameCard'
-import { Badge, Button, Confirm, Modal, Progress, Spinner, Switch, Tabs, cx, errorText, useToast } from '../components/ui'
+import { Badge, BetaBadge, Button, Confirm, Modal, Progress, Spinner, Switch, Tabs, cx, errorText, useToast } from '../components/ui'
 import { del, post, type Archive, type ArchiveInfo, type Job, type Recipe } from '../lib/api'
 import { ago, bytes, pct } from '../lib/format'
 import { recipeLinks } from '../lib/links'
@@ -175,8 +175,9 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
           {version && <Badge className="shrink-0">{version}</Badge>}
         </div>
         <div className="mt-0.5 line-clamp-2 break-words text-xs text-zinc-500">{meta}</div>
-        {(broken || updates || unknown) && !job && (
+        {(broken || updates || unknown || (foreign && !blocked)) && !job && (
           <div className="mt-2 flex flex-wrap gap-1.5">
+            {foreign && !blocked && <BetaBadge engine={foreign.family} />}
             {broken && <Badge tone="red">{BROKEN}</Badge>}
             {updates && <Badge tone="accent">Update for {updates}</Badge>}
             {unknown && <Badge tone="amber">No game found</Badge>}
@@ -440,6 +441,7 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
         {r.developer && <div className="truncate text-xs text-zinc-400">{r.developer}</div>}
         <div className="mt-2 flex flex-wrap gap-1.5">
           {latest && <Badge>{latest.version}</Badge>}
+          <BetaBadge engine={r.engine} />
           {latest?.status === 'broken' && <Badge tone="red">{BROKEN}</Badge>}
           {r.local && (
             <Link to={`/game/${r.local.id}`}>

@@ -8,12 +8,16 @@ import { PackReader } from '../pipeline/pack.js'
 import type { SaveStore } from '../saves/store.js'
 import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
 
-/** Where an HTML game's localStorage is kept, in its save folder. */
+/** Where a web game's localStorage and IndexedDB are kept, in its save folder. */
 export const HTML_STORAGE = 'localStorage.json'
+export const HTML_IDB = 'indexedDB.json'
+
+/** Games that are web pages of their own (HTML, Unity WebGL…): every family but Ren'Py. */
+export const isWebGame = (g: GameRow) => !!g.family && g.family !== 'renpy' && !!g.entry
 
 /** The URL an installed game plays at. HTML games start at their own page. */
 export function playPath(g: GameRow): string {
-  if (g.family === 'html' && g.entry) return `/g/${g.id}/${g.build}/game/${g.entry.split('/').map(encodeURIComponent).join('/')}`
+  if (isWebGame(g)) return `/g/${g.id}/${g.build}/game/${g.entry.split('/').map(encodeURIComponent).join('/')}`
   return `/g/${g.id}/${g.build}/`
 }
 
@@ -34,7 +38,7 @@ export function createPlayRouter(
     const id = assertSlug(req.params.id)
     const game = db.getGame(id)
     if (!game || game.status !== 'installed' || !game.build) throw new HttpError(404, 'Game not installed')
-    if (req.params.build !== game.build || !BUILD_RE.test(req.params.build) || game.family === 'html') {
+    if (req.params.build !== game.build || !BUILD_RE.test(req.params.build) || isWebGame(game)) {
       // Old build ids redirect to the current one, so bookmarks keep working.
       res.redirect(302, playPath(game))
       return
@@ -76,7 +80,7 @@ export function createPlayRouter(
     res.setHeader('Access-Control-Allow-Origin', '*')
     if (/\.html?$/i.test(name)) {
       const game = db.getGame(id)
-      if (game?.family === 'html' && game.entry === name && game.build && baseOf(game.build) === base) {
+      if (game && isWebGame(game) && game.entry === name && game.build && baseOf(game.build) === base) {
         const page = (await reader.read(name)) ?? Buffer.alloc(0)
         res.setHeader('Cache-Control', 'no-store')
         res.type('html').send(await htmlPage(page.toString('utf-8'), game))
@@ -118,14 +122,18 @@ export function createPlayRouter(
    * localStorage put first in <head>, before any of the game's scripts.
    */
   async function htmlPage(page: string, game: GameRow): Promise<string> {
-    let storage: Record<string, string> = {}
-    if (game.save_dir) {
+    const stored = async (name: string): Promise<Record<string, unknown> | null> => {
+      if (!game.save_dir) return null
       try {
-        const parsed = JSON.parse((await html.saves.read(game.save_dir, HTML_STORAGE)).toString('utf-8'))
-        if (parsed && typeof parsed === 'object') storage = parsed
-      } catch {}
+        const parsed = JSON.parse((await html.saves.read(game.save_dir, name)).toString('utf-8'))
+        return parsed && typeof parsed === 'object' ? parsed : null
+      } catch {
+        return null
+      }
     }
-    const cfg = JSON.stringify({ id: game.id, build: game.build, storage }).replace(/</g, '\\u003c')
+    const storage = (await stored(HTML_STORAGE)) ?? {}
+    const idb = await stored(HTML_IDB)
+    const cfg = JSON.stringify({ id: game.id, build: game.build, storage, idb }).replace(/</g, '\\u003c')
     const inject = `<script>window.__renplay=${cfg};</script><script>${await html.runtime()}</script>`
     const head = page.match(/<head\b[^>]*>/i)
     if (head) return page.slice(0, head.index! + head[0].length) + inject + page.slice(head.index! + head[0].length)
@@ -191,7 +199,10 @@ const MIME: Record<string, string> = {
 }
 
 function mimeOf(name: string): string {
-  return MIME[name.slice(name.lastIndexOf('.') + 1).toLowerCase()] ?? 'application/octet-stream'
+  // Unity WebGL builds name files game.wasm.br or .gz; served as they are (itch.io, for one, keeps
+  // them uncompressed), they need the type of the name underneath, or wasm compiles slowly.
+  const bare = name.replace(/\.(br|gz)$/i, '')
+  return MIME[bare.slice(bare.lastIndexOf('.') + 1).toLowerCase()] ?? 'application/octet-stream'
 }
 
 async function findPresplash(dir: string): Promise<string | null> {

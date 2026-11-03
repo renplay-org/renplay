@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import type { Game } from '../lib/api'
 import { ago, capitalize, pct } from '../lib/format'
 import { useBlurAdultCovers } from '../lib/prefs'
-import { Badge, Progress, cx } from './ui'
+import { Badge, BetaBadge, cx, Progress } from './ui'
 
 /** Shape of cover frames: itch.io's cover format (630×500), which most official art uses. */
 export const COVER_ASPECT = 'aspect-[63/50]'
@@ -125,6 +125,7 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
         <div className="px-0.5 pt-2.5">
           <h3 className="line-clamp-1 text-[15px] font-semibold tracking-tight text-white">{game.title}</h3>
           <div className="mt-0.5 flex items-center gap-3 text-[12px] text-zinc-400">
+            <BetaBadge engine={game.family} />
             {game.version && <span className="truncate">{game.version}</span>}
             {game.saves.count > 0 && (
               <span className="flex shrink-0 items-center gap-1">

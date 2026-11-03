@@ -98,6 +98,16 @@ export function Badge({ tone = 'neutral', children, className }: { tone?: 'neutr
   )
 }
 
+/** Games of engines other than Ren'Py play as a beta: they work, with fewer features (docs/engines.md). */
+export function BetaBadge({ engine }: { engine?: string | null }) {
+  if (!engine || engine === 'renpy') return null
+  return (
+    <span className="inline-flex shrink-0" title="Renplay plays games of engines other than Ren’Py as a beta: they work, with fewer features.">
+      <Badge tone="violet">Beta</Badge>
+    </span>
+  )
+}
+
 export function Progress({ value, className, indeterminate }: { value: number; className?: string; indeterminate?: boolean }) {
   return (
     <div className={cx('h-1.5 overflow-hidden rounded-full bg-white/10', className)}>
