@@ -7,6 +7,13 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- Install logs show progress every half minute (how much is read, files written, images
+  converted), and their times follow the server's time zone (`TZ`).
+- The catalog is refreshed every hour while Renplay runs, not only at startup.
+- Games made with Ren'Py 7 show their Ren'Py version instead of "unknown".
+
 ## [2.3.0] - 2026-11-03
 
 ### Added

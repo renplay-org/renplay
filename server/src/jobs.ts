@@ -125,7 +125,8 @@ export class JobManager {
         this.scheduleFlush()
       },
       log: (line) => {
-        const stamp = new Date().toISOString().slice(11, 19)
+        // Local time of the server (TZ), as people read the log.
+        const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false })
         let l = (this.logs.get(next.id) ?? '') + `[${stamp}] ${line}\n`
         if (l.length > LOG_LIMIT) l = l.slice(l.length - LOG_LIMIT)
         this.logs.set(next.id, l)

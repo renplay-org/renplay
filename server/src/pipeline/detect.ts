@@ -105,8 +105,19 @@ export interface GameMeta {
   screen?: [number, number]
 }
 
-/** Reads `version = '8.3.4.24120703'` from renpy/vc_version.py. */
-export function renpyVersionFromVc(src: string): string | undefined {
-  const m = src.match(/^version\s*=\s*['"]([^'"]+)['"]/m)
-  return m ? m[1] : undefined
+/**
+ * The Ren'Py version: `version = '8.3.4.24120703'` in renpy/vc_version.py, or
+ * for Ren'Py 7 and older, whose vc_version.py only has `vc_version = 320`,
+ * `version_tuple = (7, 3, 2, vc_version)` from renpy/__init__.py.
+ */
+export function renpyVersionFromVc(vc: string, init?: string): string | undefined {
+  const m = vc.match(/^version\s*=\s*['"]([^'"]+)['"]/m)
+  if (m) return m[1]
+  const t = init?.match(/^version_tuple\s*=\s*\((\d+),\s*(\d+),\s*(\d+)/m)
+  if (!t) return undefined
+  const n = vc.match(/^vc_version\s*=\s*(\d+)/m)
+  return `${t[1]}.${t[2]}.${t[3]}${n ? `.${n[1]}` : ''}`
 }
+
+/** Whether a version string needs renpy/__init__.py to be read as well. */
+export const vcNeedsInit = (vc: string) => !/^version\s*=/m.test(vc)

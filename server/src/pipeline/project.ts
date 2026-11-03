@@ -6,7 +6,7 @@ import { pipeline } from 'node:stream/promises'
 import type { JobContext } from '../jobs.js'
 import { Limiter } from '../util/limit.js'
 import { readAll, type ArchiveSource, type SourceEntry } from './archive.js'
-import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, type GameMeta } from './detect.js'
+import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit, type GameMeta } from './detect.js'
 import { isOptimizableImage, transcodeImage, type ImagePolicy } from './optimize.js'
 import type { PackWriter } from './pack.js'
 import { classify, makePlaceholder, streamsImage, type Placeholder, type ProgressiveRule } from './progressive.js'
@@ -126,7 +126,9 @@ export async function extractProject(
   for (const e of inRoot) {
     const rel = e.path.slice(root.length)
     if (rel === 'renpy/vc_version.py') {
-      meta.renpyVersion = renpyVersionFromVc((await readAll(await e.open(), 1 << 20)).toString('utf-8'))
+      const vc = (await readAll(await e.open(), 1 << 20)).toString('utf-8')
+      const init = vcNeedsInit(vc) ? inRoot.find((x) => x.path === `${root}renpy/__init__.py`) : undefined
+      meta.renpyVersion = renpyVersionFromVc(vc, init ? (await readAll(await init.open(), 1 << 20)).toString('utf-8') : undefined)
       continue
     }
     if (!rel.startsWith('game/')) {
@@ -156,9 +158,16 @@ export async function extractProject(
   }
 
   let done = 0
+  let reported = Date.now()
   const tick = (n: number, what: string) => {
     done += n
     ctx.progress('Unpacking game files', total ? done / total : 0, what)
+    // Long installs write a progress line now and then, so the log shows they move.
+    if (Date.now() - reported > 30_000) {
+      reported = Date.now()
+      const pct = total ? Math.floor((100 * done) / total) : 0
+      ctx.log(`Unpacking: ${pct}% (${(done / 1e9).toFixed(2)} of ${(total / 1e9).toFixed(2)} GB read), ${stats.files.toLocaleString('en-US')} files written, ${stats.imagesConverted.toLocaleString('en-US')} images converted`)
+    }
   }
 
   /** Streamed (non-image) files go to the assets pack; images decide after their placeholder. */
