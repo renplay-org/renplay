@@ -7,6 +7,12 @@ release notes say what).
 
 ## [Unreleased]
 
+### Removed
+
+- Installing from a download link. File hosts tie their links to the browser (and network) that
+  opened them, so the server's download failed for most links. Upload the download, or copy it
+  into the archives folder; the Upload tab now explains where that is.
+
 ## [2.2.0] - 2026-11-03
 
 ### Added

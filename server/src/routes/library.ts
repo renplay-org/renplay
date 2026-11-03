@@ -120,9 +120,10 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
   router.post('/imports', (req, res) => {
     const b = req.body ?? {}
     const source = b.source
-    if (!source || (source.kind !== 'archive' && source.kind !== 'url')) throw new HttpError(400, 'source must be {kind:"archive",path} or {kind:"url",url}')
-    if (source.kind === 'archive') cleanRelPath(source.path)
-    if (source.kind === 'url' && !/^https?:\/\//i.test(String(source.url))) throw new HttpError(400, 'Invalid URL')
+    // Games come from the archives folder (copied there or uploaded). Download
+    // links are not supported: file hosts tie them to the browser that made them.
+    if (!source || source.kind !== 'archive') throw new HttpError(400, 'source must be {kind:"archive",path}')
+    cleanRelPath(source.path)
     if (b.game !== undefined && b.game !== null && !isSlug(b.game)) throw new HttpError(400, 'Invalid game id')
     if (b.game && jobs.activeFor(b.game)) throw new HttpError(409, 'A job is already running for this game')
     const id = jobs.enqueue('import', b.game ?? '', {

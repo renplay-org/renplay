@@ -9,7 +9,6 @@ export interface GameSource {
   archive?: string
   size?: number
   sha256?: string
-  url?: string
 }
 
 export interface BuildOptions {

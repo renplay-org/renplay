@@ -110,6 +110,10 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   resumes `game.zip` with Range requests and shows an error with a retry button after 8 failures.
 - **Ren'Py recompiles old games' scripts** on the newer web engine on every start (17 s for Pale
   Carnations); the runtime stores the recompiled `.rpyc` files with the build.
+- **Download links do not work from the server.** File hosts (Mediafire, Mega, Google Drive…)
+  tie a direct link to the browser and IP that opened it, and official stores need the user's
+  login, so "install from a link" failed for real links and was removed. Games arrive by upload or
+  through the archives folder.
 - **iPhone Safari cannot make a page fullscreen.** Only a home-screen web app fills the screen;
   the player explains that instead of showing a broken button.
 
