@@ -453,7 +453,8 @@ export default function Player() {
           onClick={showToolbar}
           aria-label="Show the menu"
           className="absolute z-30 flex size-10 items-center justify-center rounded-full bg-black/45 text-white/80 opacity-55 ring-1 ring-white/15 backdrop-blur transition-opacity active:opacity-100"
-          style={{ top: 8 + Math.max(insets.top, pad.top), left: 8 + insets.left }}
+          // HTML games often put their own menu in the top left (SugarCube's sidebar toggle).
+          style={sandboxed ? { top: 8 + Math.max(insets.top, pad.top), right: 8 + insets.right } : { top: 8 + Math.max(insets.top, pad.top), left: 8 + insets.left }}
         >
           <Menu className="size-5" />
         </button>

@@ -1,4 +1,4 @@
-import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
+import { mkdir, open, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../builds.js'
 import type { BuildSettings, Catalog, RecipeMatch } from '../catalog.js'
@@ -157,6 +157,10 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     let res
     try {
       res = await extractProject(src, layout.root, staging, policy, imageConcurrency(cfg.imageConcurrency), ctx, rules, { assets, zip: zipPack, skip }, excluder(settings.exclude))
+      // The zip pack is read back, so everything must be on disk first.
+      await zipPack.close()
+      const aside = await setSourcesAside(join(work, 'zip.pack'), zipPack, assets)
+      if (aside) ctx.log(`${aside} scripts load from the game's compiled .rpyc files; their .rpy sources stay in the build for mods`)
     } finally {
       await Promise.allSettled([assets.close(), zipPack.close()])
     }
@@ -254,6 +258,34 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     src?.close()
     await rm(work, { recursive: true, force: true }).catch(() => {})
   }
+}
+
+/**
+ * Moves a script's source (.rpy, .rpym) out of game.zip when its compiled file
+ * is there too, into the assets pack, where the file browser and mods find it
+ * but Ren'Py does not. A .rpyc records its source's digest with a marker of
+ * the Ren'Py version that wrote it, so Ren'Py 8.5 sees every older game's
+ * .rpyc as stale and compiles the source again: slower, and with a stricter
+ * parser and Python 3.12, which refuse code the game's own Ren'Py accepted.
+ * Without the source it loads the .rpyc, as for most released games. A
+ * modded source goes into game.zip again (applymods), so Ren'Py compiles it.
+ */
+export async function setSourcesAside(zipPackPath: string, zip: PackWriter, assets: PackWriter): Promise<number> {
+  const sources = [...zip.index.keys()].filter((n) => /\.rpym?$/i.test(n) && zip.index.has(`${n}c`))
+  if (!sources.length) return 0
+  const fh = await open(zipPackPath, 'r')
+  try {
+    for (const name of sources) {
+      const [offset, size] = zip.index.get(name)!
+      const data = Buffer.alloc(size)
+      if (size) await fh.read(data, 0, size, offset)
+      await assets.add(name, data)
+      zip.index.delete(name)
+    }
+  } finally {
+    await fh.close()
+  }
+  return sources.length
 }
 
 /**

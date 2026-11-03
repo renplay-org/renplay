@@ -125,7 +125,15 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
 - **Ren'Py 7 games run on the Ren'Py 8 engine.** Ren'Py 8 loads their compiled scripts and
   compiles all their Python at load time, so a game that starts has no Python 2 syntax; what can
   still fail is Python 2 behaviour (xrange, iteritems, unicode). Once in a Lifetime (7.3.2)
-  played through its opening, a fight minigame and more without errors.
+  played through its opening, a fight minigame and more without errors. Harem Hotel (7.4.11)
+  does not: it sorts numbers with text, which Python 3 refuses.
+- **Load the developer's .rpyc, not the .rpy.** A `.rpyc` stores its source's digest with a
+  marker of the Ren'Py version that wrote it, so Ren'Py 8.5 sees every older game's `.rpyc` as
+  stale and compiles the `.rpy` again, with a stricter parser and Python 3.12 (Harem Hotel's
+  empty `screen`, Heros Harem Guild's `[:02]` and `xadjustment` failed that way). Builds keep
+  sources out of `game.zip` when the `.rpyc` is there (`setSourcesAside`). Ren'Py's own Python 2
+  fixer (`renpy.compat.fixes`) uses `tokenize`, which Python 3.12 makes fail on the very code it
+  should fix; `webcompat.ts` retries from the error's position instead.
 - **iPhone Safari cannot make a page fullscreen.** Only a home-screen web app fills the screen;
   the player explains that instead of showing a broken button.
 

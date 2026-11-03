@@ -7,6 +7,21 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- Ren'Py games load the scripts their developer compiled (`.rpyc`) instead of compiling their
+  sources again on the newer engine. Older games start faster, and games whose sources the newer
+  engine refuses start at all (Heros Harem Guild). The sources stay in the build for mods. This
+  applies to games installed or reinstalled from now on.
+- Builds stand in for more of what desktop games expect and a browser lacks: import hooks of
+  old libraries (`six`, bundled with old versions of `requests`), the Unix sockets Discord status
+  libraries look for, and Python 2 numbers with leading zeros (`02`, `010`).
+
+### Fixed
+
+- In HTML games on phones, the player's menu button is in the top right, so the game's own menu
+  in the top left (SugarCube's sidebar) can be opened.
+
 ## [2.6.0] - 2026-11-03
 
 ### Added
