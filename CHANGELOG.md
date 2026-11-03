@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-03
+
 ### Changed
 
 - Ren'Py games load the scripts their developer compiled (`.rpyc`) instead of compiling their
@@ -196,7 +198,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.6.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.7.0...dev
+[2.7.0]: https://github.com/renplay-web/renplay/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/renplay-web/renplay/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/renplay-web/renplay/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/renplay-web/renplay/compare/v2.3.0...v2.4.0
