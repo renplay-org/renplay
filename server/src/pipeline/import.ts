@@ -173,7 +173,9 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
         (s.imagesConverted ? `, converted ${s.imagesConverted} images ${(s.imageBytesBefore / 1e9).toFixed(2)} GB -> ${(s.imageBytesAfter / 1e9).toFixed(2)} GB` : ''),
     )
     const meta = res.meta
-    const saveDir = meta.saveDir ?? match?.recipe.saveDir
+    // A recipe's folder was checked by playing; detection reads options.rpy, which other scripts
+    // can override (Hero's Harem Guild sets another folder later).
+    const saveDir = match?.recipe.saveDir ?? meta.saveDir
 
     // 6. Game id: the existing game, the recipe, or the title.
     const existing =
