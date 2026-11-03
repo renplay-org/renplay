@@ -20,8 +20,15 @@ release notes say what).
   `docs/engines.md` has the plan.
 - A game's Details tab says what made it.
 
+### Fixed
+
+- Games made with Ren'Py 7.4 to 7.5 that ship only Python 2 show their Ren'Py 7 version, not 8.0.
+
 ### Changed
 
+- Ren'Py 7 games' Python print statements (`print "…"`) work: code that fails to compile on the
+  Ren'Py 8 engine for that reason is compiled again with print() calls. Games that depend on other
+  Python 2 behaviour still fail; Harem Hotel (Ren'Py 7.4) is one.
 - Renplay reads the catalog's schema 3 (`index.v3.json`), where recipes say which engine made the
   game (`engine`), the runtime to build with (`runtime`) and the engine version a release was made
   with (`madeWith`). It still reads schema 2. Exported recipes use the new names.

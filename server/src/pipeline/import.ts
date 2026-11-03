@@ -11,7 +11,7 @@ import { dirSize, exists } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
 import { extractWithBsdtar, openDir, openZip, readAll, sniffArchive, type ArchiveSource, type SourceEntry } from './archive.js'
 import { assemble } from './assemble.js'
-import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit } from './detect.js'
+import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit } from './detect.js'
 import { defaultImagePolicy, imageConcurrency } from './optimize.js'
 import { PackWriter, writeIndex } from './pack.js'
 import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
@@ -115,7 +115,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     if (layout.kind === 'web') throw new Error('This is a web build. Use the game’s PC download; renplay builds the web version itself.')
 
     // 4. Engine, from the recipe or the game's own Ren'Py version.
-    const gameRenpy = await renpyVersionOf((p) => src!.entries.find((e) => e.path === layout.root + p))
+    const gameRenpy = await renpyVersionOf((p) => src!.entries.find((e) => e.path === layout.root + p), pythonOf(src.entries.map((e) => e.path), layout.root))
     const engine = await engines.pick(p.engine ?? settings.engine, gameRenpy ?? match?.release?.madeWith)
     ctx.log(`Game made with Ren'Py ${gameRenpy ?? 'unknown'}; building with engine ${engine}`)
     if (gameRenpy && Number(gameRenpy.split('.')[0]) < Number(engine.split('.')[0])) {
@@ -390,7 +390,7 @@ export async function inspectArchive(path: string): Promise<ArchiveInfo> {
       info.title = j.name
       info.version = j.version
     }
-    info.renpyVersion = await renpyVersionOf((p) => byPath.get(root + p))
+    info.renpyVersion = await renpyVersionOf((p) => byPath.get(root + p), pythonOf(src.entries.map((e) => e.path), root))
     const consider = (name: string, data: Buffer) => {
       if (name.endsWith('.rpy')) {
         const text = data.toString('utf-8')
@@ -435,11 +435,11 @@ export async function cleanWorkDir(cfg: Config): Promise<void> {
 }
 
 /** The game's Ren'Py version from its renpy/ folder (see renpyVersionFromVc). */
-async function renpyVersionOf(find: (path: string) => SourceEntry | undefined): Promise<string | undefined> {
+async function renpyVersionOf(find: (path: string) => SourceEntry | undefined, python?: 2 | 3): Promise<string | undefined> {
   const vc = find('renpy/vc_version.py')
   if (!vc) return undefined
   const text = async (e: SourceEntry) => (await readAll(await e.open(), 1 << 20)).toString('utf-8')
   const src = await text(vc)
   const init = vcNeedsInit(src) ? find('renpy/__init__.py') : undefined
-  return renpyVersionFromVc(src, init ? await text(init) : undefined)
+  return renpyVersionFromVc(src, init ? await text(init) : undefined, python)
 }
