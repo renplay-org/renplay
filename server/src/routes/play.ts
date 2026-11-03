@@ -176,7 +176,9 @@ export function renderPage(template: string, o: PageOptions): string {
   out = out.replace(/<script[^>]*\ssrc=["']renpy\.js["'][^>]*><\/script>/, '')
   out = out.replace(/<meta name="viewport"[^>]*>/i, '<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">')
   // Ren'Py's own menu imports and exports browser-local saves, which renplay
-  // replaces with saves on the server; the player has its own controls.
-  out = out.replace(/<\/head>/i, '<style>#ContextContainer{display:none!important}</style></head>')
+  // replaces with saves on the server; the player has its own controls. The
+  // canvas takes keyboard focus on every click and key, and browsers would
+  // outline the whole game for it.
+  out = out.replace(/<\/head>/i, '<style>#ContextContainer{display:none!important}#canvas,#canvas:focus,#canvas:focus-visible{outline:none!important}</style></head>')
   return out
 }

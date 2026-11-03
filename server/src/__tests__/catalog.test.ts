@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,7 +16,9 @@ describe('catalog', () => {
   let coverRequests = 0
 
   beforeAll(async () => {
-    cover = await sharp({ create: { width: 64, height: 36, channels: 3, background: '#a35' } }).webp().toBuffer()
+    // Official art is often a PNG wider than a thumbnail needs.
+    cover = await sharp({ create: { width: 1260, height: 1000, channels: 3, background: '#a35' } }).png().toBuffer()
+    const sha = createHash('sha256').update(cover).digest('hex')
     const index = {
       schema: 2,
       games: [
@@ -24,28 +27,30 @@ describe('catalog', () => {
           title: 'Ripples',
           developer: 'Jestur',
           tags: ['sci-fi'],
-          cover: 'covers/ripples.webp',
+          cover: { url: 'https://example.invalid/ignored', sha256: sha, width: 1260, height: 1000 },
           releases: [
             { version: '0.9.24', status: 'verified', archives: [] },
             { version: '0.9.23', status: 'verified', archives: [] },
           ],
         },
-        { id: 'by-save', title: 'By Save', saveDir: 'BySave-1', releases: [] },
+        { id: 'by-save', title: 'By Save', saveDir: 'BySave-1', cover: { url: 'covers/other.png', sha256: '0'.repeat(64) }, releases: [] },
         { id: 'by-pattern', title: 'By Pattern', match: ['Pattern-*-pc.zip'], cover: 'covers/missing.webp', releases: [] },
       ],
     }
     server = createServer((req, res) => {
       if (req.url === '/catalog/index.json') return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(index))
-      if (req.url === '/catalog/covers/ripples.webp') {
+      if (req.url === '/catalog/covers/ripples.png') {
         coverRequests++
         if (req.headers['if-none-match'] === '"v1"') return void res.writeHead(304).end()
-        return void res.writeHead(200, { 'content-type': 'image/webp', etag: '"v1"' }).end(cover)
+        return void res.writeHead(200, { 'content-type': 'image/png', etag: '"v1"' }).end(cover)
       }
+      if (req.url === '/catalog/covers/other.png') return void res.writeHead(200, { 'content-type': 'image/png' }).end(cover)
       res.writeHead(404).end()
     })
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
     const addr = server.address() as { port: number }
     base = `http://127.0.0.1:${addr.port}/catalog/index.json`
+    index.games[0]!.cover = { url: `http://127.0.0.1:${addr.port}/catalog/covers/ripples.png`, sha256: sha, width: 1260, height: 1000 }
   })
   afterAll(() => server?.close())
 
@@ -79,6 +84,12 @@ describe('catalog', () => {
     const url = catalog.cover('ripples')!
     expect(url).toMatch(/^\/api\/covers\/ripples\.[0-9a-f]{12}\.webp$/)
     expect(readdirSync(cfg.coversDir)).toEqual([url.split('/').pop()])
+    // Stored as a WebP thumbnail, scaled down to 960 pixels wide.
+    const thumb = await sharp(readFileSync(join(cfg.coversDir, url.split('/').pop()!))).metadata()
+    expect([thumb.format, thumb.width, thumb.height]).toEqual(['webp', 960, 762])
+    // An image that does not match the catalog's checksum is refused.
+    expect(catalog.cover('by-save')).toBeNull()
+    expect(res.errors.some((e) => e.includes('by-save') && e.includes('changed'))).toBe(true)
     // A cover that fails to download is reported, not fatal.
     expect(catalog.cover('by-pattern')).toBeNull()
     expect(res.errors.some((e) => e.includes('by-pattern'))).toBe(true)

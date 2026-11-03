@@ -5,6 +5,8 @@ export interface Game {
   tags: string[]
   /** Curated cover from the catalog (URL), or null. */
   cover: string | null
+  /** An adult game, per its recipe. */
+  nsfw: boolean
   walkthrough: string | null
   status: 'installed' | 'not_installed' | 'installing'
   build: string | null

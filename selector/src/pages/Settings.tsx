@@ -3,9 +3,10 @@ import { Activity, Download, ExternalLink, FileCode2, HardDrive, Package, Refres
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import RecipeDialog from '../components/RecipeDialog'
-import { Button, Progress, Spinner, errorText, useToast } from '../components/ui'
+import { Button, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { post } from '../lib/api'
 import { bytes } from '../lib/format'
+import { useBlurAdultCovers } from '../lib/prefs'
 import { useCatalog, useGames, useSystem } from '../lib/queries'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
@@ -35,6 +36,7 @@ export default function Settings() {
   const qc = useQueryClient()
   const toast = useToast()
   const [persisted, setPersisted] = useState<boolean | null>(null)
+  const [blurAdult, setBlurAdult] = useBlurAdultCovers()
   if (isLoading || !sys) return <Spinner />
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
@@ -186,6 +188,9 @@ export default function Settings() {
             Keep game cache
           </Button>
           {persisted !== null && <p className="text-xs text-zinc-500">{persisted ? 'The browser will keep the cache.' : 'The browser declined; it may still keep it.'}</p>}
+          <div className="border-t border-white/[0.06] pt-4">
+            <Switch checked={blurAdult} onChange={setBlurAdult} label="Blur pictures of adult games" hint="Covers and save pictures in the library, for screens other people can see. Only this browser is affected." />
+          </div>
         </section>
       </div>
     </div>

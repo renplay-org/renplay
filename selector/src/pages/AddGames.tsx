@@ -373,7 +373,7 @@ function CatalogTab() {
       {!games.length ? (
         <Empty title="The catalog is empty">No recipes are available from {data?.status.urls.join(', ')} yet.</Empty>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {games.map((r) => (
             <RecipeCard key={r.id} recipe={r} />
           ))}
@@ -388,15 +388,12 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
   const tone = latest?.status === 'verified' ? 'green' : latest?.status === 'broken' ? 'red' : latest?.status === 'playable' ? 'violet' : 'neutral'
   return (
     <div className="overflow-hidden rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.07]">
-      <div className="relative aspect-video">
-        <Cover game={{ title: r.title, cover: r.cover ?? null }} rounded={false} className="absolute inset-0" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-        <div className="absolute bottom-3 left-4 right-4">
-          <div className="font-display text-lg font-semibold text-white">{r.title}</div>
-          {r.developer && <div className="text-xs text-zinc-300">{r.developer}</div>}
-        </div>
-      </div>
+      <Cover game={{ title: r.title, cover: typeof r.cover === 'string' ? r.cover : null, nsfw: r.nsfw }} rounded={false} className="aspect-[63/50]" />
       <div className="space-y-3 p-4">
+        <div>
+          <div className="font-display text-lg font-semibold text-white">{r.title}</div>
+          {r.developer && <div className="text-xs text-zinc-400">{r.developer}</div>}
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {latest && <Badge tone={tone}>{capitalize(latest.status)}</Badge>}
           {latest && <Badge>{latest.version}</Badge>}

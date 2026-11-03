@@ -61,6 +61,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     title: recipe?.title ?? row.title,
     developer: recipe?.developer ?? null,
     tags: recipe?.tags ?? [],
+    nsfw: recipe?.nsfw ?? false,
     cover: recipe ? deps.catalog.cover(recipe.id) : null,
     walkthrough: row.walkthrough || null,
     status: row.status,
