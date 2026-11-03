@@ -36,7 +36,7 @@ describe('engine detection', () => {
 
   it('reads Twine stories, Twine 2 and Twine 1 style', async () => {
     const tw2 = await detect({ 'Story/index.html': '<html><tw-storydata name="My Story" format="Harlowe" format-version="3.3.9" ifid="x"></tw-storydata></html>' })
-    expect(tw2).toMatchObject({ family: 'html', kind: 'twine-harlowe', version: '3.3.9', label: 'Harlowe 3.3.9 (Twine)', title: 'My Story', root: 'Story/', entry: 'index.html' })
+    expect(tw2).toMatchObject({ family: 'html', kind: 'twine-harlowe', version: '3.3.9', label: 'HTML (Harlowe 3.3.9)', title: 'My Story', root: 'Story/', entry: 'index.html' })
     const sc = await detect({
       'College/College.html': '<title>main_file</title><div id="store-area" data-size="2" hidden><div tiddler="StoryTitle" tags="">College Daze</div></div><script>version:{title:"SugarCube",major:2,minor:36,patch:1}</script>',
       'College/images/a.mp4': 'x',
@@ -46,7 +46,7 @@ describe('engine detection', () => {
 
   it('reads RPG Maker MV and MZ versions', async () => {
     const mz = await detect({ 'Game/index.html': '<title>Quest</title>', 'Game/js/rmmz_core.js': 'Utils.RPGMAKER_VERSION = "1.8.0";' })
-    expect(mz).toMatchObject({ family: 'html', kind: 'rpgmaker-mz', version: '1.8.0', label: 'RPG Maker MZ 1.8.0', root: 'Game/' })
+    expect(mz).toMatchObject({ family: 'html', kind: 'rpgmaker-mz', version: '1.8.0', label: 'RPGM (MZ 1.8.0)', root: 'Game/' })
     const mv = await detect({ 'Game/Game.exe': 'x', 'Game/www/index.html': '', 'Game/www/js/rpg_core.js': "Utils.RPGMAKER_VERSION = '1.6.1';" })
     expect(mv).toMatchObject({ kind: 'rpgmaker-mv', version: '1.6.1', root: 'Game/www/' })
   })

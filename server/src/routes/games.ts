@@ -72,7 +72,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     build: row.build || null,
     playUrl: row.status === 'installed' && row.build ? playPath(row) : null,
     family: row.family || 'renpy',
-    /** What made the game, for other engines ("SugarCube 2.36.1 (Twine)"). */
+    /** What made the game, for other engines ("HTML (SugarCube 2.36.1)"). */
     engineLabel: row.engine_label || null,
     version: row.version || null,
     renpyVersion: row.renpy_version || null,

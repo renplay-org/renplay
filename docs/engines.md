@@ -105,6 +105,23 @@ with a `family` field; entries without one are Ren'Py.
    Needs a Godot game without native plugins to finish this phase; detection already warns
    about plugins and C#. `web_dlink_nothreads_release` loads GDExtensions, but only ones
    compiled for the web, which games do not ship.
+
+   What building it takes, from that try:
+   - **Runtime pack**: renplay-web/engines builds `godot-<version>` from the official
+     `Godot_v<version>-stable_export_templates.tpz` (checked against the release's SHA512-SUMS):
+     `godot.js`, `godot.wasm` (gzipped), the two audio worklets and Godot's license. The index
+     lists them under a separate `runtimes` key with `family: "godot"`, so Renplay 2.7 and older,
+     which read `engines`, never mistake them for Ren'Py. Pick the pack matching the `.pck`
+     header's version, else the newest of the same minor version.
+   - **Build**: the `.pck` goes into the assets pack as `game.pck`; the page is Renplay's own,
+     starting `new Engine({ executable, mainPack: 'game/game.pck', persistentPaths: ['/userfs'] })`.
+   - **Sandbox**: the engine files under `/engine/` need `Access-Control-Allow-Origin: *` (the
+     sandboxed frame fetches the wasm and adds the audio worklets from an opaque origin).
+   - **Saves**: Godot keeps `user://` (`/userfs`) in IndexedDB through Emscripten's IDBFS, and
+     does not expose its filesystem. The runtime would provide an in-memory IndexedDB (such as
+     fake-indexeddb), fill IDBFS's `FILE_DATA` store from the server before the engine starts,
+     and send it to the player after each sync. The same stand-in would serve RPG Maker MZ
+     (localforage) and Unity WebGL, which keep saves in IndexedDB too.
 4. **Unity WebGL**: serve the build as it is. Needs a game that publishes a WebGL build.
 
 Later candidates, by how many adult games use them: TyranoScript and Construct (HTML, so phase 2

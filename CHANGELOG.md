@@ -7,6 +7,20 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-11-03
+
+### Changed
+
+- Games of other engines are named the way players know them from F95zone: HTML (SugarCube 2.36.1),
+  RPGM (MZ 1.8.0), Unity, Godot.
+- The catalog's games are not labeled Verified or Known issues any more: being in the catalog means
+  a game works. A release that does not work still says so.
+
+### Fixed
+
+- A game installed from a catalog recipe uses the recipe's save folder; Renplay's own guess from the
+  game's options came first and could be wrong (Hero's Harem Guild).
+
 ## [2.7.1] - 2026-11-03
 
 ### Fixed
@@ -205,7 +219,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.7.1...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.8.0...dev
+[2.8.0]: https://github.com/renplay-web/renplay/compare/v2.7.1...v2.8.0
 [2.7.1]: https://github.com/renplay-web/renplay/compare/v2.7.0...v2.7.1
 [2.7.0]: https://github.com/renplay-web/renplay/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/renplay-web/renplay/compare/v2.5.0...v2.6.0
