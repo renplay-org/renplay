@@ -155,6 +155,32 @@
     parentFullscreen: false,
   }
 
+  // ---------------------------------------------------------------- vertex uploads
+
+  /*
+   * Ren'Py's renderer draws from client-side vertex arrays, which WebGL lacks;
+   * Emscripten emulates them by copying each draw's vertices and indices into
+   * a pooled buffer with bufferSubData(target, 0, data) right before the draw.
+   * Overwriting a buffer that earlier draws of the same frame still read makes
+   * the browser's GPU process wait or copy. Menus with many small draws (170 a
+   * frame in Ripples) fell to 15 fps that way.
+   *
+   * Whole uploads from offset 0 therefore get fresh storage of exactly that
+   * size (bufferData), which the draw that follows reads in full. Nothing else
+   * changes: 15 -> 60 fps on that menu, same picture.
+   */
+  ;[window.WebGL2RenderingContext, window.WebGLRenderingContext].forEach(function (C) {
+    if (!C || C.prototype.__renplayUploads) return
+    var bufferSubData = C.prototype.bufferSubData
+    C.prototype.bufferSubData = function (target, offset, data) {
+      if (offset === 0 && arguments.length === 3 && data && data.byteLength) {
+        return this.bufferData(target, data, this.DYNAMIC_DRAW)
+      }
+      return bufferSubData.apply(this, arguments)
+    }
+    C.prototype.__renplayUploads = true
+  })
+
   // ---------------------------------------------------------------- messaging
 
   function post(type, data) {

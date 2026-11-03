@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Archive as ArchiveIcon, BadgeCheck, CloudUpload, ExternalLink, FileArchive, Fingerprint, Library, Link2, Pause, Play, RefreshCw, Search, Trash2, X } from 'lucide-react'
+import { Archive as ArchiveIcon, BadgeCheck, CloudUpload, ExternalLink, FileArchive, Fingerprint, Library, HardDrive, Pause, Play, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Cover } from '../components/GameCard'
@@ -7,7 +7,7 @@ import { Badge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, Tabs, 
 import { del, post, type Archive, type ArchiveInfo, type Recipe } from '../lib/api'
 import { ago, bytes, capitalize, pct } from '../lib/format'
 import { recipeLinks } from '../lib/links'
-import { useArchives, useCatalog, useGames } from '../lib/queries'
+import { useArchives, useCatalog, useGames, useSystem } from '../lib/queries'
 import { uploadArchive, type UploadHandle } from '../lib/upload'
 
 type Tab = 'server' | 'upload' | 'catalog'
@@ -28,7 +28,7 @@ export default function AddGames() {
           onChange={setTab}
           tabs={[
             { id: 'server', label: <><ArchiveIcon className="size-4" /> Archives on server</> },
-            { id: 'upload', label: <><CloudUpload className="size-4" /> Upload or link</> },
+            { id: 'upload', label: <><CloudUpload className="size-4" /> Upload</> },
             { id: 'catalog', label: <><Library className="size-4" /> Catalog</> },
           ]}
         />
@@ -227,10 +227,10 @@ function InstallDialog({ archive, onClose }: { archive: Archive; onClose: () => 
 
 function UploadTab({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient()
+  const { data: sys } = useSystem()
   const toast = useToast()
   const [drag, setDrag] = useState(false)
   const [up, setUp] = useState<{ file: File; sent: number; handle: UploadHandle; paused: boolean } | null>(null)
-  const [url, setUrl] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const start = (file: File) => {
@@ -307,32 +307,15 @@ function UploadTab({ onDone }: { onDone: () => void }) {
       </div>
       <div className="rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
         <h3 className="flex items-center gap-2 font-semibold text-white">
-          <Link2 className="size-4" /> Install from a direct link
+          <HardDrive className="size-4" /> Already on your server?
         </h3>
-        <p className="mt-1 text-sm text-zinc-400">A URL that downloads the archive directly. The server downloads it (resuming if interrupted), keeps it in the archives folder and installs it.</p>
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://…/Game-1.0-pc.zip"
-          className="mt-4 h-10 w-full rounded-xl bg-white/[0.05] px-3 text-sm ring-1 ring-inset ring-white/10 focus:outline-none focus:ring-accent-400/60"
-        />
-        <Button
-          className="mt-3"
-          variant="primary"
-          disabled={!/^https?:\/\//.test(url)}
-          onClick={async () => {
-            try {
-              await post('/api/imports', { source: { kind: 'url', url } })
-              toast('Download started. Follow it in Activity.', 'success')
-              setUrl('')
-              void qc.invalidateQueries({ queryKey: ['jobs'] })
-            } catch (e) {
-              toast(errorText(e), 'error')
-            }
-          }}
-        >
-          Download & install
-        </Button>
+        <p className="mt-2 text-sm text-zinc-400">
+          Copy downloads into the archives folder instead of uploading them. They show up under Archives on server, ready to install.
+        </p>
+        {sys?.paths.archives && <code className="mt-4 block break-all rounded-xl bg-black/30 px-3 py-2 text-[13px] text-zinc-300">{sys.paths.archives}</code>}
+        <p className="mt-4 text-sm text-zinc-400">
+          Get games from their developers in your browser (itch.io, Patreon, Steam). Download links from file hosts only work in the browser that opened them, so Renplay cannot fetch them for you.
+        </p>
       </div>
     </div>
   )

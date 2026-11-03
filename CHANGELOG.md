@@ -7,6 +7,24 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-03
+
+### Added
+
+- In fullscreen, Esc opens the game's menu (Chrome and Edge); hold Esc to leave fullscreen. Other
+  browsers keep Esc for leaving fullscreen, and right-click opens the menu.
+
+### Fixed
+
+- Menus and in-game screens with many small elements run smoothly. Ripples' main menu went from 15
+  to 60 frames per second: the browser no longer waits on the graphics card before every element.
+
+### Removed
+
+- Installing from a download link. File hosts tie their links to the browser (and network) that
+  opened them, so the server's download failed for most links. Upload the download, or copy it
+  into the archives folder; the Upload tab now explains where that is.
+
 ## [2.2.0] - 2026-11-03
 
 ### Added
@@ -90,7 +108,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.2.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.3.0...dev
+[2.3.0]: https://github.com/renplay-web/renplay/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/renplay-web/renplay/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/renplay-web/renplay/compare/v0.1.1...v2.1.0
 [0.1.1]: https://github.com/renplay-web/renplay/compare/v0.1.0...v0.1.1
