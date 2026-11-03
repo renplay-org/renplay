@@ -39,6 +39,15 @@ import { useGame, useSaves } from '../lib/queries'
 
 type Panel = null | 'saves' | 'walkthrough' | 'display' | 'fullscreen'
 
+/**
+ * Keyboard Lock (Chromium): in fullscreen, a tap of Esc reaches the game
+ * (Ren'Py's menu) and holding Esc leaves fullscreen. Elsewhere the browser
+ * keeps Esc for leaving fullscreen.
+ */
+type KeyboardLock = { lock?: (keys: string[]) => Promise<void>; unlock?: () => void }
+const keyboard = () => (navigator as Navigator & { keyboard?: KeyboardLock }).keyboard
+const canLockEscape = () => typeof keyboard()?.lock === 'function'
+
 const HOME_TIP_KEY = 'renplay:home-screen-tip'
 
 export default function Player() {
@@ -194,6 +203,7 @@ export default function Player() {
           await shellRef.current?.requestFullscreen({ navigationUI: 'hide' })
           // Phones: games are wide, so hold landscape while in fullscreen.
           if (touch) await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {})
+          else await keyboard()?.lock?.(['Escape']).catch(() => {})
         } else if (!target && on) await document.exitFullscreen()
       } catch {}
     },
@@ -202,6 +212,7 @@ export default function Player() {
   useEffect(() => {
     const onChange = () => {
       const on = !!document.fullscreenElement
+      if (!on) keyboard()?.unlock?.()
       setFullscreen(on)
       send({ type: 'renplay:fullscreen-state', value: on })
       setTimeout(() => setCoversNotch(on && fullscreenCoversNotch()), 250)
@@ -639,9 +650,16 @@ function DisplayPanel({
         </div>
       )}
       {fsMode === 'api' && (
-        <Button variant="secondary" className="w-full" icon={fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />} onClick={onFullscreen}>
-          {fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-        </Button>
+        <div>
+          <Button variant="secondary" className="w-full" icon={fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />} onClick={onFullscreen}>
+            {fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          </Button>
+          <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+            {canLockEscape()
+              ? 'In fullscreen, Esc opens the game’s menu. Hold Esc to leave fullscreen.'
+              : 'In fullscreen, this browser keeps Esc for leaving it. Right-click opens the game’s menu.'}
+          </p>
+        </div>
       )}
       {fsMode === 'home-screen' && (
         <div>

@@ -110,6 +110,11 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   resumes `game.zip` with Range requests and shows an error with a retry button after 8 failures.
 - **Ren'Py recompiles old games' scripts** on the newer web engine on every start (17 s for Pale
   Carnations); the runtime stores the recompiled `.rpyc` files with the build.
+- **Vertex uploads stalled busy menus.** Emscripten emulates Ren'Py's client-side vertex arrays by
+  overwriting pooled buffers (bufferSubData) before every draw; browsers' GPU processes then wait
+  for earlier draws. The runtime gives each whole upload fresh storage (bufferData): 15 -> 60 fps on
+  Ripples' menu (170 draws a frame). A menu that is slow while the main thread is idle points at
+  the GPU process; count WebGL calls per frame before suspecting images or Python.
 - **Download links do not work from the server.** File hosts (Mediafire, Mega, Google Drive…)
   tie a direct link to the browser and IP that opened it, and official stores need the user's
   login, so "install from a link" failed for real links and was removed. Games arrive by upload or
