@@ -12,12 +12,8 @@ import { uploadArchive, type UploadHandle } from '../lib/upload'
 
 type Tab = 'downloads' | 'catalog'
 
-const STATUS: Record<string, { label: string; tone: 'green' | 'amber' | 'red' | 'neutral' }> = {
-  verified: { label: 'Verified', tone: 'green' },
-  playable: { label: 'Known issues', tone: 'amber' },
-  broken: { label: 'Broken', tone: 'red' },
-  untested: { label: 'Untested', tone: 'neutral' },
-}
+// A game in the catalog works; only a release marked broken is worth a word.
+const BROKEN = 'Does not work'
 
 const REQUEST_URL = 'https://renplay-web.github.io/catalog.html#request'
 
@@ -141,8 +137,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   }, [a.path, a.info, a.name, qc])
   const title = a.recipe?.title ?? info?.title ?? a.name
   const version = info?.version ?? a.recipe?.version
-  // How well it works matters before installing, not after.
-  const status = a.recipe && !a.installedAs ? STATUS[a.recipe.status] : undefined
+  const broken = !a.installedAs && a.recipe?.status === 'broken'
   const updates = !a.installedAs && a.existingGame ? (games?.find((g) => g.id === a.existingGame)?.title ?? a.existingGame) : null
   const renpy = (info?.renpyVersion ?? games?.find((g) => g.id === a.installedAs)?.renpyVersion)?.split('.').slice(0, 3).join('.')
   const engine = info?.engine
@@ -180,9 +175,9 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
           {version && <Badge className="shrink-0">{version}</Badge>}
         </div>
         <div className="mt-0.5 line-clamp-2 break-words text-xs text-zinc-500">{meta}</div>
-        {(status || updates || unknown) && !job && (
+        {(broken || updates || unknown) && !job && (
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {status && <Badge tone={status.tone}>{status.label}</Badge>}
+            {broken && <Badge tone="red">{BROKEN}</Badge>}
             {updates && <Badge tone="accent">Update for {updates}</Badge>}
             {unknown && <Badge tone="amber">No game found</Badge>}
           </div>
@@ -437,7 +432,6 @@ function CatalogTab() {
 
 function RecipeCard({ recipe: r }: { recipe: Recipe }) {
   const latest = r.releases[0]
-  const status = latest ? STATUS[latest.status] : undefined
   return (
     <div className="flex min-w-0 gap-3 rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.07] sm:gap-4">
       <Cover game={{ title: r.title, cover: typeof r.cover === 'string' ? r.cover : null, nsfw: r.nsfw }} rounded={false} className="aspect-[63/50] w-28 shrink-0 self-start rounded-xl sm:w-36" />
@@ -446,7 +440,7 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
         {r.developer && <div className="truncate text-xs text-zinc-400">{r.developer}</div>}
         <div className="mt-2 flex flex-wrap gap-1.5">
           {latest && <Badge>{latest.version}</Badge>}
-          {status && <Badge tone={status.tone}>{status.label}</Badge>}
+          {latest?.status === 'broken' && <Badge tone="red">{BROKEN}</Badge>}
           {r.local && (
             <Link to={`/game/${r.local.id}`}>
               <Badge tone="accent">In your library</Badge>

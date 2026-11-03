@@ -7,6 +7,13 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- Games of other engines are named the way players know them from F95zone: HTML (SugarCube 2.36.1),
+  RPGM (MZ 1.8.0), Unity, Godot.
+- The catalog's games are not labeled Verified or Known issues any more: being in the catalog means
+  a game works. A release that does not work still says so.
+
 ## [2.7.1] - 2026-11-03
 
 ### Fixed

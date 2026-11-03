@@ -27,7 +27,7 @@ export interface GameRow {
   engine: string
   /** What made the game: renpy, html… (family.ts). */
   family: string
-  /** What made it, for people: "SugarCube 2.36.1 (Twine)"; empty for Ren'Py. */
+  /** What made it, for people: "HTML (SugarCube 2.36.1)"; empty for Ren'Py. */
   engine_label: string
   /** The page or file the game starts from, inside its build's game/; empty for Ren'Py. */
   entry: string

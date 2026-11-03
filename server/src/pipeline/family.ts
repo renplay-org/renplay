@@ -18,7 +18,10 @@ export interface EngineInfo {
   kind?: string
   /** The engine's version as the game names it: 2.36.1, 4.6.2, 6000.6.0f1… */
   version?: string
-  /** What to show: "SugarCube 2.36.1 (Twine)", "Godot 4.6.2"… */
+  /**
+   * What to show, led by the engine names players know from F95zone (Ren'Py, HTML, RPGM, Unity,
+   * Godot): "HTML (SugarCube 2.36.1)", "Godot 4.6.2"…
+   */
   label: string
   /** Folder in the archive the game lives in, '' or ending in '/'. */
   root: string
@@ -64,16 +67,16 @@ function twine(html: string): { kind: string; version?: string; label: string; t
   if (tw2) {
     const format = attr(tw2[0], 'format') ?? 'Twine'
     const version = attr(tw2[0], 'format-version')
-    return { kind: `twine-${format.toLowerCase()}`, version, label: `${format}${version ? ` ${version}` : ''} (Twine)`, title: attr(tw2[0], 'name') }
+    return { kind: `twine-${format.toLowerCase()}`, version, label: `HTML (${format}${version ? ` ${version}` : ''})`, title: attr(tw2[0], 'name') }
   }
   if (!/<div id="(store-area|storeArea)"/.test(html)) return null
   const sc = html.match(/title:"SugarCube",major:(\d+),minor:(\d+),patch:(\d+)/)
   const title = html.match(/<div tiddler="StoryTitle"[^>]*>([^<]*)</)?.[1]?.trim()
   if (sc) {
     const version = `${sc[1]}.${sc[2]}.${sc[3]}`
-    return { kind: 'twine-sugarcube', version, label: `SugarCube ${version} (Twine)`, title }
+    return { kind: 'twine-sugarcube', version, label: `HTML (SugarCube ${version})`, title }
   }
-  return { kind: 'twine-1', label: 'Twine 1', title }
+  return { kind: 'twine-1', label: 'HTML (Twine 1)', title }
 }
 
 /** A readable name from a file name: "Sexting_sim_stories_V0.17.0-release-free" → "Sexting sim stories". */
@@ -142,22 +145,22 @@ export async function detectEngine(entries: SourceEntry[], layout: Layout | null
     const mz = /rmmz_core\.js$/i.test(rm.path)
     const root = dirOf(rm.path).replace(/js\/$/i, '')
     const version = (await head(rm, 1 << 16)).toString('utf-8').match(/RPGMAKER_VERSION\s*=\s*["']([\d.]+)["']/)?.[1]
-    const label = `RPG Maker ${mz ? 'MZ' : 'MV'}${version ? ` ${version}` : ''}`
+    const label = `RPGM (${mz ? 'MZ' : 'MV'}${version ? ` ${version}` : ''})`
     return info('html', root, { kind: mz ? 'rpgmaker-mz' : 'rpgmaker-mv', version, label, entry: 'index.html' })
   }
   const tyrano = all(/(^|\/)tyrano\/(tyrano\.base\.js|libs\.js)$/i)[0]
-  if (tyrano) return info('html', dirOf(tyrano.path).replace(/tyrano\/$/i, ''), { kind: 'tyrano', label: 'TyranoScript', entry: 'index.html' })
+  if (tyrano) return info('html', dirOf(tyrano.path).replace(/tyrano\/$/i, ''), { kind: 'tyrano', label: 'HTML (TyranoScript)', entry: 'index.html' })
   const construct = all(/(^|\/)(c2runtime|c3runtime)\.js$/i)[0]
   if (construct) {
     const root = dirOf(construct.path).replace(/scripts\/$/i, '')
-    return info('html', root, { kind: /c3/i.test(construct.path) ? 'construct-3' : 'construct-2', label: /c3/i.test(construct.path) ? 'Construct 3' : 'Construct 2', entry: 'index.html' })
+    return info('html', root, { kind: /c3/i.test(construct.path) ? 'construct-3' : 'construct-2', label: /c3/i.test(construct.path) ? 'HTML (Construct 3)' : 'HTML (Construct 2)', entry: 'index.html' })
   }
 
   // Engines that only make PC programs.
   if (find(/(^|\/)Game\.rgss(ad|2a|3a)$/i) || find(/(^|\/)System\/RGSS\d+\w*\.dll$/i)) {
-    return { ...info('rpgmaker-rgss', '', { label: 'RPG Maker XP/VX/VX Ace' }), reason: 'It is a Windows program (Ruby), which browsers cannot run.' }
+    return { ...info('rpgmaker-rgss', '', { label: 'RPGM (XP, VX or VX Ace)' }), reason: 'It is a Windows program (Ruby), which browsers cannot run.' }
   }
-  if (find(/(^|\/)Data\.wolf$|(^|\/)Data\/[^/]+\.wolf$/i)) return { ...info('wolf', '', { label: 'Wolf RPG Editor' }), reason: 'It is a Windows program, which browsers cannot run.' }
+  if (find(/(^|\/)Data\.wolf$|(^|\/)Data\/[^/]+\.wolf$/i)) return { ...info('wolf', '', { label: 'Wolf RPG' }), reason: 'It is a Windows program, which browsers cannot run.' }
   if (find(/(^|\/)data\.xp3$/i)) return { ...info('kirikiri', '', { label: 'Kirikiri' }), reason: 'It is a Windows program, which browsers cannot run.' }
   if (find(/\/Content\/Paks\/[^/]+\.pak$/i)) return { ...info('unreal', '', { label: 'Unreal Engine' }), reason: 'It is a PC program, which browsers cannot run.' }
   if (find(/(^|\/)data\.win$/i)) return { ...info('gamemaker', '', { label: 'GameMaker' }), reason: 'It is a Windows program, which browsers cannot run.' }

@@ -13,7 +13,7 @@ export interface Game {
   playUrl: string | null
   /** What made the game: renpy, or another engine (docs/engines.md). */
   family: string
-  /** What made it, for other engines: "SugarCube 2.36.1 (Twine)". */
+  /** What made it, for other engines: "HTML (SugarCube 2.36.1)". */
   engineLabel: string | null
   version: string | null
   renpyVersion: string | null

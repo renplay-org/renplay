@@ -87,11 +87,11 @@ describe('HTTP API', () => {
     mkdirSync(build, { recursive: true })
     writeFileSync(join(build, 'assets.pack'), page + other)
     writeFileSync(join(build, 'assets.json'), JSON.stringify({ 'Story Page.html': [0, page.length], 'credits.html': [page.length, other.length] }))
-    app.db.insertGame({ id: 'twine-story', title: 'Story', status: 'installed', build: 'h1', family: 'html', engine_label: 'SugarCube 2.36.1 (Twine)', entry: 'Story Page.html', save_dir: 'story' })
+    app.db.insertGame({ id: 'twine-story', title: 'Story', status: 'installed', build: 'h1', family: 'html', engine_label: 'HTML (SugarCube 2.36.1)', entry: 'Story Page.html', save_dir: 'story' })
     await app.saves.write('story', 'localStorage.json', Buffer.from(JSON.stringify({ 'story.saves': '{"slots":[1]}' })))
 
     const g = (await request(app.app).get('/api/games/twine-story').expect(200)).body.game
-    expect(g).toMatchObject({ family: 'html', engineLabel: 'SugarCube 2.36.1 (Twine)', playUrl: '/g/twine-story/h1/game/Story%20Page.html' })
+    expect(g).toMatchObject({ family: 'html', engineLabel: 'HTML (SugarCube 2.36.1)', playUrl: '/g/twine-story/h1/game/Story%20Page.html' })
     expect((await request(app.app).get('/g/twine-story/h1/').expect(302)).headers.location).toBe('/g/twine-story/h1/game/Story%20Page.html')
 
     const res = await request(app.app).get('/g/twine-story/h1/game/Story%20Page.html').expect(200)
