@@ -7,10 +7,13 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-03
+
 ### Added
 
 - Downloads are deleted once their game installs, to save space. Set `RENPLAY_DELETE_ARCHIVES=false`
-  to keep them for reinstalls. A failed or cancelled install keeps the download.
+  to keep them for reinstalls (before upgrading, if you reinstall games often). A failed or
+  cancelled install keeps the download.
 - A mute button in the player's toolbar. It mutes every game in this browser, like muting a tab, and
   leaves the game's own volume settings alone.
 - In fullscreen, a hint says how to leave it, and holding Esc shows a ring that fills until
@@ -25,11 +28,11 @@ release notes say what).
   The catalog shows compact cards with where to get each game, and links to requesting a game.
 - Downloads show the same details in the same order. Ones looked into by an older version are
   looked into again, so Ren'Py 7 games show their Ren'Py version.
+- Exported recipes start with the catalog's schema line, so editors check them as you type.
 
 ### Fixed
 
 - Reinstall is offered only while the game's download is still on the server.
-- Exported recipes start with the catalog's schema line, so editors check them as you type.
 - .7z and .rar downloads no longer say "No Ren'Py game found" (Renplay looks inside them only
   when it installs them).
 
@@ -150,7 +153,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.4.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.5.0...dev
+[2.5.0]: https://github.com/renplay-web/renplay/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/renplay-web/renplay/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/renplay-web/renplay/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/renplay-web/renplay/compare/v2.1.0...v2.2.0
