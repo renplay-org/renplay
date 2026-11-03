@@ -11,212 +11,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#07070a">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <style>
-    :root {
-      color-scheme: dark;
-      --ink: #07070a; --ink2: #0d0d13; --card: rgb(255 255 255 / .035); --line: rgb(255 255 255 / .08);
-      --fg: #f1f1f6; --dim: #a3a3b3; --faint: #6e6e7e;
-      --pink: #fb7aa8; --rose: #e0306f; --violet: #8b6bff;
-      --grad: linear-gradient(90deg, #fb7aa8, #b98cff);
-      --radius: 22px;
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; overflow-x: clip; }
-    body { margin: 0; font: 17px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif; color: var(--fg); background: var(--ink); -webkit-font-smoothing: antialiased; overflow-x: clip; }
-    a { color: inherit; }
-    img { max-width: 100%; }
-    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
-    .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-
-    /* Background */
-    .hero { position: relative; }
-    .aurora { position: absolute; left: 50%; top: -140px; width: 1700px; max-width: 160vw; height: 1150px; transform: translateX(-50%); z-index: -1; pointer-events: none; overflow: hidden; -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 45%, transparent 100%); mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 45%, transparent 100%); }
-    .aurora span { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; animation: drift 22s ease-in-out infinite alternate; }
-    .aurora span:nth-child(1) { width: 620px; height: 620px; left: 8%; top: 4%; background: #e0306f; }
-    .aurora span:nth-child(2) { width: 560px; height: 560px; right: 6%; top: 0; background: #6b4bff; animation-delay: -7s; }
-    .aurora span:nth-child(3) { width: 420px; height: 420px; left: 42%; top: 30%; background: #fb7aa8; opacity: .3; animation-delay: -12s; }
-    @keyframes drift { to { transform: translate(60px, 40px) scale(1.12); } }
-    .grain { position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: .035; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-
-    /* Nav */
-    nav { position: sticky; top: 0; z-index: 50; backdrop-filter: saturate(140%) blur(16px); -webkit-backdrop-filter: saturate(140%) blur(16px); background: rgb(7 7 10 / .62); border-bottom: 1px solid transparent; transition: border-color .3s; }
-    nav.scrolled { border-bottom-color: var(--line); }
-    nav .wrap { display: flex; align-items: center; gap: 28px; height: 68px; }
-    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; letter-spacing: -.02em; text-decoration: none; }
-    .brand img { width: 34px; height: 34px; border-radius: 10px; box-shadow: 0 8px 26px -8px rgb(244 80 138 / .8); }
-    nav .links { display: flex; gap: 24px; margin-left: 12px; font-size: 15px; }
-    nav .links a { color: var(--dim); text-decoration: none; transition: color .2s; }
-    nav .links a:hover { color: var(--fg); }
-    nav .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
-
-    /* Buttons */
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 13px 22px; border-radius: 14px; font-weight: 650; font-size: 16px; text-decoration: none; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); cursor: pointer; transition: transform .2s, filter .2s, background .2s; white-space: nowrap; }
-    .btn:hover { transform: translateY(-2px); filter: brightness(1.12); }
-    .btn.primary { background: linear-gradient(180deg, #f6609a, #e0306f); border-color: rgb(255 255 255 / .12); color: #fff; box-shadow: 0 14px 36px -12px rgb(244 80 138 / .85), inset 0 1px 0 rgb(255 255 255 / .25); }
-    .btn.sm { padding: 8px 14px; font-size: 14px; border-radius: 11px; }
-    .btn svg { width: 18px; height: 18px; flex: none; }
-
-    /* Hero */
-    .hero { text-align: center; padding: 84px 0 0; }
-    .chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 8px; border-radius: 999px; background: rgb(255 255 255 / .05); border: 1px solid var(--line); color: var(--dim); font-size: 14px; }
-    .chip b { color: #fff; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: linear-gradient(180deg, #f6609a, #e0306f); font-size: 12px; }
-    h1 { font-size: clamp(42px, 7.2vw, 84px); line-height: 1.02; letter-spacing: -.045em; margin: 26px auto 0; max-width: 940px; font-weight: 800; }
-    .sub { font-size: clamp(18px, 2.2vw, 21px); color: var(--dim); max-width: 690px; margin: 26px auto 34px; line-height: 1.55; }
-    .sub strong { color: var(--fg); font-weight: 600; }
-    .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    .trust { display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; margin-top: 26px; color: var(--faint); font-size: 14px; }
-    .trust span { display: inline-flex; align-items: center; gap: 7px; }
-    .trust svg { width: 16px; height: 16px; color: var(--pink); }
-
-    /* Devices */
-    .stage { position: relative; max-width: 1060px; margin: 72px auto 0; padding-bottom: 60px; }
-    .stage::before { content: ""; position: absolute; inset: 10% 8% 0; background: radial-gradient(closest-side, rgb(224 48 111 / .45), transparent); filter: blur(40px); z-index: -1; }
-    .laptop { position: relative; width: 88%; }
-    .laptop .screen { border-radius: 18px 18px 6px 6px; padding: 12px 12px 14px; background: linear-gradient(180deg, #1d1d25, #121218); border: 1px solid rgb(255 255 255 / .12); box-shadow: 0 50px 120px -40px rgb(0 0 0 / .95); }
-    .laptop .screen img { display: block; width: 100%; border-radius: 8px; }
-    .laptop .base { height: 16px; margin: 0 -5%; border-radius: 0 0 18px 18px; background: linear-gradient(180deg, #2a2a33, #15151b); border: 1px solid rgb(255 255 255 / .1); border-top: 0; }
-    .phone-land { position: absolute; right: 0; bottom: 0; width: 46%; border-radius: 30px; padding: 10px; background: #111116; border: 1px solid rgb(255 255 255 / .14); box-shadow: 0 40px 90px -24px rgb(0 0 0 / .95), 0 0 0 1px rgb(0 0 0 / .6); animation: float 7s ease-in-out infinite; }
-    .phone-land img { display: block; width: 100%; border-radius: 21px; }
-    .phone-land::after { content: ""; position: absolute; left: 3.2%; top: 50%; width: 8px; height: 26%; transform: translateY(-50%); border-radius: 6px; background: #000; }
-    @keyframes float { 50% { transform: translateY(-10px); } }
-
-    /* Sections */
-    section { padding: 130px 0 0; }
-    .eyebrow { color: var(--pink); font-weight: 650; font-size: 15px; margin: 0 0 12px; }
-    h2 { font-size: clamp(32px, 4.6vw, 52px); letter-spacing: -.035em; line-height: 1.08; margin: 0; font-weight: 780; }
-    .lead { color: var(--dim); font-size: 19px; max-width: 640px; margin: 18px 0 0; }
-    .center { text-align: center; }
-    .center .lead { margin-left: auto; margin-right: auto; }
-
-    /* Before / after */
-    .versus { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 52px; }
-    .side { padding: 32px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--card); }
-    .side h3 { margin: 0 0 20px; font-size: 20px; letter-spacing: -.01em; }
-    .side.good { background: linear-gradient(160deg, rgb(244 80 138 / .12), rgb(124 92 255 / .10)); border-color: rgb(251 122 168 / .25); }
-    .side ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 15px; }
-    .side li { display: grid; grid-template-columns: 26px 1fr; gap: 12px; color: var(--dim); font-size: 16px; line-height: 1.5; }
-    .side li b { color: var(--fg); font-weight: 600; }
-    .mark { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 14px; font-weight: 800; margin-top: 1px; }
-    .bad .mark { background: rgb(255 255 255 / .06); color: #8a8a99; }
-    .good .mark { background: linear-gradient(180deg, #f6609a, #e0306f); color: #fff; }
-
-    /* Steps */
-    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; position: relative; }
-    .steps::before { content: ""; position: absolute; top: 34px; left: 16%; right: 16%; height: 2px; background: linear-gradient(90deg, transparent, rgb(251 122 168 / .5), rgb(139 107 255 / .5), transparent); }
-    .step { text-align: center; padding: 0 12px; position: relative; }
-    .step .n { width: 68px; height: 68px; margin: 0 auto 22px; border-radius: 22px; display: grid; place-items: center; font-size: 26px; font-weight: 800; background: var(--ink2); border: 1px solid rgb(251 122 168 / .35); box-shadow: 0 0 0 8px var(--ink), 0 18px 40px -16px rgb(224 48 111 / .7); }
-    .step h3 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.01em; }
-    .step p { margin: 0; color: var(--dim); font-size: 16px; }
-
-    /* Showcase */
-    .show > *, .install > *, .band > *, .versus > * { min-width: 0; }
-    .show { display: grid; grid-template-columns: 1fr 1.2fr; gap: 64px; align-items: center; margin-top: 0; }
-    .show.flip { grid-template-columns: 1.2fr 1fr; }
-    .show.flip .text { order: 2; }
-    .bullets { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 14px; }
-    .bullets li { display: grid; grid-template-columns: 22px 1fr; gap: 12px; color: var(--dim); }
-    .bullets li b { color: var(--fg); font-weight: 600; }
-    .bullets svg { width: 20px; height: 20px; color: var(--pink); margin-top: 3px; }
-    .frame { border-radius: 18px; overflow: hidden; border: 1px solid rgb(255 255 255 / .1); box-shadow: 0 40px 100px -40px rgb(0 0 0 / .95); background: #0d0d12; }
-    .frame img { display: block; width: 100%; }
-    .phones { position: relative; display: flex; justify-content: center; align-items: flex-end; gap: 0; }
-    .phone-port { width: 38%; border-radius: 38px; padding: 10px; background: #111116; border: 1px solid rgb(255 255 255 / .14); box-shadow: 0 40px 90px -30px rgb(0 0 0 / .95); position: relative; z-index: 1; flex: none; }
-    .phone-port img { display: block; width: 100%; border-radius: 29px; }
-    .phone-port::after { content: ""; position: absolute; top: 18px; left: 50%; width: 26%; height: 18px; transform: translateX(-50%); border-radius: 12px; background: #000; }
-    .phones { padding-bottom: 4%; }
-    .phones .phone-land { position: relative; width: 74%; margin-left: -14%; margin-bottom: -4%; z-index: 2; animation: none; flex: none; }
-
-    /* Bento */
-    .bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 52px; }
-    .tile { padding: 26px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); transition: transform .3s, border-color .3s; }
-    .tile:hover { transform: translateY(-4px); border-color: rgb(251 122 168 / .3); }
-    .tile.wide { grid-column: span 2; }
-    .tile .ico { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: linear-gradient(135deg, rgb(244 80 138 / .28), rgb(124 92 255 / .28)); border: 1px solid rgb(255 255 255 / .1); margin-bottom: 16px; }
-    .tile .ico svg { width: 22px; height: 22px; color: #ffd3e4; }
-    .tile h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.01em; }
-    .tile p { margin: 0; color: var(--dim); font-size: 15px; }
-
-    /* Numbers */
-    .numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 18px; }
-    .num { padding: 26px; border-radius: var(--radius); border: 1px solid var(--line); background: linear-gradient(180deg, rgb(255 255 255 / .04), transparent); }
-    .num b { display: block; font-size: 42px; letter-spacing: -.04em; line-height: 1; font-weight: 800; }
-    .num span { display: block; margin-top: 10px; color: var(--dim); font-size: 15px; }
-
-    /* Install */
-    .install { display: grid; grid-template-columns: 1fr 1.25fr; gap: 56px; align-items: start; }
-    .tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 13px; background: rgb(255 255 255 / .04); border: 1px solid var(--line); margin-bottom: 14px; }
-    .tabs button { font: inherit; font-size: 14px; font-weight: 600; color: var(--dim); background: none; border: 0; padding: 7px 14px; border-radius: 9px; cursor: pointer; }
-    .tabs button.on { background: rgb(255 255 255 / .1); color: var(--fg); }
-    .code { position: relative; }
-    pre { margin: 0; background: #0b0b10; border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px; overflow-x: auto; font: 14.5px/1.75 ui-monospace, SFMono-Regular, Menlo, monospace; color: #e9e9f1; }
-    pre .c { color: #6f6f80; }
-    pre .k { color: #ff9cc2; }
-    .copy { position: absolute; top: 12px; right: 12px; }
-    .after { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 10px; color: var(--dim); font-size: 16px; counter-reset: a; }
-    .after li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; }
-    .after li::before { counter-increment: a; content: counter(a); width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; background: linear-gradient(180deg, #f6609a, #e0306f); }
-    .after b { color: var(--fg); font-weight: 600; }
-    .fine { color: var(--faint); font-size: 14px; margin-top: 18px; }
-    code { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; background: rgb(255 255 255 / .07); padding: 2px 6px; border-radius: 6px; color: var(--fg); }
-
-    /* Catalog */
-    .band { display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; align-items: center; padding: 48px; border-radius: 28px; background: radial-gradient(600px 300px at 0% 0%, rgb(244 80 138 / .18), transparent 60%), radial-gradient(600px 300px at 100% 100%, rgb(124 92 255 / .18), transparent 60%), var(--ink2); border: 1px solid var(--line); }
-    .band p { color: var(--dim); margin: 14px 0 0; }
-    .band .actions { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
-
-    /* FAQ */
-    .faq { max-width: 820px; margin: 48px auto 0; display: grid; gap: 12px; }
-    details { border-radius: 18px; border: 1px solid var(--line); background: var(--card); padding: 0 24px; transition: background .2s; }
-    details[open] { background: rgb(255 255 255 / .05); }
-    summary { cursor: pointer; list-style: none; padding: 20px 0; font-weight: 650; font-size: 17px; display: flex; justify-content: space-between; gap: 16px; }
-    summary::-webkit-details-marker { display: none; }
-    summary::after { content: "+"; color: var(--pink); font-size: 22px; line-height: 1; transition: transform .25s; }
-    details[open] summary::after { transform: rotate(45deg); }
-    details p { margin: 0 0 20px; color: var(--dim); font-size: 16px; }
-
-    /* Final */
-    .final { text-align: center; padding: 140px 0 40px; }
-    .final h2 { font-size: clamp(36px, 5.4vw, 64px); }
-    .final .cta { margin-top: 34px; }
-    footer { margin-top: 90px; padding: 34px 0 52px; border-top: 1px solid var(--line); color: var(--faint); font-size: 14px; }
-    footer .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; }
-    footer .row a { text-decoration: none; color: var(--dim); }
-    footer .row a:hover { color: var(--fg); }
-    footer small { display: block; margin-top: 18px; line-height: 1.6; }
-
-    /* Reveal */
-    .reveal { opacity: 0; transform: translateY(26px); transition: opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
-    .reveal.in { opacity: 1; transform: none; }
-    .intro { animation: rise .9s cubic-bezier(.2,.7,.2,1) both; animation-delay: var(--d, 0ms); }
-    @keyframes rise { from { opacity: 0; transform: translateY(24px); } }
-    @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } .intro { animation: none; } .aurora span, .phone-land { animation: none; } html { scroll-behavior: auto; } }
-
-    @media (max-width: 900px) {
-      .aurora { width: 100vw; max-width: 100vw; }
-      nav .links { display: none; }
-      .hero { padding-top: 56px; }
-      .stage { margin-top: 52px; padding-bottom: 0; }
-      .laptop { width: 100%; }
-      .phone-land { position: relative; width: 78%; margin: -14% 0 0 auto; }
-      .versus, .show, .show.flip, .install, .band { grid-template-columns: 1fr; }
-      .show.flip .text { order: 0; }
-      .show { gap: 40px; }
-      .steps { grid-template-columns: 1fr; gap: 34px; }
-      .steps::before { display: none; }
-      .bento { grid-template-columns: 1fr 1fr; }
-      .numbers { grid-template-columns: 1fr 1fr; }
-      .band { padding: 30px; }
-      section { padding-top: 100px; }
-    }
-    @media (max-width: 560px) {
-      body { font-size: 16px; }
-      .bento { grid-template-columns: 1fr; }
-      .tile.wide { grid-column: auto; }
-      .side { padding: 24px; }
-      .num b { font-size: 34px; }
-      nav .right .gh-label { display: none; }
-    }
-  </style>
+  <link rel="stylesheet" href="site.css">
 </head>
 <body>
 <div class="grain"></div>
@@ -230,6 +25,7 @@
       <a href="#phones">Phones</a>
       <a href="#install">Install</a>
       <a href="#faq">FAQ</a>
+      <a href="catalog.html">Catalog</a>
     </div>
     <div class="right">
       <a class="btn sm" href="https://github.com/renplay-web/renplay">
@@ -245,7 +41,7 @@
   <div class="aurora"><span></span><span></span><span></span></div>
   <div class="wrap">
     <span class="chip intro" style="--d:0ms"><b>Free</b> Open source and self-hosted</span>
-    <h1 class="intro" style="--d:80ms">Your Ren’Py games,<br><span class="grad-text">on every screen.</span></h1>
+    <h1 class="intro" style="--d:80ms">Your Ren’Py games,<br><span class="rotator" aria-label="on every screen."><span class="grad-text on">on every screen.</span><span class="grad-text" aria-hidden="true">on your phone.</span><span class="grad-text" aria-hidden="true">on your laptop.</span><span class="grad-text" aria-hidden="true">on your tablet.</span></span></h1>
     <p class="sub intro" style="--d:160ms">Renplay turns the visual novels you download into games that play in any browser: <strong>your computer, your tablet, your phone</strong>. Every save lands on your own server, so you start a chapter at your desk and finish it on the couch.</p>
     <div class="cta intro" style="--d:240ms">
       <a class="btn primary" href="#install">Set it up in a minute
@@ -277,7 +73,7 @@
       <p class="lead">Ren’Py games ship as desktop downloads. That is fine until you want to read on the train, on the couch, or on the laptop you took on holiday.</p>
     </div>
     <div class="versus">
-      <div class="side bad reveal">
+      <div class="side bad reveal spot">
         <h3>Without Renplay</h3>
         <ul>
           <li><span class="mark">✕</span><span><b>One machine per game.</b> Your phone can’t run the PC version, and the Android build, when there is one, is another big download.</span></li>
@@ -286,7 +82,7 @@
           <li><span class="mark">✕</span><span><b>A messy folder of zips.</b> No covers, no overview, no idea which version you have.</span></li>
         </ul>
       </div>
-      <div class="side good reveal">
+      <div class="side good reveal spot">
         <h3>With Renplay</h3>
         <ul>
           <li><span class="mark">✓</span><span><b>Every screen plays it.</b> Any modern browser, including phones and tablets, full screen and smooth.</span></li>
@@ -351,18 +147,18 @@
       <h2>Small touches that add up.</h2>
     </div>
     <div class="bento">
-      <div class="tile wide reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4 12a4 4 0 0 0 1 7.9"/><path d="m9 15 3-3 3 3"/><path d="M12 12v9"/></svg></div><h3>Saves you never lose</h3><p>Saves, autosaves and unlocked galleries sync the moment the game writes them. Every overwrite keeps the previous version. If the connection drops, they wait and upload later.</p></div>
-      <div class="tile reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/><path d="M4 18l6-6-6-6"/></svg></div><h3>Sequels just work</h3><p>Season two finds season one’s saves, exactly like on desktop.</p></div>
-      <div class="tile reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></div><h3>Bring your saves</h3><p>Import saves from the desktop version, or export them back.</p></div>
-      <div class="tile reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></div><h3>Mods in the browser</h3><p>Edit scripts or upload a mod. Your changes survive updates.</p></div>
-      <div class="tile reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></div><h3>A tested catalog</h3><p>Known games come with their cover, links and the settings that work.</p></div>
-      <div class="tile wide reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h3>Private by design</h3><p>Everything runs on your own hardware. No accounts, no telemetry, nobody else’s cloud. Games are prepared without running their code on your server, and covers of adult games can be blurred on shared screens.</p></div>
+      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4 12a4 4 0 0 0 1 7.9"/><path d="m9 15 3-3 3 3"/><path d="M12 12v9"/></svg></div><h3>Saves you never lose</h3><p>Saves, autosaves and unlocked galleries sync the moment the game writes them. Every overwrite keeps the previous version. If the connection drops, they wait and upload later.</p></div>
+      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/><path d="M4 18l6-6-6-6"/></svg></div><h3>Sequels just work</h3><p>Season two finds season one’s saves, exactly like on desktop.</p></div>
+      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></div><h3>Bring your saves</h3><p>Import saves from the desktop version, or export them back.</p></div>
+      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></div><h3>Mods in the browser</h3><p>Edit scripts or upload a mod. Your changes survive updates.</p></div>
+      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></div><h3>A tested catalog</h3><p>Known games come with their cover, links and the settings that work.</p></div>
+      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h3>Private by design</h3><p>Everything runs on your own hardware. No accounts, no telemetry, nobody else’s cloud. Games are prepared without running their code on your server, and covers of adult games can be blurred on shared screens.</p></div>
     </div>
     <div class="numbers">
-      <div class="num reveal"><b class="grad-text">60 fps</b><span>Smooth playback in the browser</span></div>
-      <div class="num reveal"><b class="grad-text">~10 s</b><span>To start a 15 GB game again</span></div>
-      <div class="num reveal"><b class="grad-text">Up to 9×</b><span>Smaller images, no visible difference</span></div>
-      <div class="num reveal"><b class="grad-text">1</b><span>Container to run it all</span></div>
+      <div class="num reveal spot"><b class="grad-text" data-to="60" data-suffix=" fps">60 fps</b><span>Smooth playback in the browser</span></div>
+      <div class="num reveal spot"><b class="grad-text" data-to="10" data-prefix="~" data-suffix=" s">~10 s</b><span>To start a 15 GB game again</span></div>
+      <div class="num reveal spot"><b class="grad-text" data-to="9" data-prefix="Up to " data-suffix="×">Up to 9×</b><span>Smaller images, no visible difference</span></div>
+      <div class="num reveal spot"><b class="grad-text">1</b><span>Container to run it all</span></div>
     </div>
   </section>
 
@@ -415,8 +211,9 @@
         <p>The community catalog lists games that work in Renplay: which download to get from the developer, its official cover, and any settings it needs. It never hosts game files. Got one working? Add it in a pull request.</p>
       </div>
       <div class="actions">
-        <a class="btn primary" href="https://github.com/renplay-web/catalog">Browse the catalog</a>
-        <a class="btn" href="https://github.com/renplay-web/catalog/blob/main/CONTRIBUTING.md">Add a game</a>
+        <a class="btn primary" href="catalog.html">Browse the catalog</a>
+        <a class="btn" href="https://github.com/renplay-web/catalog/issues/new?template=request-game.yml">Request a game</a>
+        <a class="btn" href="https://github.com/renplay-web/catalog/blob/main/CONTRIBUTING.md">Add one yourself</a>
       </div>
     </div>
   </section>
@@ -456,7 +253,8 @@
       <a class="brand" href="#"><img src="logo.svg" alt="" style="width:26px;height:26px;border-radius:8px">Renplay</a>
       <a href="https://github.com/renplay-web/renplay">GitHub</a>
       <a href="https://github.com/renplay-web/renplay/releases">Releases</a>
-      <a href="https://github.com/renplay-web/catalog">Catalog</a>
+      <a href="catalog.html">Catalog</a>
+      <a href="https://github.com/renplay-web/catalog/issues/new?template=request-game.yml">Request a game</a>
       <a href="https://github.com/renplay-web/engines">Engines</a>
       <a href="https://ko-fi.com/janpuc">Ko-fi</a>
     </div>
@@ -476,6 +274,50 @@
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b))
     document.querySelectorAll('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== b.dataset.tab))
   }))
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches
+  // Cursor spotlight on cards.
+  document.querySelectorAll('.spot').forEach((el) => el.addEventListener('pointermove', (e) => {
+    const r = el.getBoundingClientRect()
+    el.style.setProperty('--mx', `${e.clientX - r.left}px`)
+    el.style.setProperty('--my', `${e.clientY - r.top}px`)
+  }))
+  // The devices lean towards the cursor.
+  const stage = document.querySelector('.stage'), hero = document.querySelector('.hero')
+  if (stage && fine && !still) {
+    hero.addEventListener('pointermove', (e) => {
+      const x = e.clientX / innerWidth - 0.5, y = e.clientY / innerHeight - 0.5
+      stage.style.transform = `perspective(1600px) rotateY(${x * 6}deg) rotateX(${-y * 4}deg)`
+    })
+    hero.addEventListener('pointerleave', () => (stage.style.transform = ''))
+  }
+  // Headline: phone, laptop, tablet, every screen.
+  const words = [...document.querySelectorAll('.rotator > span')]
+  if (words.length && !still) {
+    let i = 0
+    setInterval(() => {
+      const prev = words[i]
+      i = (i + 1) % words.length
+      prev.classList.remove('on'); prev.classList.add('out')
+      setTimeout(() => prev.classList.remove('out'), 500)
+      words[i].classList.add('on')
+    }, 2600)
+  }
+  // Numbers count up when they come into view.
+  const counters = new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (!e.isIntersecting) return
+    counters.unobserve(e.target)
+    const el = e.target, to = +el.dataset.to, pre = el.dataset.prefix ?? '', suf = el.dataset.suffix ?? ''
+    if (still) return
+    const t0 = performance.now()
+    const tick = (t) => {
+      const k = Math.min(1, (t - t0) / 1200)
+      el.textContent = pre + Math.round(to * (1 - Math.pow(1 - k, 3))) + suf
+      if (k < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }), { threshold: 0.6 })
+  document.querySelectorAll('[data-to]').forEach((el) => counters.observe(el))
   document.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', async () => {
     await navigator.clipboard.writeText(b.previousElementSibling.innerText)
     b.textContent = 'Copied'
