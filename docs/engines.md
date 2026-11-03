@@ -1,8 +1,9 @@
 # Engines
 
-Renplay is a player for Ren'Py games. Other engines are second-class citizens: Renplay recognizes
-them, installs the ones a browser can run, and gives them the features that come cheap. When a
-feature works for Ren'Py and not for another engine, that is fine.
+Renplay is a player for Ren'Py games. Other engines are second-class citizens, shown as Beta in
+the app: Renplay recognizes them, installs the ones a browser can run, and gives them the
+features that come cheap. When a feature works for Ren'Py and not for another engine, that is
+fine.
 
 ## Support
 
@@ -10,8 +11,9 @@ feature works for Ren'Py and not for another engine, that is fine.
 |---|---|---|---|
 | Ren'Py 8, and 7 on the 8 engine | yes | yes | Everything: saves on the server, streaming, phones, mods |
 | HTML: Twine (SugarCube, Harlowe), RPG Maker MV and MZ, TyranoScript, Construct, plain pages | yes | yes (2.6) | Web pages already. Tested with Twine (SugarCube); RPG Maker MV/MZ, TyranoScript and Construct take the same path but are untested |
-| Godot 4 | yes | phase 3 | Godot's own web export template loads the game's `.pck`. Native plugins (GDExtension) and C# do not run in browsers |
-| Unity WebGL builds | yes | phase 4 | Only builds the developer made for WebGL |
+| Godot 4 web builds | yes | yes (2.9) | The developer's single-threaded web export (on itch.io, the version that plays in the browser). Tested with Diggz for Vex (4.7.1). Threaded web builds need SharedArrayBuffer, which the sandbox cannot give |
+| Godot 4 PC builds | yes | planned | Godot's own web template loads a PC `.pck` (tried), but games with native plugins (GDExtension) or C# cannot run in browsers |
+| Unity WebGL builds | yes | yes (2.9) | The developer's WebGL build, served as it is. Tested with NaughtyPhone (Unity 6) |
 | Unity PC builds | yes | never | Compiled for one system; a browser cannot run them |
 | RPG Maker XP, VX, VX Ace; Wolf RPG; Kirikiri; GameMaker; Unreal | yes | never | Windows (or PC) programs |
 | Flash (`.swf`) | yes | maybe | [Ruffle](https://ruffle.rs) plays many Flash games in a browser |
@@ -38,7 +40,7 @@ panel, fullscreen, mute, wake lock, phones) is shared.
 
 | Feature | Ren'Py | HTML | Godot | Unity WebGL |
 |---|---|---|---|---|
-| Saves on the server | yes | `localStorage` synced | `user://` synced | `persistentDataPath` synced |
+| Saves on the server | yes | `localStorage` synced | `user://` (IndexedDB) synced | IndexedDB synced (`/idbfs`, the game's own) |
 | Streaming files on demand | yes | yes (the page fetches them) | no (one pack) | no (one data file) |
 | WebP images | yes | yes | no (imported into the pack) | no |
 | Mute | yes | yes (Web Audio and media elements) | yes (Web Audio) | yes (Web Audio) |
@@ -57,8 +59,16 @@ An opaque origin has no `localStorage` or IndexedDB either, so the runtime provi
 
 - HTML games: a `localStorage` stand-in backed by the server's save store, loaded before the game's
   scripts run (SugarCube and RPG Maker keep saves there).
-- Godot and Unity: both are Emscripten builds that keep files in IndexedDB (`IDBFS`). The runtime
-  mounts their save folder in memory and syncs it to the server, the way Ren'Py's runtime does.
+- IndexedDB: Godot and Unity keep files in it through Emscripten's IDBFS (Godot's `user://` at
+  `/userfs`, Unity's at `/idbfs`), and games keep their own databases there too (NaughtyPhone,
+  RPG Maker MZ through localforage). The runtime puts an in-memory IndexedDB in place
+  (`runtime/vendor/fake-indexeddb.js`, bundled by `runtime/vendor/build.sh`), restores the stored
+  databases before the game's scripts run (IndexedDB serves a database's open requests in order,
+  so the game's wait for these), and after every write sends a snapshot (`indexedDB.json` in the
+  save folder; binary data, dates and the like keep their type). Unity's download cache
+  (`UnityCache`) is refused, so the game fetches again instead of holding it in memory.
+- Cache Storage (`window.caches`) throws in a sandboxed frame; the runtime makes it absent, which
+  loaders such as Unity's treat as no caching.
 
 Ren'Py games can also run JavaScript (Ren'Py's `emscripten` module), so moving them into the same
 sandbox is worth doing later; their saves already go through the runtime.
@@ -95,7 +105,14 @@ with a `family` field; entries without one are Ren'Py.
    Chromium and WebKit, a save made in one browser loads in another, the game cannot reach
    Renplay's API. Next: an RPG Maker MV or MZ game (MZ keeps saves with localforage, which falls
    back to `localStorage` when IndexedDB is missing).
-3. **Godot 4**: the single-threaded web template per version, picked from the pack header.
+3. **Godot 4** (web builds done in 2.9): a single-threaded web export is a page with the engine
+   (`<name>.wasm`, `<name>.js`) and the pack (`<name>.pck`); it installs like an HTML game, and
+   the IndexedDB stand-in keeps `user://`. Tested with Diggz for Vex (Godot 4.7.1): plays, and its
+   settings saved in one browser load in another. Threaded web exports need cross-origin
+   isolation (SharedArrayBuffer), which the sandboxed frame does not have; they are refused with
+   that reason. PC builds are planned, as follows.
+
+   PC builds: the single-threaded web template per version, picked from the pack header.
    Tried on 2026-11-03 with Godot's official 4.6.2 `web_nothreads_release` template and the
    Windows `.pck` of Sexting sim stories (4.6.2, 1.2 GB), unchanged: the engine starts, renders
    with the Compatibility renderer (WebGL 2) and loads the game's scenes, so a PC pack works as
@@ -117,12 +134,13 @@ with a `family` field; entries without one are Ren'Py.
      starting `new Engine({ executable, mainPack: 'game/game.pck', persistentPaths: ['/userfs'] })`.
    - **Sandbox**: the engine files under `/engine/` need `Access-Control-Allow-Origin: *` (the
      sandboxed frame fetches the wasm and adds the audio worklets from an opaque origin).
-   - **Saves**: Godot keeps `user://` (`/userfs`) in IndexedDB through Emscripten's IDBFS, and
-     does not expose its filesystem. The runtime would provide an in-memory IndexedDB (such as
-     fake-indexeddb), fill IDBFS's `FILE_DATA` store from the server before the engine starts,
-     and send it to the player after each sync. The same stand-in would serve RPG Maker MZ
-     (localforage) and Unity WebGL, which keep saves in IndexedDB too.
-4. **Unity WebGL**: serve the build as it is. Needs a game that publishes a WebGL build.
+   - **Saves**: the IndexedDB stand-in (done, see Security) covers `user://`.
+4. **Unity WebGL** (done in 2.9): the build is served as it is and installs like an HTML game.
+   NaughtyPhone's build from itch.io names its files `.br` but holds them uncompressed (itch.io
+   unpacks uploads), so files ending in `.br` or `.gz` get the type of the name underneath and no
+   encoding; Unity's loader takes them either way. Its photo bundles in `StreamingAssets` are
+   fetched by the game itself. Tested: plays, and its progress saved in one browser loads in
+   another. Unity PC builds cannot run in a browser.
 
 Later candidates, by how many adult games use them: TyranoScript and Construct (HTML, so phase 2
 may cover them), Flash through Ruffle, NW.js and Electron apps whose content is a web page.

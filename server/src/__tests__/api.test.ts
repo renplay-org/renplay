@@ -83,10 +83,11 @@ describe('HTTP API', () => {
   it('serves an HTML game’s page with the runtime and its stored localStorage first', async () => {
     const page = '<!doctype html><html><head><title>Story</title><script>window.gameScript = 1</script></head><body></body></html>'
     const other = '<p>credits</p>'
+    const wasm = '\0asm'
     const build = join(root, 'games', 'twine-story', 'h1')
     mkdirSync(build, { recursive: true })
-    writeFileSync(join(build, 'assets.pack'), page + other)
-    writeFileSync(join(build, 'assets.json'), JSON.stringify({ 'Story Page.html': [0, page.length], 'credits.html': [page.length, other.length] }))
+    writeFileSync(join(build, 'assets.pack'), page + other + wasm)
+    writeFileSync(join(build, 'assets.json'), JSON.stringify({ 'Story Page.html': [0, page.length], 'credits.html': [page.length, other.length], 'Build/Game.wasm.br': [page.length + other.length, wasm.length] }))
     app.db.insertGame({ id: 'twine-story', title: 'Story', status: 'installed', build: 'h1', family: 'html', engine_label: 'HTML (SugarCube 2.36.1)', entry: 'Story Page.html', save_dir: 'story' })
     await app.saves.write('story', 'localStorage.json', Buffer.from(JSON.stringify({ 'story.saves': '{"slots":[1]}' })))
 
@@ -102,10 +103,17 @@ describe('HTTP API', () => {
     expect(at('window.__renplay=')).toBeLessThan(at('window.gameScript'))
     expect(at("renplay:' + type")).toBeGreaterThan(at('window.__renplay='))
     expect(res.text).toContain('"story.saves":"{\\"slots\\":[1]}"')
+    // The in-memory IndexedDB comes first, then the runtime that installs it.
+    expect(at('window.__renplayIDB')).toBeGreaterThan(at('window.__renplay='))
+    expect(at('window.__renplayIDB')).toBeLessThan(at("renplay:' + type"))
     // Other pages of the game are plain files.
     const plain = await request(app.app).get('/g/twine-story/h1/game/credits.html').expect(200)
     expect(plain.text).toBe(other)
     expect(plain.headers['content-type']).toBe('text/html; charset=utf-8')
+    // Unity names files .wasm.br; served as they are, they need the type underneath.
+    const unity = await request(app.app).get('/g/twine-story/h1/game/Build/Game.wasm.br').expect(200)
+    expect(unity.headers['content-type']).toBe('application/wasm')
+    expect(unity.headers['content-encoding']).toBeUndefined()
     await app.saves.remove('story', 'localStorage.json', 'test')
     // The startup check knows HTML builds have no game.zip.
     const checked = await app.builds.verify()

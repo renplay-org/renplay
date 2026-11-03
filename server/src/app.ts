@@ -96,7 +96,11 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   // The HTML games' runtime lives next to Ren'Py's (runtime/ in the repository and the image).
   const htmlRuntimePath = resolve(dirname(opts.runtimePath ?? fileURLToPath(new URL('../../runtime/renplay-runtime.js', import.meta.url))), 'renplay-html.js')
   let htmlRuntime: Promise<string> | null = null
-  const readHtmlRuntime = () => (htmlRuntime ??= readFile(htmlRuntimePath, 'utf-8').catch((e) => ((htmlRuntime = null), Promise.reject(e))))
+  // An in-memory IndexedDB goes first; the runtime installs it in place of the browser's.
+  const readHtmlRuntime = () =>
+    (htmlRuntime ??= Promise.all([readFile(join(dirname(htmlRuntimePath), 'vendor', 'fake-indexeddb.js'), 'utf-8'), readFile(htmlRuntimePath, 'utf-8')])
+      .then((parts) => parts.join('\n;\n').replace(/<\/script/gi, '<\\/script'))
+      .catch((e) => ((htmlRuntime = null), Promise.reject(e))))
   app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath), { runtime: readHtmlRuntime, saves }))
   // Static fallbacks for development; nginx serves these paths in production.
   // resolve(): sendFile refuses paths with "..", like the $PWD/../runtime one in AGENTS.md.

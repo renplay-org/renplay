@@ -60,6 +60,18 @@ describe('engine detection', () => {
     expect(encrypted!.reason).toContain('encrypted')
   })
 
+  it('installs Godot web builds, single-threaded ones', async () => {
+    const page = (threads: boolean) => `<title>Space Game</title><script>const GODOT_CONFIG = {"executable":"Game"}; const GODOT_THREADS_ENABLED = ${threads};</script>`
+    const web = await detect({ 'Web/index.html': page(false), 'Web/Game.pck': pck(3, [4, 7, 1]), 'Web/Game.wasm': 'x', 'Web/Game.js': 'x' })
+    expect(web).toMatchObject({ family: 'godot', kind: 'godot-web', version: '4.7.1', entry: 'index.html', title: 'Space Game', installable: true })
+    const threaded = await detect({ 'Web/index.html': page(true), 'Web/Game.pck': pck(3, [4, 7, 1]), 'Web/Game.wasm': 'x', 'Web/Game.js': 'x' })
+    expect(threaded).toMatchObject({ kind: 'godot-web', installable: false })
+    // A PC build is no web page, even with an HTML file around.
+    const pc = await detect({ 'Game.exe': 'x', 'Game.pck': pck(3, [4, 6, 2]), 'README.html': '<p>hi</p>' })
+    expect(pc).toMatchObject({ family: 'godot', installable: false })
+    expect(pc!.reason).toContain('web build')
+  })
+
   it('makes names readable', () => {
     expect(nameFromFile('Sexting_sim_stories_V0.17.0-release-free')).toBe('Sexting sim stories')
     expect(nameFromFile('My Game')).toBe('My Game')
@@ -67,8 +79,8 @@ describe('engine detection', () => {
   })
 
   it('tells Unity WebGL builds from PC builds', async () => {
-    const webgl = await detect({ 'Game/index.html': '', 'Game/Build/Game.loader.js': '', 'Game/Build/Game.data.br': '' })
-    expect(webgl).toMatchObject({ family: 'unity', kind: 'unity-webgl', root: 'Game/' })
+    const webgl = await detect({ 'Game/index.html': '<title>Unity WebGL Player</title><script>var config = { productName: "Phone Game", productVersion: "0.3" }</script>', 'Game/Build/Game.loader.js': '', 'Game/Build/Game.data.br': '' })
+    expect(webgl).toMatchObject({ family: 'unity', kind: 'unity-webgl', root: 'Game/', title: 'Phone Game', installable: true })
     const pc = await detect({ 'Phone.exe': 'x', 'UnityPlayer.dll': 'x', 'Phone_Data/globalgamemanagers': Buffer.concat([Buffer.alloc(20), Buffer.from('6000.6.0f1\0', 'latin1')]) })
     expect(pc).toMatchObject({ family: 'unity', kind: 'unity-desktop', version: '6000.6.0f1', title: 'Phone', installable: false })
   })
