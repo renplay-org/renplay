@@ -107,6 +107,11 @@ describe('HTTP API', () => {
     expect(plain.text).toBe(other)
     expect(plain.headers['content-type']).toBe('text/html; charset=utf-8')
     await app.saves.remove('story', 'localStorage.json', 'test')
+    // The startup check knows HTML builds have no game.zip.
+    const checked = await app.builds.verify()
+    expect(checked.missing).not.toContain('twine-story')
+    expect(app.db.getGame('twine-story')?.status).toBe('installed')
+    await request(app.app).get('/api/games/twine-story/files').expect(409)
   })
 
   it('renders the game page from the engine template', async () => {

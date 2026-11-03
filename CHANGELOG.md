@@ -7,6 +7,13 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-11-03
+
+### Fixed
+
+- HTML games stay installed when Renplay restarts. The startup check looked for a `game.zip`,
+  which only Ren'Py builds have, and marked them not installed; reinstall them once.
+
 ## [2.7.0] - 2026-11-03
 
 ### Changed
@@ -198,7 +205,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.7.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.7.1...dev
+[2.7.1]: https://github.com/renplay-web/renplay/compare/v2.7.0...v2.7.1
 [2.7.0]: https://github.com/renplay-web/renplay/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/renplay-web/renplay/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/renplay-web/renplay/compare/v2.4.0...v2.5.0

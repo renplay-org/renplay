@@ -21,6 +21,7 @@ export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jo
     const g = db.getGame(assertSlug(req.params.id))
     if (!g) throw new HttpError(404, 'Game not found')
     if (g.status !== 'installed') throw new HttpError(409, 'Install the game to browse its files')
+    if (g.family && g.family !== 'renpy') throw new HttpError(409, 'Files and mods are for Ren’Py games')
     return g
   }
 
