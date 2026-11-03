@@ -314,7 +314,7 @@ function Details({ game }: { game: Game }) {
               <span className="font-mono text-[13px]">{game.saveDir}</span>
             </Row>
           )}
-          {(game.source.archive || game.source.url) && <Row label="Source">{game.source.archive ?? game.source.url}</Row>}
+          {game.source.archive && <Row label="Source">{game.source.archive}</Row>}
           {game.installedAt && <Row label="Installed">{capitalize(ago(game.installedAt))}</Row>}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">

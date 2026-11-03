@@ -74,7 +74,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     fileCount: row.file_count,
     screen: row.screen_w ? ([row.screen_w, row.screen_h] as [number, number]) : null,
     saveDir: row.save_dir || null,
-    source: { archive: source.archive ?? null, url: source.url ?? null, size: source.size ?? null },
+    source: { archive: source.archive ?? null, size: source.size ?? null },
     canReinstall: !!source.archive,
     recipe: recipe
       ? {

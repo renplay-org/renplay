@@ -1,8 +1,5 @@
-import { createWriteStream } from 'node:fs'
 import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
-import { Readable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../builds.js'
 import type { Catalog, RecipeMatch } from '../catalog.js'
 import type { Config } from '../config.js'
@@ -22,7 +19,8 @@ import { detectLayout, extractProject } from './project.js'
 import { readRpaIndex, splitRpa } from './rpa.js'
 
 export interface ImportParams {
-  source: { kind: 'archive'; path: string } | { kind: 'url'; url: string; filename?: string }
+  /** An archive in the archives folder (copied there, or uploaded). */
+  source: { kind: 'archive'; path: string }
   /** Install into this game (update or reinstall). */
   game?: string
   recipeId?: string
@@ -49,15 +47,9 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
   let src: ArchiveSource | null = null
   try {
     // 1. Source archive.
-    let archivePath: string
     const source: GameSource = {}
-    if (p.source.kind === 'url') {
-      archivePath = await downloadToArchives(p.source.url, p.source.filename, cfg, ctx)
-      source.url = p.source.url
-    } else {
-      archivePath = safeJoin(cfg.archivesDir, cleanRelPath(p.source.path))
-      if (!(await exists(archivePath))) throw new Error(`Archive not found: ${p.source.path}`)
-    }
+    const archivePath = safeJoin(cfg.archivesDir, cleanRelPath(p.source.path))
+    if (!(await exists(archivePath))) throw new Error(`Archive not found: ${p.source.path}`)
     source.archive = relative(cfg.archivesDir, archivePath)
     const st = await stat(archivePath)
     source.size = st.size
@@ -234,49 +226,6 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
 async function modsInfo(deps: ImportDeps, id: string): Promise<BuildInfo['mods']> {
   const s = await deps.overlays.summary(id)
   return s.files + s.deleted ? { hash: s.hash, files: s.files + s.deleted } : null
-}
-
-async function downloadToArchives(url: string, filename: string | undefined, cfg: Config, ctx: JobContext): Promise<string> {
-  const u = new URL(url)
-  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('Only http(s) URLs are supported')
-  await mkdir(cfg.uploadsDir, { recursive: true })
-  const part = join(cfg.uploadsDir, `${ctx.id}.download`)
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      const have = (await stat(part).catch(() => null))?.size ?? 0
-      const res = await fetch(url, { signal: ctx.signal, headers: have ? { range: `bytes=${have}-` } : {}, redirect: 'follow' })
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
-      const resumed = have > 0 && res.status === 206
-      const total = (resumed ? have : 0) + (Number(res.headers.get('content-length')) || 0)
-      filename ??= contentDispositionName(res.headers.get('content-disposition')) ?? (basename(u.pathname) || 'download.zip')
-      let got = resumed ? have : 0
-      const body = Readable.fromWeb(res.body as any)
-      body.on('data', (c: Buffer) => {
-        got += c.length
-        ctx.progress('Downloading', total ? got / total : 0, `${(got / 1e9).toFixed(2)} GB`)
-      })
-      await pipeline(body, createWriteStream(part, { flags: resumed ? 'a' : 'w' }))
-      break
-    } catch (e) {
-      if (ctx.signal.aborted || attempt === 4) throw e
-      ctx.log(`Download interrupted (${(e as Error).message}), resuming…`)
-      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
-    }
-  }
-  const name = (filename || 'download.zip').replace(/[^\w.() -]+/g, '_').slice(0, 180)
-  await mkdir(cfg.archivesDir, { recursive: true })
-  let dest = join(cfg.archivesDir, name)
-  let i = 1
-  while (await exists(dest)) dest = join(cfg.archivesDir, name.replace(/(\.[^.]+)?$/, `-${++i}$1`))
-  await rename(part, dest)
-  return dest
-}
-
-function contentDispositionName(h: string | null): string | undefined {
-  if (!h) return undefined
-  const star = h.match(/filename\*=UTF-8''([^;]+)/i)
-  if (star) return decodeURIComponent(star[1]!)
-  return h.match(/filename="?([^";]+)"?/i)?.[1]
 }
 
 // ---- Archive inspection (fast, no extraction) ------------------------------

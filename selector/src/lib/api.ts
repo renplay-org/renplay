@@ -18,7 +18,7 @@ export interface Game {
   fileCount: number
   screen: [number, number] | null
   saveDir: string | null
-  source: { archive: string | null; url: string | null; size: number | null }
+  source: { archive: string | null; size: number | null }
   canReinstall: boolean
   recipe: { id: string; links: Record<string, string>; continuesFrom: string[]; status: string | null } | null
   /** A newer working release listed in the catalog. */
@@ -62,7 +62,7 @@ export interface Job {
   progress: number
   message: string
   error: string | null
-  params: { source?: { kind: string; path?: string; url?: string }; game?: string; path?: string } | null
+  params: { source?: { kind: string; path?: string }; game?: string; path?: string } | null
   result: any
   createdAt: string
   startedAt: string | null
