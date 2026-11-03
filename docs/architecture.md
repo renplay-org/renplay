@@ -51,6 +51,12 @@ archives, while they are kept).
 7. **Write the build**: streamed files are appended to `assets.pack` (with an `assets.json`
    index); `game.zip` (`assemble.ts`) holds the engine's Python package, the game's scripts and
    small files, the placeholders and the streaming list. The finished folder appears atomically.
+   Script sources (`.rpy`) whose compiled `.rpyc` is there too go into the pack instead of
+   `game.zip` (`setSourcesAside`), so Ren'Py loads the developer's compiled scripts: a `.rpyc`
+   from another Ren'Py version looks stale to Ren'Py 8.5, which would compile the source again
+   with a stricter parser and Python 3.12. Every build also gets `game/renplay_web.rpy`
+   (`webcompat.ts`), stand-ins for what desktop games expect and a browser lacks (`ssl`, threads,
+   Unix sockets, old import hooks, Python 2 print statements and octal numbers).
 8. **Delete the archive** once the archive is closed (on NFS, deleting an open file leaves a
    hidden copy), unless `RENPLAY_DELETE_ARCHIVES=false`. Failed installs keep it.
 

@@ -98,14 +98,20 @@ export class PackWriter {
     return true
   }
 
-  async close(): Promise<PackIndex> {
-    await this.lock
-    await new Promise<void>((resolve, reject) => {
-      this.ws.once('error', reject)
-      this.ws.end(() => resolve())
-    })
-    if (this.failed) throw this.failed
-    return this.index
+  private closing: Promise<PackIndex> | null = null
+
+  /** Flushes and closes the pack; later calls wait for the same close. */
+  close(): Promise<PackIndex> {
+    this.closing ??= (async () => {
+      await this.lock
+      await new Promise<void>((resolve, reject) => {
+        this.ws.once('error', reject)
+        this.ws.end(() => resolve())
+      })
+      if (this.failed) throw this.failed
+      return this.index
+    })()
+    return this.closing
   }
 }
 
