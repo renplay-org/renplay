@@ -8,6 +8,9 @@
  * - threads: they cannot start. A thread of the game's own (its target or
  *   class comes from the store) that fails to start counts as finished
  *   instead of raising; Ren'Py's own threads are left alone.
+ * - Python 2 print statements: games made for Ren'Py 7 (Python 2) can have
+ *   them in their scripts' Python, which Ren'Py 8 compiles as Python 3. Code
+ *   that fails for that reason is compiled again with print() calls.
  */
 export const WEB_COMPAT_PATH = 'renplay_web.rpy'
 
@@ -70,6 +73,34 @@ python early:
                 print("Renplay: threads do not run in the browser, skipped %r" % (owner,))
 
         threading.Thread.start = start_or_skip
+
+        import re
+
+        compile_py = renpy.python.py_compile
+        statement = re.compile(r"^([ \\t]*)print\\b(?![ \\t]*[(=.])[ \\t]*(.*?)[ \\t]*$", re.M)
+
+        def call(m):
+            body = m.group(2)
+            if body.endswith(","):
+                return '%sprint(%s, end=" ")' % (m.group(1), body[:-1])
+            return "%sprint(%s)" % (m.group(1), body)
+
+        def py_compile(source, mode, *args, **kwargs):
+            try:
+                return compile_py(source, mode, *args, **kwargs)
+            except SyntaxError as e:
+                if "print" not in str(e.msg) or not isinstance(source, str):
+                    raise
+                fixed = statement.sub(call, source)
+                if fixed == source:
+                    raise
+                try:
+                    fixed = type(source)(fixed, source.filename, source.linenumber)
+                except Exception:
+                    pass
+                return compile_py(fixed, mode, *args, **kwargs)
+
+        renpy.python.py_compile = py_compile
 
     _renplay_web_compat()
     del _renplay_web_compat

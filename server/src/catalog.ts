@@ -21,10 +21,10 @@ export type RecipeStatus = 'verified' | 'playable' | 'broken' | 'untested'
 export interface RecipeRelease {
   version: string
   date?: string
-  /** Ren'Py version the game was made with. */
-  renpy?: string
-  /** Engine to build this release with (overrides the recipe's). */
-  engine?: string
+  /** Version of the engine the game was made with (Ren'Py 8.2.1, Godot 4.6.2). */
+  madeWith?: string
+  /** Web runtime to build this release with (overrides the recipe's). */
+  runtime?: string
   status: RecipeStatus
   archives: RecipeArchive[]
   verified?: { date?: string; renplay?: string; browsers?: string[]; notes?: string }
@@ -56,7 +56,10 @@ export interface Recipe {
   continuesFrom?: string[]
   /** Archive name patterns (with *) that belong to this game, for releases not listed yet. */
   match?: string[]
-  engine?: string
+  /** What made the game. Ren'Py is what Renplay is for (docs/engines.md). */
+  engine: 'renpy' | 'html' | 'godot' | 'unity'
+  /** Web runtime to build with, from renplay-web/engines; default the newest that fits. */
+  runtime?: string
   build?: {
     optimizeImages?: boolean
     imageQuality?: number
@@ -124,6 +127,22 @@ function valid(g: any): g is Recipe {
   return g && typeof g.id === 'string' && typeof g.title === 'string' && Array.isArray(g.releases)
 }
 
+/**
+ * Recipes in catalog schema 3 names. Schema 2 (and caches written by Renplay
+ * 2.5 and older) called the runtime `engine` and a release's madeWith and
+ * runtime `renpy` and `engine`; all of those were Ren'Py games.
+ */
+export function normalizeRecipe(g: any): Recipe {
+  const old = typeof g.engine !== 'string' || /^\d/.test(g.engine)
+  const { renpy: _r, engine: _e, ...rest } = g
+  return {
+    ...rest,
+    engine: old ? 'renpy' : g.engine,
+    runtime: g.runtime ?? (old ? g.engine : undefined),
+    releases: g.releases.map(({ renpy, engine, ...r }: any) => ({ ...r, madeWith: r.madeWith ?? renpy, runtime: r.runtime ?? engine })),
+  }
+}
+
 export class Catalog {
   private recipes = new Map<string, Recipe>()
   private covers = new Map<string, string>()
@@ -162,7 +181,7 @@ export class Catalog {
 
   private load(games: unknown[]): void {
     this.recipes.clear()
-    for (const g of games) if (valid(g)) this.recipes.set(g.id, g)
+    for (const g of games) if (valid(g)) this.recipes.set(g.id, normalizeRecipe(g))
   }
 
   async refresh(): Promise<{ games: number; errors: string[] }> {
@@ -174,7 +193,7 @@ export class Catalog {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const idx = (await res.json()) as { schema?: number; games?: unknown[] }
         if ((idx.schema ?? 1) < 2) throw new Error(`catalog schema ${idx.schema ?? 1} is too old`)
-        for (const g of idx.games ?? []) if (valid(g)) all.push({ ...g, _base: url })
+        for (const g of idx.games ?? []) if (valid(g)) all.push({ ...normalizeRecipe(g), _base: url })
       } catch (e) {
         this.errors.push(`${url}: ${(e as Error).message}`)
       }
@@ -303,7 +322,7 @@ export class Catalog {
   /** Build settings for a recipe, with the engine of the given release. */
   settings(recipe: Recipe, release: RecipeRelease | null): BuildSettings {
     return {
-      engine: release?.engine ?? recipe.engine,
+      engine: release?.runtime ?? recipe.runtime,
       quality: recipe.build?.imageQuality,
       optimize: recipe.build?.optimizeImages,
       keep: recipe.build?.keep ?? [],

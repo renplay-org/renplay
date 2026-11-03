@@ -1,7 +1,7 @@
 import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../builds.js'
-import type { Catalog, RecipeMatch } from '../catalog.js'
+import type { BuildSettings, Catalog, RecipeMatch } from '../catalog.js'
 import type { Config } from '../config.js'
 import { parseJson, type BuildOptions, type Db, type GameRow, type GameSource } from '../db.js'
 import type { EngineStore } from '../engines.js'
@@ -11,10 +11,12 @@ import { dirSize, exists } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
 import { extractWithBsdtar, openDir, openZip, readAll, sniffArchive, type ArchiveSource, type SourceEntry } from './archive.js'
 import { assemble } from './assemble.js'
-import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit } from './detect.js'
+import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit } from './detect.js'
 import { defaultImagePolicy, imageConcurrency } from './optimize.js'
 import { PackWriter, writeIndex } from './pack.js'
 import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
+import { detectEngine, type EngineInfo } from './family.js'
+import { extractHtml, storyId, versionFromName } from './html.js'
 import { detectLayout, extractProject } from './project.js'
 import { readRpaIndex, splitRpa } from './rpa.js'
 
@@ -102,12 +104,19 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
       src = await openDir(join(work, 'raw'))
     } else throw new Error('Unsupported archive format (expected zip, 7z, rar or tar)')
     const layout = detectLayout(src.entries)
-    if (!layout) throw new Error('No Ren’Py game found in the archive (no game/ folder with scripts)')
+    if (!layout) {
+      const other = await detectEngine(src.entries, null)
+      if (other?.family === 'html' && other.installable && other.entry) {
+        return await installHtml(ctx, deps, { src, engine: other, source, match, settings, work, archiveName: basename(archivePath) })
+      }
+      if (other) throw new Error(`This is a ${other.label} game. ${other.reason ?? ''}`.trim())
+      throw new Error('No game found in the archive (no Ren’Py game/ folder with scripts, no page or game pack)')
+    }
     if (layout.kind === 'web') throw new Error('This is a web build. Use the game’s PC download; renplay builds the web version itself.')
 
     // 4. Engine, from the recipe or the game's own Ren'Py version.
-    const gameRenpy = await renpyVersionOf((p) => src!.entries.find((e) => e.path === layout.root + p))
-    const engine = await engines.pick(p.engine ?? settings.engine, gameRenpy ?? match?.release?.renpy)
+    const gameRenpy = await renpyVersionOf((p) => src!.entries.find((e) => e.path === layout.root + p), pythonOf(src.entries.map((e) => e.path), layout.root))
+    const engine = await engines.pick(p.engine ?? settings.engine, gameRenpy ?? match?.release?.madeWith)
     ctx.log(`Game made with Ren'Py ${gameRenpy ?? 'unknown'}; building with engine ${engine}`)
     if (gameRenpy && Number(gameRenpy.split('.')[0]) < Number(engine.split('.')[0])) {
       ctx.log(`Made with an older Ren'Py: most such games work on the newer engine, but Python 2 code in the game can fail while playing. Report problems to the catalog.`)
@@ -247,6 +256,93 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
   }
 }
 
+/**
+ * Installs an HTML game (docs/engines.md): its folder into one pack, images as
+ * WebP. No engine to fetch and no game.zip; the page is served from the pack.
+ */
+async function installHtml(
+  ctx: JobContext<ImportParams>,
+  deps: ImportDeps,
+  o: { src: ArchiveSource; engine: EngineInfo; source: GameSource; match: RecipeMatch | null; settings: BuildSettings; work: string; archiveName: string },
+): Promise<unknown> {
+  const { cfg, db, builds } = deps
+  const { engine, match, settings } = o
+  const p = ctx.params
+  ctx.log(`Game made with ${engine.label}; it plays as a web page, with fewer features than Ren'Py games`)
+  for (const w of engine.warnings) ctx.log(w)
+  const options: BuildOptions = { optimizeImages: settings.optimize ?? true, imageQuality: settings.quality ?? cfg.imageQuality }
+  const policy = { ...defaultImagePolicy(options.imageQuality), enabled: options.optimizeImages !== false }
+  const staging = join(o.work, 'build')
+  await mkdir(staging, { recursive: true })
+  const pack = new PackWriter(join(staging, 'assets.pack'))
+  let s
+  try {
+    s = await extractHtml(o.src, engine.root, pack, policy, imageConcurrency(cfg.imageConcurrency), ctx, excluder(settings.exclude))
+  } finally {
+    await pack.close()
+  }
+  if (!pack.index.has(engine.entry!)) throw new Error(`The game's page ${engine.entry} is missing`)
+  await writeIndex(join(staging, 'assets.json'), pack.index)
+  ctx.log(
+    `Extracted ${s.files} files (${(s.bytes / 1e9).toFixed(2)} GB)` +
+      (s.imagesConverted ? `, converted ${s.imagesConverted} images ${(s.imageBytesBefore / 1e9).toFixed(2)} GB -> ${(s.imageBytesAfter / 1e9).toFixed(2)} GB` : ''),
+  )
+
+  const title = match?.recipe.title ?? engine.title ?? o.archiveName.replace(/\.[^.]+$/, '')
+  const version = match?.release?.version ?? versionFromName(o.archiveName)
+  // Where the story keeps its saves: SugarCube uses its title's slug.
+  const saveDir = match?.recipe.saveDir ?? storyId(engine.title ?? title)
+  const existing = (p.game ? db.getGame(p.game) : null) ?? (match ? db.gameByRecipe(match.recipe.id) : null) ?? (saveDir ? db.gameBySaveDir(saveDir) : null)
+  if (p.game && !existing) throw new HttpError(404, `Game ${p.game} not found`)
+  const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(title))
+  if (!isSlug(id)) throw new Error(`Invalid game id ${id}`)
+
+  ctx.progress('Installing')
+  const build = newBuildId()
+  const images = { converted: s.imagesConverted, before: s.imageBytesBefore, after: s.imageBytesAfter }
+  const info: BuildInfo = {
+    schema: 1,
+    game: id,
+    build,
+    engine: '',
+    family: engine.family,
+    engineLabel: engine.label,
+    entry: engine.entry,
+    title,
+    version,
+    saveDir,
+    createdAt: new Date().toISOString(),
+    images,
+  }
+  await builds.writeInfo(staging, info)
+  await mkdir(builds.gameDir(id), { recursive: true })
+  await rename(staging, builds.dir(id, build))
+  const size = await dirSize(builds.dir(id, build))
+  const previous = existing?.build ? baseOf(existing.build) : undefined
+  const row: Partial<GameRow> = {
+    status: 'installed',
+    recipe_id: match?.recipe.id ?? existing?.recipe_id ?? '',
+    version: version ?? '',
+    renpy_version: engine.version ?? '',
+    engine: '',
+    family: engine.family,
+    engine_label: engine.label,
+    entry: engine.entry!,
+    build,
+    size_bytes: size.bytes,
+    file_count: size.files,
+    save_dir: saveDir,
+    source: JSON.stringify(o.source),
+    build_options: JSON.stringify(options),
+    installed_at: new Date().toISOString(),
+  }
+  if (existing) db.updateGame(id, row)
+  else db.insertGame({ id, title, ...row })
+  await builds.prune(id, previous)
+  ctx.log(`Installed ${id} (build ${build}, ${engine.label}, ${(size.bytes / 1e9).toFixed(2)} GB)`)
+  return { game: id, build, family: engine.family, size: size.bytes, saveDir, title, version, images, recipe: match?.recipe.id ?? null }
+}
+
 async function modsInfo(deps: ImportDeps, id: string): Promise<BuildInfo['mods']> {
   const s = await deps.overlays.summary(id)
   return s.files + s.deleted ? { hash: s.hash, files: s.files + s.deleted } : null
@@ -262,12 +358,14 @@ export interface ArchiveInfo {
   saveDir?: string
   renpyVersion?: string
   files: number
+  /** What made the game (Ren'Py, Twine, Godot…), and whether it installs. */
+  engine?: EngineInfo
   /** INSPECT_VERSION of the inspection; older results are inspected again. */
   v?: number
 }
 
-/** Bump when inspectArchive learns to find more. 2: Ren'Py 7 versions. */
-export const INSPECT_VERSION = 2
+/** Bump when inspectArchive learns to find more. 2: Ren'Py 7 versions. 3: other engines. */
+export const INSPECT_VERSION = 3
 
 /**
  * Reads metadata from a zip without extracting it. Script archives (.rpa) are
@@ -280,7 +378,9 @@ export async function inspectArchive(path: string): Promise<ArchiveInfo> {
   const src = await openZip(path)
   try {
     const layout = detectLayout(src.entries)
-    const info: ArchiveInfo = { type, layout: layout?.kind ?? null, files: src.entries.length, v: INSPECT_VERSION }
+    const engine = await detectEngine(src.entries, layout)
+    const info: ArchiveInfo = { type, layout: layout?.kind ?? null, files: src.entries.length, engine: engine ?? undefined, v: INSPECT_VERSION }
+    if (engine && engine.family !== 'renpy') info.title = engine.title
     if (!layout || layout.kind === 'web') return info
     const root = layout.root
     const byPath = new Map(src.entries.map((e) => [e.path, e]))
@@ -290,7 +390,7 @@ export async function inspectArchive(path: string): Promise<ArchiveInfo> {
       info.title = j.name
       info.version = j.version
     }
-    info.renpyVersion = await renpyVersionOf((p) => byPath.get(root + p))
+    info.renpyVersion = await renpyVersionOf((p) => byPath.get(root + p), pythonOf(src.entries.map((e) => e.path), root))
     const consider = (name: string, data: Buffer) => {
       if (name.endsWith('.rpy')) {
         const text = data.toString('utf-8')
@@ -335,11 +435,11 @@ export async function cleanWorkDir(cfg: Config): Promise<void> {
 }
 
 /** The game's Ren'Py version from its renpy/ folder (see renpyVersionFromVc). */
-async function renpyVersionOf(find: (path: string) => SourceEntry | undefined): Promise<string | undefined> {
+async function renpyVersionOf(find: (path: string) => SourceEntry | undefined, python?: 2 | 3): Promise<string | undefined> {
   const vc = find('renpy/vc_version.py')
   if (!vc) return undefined
   const text = async (e: SourceEntry) => (await readAll(await e.open(), 1 << 20)).toString('utf-8')
   const src = await text(vc)
   const init = vcNeedsInit(src) ? find('renpy/__init__.py') : undefined
-  return renpyVersionFromVc(src, init ? await text(init) : undefined)
+  return renpyVersionFromVc(src, init ? await text(init) : undefined, python)
 }

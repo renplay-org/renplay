@@ -6,7 +6,7 @@ import { pipeline } from 'node:stream/promises'
 import type { JobContext } from '../jobs.js'
 import { Limiter } from '../util/limit.js'
 import { readAll, type ArchiveSource, type SourceEntry } from './archive.js'
-import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit, type GameMeta } from './detect.js'
+import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit, type GameMeta } from './detect.js'
 import { isOptimizableImage, transcodeImage, type ImagePolicy } from './optimize.js'
 import type { PackWriter } from './pack.js'
 import { classify, makePlaceholder, streamsImage, type Placeholder, type ProgressiveRule } from './progressive.js'
@@ -128,7 +128,7 @@ export async function extractProject(
     if (rel === 'renpy/vc_version.py') {
       const vc = (await readAll(await e.open(), 1 << 20)).toString('utf-8')
       const init = vcNeedsInit(vc) ? inRoot.find((x) => x.path === `${root}renpy/__init__.py`) : undefined
-      meta.renpyVersion = renpyVersionFromVc(vc, init ? (await readAll(await init.open(), 1 << 20)).toString('utf-8') : undefined)
+      meta.renpyVersion = renpyVersionFromVc(vc, init ? (await readAll(await init.open(), 1 << 20)).toString('utf-8') : undefined, pythonOf(inRoot.map((x) => x.path), root))
       continue
     }
     if (!rel.startsWith('game/')) {

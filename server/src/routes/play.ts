@@ -2,25 +2,41 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
 import { BUILD_RE, baseOf, type Builds } from '../builds.js'
-import type { Db } from '../db.js'
+import type { Db, GameRow } from '../db.js'
 import type { EngineStore } from '../engines.js'
 import { PackReader } from '../pipeline/pack.js'
+import type { SaveStore } from '../saves/store.js'
 import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
+
+/** Where an HTML game's localStorage is kept, in its save folder. */
+export const HTML_STORAGE = 'localStorage.json'
+
+/** The URL an installed game plays at. HTML games start at their own page. */
+export function playPath(g: GameRow): string {
+  if (g.family === 'html' && g.entry) return `/g/${g.id}/${g.build}/game/${g.entry.split('/').map(encodeURIComponent).join('/')}`
+  return `/g/${g.id}/${g.build}/`
+}
 
 /**
  * Serves a game page: the engine's page template with renplay's runtime wired
  * in. Everything else under /g/ is static and served by nginx.
  */
-export function createPlayRouter(db: Db, builds: Builds, engines: EngineStore, runtimeVersion: string): Router {
+export function createPlayRouter(
+  db: Db,
+  builds: Builds,
+  engines: EngineStore,
+  runtimeVersion: string,
+  html: { runtime: () => Promise<string>; saves: SaveStore },
+): Router {
   const router = Router()
 
   router.get(['/g/:id/:build/', '/g/:id/:build/index.html'], async (req, res) => {
     const id = assertSlug(req.params.id)
     const game = db.getGame(id)
     if (!game || game.status !== 'installed' || !game.build) throw new HttpError(404, 'Game not installed')
-    if (req.params.build !== game.build || !BUILD_RE.test(req.params.build)) {
+    if (req.params.build !== game.build || !BUILD_RE.test(req.params.build) || game.family === 'html') {
       // Old build ids redirect to the current one, so bookmarks keep working.
-      res.redirect(302, `/g/${id}/${game.build}/`)
+      res.redirect(302, playPath(game))
       return
     }
     const template = await engines.template(game.engine)
@@ -56,6 +72,17 @@ export function createPlayRouter(db: Db, builds: Builds, engines: EngineStore, r
       entry = null
     }
     if (!entry) throw new HttpError(404, 'Not found')
+    // Other engines' games run in sandboxed frames, whose requests come from an opaque origin.
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    if (/\.html?$/i.test(name)) {
+      const game = db.getGame(id)
+      if (game?.family === 'html' && game.entry === name && game.build && baseOf(game.build) === base) {
+        const page = (await reader.read(name)) ?? Buffer.alloc(0)
+        res.setHeader('Cache-Control', 'no-store')
+        res.type('html').send(await htmlPage(page.toString('utf-8'), game))
+        return
+      }
+    }
     const size = entry[1]
     res.setHeader('Content-Type', mimeOf(name))
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
@@ -85,6 +112,26 @@ export function createPlayRouter(db: Db, builds: Builds, engines: EngineStore, r
     req.on('close', () => s.destroy())
     s.pipe(res)
   })
+
+  /**
+   * An HTML game's page with Renplay's runtime and the game's stored
+   * localStorage put first in <head>, before any of the game's scripts.
+   */
+  async function htmlPage(page: string, game: GameRow): Promise<string> {
+    let storage: Record<string, string> = {}
+    if (game.save_dir) {
+      try {
+        const parsed = JSON.parse((await html.saves.read(game.save_dir, HTML_STORAGE)).toString('utf-8'))
+        if (parsed && typeof parsed === 'object') storage = parsed
+      } catch {}
+    }
+    const cfg = JSON.stringify({ id: game.id, build: game.build, storage }).replace(/</g, '\\u003c')
+    const inject = `<script>window.__renplay=${cfg};</script><script>${await html.runtime()}</script>`
+    const head = page.match(/<head\b[^>]*>/i)
+    if (head) return page.slice(0, head.index! + head[0].length) + inject + page.slice(head.index! + head[0].length)
+    const doctype = page.match(/^\s*<!doctype[^>]*>/i)
+    return doctype ? doctype[0] + inject + page.slice(doctype[0].length) : inject + page
+  }
 
   return router
 }
@@ -121,6 +168,26 @@ const MIME: Record<string, string> = {
   ogv: 'video/ogg',
   mkv: 'video/x-matroska',
   avi: 'video/x-msvideo',
+  m4v: 'video/mp4',
+  mov: 'video/quicktime',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  flac: 'audio/flac',
+  ico: 'image/x-icon',
+  // HTML games load their own pages, scripts and styles; nginx sends nosniff, so these must be right.
+  html: 'text/html; charset=utf-8',
+  htm: 'text/html; charset=utf-8',
+  css: 'text/css; charset=utf-8',
+  js: 'text/javascript; charset=utf-8',
+  mjs: 'text/javascript; charset=utf-8',
+  json: 'application/json',
+  txt: 'text/plain; charset=utf-8',
+  xml: 'application/xml',
+  wasm: 'application/wasm',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  ttf: 'font/ttf',
+  otf: 'font/otf',
 }
 
 function mimeOf(name: string): string {

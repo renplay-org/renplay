@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { mkdir, readdir, stat } from 'node:fs/promises'
+import { mkdir, readFile, readdir, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler } from 'express'
@@ -93,7 +93,11 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.set('trust proxy', true)
   app.use(express.json({ limit: '2mb' }))
 
-  app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath)))
+  // The HTML games' runtime lives next to Ren'Py's (runtime/ in the repository and the image).
+  const htmlRuntimePath = resolve(dirname(opts.runtimePath ?? fileURLToPath(new URL('../../runtime/renplay-runtime.js', import.meta.url))), 'renplay-html.js')
+  let htmlRuntime: Promise<string> | null = null
+  const readHtmlRuntime = () => (htmlRuntime ??= readFile(htmlRuntimePath, 'utf-8').catch((e) => ((htmlRuntime = null), Promise.reject(e))))
+  app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath), { runtime: readHtmlRuntime, saves }))
   // Static fallbacks for development; nginx serves these paths in production.
   // resolve(): sendFile refuses paths with "..", like the $PWD/../runtime one in AGENTS.md.
   if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(resolve(opts.runtimePath!)))

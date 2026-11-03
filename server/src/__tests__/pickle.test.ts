@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { pyStringLiteral, rpycAst, saveDirFromRpyc, saveDirFromSource, nameVersionFromSource, renpyVersionFromVc } from '../pipeline/detect.js'
+import { nameVersionFromSource, pyStringLiteral, pythonOf, renpyVersionFromVc, rpycAst, saveDirFromRpyc, saveDirFromSource } from '../pipeline/detect.js'
 import { parseRpaHeader } from '../pipeline/rpa.js'
 import { PyGlobal, PyObject, unpickle } from '../util/pickle.js'
 
@@ -88,5 +88,11 @@ describe('Ren\'Py version', () => {
     expect(renpyVersionFromVc('vc_version = 320')).toBeUndefined()
     const both = 'if PY2:\n    version_tuple = (7, 5, 3, vc_version)\nelse:\n    version_tuple = (8, 0, 3, vc_version)\n'
     expect(renpyVersionFromVc('vc_version = 22090809', both)).toBe('8.0.3.22090809')
+    expect(renpyVersionFromVc('vc_version = 22090809', both, 3)).toBe('8.0.3.22090809')
+    // Harem Hotel ships only lib/python2.7: it runs the Python 2 build, Ren'Py 7.
+    expect(renpyVersionFromVc('vc_version = 2266', both, 2)).toBe('7.5.3.2266')
+    expect(pythonOf(['G/lib/python2.7/os.pyo', 'G/lib/windows-x86_64/python.exe'], 'G/')).toBe(2)
+    expect(pythonOf(['G/lib/py3-windows-x86_64/python.exe', 'G/lib/py2-windows-x86_64/python.exe'], 'G/')).toBe(3)
+    expect(pythonOf(['G/game/script.rpyc'], 'G/')).toBeUndefined()
   })
 })

@@ -110,15 +110,33 @@ export interface GameMeta {
  * for Ren'Py 7 and older, whose vc_version.py only has `vc_version = 320`,
  * `version_tuple = (7, 3, 2, vc_version)` from renpy/__init__.py.
  */
-export function renpyVersionFromVc(vc: string, init?: string): string | undefined {
+export function renpyVersionFromVc(vc: string, init?: string, python?: 2 | 3): string | undefined {
   const m = vc.match(/^version\s*=\s*['"]([^'"]+)['"]/m)
   if (m) return m[1]
-  // Ren'Py 7.5/8.0 define it twice, for Python 2 and 3: the higher one is the Python 3 build.
+  // Ren'Py 7.4 to 8.0 define it twice, for Python 2 (7.x) and Python 3 (8.x). Which one a game
+  // runs depends on the Python it ships (pythonOf); without that, the Python 3 one.
   const tuples = [...(init ?? '').matchAll(/^\s*version_tuple\s*=\s*\((\d+),\s*(\d+),\s*(\d+)/gm)].map((t) => [+t[1]!, +t[2]!, +t[3]!])
   if (!tuples.length) return undefined
-  const t = tuples.sort((a, b) => b[0]! - a[0]! || b[1]! - a[1]! || b[2]! - a[2]!)[0]!
+  tuples.sort((a, b) => b[0]! - a[0]! || b[1]! - a[1]! || b[2]! - a[2]!)
+  const t = python === 2 ? tuples[tuples.length - 1]! : tuples[0]!
   const n = vc.match(/^vc_version\s*=\s*(\d+)/m)
   return `${t.join('.')}${n ? `.${n[1]}` : ''}`
+}
+
+/**
+ * The Python a Ren'Py game ships, from its lib/ folder: lib/python2.7 or
+ * lib/py2-* (Ren'Py 7), lib/python3.x or lib/py3-* (Ren'Py 8).
+ */
+export function pythonOf(paths: string[], root: string): 2 | 3 | undefined {
+  let py2 = false
+  let py3 = false
+  for (const p of paths) {
+    if (!p.startsWith(`${root}lib/`)) continue
+    const dir = p.slice(root.length + 4).split('/')[0]!
+    if (/^(python2|py2-)/.test(dir)) py2 = true
+    else if (/^(python3|py3-)/.test(dir)) py3 = true
+  }
+  return py3 ? 3 : py2 ? 2 : undefined
 }
 
 /** Whether a version string needs renpy/__init__.py to be read as well. */
