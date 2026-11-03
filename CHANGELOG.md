@@ -7,6 +7,32 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- HTML games install and play: Twine stories (tested with SugarCube), and RPG Maker MV and MZ,
+  TyranoScript and Construct games, untested so far. They play in a sandboxed frame that cannot
+  reach Renplay, with their saves (the browser storage they use) kept on the server, so they
+  follow you to other devices. Mute, fullscreen and Save & exit work; save slots, mods and the
+  script cache are for Ren'Py games only.
+- Add games says what made each download. Downloads of engines Renplay cannot install are listed
+  apart with the reason: Godot (with its version, and a warning about native plugins), Unity (WebGL
+  and PC builds), and engines that only make PC programs. Godot and Unity WebGL support is planned;
+  `docs/engines.md` has the plan.
+- A game's Details tab says what made it.
+
+### Fixed
+
+- Games made with Ren'Py 7.4 to 7.5 that ship only Python 2 show their Ren'Py 7 version, not 8.0.
+
+### Changed
+
+- Ren'Py 7 games' Python print statements (`print "…"`) work: code that fails to compile on the
+  Ren'Py 8 engine for that reason is compiled again with print() calls. Games that depend on other
+  Python 2 behaviour still fail; Harem Hotel (Ren'Py 7.4) is one.
+- Renplay reads the catalog's schema 3 (`index.v3.json`), where recipes say which engine made the
+  game (`engine`), the runtime to build with (`runtime`) and the engine version a release was made
+  with (`madeWith`). It still reads schema 2. Exported recipes use the new names.
+
 ## [2.5.0] - 2026-11-03
 
 ### Added

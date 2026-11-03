@@ -14,7 +14,7 @@ user-visible change.
 | Repository | What |
 |---|---|
 | `renplay` (this one) | The app: server, library UI, in-game runtime, container image |
-| `catalog` | Curated recipes and covers, published as `https://renplay-web.github.io/catalog/index.json` |
+| `catalog` | Curated recipes and covers, published as `https://renplay-web.github.io/catalog/index.v3.json` (schema 3) |
 | `engines` | Official Ren'Py web engines repackaged per version, index at `https://renplay-web.github.io/engines/index.json` |
 | `renplay-web.github.io` | The website |
 | `.github` | Organization profile and the default `FUNDING.yml` (Ko-fi) |
@@ -26,6 +26,9 @@ These decide most review comments. Follow them without being asked.
 - **Curated, not configurable.** Title, developer, tags, links and cover come only from the game's
   catalog recipe. Users cannot edit them; there are no per-install image or engine options in the
   UI. Add a setting only when a real user need cannot be solved by better defaults or a recipe.
+- **Ren'Py first.** Renplay is a Ren'Py player. Other engines are second-class: recognized, and
+  installed where a browser can run them, with the features that come cheap. A feature may work
+  only for Ren'Py; never make Ren'Py worse for another engine. Plan and status: `docs/engines.md`.
 - **Saves are sacred.** Never delete or rewrite save data as a side effect. Every overwrite and
   delete keeps history. Uninstall and reinstall leave saves alone.
 - **Works on phones.** Every screen must work at 390 px wide in portrait and in landscape, with

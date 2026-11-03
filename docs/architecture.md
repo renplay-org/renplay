@@ -34,7 +34,8 @@ archives, while they are kept).
 `server/src/pipeline/import.ts` runs as a background job:
 
 1. **Read the archive in place** (`archive.ts`): zip, 7z, rar or tar, without unpacking it to disk.
-   Find the game folder and the Ren'Py version (`renpy/vc_version.py`).
+   Find the game folder and the Ren'Py version (`renpy/vc_version.py`). Other engines' games are
+   recognized (`family.ts`) and refused with the reason; see [engines.md](engines.md).
 2. **Match the catalog** (`catalog.ts`): by sha256, name and size, or a `match` pattern. The recipe
    can choose the engine, files to keep or exclude, and small patches.
 3. **Pick the engine** (`engines.ts`): the recipe's, `RENPLAY_ENGINE`, or the newest published
@@ -93,7 +94,8 @@ saves on uninstall or reinstall.
 
 ## The catalog
 
-`catalog.ts` fetches the index every 6 hours (or from Settings). It links installed games to
+`catalog.ts` fetches the index (`index.v3.json`, catalog schema 3; `normalizeRecipe` also reads
+schema 2) every hour (or from Settings). It links installed games to
 recipes (by id, archive or save folder) and reports newer working releases as updates. Library
 metadata (title, developer, tags, links, cover) comes only from recipes.
 

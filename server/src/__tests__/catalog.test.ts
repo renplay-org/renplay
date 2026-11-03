@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { Catalog } from '../catalog.js'
+import { Catalog, normalizeRecipe } from '../catalog.js'
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
 
@@ -114,9 +114,11 @@ describe('catalog', () => {
     db.close()
   })
 
-  it('drops the hand-edited columns of a 2.1 database', () => {
+  it('upgrades a 2.1 database: drops the hand-edited columns, adds the engine family', () => {
     const root = mkdtempSync(join(tmpdir(), 'renplay-db-'))
     let db = Db.open(root)
+    // As 2.1 left it: without the 2.6 columns, with the hand-edited ones.
+    db.raw.exec('ALTER TABLE games DROP COLUMN family; ALTER TABLE games DROP COLUMN engine_label; ALTER TABLE games DROP COLUMN entry')
     db.raw.exec("ALTER TABLE games ADD COLUMN save_dir_locked INTEGER NOT NULL DEFAULT 0; ALTER TABLE games ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'; ALTER TABLE games ADD COLUMN cover TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 1")
     db.insertGame({ id: 'kept', title: 'Kept', status: 'installed' })
     db.close()
@@ -125,8 +127,18 @@ describe('catalog', () => {
     expect(cols).not.toContain('tags')
     expect(cols).not.toContain('cover')
     expect(cols).not.toContain('save_dir_locked')
-    expect(db.getGame('kept')?.title).toBe('Kept')
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(2)
+    expect(db.getGame('kept')).toMatchObject({ title: 'Kept', family: 'renpy', engine_label: '', entry: '' })
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(3)
     db.close()
+  })
+
+  it('reads recipes of catalog schema 2 and 3 alike', () => {
+    const v2 = normalizeRecipe({ id: 'a', title: 'A', engine: '8.5.3', releases: [{ version: '1', status: 'verified', archives: [], renpy: '7.3.2', engine: '8.4.0' }] })
+    const v3 = normalizeRecipe({ id: 'a', title: 'A', engine: 'renpy', runtime: '8.5.3', releases: [{ version: '1', status: 'verified', archives: [], madeWith: '7.3.2', runtime: '8.4.0' }] })
+    expect(v2).toEqual(v3)
+    expect(v3).toMatchObject({ engine: 'renpy', runtime: '8.5.3', releases: [{ madeWith: '7.3.2', runtime: '8.4.0' }] })
+    expect(v3.releases[0]).not.toHaveProperty('renpy')
+    expect(normalizeRecipe({ id: 'b', title: 'B', releases: [] })).toMatchObject({ engine: 'renpy', runtime: undefined })
+    expect(normalizeRecipe({ id: 'c', title: 'C', engine: 'godot', releases: [{ version: '0.17.0', status: 'untested', archives: [], madeWith: '4.6.2' }] })).toMatchObject({ engine: 'godot', releases: [{ madeWith: '4.6.2' }] })
   })
 })

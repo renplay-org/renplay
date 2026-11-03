@@ -23,6 +23,10 @@ export interface BuildInfo {
   base?: string
   engine: string
   renpyVersion?: string
+  /** Other engines (docs/engines.md): family, what made it, and the page the game starts from. */
+  family?: string
+  engineLabel?: string
+  entry?: string
   title?: string
   version?: string
   saveDir?: string

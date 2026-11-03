@@ -57,8 +57,11 @@ function Downloads() {
   if (isLoading) return <Spinner />
   const archives = data?.archives ?? []
   const job = (a: Archive) => activeJob(jobs?.jobs, a)
-  const ready = archives.filter((a) => !a.installedAs || job(a))
+  // Games of engines this version cannot install are listed apart, with the reason.
+  const other = (a: Archive) => !a.installedAs && !job(a) && a.info?.engine?.installable === false
+  const ready = archives.filter((a) => (!a.installedAs || job(a)) && !other(a))
   const installed = archives.filter((a) => a.installedAs && !job(a))
+  const others = archives.filter(other)
   const refresh = (
     <Button size="sm" variant="ghost" icon={<RefreshCw className={cx('size-4', isFetching && 'animate-spin')} />} onClick={() => void refetch()}>
       Refresh
@@ -84,6 +87,13 @@ function Downloads() {
           {installed.length > 0 && (
             <Section title="Installed" action={ready.length ? undefined : refresh}>
               {installed.map((a) => (
+                <ArchiveRow key={a.path} archive={a} onInstall={() => setInstalling(a)} />
+              ))}
+            </Section>
+          )}
+          {others.length > 0 && (
+            <Section title="Other engines" action={ready.length || installed.length ? undefined : refresh}>
+              {others.map((a) => (
                 <ArchiveRow key={a.path} archive={a} onInstall={() => setInstalling(a)} />
               ))}
             </Section>
@@ -122,17 +132,25 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   useEffect(() => {
     if (a.info || !/\.zip$/i.test(a.name)) return
     post<{ info: ArchiveInfo }>('/api/archives/inspect', { path: a.path })
-      .then((r) => setInfo(r.info))
+      .then((r) => {
+        setInfo(r.info)
+        // So the row moves to its section.
+        void qc.invalidateQueries({ queryKey: ['archives'] })
+      })
       .catch(() => {})
-  }, [a.path, a.info, a.name])
+  }, [a.path, a.info, a.name, qc])
   const title = a.recipe?.title ?? info?.title ?? a.name
   const version = info?.version ?? a.recipe?.version
   // How well it works matters before installing, not after.
   const status = a.recipe && !a.installedAs ? STATUS[a.recipe.status] : undefined
   const updates = !a.installedAs && a.existingGame ? (games?.find((g) => g.id === a.existingGame)?.title ?? a.existingGame) : null
   const renpy = (info?.renpyVersion ?? games?.find((g) => g.id === a.installedAs)?.renpyVersion)?.split('.').slice(0, 3).join('.')
-  const unknown = info?.type === 'zip' && !info.layout
-  const meta = [bytes(a.size), renpy && `Ren’Py ${renpy}`, `Added ${ago(a.mtime)}`, title !== a.name && a.name].filter(Boolean).join(' · ')
+  const engine = info?.engine
+  const foreign = engine && engine.family !== 'renpy' ? engine : null
+  const unknown = info?.type === 'zip' && !info.layout && !engine
+  const blocked = !a.installedAs && engine?.installable === false
+  const madeWith = foreign ? foreign.label : renpy && `Ren’Py ${renpy}`
+  const meta = [bytes(a.size), madeWith, `Added ${ago(a.mtime)}`, title !== a.name && a.name].filter(Boolean).join(' · ')
   const actions = job ? (
     <Link to="/activity" className="inline-flex h-9 items-center rounded-xl px-3 text-sm text-zinc-400 hover:bg-white/10 hover:text-white">
       Show log
@@ -140,9 +158,11 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   ) : (
     <>
       <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" />} onClick={() => setConfirmDelete(true)} aria-label={`Delete ${a.name}`} title="Delete download" />
-      <Button size="sm" variant={a.installedAs ? 'secondary' : 'primary'} onClick={onInstall}>
-        {a.installedAs ? 'Reinstall' : updates ? 'Update' : 'Install'}
-      </Button>
+      {!blocked && (
+        <Button size="sm" variant={a.installedAs ? 'secondary' : 'primary'} onClick={onInstall}>
+          {a.installedAs ? 'Reinstall' : updates ? 'Update' : 'Install'}
+        </Button>
+      )}
     </>
   )
   return (
@@ -164,9 +184,15 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
           <div className="mt-2 flex flex-wrap gap-1.5">
             {status && <Badge tone={status.tone}>{status.label}</Badge>}
             {updates && <Badge tone="accent">Update for {updates}</Badge>}
-            {unknown && <Badge tone="amber">No Ren’Py game found</Badge>}
+            {unknown && <Badge tone="amber">No game found</Badge>}
           </div>
         )}
+        {blocked && engine?.reason && <p className="mt-1.5 text-xs text-amber-200/80">{engine.reason}</p>}
+        {!blocked && !job && engine?.warnings.map((w) => (
+          <p key={w} className="mt-1.5 text-xs text-amber-200/80">
+            {w}
+          </p>
+        ))}
         {job && <JobLine job={job} />}
         <div className="-ml-2.5 mt-2 flex flex-wrap items-center gap-1 sm:hidden">{actions}</div>
       </div>

@@ -11,6 +11,10 @@ export interface Game {
   status: 'installed' | 'not_installed' | 'installing'
   build: string | null
   playUrl: string | null
+  /** What made the game: renpy, or another engine (docs/engines.md). */
+  family: string
+  /** What made it, for other engines: "SugarCube 2.36.1 (Twine)". */
+  engineLabel: string | null
   version: string | null
   renpyVersion: string | null
   engine: string | null
@@ -77,7 +81,20 @@ export interface ArchiveInfo {
   saveDir?: string
   renpyVersion?: string
   files: number
+  engine?: EngineInfo
   v?: number
+}
+
+/** What made a game; Renplay installs Ren'Py games and, step by step, some others. */
+export interface EngineInfo {
+  family: string
+  kind?: string
+  version?: string
+  label: string
+  title?: string
+  installable: boolean
+  reason?: string
+  warnings: string[]
 }
 
 export interface Archive {
@@ -95,8 +112,8 @@ export interface Archive {
 export interface RecipeRelease {
   version: string
   date?: string
-  renpy?: string
-  engine?: string
+  madeWith?: string
+  runtime?: string
   status: 'verified' | 'playable' | 'broken' | 'untested'
   archives: Array<{ name: string; size?: number; sha256?: string }>
   verified?: { date?: string; renplay?: string; browsers?: string[]; notes?: string }

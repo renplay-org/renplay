@@ -80,6 +80,35 @@ describe('HTTP API', () => {
     expect(await canReinstall()).toBe(false)
   })
 
+  it('serves an HTML game’s page with the runtime and its stored localStorage first', async () => {
+    const page = '<!doctype html><html><head><title>Story</title><script>window.gameScript = 1</script></head><body></body></html>'
+    const other = '<p>credits</p>'
+    const build = join(root, 'games', 'twine-story', 'h1')
+    mkdirSync(build, { recursive: true })
+    writeFileSync(join(build, 'assets.pack'), page + other)
+    writeFileSync(join(build, 'assets.json'), JSON.stringify({ 'Story Page.html': [0, page.length], 'credits.html': [page.length, other.length] }))
+    app.db.insertGame({ id: 'twine-story', title: 'Story', status: 'installed', build: 'h1', family: 'html', engine_label: 'SugarCube 2.36.1 (Twine)', entry: 'Story Page.html', save_dir: 'story' })
+    await app.saves.write('story', 'localStorage.json', Buffer.from(JSON.stringify({ 'story.saves': '{"slots":[1]}' })))
+
+    const g = (await request(app.app).get('/api/games/twine-story').expect(200)).body.game
+    expect(g).toMatchObject({ family: 'html', engineLabel: 'SugarCube 2.36.1 (Twine)', playUrl: '/g/twine-story/h1/game/Story%20Page.html' })
+    expect((await request(app.app).get('/g/twine-story/h1/').expect(302)).headers.location).toBe('/g/twine-story/h1/game/Story%20Page.html')
+
+    const res = await request(app.app).get('/g/twine-story/h1/game/Story%20Page.html').expect(200)
+    expect(res.headers['cache-control']).toBe('no-store')
+    expect(res.headers['access-control-allow-origin']).toBe('*')
+    const at = (s: string) => res.text.indexOf(s)
+    expect(at('window.__renplay=')).toBeGreaterThan(at('<head>'))
+    expect(at('window.__renplay=')).toBeLessThan(at('window.gameScript'))
+    expect(at("renplay:' + type")).toBeGreaterThan(at('window.__renplay='))
+    expect(res.text).toContain('"story.saves":"{\\"slots\\":[1]}"')
+    // Other pages of the game are plain files.
+    const plain = await request(app.app).get('/g/twine-story/h1/game/credits.html').expect(200)
+    expect(plain.text).toBe(other)
+    expect(plain.headers['content-type']).toBe('text/html; charset=utf-8')
+    await app.saves.remove('story', 'localStorage.json', 'test')
+  })
+
   it('renders the game page from the engine template', async () => {
     const res = await request(app.app).get('/g/fixture-game/b1/').expect(200)
     expect(res.text).toContain('<title>Fixture Game</title>')
@@ -157,7 +186,8 @@ describe('HTTP API', () => {
     const res = await request(app.app).get('/api/games/fixture-game/recipe').expect(200)
     expect(res.body.yaml).toMatch(/^# yaml-language-server: \$schema=https:\/\/renplay-web\.github\.io\/catalog\/recipe\.schema\.json\nid: fixture-game\n/)
     expect(res.body.yaml).toContain('saveDir: MyGame-1234567890')
-    expect(res.body.yaml).toContain('engine: 8.5.3')
+    expect(res.body.yaml).toContain('engine: renpy')
+    expect(res.body.yaml).toContain('runtime: 8.5.3')
   })
 
   it('refuses unsafe paths', async () => {
