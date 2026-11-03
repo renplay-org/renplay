@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-03
+
 ### Added
 
 - HTML games install and play: Twine stories (tested with SugarCube), and RPG Maker MV and MZ,
@@ -179,7 +181,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.5.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.6.0...dev
+[2.6.0]: https://github.com/renplay-web/renplay/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/renplay-web/renplay/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/renplay-web/renplay/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/renplay-web/renplay/compare/v2.2.0...v2.3.0
