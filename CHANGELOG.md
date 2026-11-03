@@ -7,6 +7,32 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Downloads are deleted once their game installs, to save space. Set `RENPLAY_DELETE_ARCHIVES=false`
+  to keep them for reinstalls. A failed or cancelled install keeps the download.
+- A mute button in the player's toolbar. It mutes every game in this browser, like muting a tab, and
+  leaves the game's own volume settings alone.
+- In fullscreen, a hint says how to leave it, and holding Esc shows a ring that fills until
+  fullscreen ends (1.5 seconds, as in Chrome).
+- Games that go online for news or updates start: builds include stand-ins for Python's `ssl`
+  module and for threads, which browsers do not have. Moonripple Lake opened on an error before.
+
+### Changed
+
+- Add games is simpler: Upload is part of Downloads, which lists downloads ready to install with
+  their catalog cover and a progress bar while they install, and those already installed apart.
+  The catalog shows compact cards with where to get each game, and links to requesting a game.
+- Downloads show the same details in the same order. Ones looked into by an older version are
+  looked into again, so Ren'Py 7 games show their Ren'Py version.
+
+### Fixed
+
+- Reinstall is offered only while the game's download is still on the server.
+- Exported recipes start with the catalog's schema line, so editors check them as you type.
+- .7z and .rar downloads no longer say "No Ren'Py game found" (Renplay looks inside them only
+  when it installs them).
+
 ## [2.4.0] - 2026-11-03
 
 ### Added

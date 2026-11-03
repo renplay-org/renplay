@@ -14,6 +14,8 @@ import {
   Shrink,
   Smartphone,
   SquarePlus,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -47,6 +49,11 @@ type Panel = null | 'saves' | 'walkthrough' | 'display' | 'fullscreen'
 type KeyboardLock = { lock?: (keys: string[]) => Promise<void>; unlock?: () => void }
 const keyboard = () => (navigator as Navigator & { keyboard?: KeyboardLock }).keyboard
 const canLockEscape = () => typeof keyboard()?.lock === 'function'
+/** How long Chromium wants Esc held (kHoldEscapeTime in exclusive_access_manager.cc). */
+const HOLD_ESCAPE_MS = 1500
+
+/** Muting works like muting a tab, for every game in this browser; the runtime reads it at start. */
+const MUTE_KEY = 'renplay:muted'
 
 const HOME_TIP_KEY = 'renplay:home-screen-tip'
 
@@ -75,6 +82,12 @@ export default function Player() {
   const [coversNotch, setCoversNotch] = useState(false)
   const [screenSize, setScreenSize] = useState<[number, number] | null>(null)
   const [exiting, setExiting] = useState(false)
+  const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === '1')
+  // Esc is locked (a tap reaches the game), shown as a hint for a few seconds,
+  // and currently held down.
+  const [escLocked, setEscLocked] = useState(false)
+  const [escHint, setEscHint] = useState(false)
+  const [escHeld, setEscHeld] = useState(false)
   const notch = useMemo(notchHeight, [])
   const touch = useMemo(isTouchDevice, [])
   const fsMode = useMemo(fullscreenMode, [])
@@ -130,6 +143,9 @@ export default function Player() {
           break
         case 'renplay:error':
           if (typeof d.message === 'string') setFailed(d.message)
+          break
+        case 'renplay:escape':
+          setEscHeld(!!d.down)
           break
       }
     }
@@ -203,7 +219,8 @@ export default function Player() {
           await shellRef.current?.requestFullscreen({ navigationUI: 'hide' })
           // Phones: games are wide, so hold landscape while in fullscreen.
           if (touch) await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {})
-          else await keyboard()?.lock?.(['Escape']).catch(() => {})
+          // Chrome may refuse the lock (it asks for permission since 130): then Esc just leaves.
+          else if (keyboard()?.lock) setEscLocked(await keyboard()!.lock!(['Escape']).then(() => true, () => false))
         } else if (!target && on) await document.exitFullscreen()
       } catch {}
     },
@@ -212,7 +229,11 @@ export default function Player() {
   useEffect(() => {
     const onChange = () => {
       const on = !!document.fullscreenElement
-      if (!on) keyboard()?.unlock?.()
+      if (!on) {
+        keyboard()?.unlock?.()
+        setEscLocked(false)
+        setEscHeld(false)
+      }
       setFullscreen(on)
       send({ type: 'renplay:fullscreen-state', value: on })
       setTimeout(() => setCoversNotch(on && fullscreenCoversNotch()), 250)
@@ -221,6 +242,37 @@ export default function Player() {
     document.addEventListener('fullscreenchange', onChange)
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [send])
+
+  // Esc in fullscreen: say how to leave when it starts, and show the hold.
+  useEffect(() => {
+    if (!escLocked) return
+    setEscHint(true)
+    const t = setTimeout(() => setEscHint(false), 4000)
+    return () => clearTimeout(t)
+  }, [escLocked])
+  useEffect(() => {
+    if (!escLocked) return
+    // When the player rather than the game has focus.
+    const key = (down: boolean) => (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.repeat) setEscHeld(down)
+    }
+    const down = key(true)
+    const up = key(false)
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [escLocked])
+
+  const toggleMute = () => {
+    const next = !muted
+    setMuted(next)
+    if (next) localStorage.setItem(MUTE_KEY, '1')
+    else localStorage.removeItem(MUTE_KEY)
+    send({ type: 'renplay:mute', value: next })
+  }
 
   // Toolbar auto-hide.
   const showToolbar = useCallback(() => {
@@ -410,6 +462,9 @@ export default function Player() {
           </div>
           <div className="ml-auto flex items-center gap-1">
             <SyncBadge sync={sync} />
+            <IconButton label={muted ? 'Unmute' : 'Mute'} active={muted} onClick={toggleMute}>
+              {muted ? <VolumeX className="size-[18px]" /> : <Volume2 className="size-[18px]" />}
+            </IconButton>
             <IconButton label="Saves" active={panel === 'saves'} onClick={() => setPanel(panel === 'saves' ? null : 'saves')}>
               <Save className="size-[18px]" />
             </IconButton>
@@ -429,6 +484,8 @@ export default function Player() {
           </div>
         </div>
       </div>
+
+      {fullscreen && escLocked && (escHeld || escHint) && <EscapeHint held={escHeld} top={Math.max(insets.top, pad.top) + (toolbar || pinned ? 72 : 16)} />}
 
       {/* Panels */}
       {panel === 'saves' && (
@@ -483,6 +540,45 @@ export default function Player() {
           <iframe src={`/api/walkthroughs/${encodeURIComponent(game.walkthrough)}`} title="Walkthrough" className="min-h-0 flex-1 border-0 bg-white" />
         </div>
       )}
+    </div>
+  )
+}
+
+/** How to leave fullscreen, and while Esc is held, a ring that fills until it does. */
+function EscapeHint({ held, top }: { held: boolean; top: number }) {
+  const r = 9
+  const c = 2 * Math.PI * r
+  return (
+    <div className="pointer-events-none absolute inset-x-0 z-40 flex justify-center px-4 animate-fade-in" style={{ top }}>
+      <div className="flex items-center gap-3 rounded-full bg-black/75 py-2 pl-2.5 pr-4 text-sm text-white ring-1 ring-white/15 backdrop-blur">
+        <svg viewBox="0 0 24 24" className="size-6 -rotate-90" aria-hidden="true">
+          <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+          {held && (
+            <circle
+              key="hold"
+              cx="12"
+              cy="12"
+              r={r}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeDasharray={c}
+              strokeDashoffset={c}
+              style={{ animation: `escape-hold ${HOLD_ESCAPE_MS}ms linear forwards` }}
+            />
+          )}
+        </svg>
+        <span>
+          {held ? (
+            'Keep holding Esc to leave fullscreen'
+          ) : (
+            <>
+              Hold <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-sans text-xs">Esc</kbd> to leave fullscreen. A short press opens the game’s menu.
+            </>
+          )}
+        </span>
+      </div>
     </div>
   )
 }

@@ -7,7 +7,7 @@ import type { Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
 import { parseJson, type Db, type GameSource } from '../db.js'
 import type { JobManager } from '../jobs.js'
-import { inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
+import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
 import { exists, newId } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
 
@@ -64,7 +64,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
       archives: files.map((f) => {
         const row = known.get(f.rel)
         const fresh = row && row.size === f.size && row.mtime_ms === f.mtimeMs
-        const info = fresh ? parseJson<ArchiveInfo | null>(row.info, null) : null
+        const parsed = fresh ? parseJson<ArchiveInfo | null>(row.info, null) : null
+        const info = parsed?.v === INSPECT_VERSION ? parsed : null
         const sha256 = fresh ? row.sha256 || null : null
         const match = catalog.match({ name: f.rel, size: f.size, sha256: sha256 ?? undefined })
         return {
@@ -76,7 +77,15 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
           info,
           installedAs: installedBy.get(f.rel) ?? null,
           recipe: match
-            ? { id: match.recipe.id, title: match.recipe.title, version: match.release?.version ?? null, status: match.release?.status ?? 'untested', exact: match.exact }
+            ? {
+                id: match.recipe.id,
+                title: match.recipe.title,
+                version: match.release?.version ?? null,
+                status: match.release?.status ?? 'untested',
+                exact: match.exact,
+                cover: catalog.cover(match.recipe.id),
+                nsfw: match.recipe.nsfw ?? false,
+              }
             : null,
           existingGame: (match ? db.gameByRecipe(match.recipe.id)?.id : null) ?? (info?.saveDir ? (db.gameBySaveDir(info.saveDir)?.id ?? null) : null),
         }

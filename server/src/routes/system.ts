@@ -67,6 +67,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
       orphans,
       purging: purger.pending(),
       paths: { games: cfg.gamesDir, archives: cfg.archivesDir, data: cfg.dataDir },
+      deleteArchives: cfg.deleteArchives,
       busy: jobs.isBusy(),
     })
   })

@@ -10,6 +10,12 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(v) ? v : fallback
 }
 
+function envBool(name: string, fallback: boolean): boolean {
+  const v = process.env[name]?.trim().toLowerCase()
+  if (!v) return fallback
+  return !['0', 'false', 'no', 'off'].includes(v)
+}
+
 export interface Config {
   port: number
   dataDir: string
@@ -24,6 +30,8 @@ export interface Config {
   internalDir: string
   /** Original game archives (zip/7z/rar): drop folder and reinstall source. */
   archivesDir: string
+  /** Delete an archive once it installed. Off keeps it for reinstalls. */
+  deleteArchives: boolean
   enginesDir: string
   workDir: string
   purgeDir: string
@@ -55,6 +63,7 @@ export function loadConfig(): Config {
     gamesDir,
     internalDir,
     archivesDir: env('ARCHIVES_DIR', join(gamesDir, '_archives')),
+    deleteArchives: envBool('RENPLAY_DELETE_ARCHIVES', true),
     enginesDir: join(internalDir, 'engines'),
     workDir: join(internalDir, 'work'),
     purgeDir: join(internalDir, 'purge'),

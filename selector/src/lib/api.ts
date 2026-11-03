@@ -77,6 +77,7 @@ export interface ArchiveInfo {
   saveDir?: string
   renpyVersion?: string
   files: number
+  v?: number
 }
 
 export interface Archive {
@@ -87,7 +88,7 @@ export interface Archive {
   sha256: string | null
   info: ArchiveInfo | null
   installedAs: string | null
-  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean } | null
+  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean } | null
   existingGame: string | null
 }
 
@@ -128,6 +129,8 @@ export interface SystemInfo {
   orphans: string[]
   purging: number
   paths: { games: string; archives: string; data: string }
+  /** Archives are deleted once they installed (RENPLAY_DELETE_ARCHIVES). */
+  deleteArchives: boolean
   busy: boolean
 }
 

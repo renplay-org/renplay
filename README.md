@@ -71,7 +71,7 @@ home-screen app can. On Android, the fullscreen button does it.
 | Folder | What is in it |
 |---|---|
 | `/data` | Saves and their history, the library, mods, covers, walkthroughs. **Back this up.** |
-| `/games/_archives` | The game downloads you added. Keep them to reinstall. |
+| `/games/_archives` | The game downloads you added. Each is deleted once its game installs, unless `RENPLAY_DELETE_ARCHIVES=false`. |
 | `/games` (the rest) | Installed games. Renplay can rebuild them from the archives. |
 
 ### Settings
@@ -82,6 +82,7 @@ Everything works without configuration. These environment variables exist for sp
 |---|---|---|
 | `GAMES_DIR`, `DATA_DIR` | `/games`, `/data` | Where games and data live |
 | `ARCHIVES_DIR` | `$GAMES_DIR/_archives` | Game downloads |
+| `RENPLAY_DELETE_ARCHIVES` | `true` | Delete a download once its game installed. `false` keeps it, so the game can be reinstalled |
 | `RENPLAY_DIR` | `$GAMES_DIR/_renplay` | Engines and scratch space (same filesystem as `GAMES_DIR`) |
 | `RENPLAY_CATALOG_URLS` | the public catalog | Comma-separated catalog indexes |
 | `RENPLAY_ENGINES_URL` | the public engine index | Where engines come from |

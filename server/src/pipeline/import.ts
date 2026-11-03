@@ -1,4 +1,4 @@
-import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../builds.js'
 import type { Catalog, RecipeMatch } from '../catalog.js'
@@ -39,6 +39,28 @@ export interface ImportDeps {
 }
 
 export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<unknown> {
+  const result = await install(ctx, deps)
+  // After install() closed the archive: on NFS, deleting an open file leaves a hidden copy behind.
+  if (deps.cfg.deleteArchives) await deleteSource(ctx, deps)
+  return result
+}
+
+/** Removes the archive a game was installed from. Failing to only costs space. */
+export async function deleteSource(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<void> {
+  const rel = cleanRelPath(ctx.params.source.path)
+  const path = safeJoin(deps.cfg.archivesDir, rel)
+  try {
+    const st = await stat(path)
+    if (!st.isFile()) return
+    await unlink(path)
+    deps.db.deleteArchive(rel)
+    ctx.log(`Deleted ${rel} (${(st.size / 1e9).toFixed(2)} GB) from the archives folder; add it again to reinstall`)
+  } catch (e) {
+    ctx.log(`Could not delete ${rel}: ${(e as Error).message}`)
+  }
+}
+
+async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<unknown> {
   const { cfg, db, builds, engines, catalog } = deps
   const p = ctx.params
   const work = join(cfg.workDir, ctx.id)
@@ -240,16 +262,25 @@ export interface ArchiveInfo {
   saveDir?: string
   renpyVersion?: string
   files: number
+  /** INSPECT_VERSION of the inspection; older results are inspected again. */
+  v?: number
 }
 
-/** Reads metadata from a zip without extracting it. */
+/** Bump when inspectArchive learns to find more. 2: Ren'Py 7 versions. */
+export const INSPECT_VERSION = 2
+
+/**
+ * Reads metadata from a zip without extracting it. Script archives (.rpa) are
+ * only read when small, so the save folder of a game that keeps its scripts in
+ * a large one is known once it is installed.
+ */
 export async function inspectArchive(path: string): Promise<ArchiveInfo> {
   const type = await sniffArchive(path)
-  if (type !== 'zip') return { type, layout: null, files: 0 }
+  if (type !== 'zip') return { type, layout: null, files: 0, v: INSPECT_VERSION }
   const src = await openZip(path)
   try {
     const layout = detectLayout(src.entries)
-    const info: ArchiveInfo = { type, layout: layout?.kind ?? null, files: src.entries.length }
+    const info: ArchiveInfo = { type, layout: layout?.kind ?? null, files: src.entries.length, v: INSPECT_VERSION }
     if (!layout || layout.kind === 'web') return info
     const root = layout.root
     const byPath = new Map(src.entries.map((e) => [e.path, e]))
