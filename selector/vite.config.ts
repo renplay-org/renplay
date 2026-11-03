@@ -8,11 +8,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: { outDir: 'dist', target: 'es2022', chunkSizeWarningLimit: 700 },
   server: {
-    proxy: {
-      '/api': backend,
-      '/g/': backend,
-      '/engine': backend,
-      '/renplay/runtime.js': backend,
-    },
+    // RENPLAY_BACKEND can point at a deployed renplay too.
+    proxy: Object.fromEntries(['/api', '/g/', '/engine', '/renplay/runtime.js'].map((p) => [p, { target: backend, changeOrigin: true }])),
   },
 })

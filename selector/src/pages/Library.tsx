@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import GameCard, { Cover } from '../components/GameCard'
 import { Button, Empty, cx } from '../components/ui'
 import { api, slotName, type Game, type SavesResponse } from '../lib/api'
-import { ago } from '../lib/format'
+import { ago, capitalize } from '../lib/format'
 import { useGames } from '../lib/queries'
 
 type Filter = 'all' | 'installed' | 'not_installed'
@@ -32,13 +32,13 @@ function ContinueHero({ game }: { game: Game }) {
       </div>
       <div className="relative flex min-h-[300px] flex-col justify-end gap-5 p-6 sm:min-h-[360px] sm:p-10 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-xl">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-accent-300">Continue playing</p>
+          <p className="mb-2 text-sm font-medium text-accent-300">Continue playing</p>
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-5xl">{game.title}</h1>
           <p className="mt-3 text-sm text-zinc-300">
             {latest ? (
               <>
                 {latest.name ? <span className="text-zinc-100">“{latest.name}” · </span> : null}
-                {latest.label} · saved {ago(latest.ctime)}
+                {latest.label} · Saved {ago(latest.ctime)}
               </>
             ) : (
               <>Last played {ago(game.lastPlayedAt)}</>
@@ -71,6 +71,8 @@ function ContinueHero({ game }: { game: Game }) {
 }
 
 const COUNT_KEY = 'renplay:library-size'
+/** Tag filters only help once there is something to filter. */
+const TAGS_FROM = 8
 
 /**
  * Placeholders while the library loads: as many as there were games last
@@ -106,7 +108,7 @@ export default function Library() {
     () => (games ?? []).filter((g) => g.status === 'installed' && g.lastPlayedAt).sort((a, b) => Date.parse(b.lastPlayedAt!) - Date.parse(a.lastPlayedAt!))[0],
     [games],
   )
-  const tags = useMemo(() => [...new Set((games ?? []).flatMap((g) => g.tags))].sort(), [games])
+  const tags = useMemo(() => ((games?.length ?? 0) >= TAGS_FROM ? [...new Set(games!.flatMap((g) => g.tags))].sort() : []), [games])
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase()
     return (games ?? []).filter(
@@ -165,7 +167,7 @@ export default function Library() {
                 tag === t ? 'bg-accent-500/20 text-accent-300 ring-accent-500/40' : 'bg-white/[0.04] text-zinc-400 ring-white/10 hover:text-zinc-200',
               )}
             >
-              {t}
+              {capitalize(t)}
             </button>
           ))}
         </div>

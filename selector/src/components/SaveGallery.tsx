@@ -70,7 +70,7 @@ export default function SaveGallery({ game }: { game: Game }) {
             </button>
           ))}
         </div>
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 sm:ml-auto">
           <input ref={fileRef} type="file" multiple accept=".save,.zip,application/zip" className="hidden" onChange={(e) => void onImport(e.target.files)} />
           <Button size="sm" icon={<Upload className="size-4" />} loading={importing} onClick={() => fileRef.current?.click()}>
             Import
@@ -143,22 +143,6 @@ export default function SaveGallery({ game }: { game: Game }) {
                       <MenuItem icon={<Copy />} onClick={() => (close(), setCopying(s))}>
                         Copy to another game…
                       </MenuItem>
-                      <MenuItem
-                        icon={<ImageIcon />}
-                        disabled={!s.screenshot}
-                        onClick={async () => {
-                          close()
-                          try {
-                            await post(`/api/games/${game.id}/thumbnail/from-save`, { file: s.file })
-                            toast('Cover updated', 'success')
-                            refresh()
-                          } catch (e) {
-                            toast(errorText(e), 'error')
-                          }
-                        }}
-                      >
-                        Use as cover
-                      </MenuItem>
                       <MenuItem icon={<History />} onClick={() => (close(), setHistory(s))}>
                         Previous versions
                       </MenuItem>
@@ -175,7 +159,7 @@ export default function SaveGallery({ game }: { game: Game }) {
       )}
 
       <p className="mt-6 text-xs text-zinc-500">
-        Save folder <code className="text-zinc-400">{game.saveDir}</code> · every overwrite and delete keeps a previous version you can restore.
+        Saves are kept on the server in <code className="text-zinc-400">{game.saveDir}</code>. Every overwrite and delete keeps a previous version you can restore.
       </p>
 
       <Confirm

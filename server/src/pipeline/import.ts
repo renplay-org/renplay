@@ -1,5 +1,5 @@
 import { createWriteStream } from 'node:fs'
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -15,8 +15,8 @@ import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
 import { extractWithBsdtar, openDir, openZip, readAll, sniffArchive, type ArchiveSource } from './archive.js'
 import { assemble } from './assemble.js'
 import { nameVersionFromSource, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource } from './detect.js'
-import { defaultImagePolicy, imageConcurrency, makeCover } from './optimize.js'
-import { PackReader, PackWriter, writeIndex, type PackIndex } from './pack.js'
+import { defaultImagePolicy, imageConcurrency } from './optimize.js'
+import { PackWriter, writeIndex } from './pack.js'
 import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
 import { detectLayout, extractProject } from './project.js'
 import { readRpaIndex, splitRpa } from './rpa.js'
@@ -25,11 +25,9 @@ export interface ImportParams {
   source: { kind: 'archive'; path: string } | { kind: 'url'; url: string; filename?: string }
   /** Install into this game (update or reinstall). */
   game?: string
-  title?: string
   recipeId?: string
+  /** Engine version to build with instead of the recipe's or the newest matching one. */
   engine?: string
-  optimizeImages?: boolean
-  imageQuality?: number
   reapplyMods?: boolean
 }
 
@@ -102,8 +100,8 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
 
     // 5. Extract and optimize.
     const options: BuildOptions = {
-      optimizeImages: p.optimizeImages ?? settings.optimize ?? true,
-      imageQuality: p.imageQuality ?? settings.quality ?? cfg.imageQuality,
+      optimizeImages: settings.optimize ?? true,
+      imageQuality: settings.quality ?? cfg.imageQuality,
     }
     const policy = { ...defaultImagePolicy(options.imageQuality), enabled: options.optimizeImages !== false }
     const staging = join(work, 'build')
@@ -154,11 +152,10 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
       (match ? db.gameByRecipe(match.recipe.id) : null) ??
       (saveDir ? db.gameBySaveDir(saveDir) : null)
     if (p.game && !existing) throw new HttpError(404, `Game ${p.game} not found`)
-    const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(p.title || match?.recipe.title || meta.title || basename(archivePath).replace(/\.[^.]+$/, '')))
+    const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(match?.recipe.title || meta.title || basename(archivePath).replace(/\.[^.]+$/, '')))
     if (!isSlug(id)) throw new Error(`Invalid game id ${id}`)
 
-    // 7. Cover (from the packs), then game.zip.
-    const cover = await findCover(staging, join(work, 'zip.pack'), assets.index, zipPack.index, res.coverCandidates)
+    // 7. game.zip.
     ctx.progress('Packing game.zip', 0)
     const asm = await assemble({
       dir: staging,
@@ -216,14 +213,13 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
       build_options: JSON.stringify(options),
       installed_at: new Date().toISOString(),
     }
-    if (saveDir && !existing?.save_dir_locked) row.save_dir = saveDir
+    if (saveDir) row.save_dir = saveDir
     if (meta.screen) {
       row.screen_w = meta.screen[0]
       row.screen_h = meta.screen[1]
     }
-    if (!existing?.cover && cover) row.cover = await saveCover(cfg, id, cover)
     if (existing) db.updateGame(id, row)
-    else db.insertGame({ id, title: p.title || match?.recipe.title || meta.title || id, tags: JSON.stringify(match?.recipe.tags ?? []), ...row })
+    else db.insertGame({ id, title: meta.title || match?.recipe.title || id, ...row })
 
     await builds.prune(id, previous)
     await engines.prune(new Set(db.allGames().map((g) => g.engine).filter(Boolean)))
@@ -238,47 +234,6 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
 async function modsInfo(deps: ImportDeps, id: string): Promise<BuildInfo['mods']> {
   const s = await deps.overlays.summary(id)
   return s.files + s.deleted ? { hash: s.hash, files: s.files + s.deleted } : null
-}
-
-async function findCover(
-  dir: string,
-  zipPackPath: string,
-  assets: PackIndex,
-  zipIndex: PackIndex,
-  candidates: Array<['assets' | 'zip' | 'root', string]>,
-): Promise<Buffer | null> {
-  const scored = candidates.map(([where, name]) => {
-    const size = where === 'assets' ? (assets.get(name)?.[1] ?? 0) : where === 'zip' ? (zipIndex.get(name)?.[1] ?? 0) : 1
-    const bonus = /main_menu\./i.test(name) ? 4 : /main_menu/i.test(name) ? 2 : /presplash/i.test(name) ? 1 : 0
-    return { where, name, score: bonus * 1e9 + size }
-  })
-  scored.sort((a, b) => b.score - a.score)
-  for (const c of scored.slice(0, 4)) {
-    try {
-      let data: Buffer | null
-      if (c.where === 'root') data = await readFile(join(dir, c.name))
-      else {
-        const reader = new PackReader(c.where === 'assets' ? join(dir, 'assets.pack') : zipPackPath, '')
-        const entry = (c.where === 'assets' ? assets : zipIndex).get(c.name)
-        data = entry ? await readEntry(reader, entry) : null
-      }
-      if (data) return await makeCover(data)
-    } catch {}
-  }
-  return null
-}
-
-async function readEntry(reader: PackReader, entry: [number, number]): Promise<Buffer> {
-  const chunks: Buffer[] = []
-  for await (const c of reader.stream(entry)) chunks.push(c as Buffer)
-  return Buffer.concat(chunks)
-}
-
-export async function saveCover(cfg: Config, id: string, data: Buffer): Promise<string> {
-  await mkdir(cfg.coversDir, { recursive: true })
-  const name = `${id}-${Date.now().toString(36)}.webp`
-  await writeFile(join(cfg.coversDir, name), data)
-  return name
 }
 
 async function downloadToArchives(url: string, filename: string | undefined, cfg: Config, ctx: JobContext): Promise<string> {

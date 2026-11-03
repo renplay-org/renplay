@@ -6,10 +6,14 @@ import {
   CloudOff,
   Expand,
   Loader2,
+  Menu,
   MonitorSmartphone,
   RefreshCw,
   Save,
+  Share,
   Shrink,
+  Smartphone,
+  SquarePlus,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -17,11 +21,25 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Cover } from '../components/GameCard'
 import { Button, IconButton, Progress, Spinner, Switch, cx } from '../components/ui'
 import { post, slotName } from '../lib/api'
-import { frameRect, fullscreenCoversNotch, loadPrefs, notchHeight, savePrefs, type DisplayPrefs } from '../lib/display'
+import {
+  NO_INSETS,
+  frameRect,
+  fullscreenCoversNotch,
+  fullscreenMode,
+  isTouchDevice,
+  loadPrefs,
+  notchHeight,
+  safeInsets,
+  savePrefs,
+  type DisplayPrefs,
+  type Insets,
+} from '../lib/display'
 import { ago } from '../lib/format'
 import { useGame, useSaves } from '../lib/queries'
 
-type Panel = null | 'saves' | 'walkthrough' | 'display'
+type Panel = null | 'saves' | 'walkthrough' | 'display' | 'fullscreen'
+
+const HOME_TIP_KEY = 'renplay:home-screen-tip'
 
 export default function Player() {
   const { id: gameId = '' } = useParams()
@@ -49,6 +67,11 @@ export default function Player() {
   const [screenSize, setScreenSize] = useState<[number, number] | null>(null)
   const [exiting, setExiting] = useState(false)
   const notch = useMemo(notchHeight, [])
+  const touch = useMemo(isTouchDevice, [])
+  const fsMode = useMemo(fullscreenMode, [])
+  const [insets, setInsets] = useState<Insets>(NO_INSETS)
+  const [portraitOk, setPortraitOk] = useState(false)
+  const [homeTip, setHomeTip] = useState(() => fsMode === 'home-screen' && !localStorage.getItem(HOME_TIP_KEY))
   const hideTimer = useRef<number | null>(null)
   const resumed = useRef(false)
   const waiters = useRef(new Map<string, () => void>())
@@ -125,17 +148,56 @@ export default function Player() {
     return () => ro.disconnect()
   }, [])
 
+  // The screen's real safe area (camera cutout, rounded corners, home indicator), per orientation.
+  useEffect(() => {
+    const update = () => setInsets(safeInsets())
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('orientationchange', update)
+    }
+  }, [])
+
+  // Keep the screen on while playing (reading a long scene is not "idle").
+  useEffect(() => {
+    if (!ready || !('wakeLock' in navigator)) return
+    let lock: WakeLockSentinel | null = null
+    let done = false
+    const take = async () => {
+      try {
+        if (!done && document.visibilityState === 'visible') lock = await navigator.wakeLock.request('screen')
+      } catch {}
+    }
+    void take()
+    document.addEventListener('visibilitychange', take)
+    return () => {
+      done = true
+      document.removeEventListener('visibilitychange', take)
+      void lock?.release().catch(() => {})
+    }
+  }, [ready])
+
   // Fullscreen.
   const toggleFullscreen = useCallback(
     async (want?: boolean) => {
+      if (fsMode === 'home-screen') {
+        if (want !== false) setPanel('fullscreen')
+        return
+      }
+      if (fsMode !== 'api') return
       const on = !!document.fullscreenElement
       const target = want ?? !on
       try {
-        if (target && !on) await shellRef.current?.requestFullscreen({ navigationUI: 'hide' })
-        else if (!target && on) await document.exitFullscreen()
+        if (target && !on) {
+          await shellRef.current?.requestFullscreen({ navigationUI: 'hide' })
+          // Phones: games are wide, so hold landscape while in fullscreen.
+          if (touch) await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {})
+        } else if (!target && on) await document.exitFullscreen()
       } catch {}
     },
-    [],
+    [fsMode, touch],
   )
   useEffect(() => {
     const onChange = () => {
@@ -177,8 +239,22 @@ export default function Player() {
     navigate(`/game/${gameId}`)
   }, [navigate, qc, ready, send, gameId])
 
-  const padTop = fullscreen && prefs.avoidNotch && notch && coversNotch ? notch : 0
-  const rect = frameRect(stage.w, stage.h - padTop, screenSize, prefs.fit)
+  // Space the game keeps clear of: a MacBook's notch in fullscreen, a phone's cutout and home indicator.
+  const avoid = prefs.avoidNotch
+  const pad = {
+    top: Math.max(fullscreen && avoid && notch && coversNotch ? notch : 0, avoid ? insets.top : 0),
+    right: avoid ? insets.right : 0,
+    bottom: avoid ? insets.bottom : 0,
+    left: avoid ? insets.left : 0,
+  }
+  const area = { w: Math.max(0, stage.w - pad.left - pad.right), h: Math.max(0, stage.h - pad.top - pad.bottom) }
+  const rect = frameRect(area.w, area.h, screenSize, prefs.fit)
+  const hasCutout = notch > 0 || insets.top + insets.right + insets.bottom + insets.left > 0
+  const portrait = touch && stage.h > stage.w && (!screenSize || screenSize[0] > screenSize[1])
+  const dismissHomeTip = () => {
+    localStorage.setItem(HOME_TIP_KEY, '1')
+    setHomeTip(false)
+  }
 
   if (isLoading)
     return (
@@ -197,10 +273,10 @@ export default function Player() {
   const loadPct = progress && progress.total ? progress.done / progress.total : 0
 
   return (
-    <div ref={shellRef} className="fixed inset-0 overflow-hidden bg-black text-white">
+    <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white">
       {/* Game stage */}
       <div ref={stageRef} className={cx('absolute inset-0 transition-[right] duration-300', panel === 'walkthrough' && !fullscreen && 'md:right-[42%]')}>
-        <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ top: padTop }}>
+        <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
           <iframe
             ref={frameRef}
             key={attempt}
@@ -243,6 +319,20 @@ export default function Player() {
           ) : (
             <Progress value={loadPct} indeterminate={!progress || !progress.total} className="mt-6 w-full" />
           )}
+          {homeTip && (
+            <div className="mt-8 flex items-center gap-3 rounded-2xl bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-300 ring-1 ring-white/10">
+              <SquarePlus className="size-5 shrink-0 text-accent-300" />
+              <span>
+                For full screen, add Renplay to your home screen.{' '}
+                <button className="font-medium text-accent-300" onClick={() => setPanel('fullscreen')}>
+                  How
+                </button>
+              </span>
+              <IconButton label="Dismiss" onClick={dismissHomeTip}>
+                <X className="size-4" />
+              </IconButton>
+            </div>
+          )}
           {slow && !failed && (
             <button onClick={() => setReady(true)} className="mt-6 text-xs text-zinc-400 underline-offset-4 hover:text-zinc-200 hover:underline">
               Taking long? Show the game’s own loading screen
@@ -259,6 +349,30 @@ export default function Player() {
         </div>
       )}
 
+      {/* Portrait phones: games are wide. */}
+      {ready && portrait && !portraitOk && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/85 p-8 text-center backdrop-blur-sm">
+          <Smartphone className="mb-2 size-10 rotate-90 text-accent-300" />
+          <p className="text-lg font-semibold">Turn your phone sideways</p>
+          <p className="max-w-xs text-sm text-zinc-400">{game.title} is made for a wide screen.</p>
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => setPortraitOk(true)}>
+            Play upright anyway
+          </Button>
+        </div>
+      )}
+
+      {/* Touch screens cannot hover to reveal the toolbar. */}
+      {touch && ready && !(toolbar || pinned) && (
+        <button
+          onClick={showToolbar}
+          aria-label="Show the menu"
+          className="absolute z-30 flex size-10 items-center justify-center rounded-full bg-black/45 text-white/80 ring-1 ring-white/15 backdrop-blur"
+          style={{ top: 8 + Math.max(insets.top, pad.top), left: 8 + insets.left }}
+        >
+          <Menu className="size-5" />
+        </button>
+      )}
+
       {/* Toolbar */}
       <div
         onMouseEnter={() => {
@@ -270,7 +384,7 @@ export default function Player() {
           'absolute inset-x-0 top-0 z-30 transition-all duration-300',
           toolbar || pinned ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-full opacity-0',
         )}
-        style={{ paddingTop: padTop }}
+        style={{ paddingTop: Math.max(insets.top, pad.top), paddingLeft: insets.left, paddingRight: insets.right }}
       >
         <div className="flex items-center gap-2 bg-gradient-to-b from-black/80 via-black/50 to-transparent px-3 pb-6 pt-3 sm:px-5">
           <Button variant="glass" size="sm" icon={<ArrowLeft className="size-4" />} onClick={exit}>
@@ -293,16 +407,18 @@ export default function Player() {
             <IconButton label="Display" active={panel === 'display'} onClick={() => setPanel(panel === 'display' ? null : 'display')}>
               <MonitorSmartphone className="size-[18px]" />
             </IconButton>
-            <IconButton label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} onClick={() => void toggleFullscreen()}>
-              {fullscreen ? <Shrink className="size-[18px]" /> : <Expand className="size-[18px]" />}
-            </IconButton>
+            {fsMode !== 'none' && (
+              <IconButton label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} onClick={() => void toggleFullscreen()}>
+                {fullscreen ? <Shrink className="size-[18px]" /> : <Expand className="size-[18px]" />}
+              </IconButton>
+            )}
           </div>
         </div>
       </div>
 
       {/* Panels */}
       {panel === 'saves' && (
-        <SidePanel title="Saves" onClose={() => setPanel(null)} top={padTop}>
+        <SidePanel title="Saves" onClose={() => setPanel(null)} top={pad.top}>
           <SavesPanel
             gameId={gameId}
             onLoad={(slot) => {
@@ -313,12 +429,37 @@ export default function Player() {
         </SidePanel>
       )}
       {panel === 'display' && (
-        <SidePanel title="Display" onClose={() => setPanel(null)} top={padTop} narrow>
-          <DisplayPanel prefs={prefs} setPrefs={setPrefs} notch={notch} fullscreen={fullscreen} coversNotch={coversNotch} screenSize={screenSize} onFullscreen={() => void toggleFullscreen()} />
+        <SidePanel title="Display" onClose={() => setPanel(null)} top={pad.top} narrow>
+          <DisplayPanel
+            prefs={prefs}
+            setPrefs={setPrefs}
+            notch={notch}
+            hasCutout={hasCutout}
+            fullscreen={fullscreen}
+            coversNotch={coversNotch}
+            screenSize={screenSize}
+            area={area}
+            fsMode={fsMode}
+            onFullscreen={() => void toggleFullscreen()}
+            onDownloadLog={() => send({ type: 'renplay:download-log' })}
+          />
+        </SidePanel>
+      )}
+      {panel === 'fullscreen' && (
+        <SidePanel
+          title="Full screen on iPhone"
+          onClose={() => {
+            dismissHomeTip()
+            setPanel(null)
+          }}
+          top={pad.top}
+          narrow
+        >
+          <HomeScreenHelp />
         </SidePanel>
       )}
       {panel === 'walkthrough' && game.walkthrough && (
-        <div className="absolute inset-y-0 right-0 z-40 flex w-full flex-col border-l border-white/10 bg-ink-900 md:w-[42%]" style={{ top: padTop }}>
+        <div className="absolute inset-y-0 right-0 z-40 flex w-full flex-col border-l border-white/10 bg-ink-900 md:w-[42%]" style={{ top: pad.top }}>
           <div className="flex items-center justify-between px-4 py-3">
             <span className="text-sm font-semibold">Walkthrough</span>
             <IconButton label="Close walkthrough" onClick={() => setPanel(null)}>
@@ -363,14 +504,14 @@ function SidePanel({ title, onClose, children, top, narrow }: { title: string; o
   return (
     <div className="absolute inset-0 z-40" style={{ top }}>
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <aside className={cx('glass absolute bottom-0 right-0 top-0 flex w-full animate-rise flex-col border-l border-white/10', narrow ? 'sm:w-96' : 'sm:w-[440px]')}>
+      <aside className={cx('safe-x safe-bottom absolute bg-ink-900/95 backdrop-blur-xl bottom-0 right-0 top-0 flex w-full animate-rise flex-col border-l border-white/10', narrow ? 'sm:w-96' : 'sm:w-[440px]')}>
         <div className="flex items-center justify-between px-5 py-4">
           <h2 className="text-[15px] font-semibold">{title}</h2>
           <IconButton label="Close" onClick={onClose}>
             <X className="size-4" />
           </IconButton>
         </div>
-        <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 pb-6">{children}</div>
+        <div className="scrollbar-thin min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pb-6">{children}</div>
       </aside>
     </div>
   )
@@ -402,28 +543,58 @@ function SavesPanel({ gameId, onLoad }: { gameId: string; onLoad: (slot: string)
   )
 }
 
+function HomeScreenHelp() {
+  return (
+    <div className="space-y-4 text-sm text-zinc-300">
+      <p>Safari on iPhone only lets videos go full screen. Renplay can fill the whole screen when you open it from your home screen:</p>
+      <ol className="space-y-3">
+        <li className="flex items-center gap-3">
+          <Share className="size-5 shrink-0 text-accent-300" />
+          <span>Tap the Share button in Safari.</span>
+        </li>
+        <li className="flex items-center gap-3">
+          <SquarePlus className="size-5 shrink-0 text-accent-300" />
+          <span>Choose Add to Home Screen.</span>
+        </li>
+        <li className="flex items-center gap-3">
+          <Smartphone className="size-5 shrink-0 rotate-90 text-accent-300" />
+          <span>Open Renplay from the home screen and hold the phone sideways.</span>
+        </li>
+      </ol>
+      <p className="text-zinc-400">Saves are on the server, so you continue where you left off on any device.</p>
+    </div>
+  )
+}
+
 function DisplayPanel({
   prefs,
   setPrefs,
   notch,
+  hasCutout,
   fullscreen,
   coversNotch,
   screenSize,
+  area,
+  fsMode,
   onFullscreen,
+  onDownloadLog,
 }: {
   prefs: DisplayPrefs
   setPrefs: (p: DisplayPrefs) => void
   notch: number
+  hasCutout: boolean
   fullscreen: boolean
   coversNotch: boolean
   screenSize: [number, number] | null
+  area: { w: number; h: number }
+  fsMode: 'api' | 'home-screen' | 'none'
   onFullscreen: () => void
+  onDownloadLog: () => void
 }) {
-  const screenAr = typeof window !== 'undefined' ? (screen.width / (screen.height - (prefs.avoidNotch ? notch : 0))).toFixed(2) : ''
   return (
     <div className="space-y-6">
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">Scaling</p>
+        <p className="mb-2 text-xs font-medium text-zinc-400">Scaling</p>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
@@ -441,30 +612,48 @@ function DisplayPanel({
             </button>
           ))}
         </div>
-        {screenSize && (
+        {screenSize && area.w > 0 && (
           <p className="mt-2 text-[11px] text-zinc-500">
-            Game {screenSize[0]}×{screenSize[1]} ({(screenSize[0] / screenSize[1]).toFixed(2)}:1) · screen {screenAr}:1
+            Game {screenSize[0]}×{screenSize[1]} ({(screenSize[0] / screenSize[1]).toFixed(2)}:1) · Screen area {area.w}×{area.h} ({(area.w / area.h).toFixed(2)}:1)
           </p>
         )}
       </div>
-      {notch > 0 && (
+      {hasCutout && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">MacBook notch</p>
+          <p className="mb-2 text-xs font-medium text-zinc-400">Camera cutout</p>
           <Switch
             checked={prefs.avoidNotch}
             onChange={(v) => setPrefs({ ...prefs, avoidNotch: v })}
-            label="Keep the game below the camera notch"
+            label="Keep the game clear of the camera"
             hint={
-              fullscreen && !coversNotch
-                ? 'Your browser already keeps the notch area black in fullscreen.'
-                : `In fullscreen the top ${notch}px strip stays black when this is on; off uses the full screen height.`
+              notch > 0
+                ? fullscreen && !coversNotch
+                  ? 'Your browser already keeps the notch area black in fullscreen.'
+                  : `In fullscreen the top ${notch}px strip below the camera stays black when this is on. Off uses the full screen height.`
+                : 'On keeps the game inside the screen’s safe area, clear of the camera and the home indicator. Off uses the whole screen.'
             }
           />
         </div>
       )}
-      <Button variant="secondary" className="w-full" icon={fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />} onClick={onFullscreen}>
-        {fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-      </Button>
+      {fsMode === 'api' && (
+        <Button variant="secondary" className="w-full" icon={fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />} onClick={onFullscreen}>
+          {fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+        </Button>
+      )}
+      {fsMode === 'home-screen' && (
+        <div>
+          <p className="mb-2 text-xs font-medium text-zinc-400">Full screen</p>
+          <HomeScreenHelp />
+        </div>
+      )}
+      <div className="flex items-center justify-between border-t border-white/[0.06] pt-4 text-xs text-zinc-500">
+        <button onClick={onDownloadLog} className="hover:text-zinc-300">
+          Download the game’s log
+        </button>
+        <a href="https://www.renpy.org/" target="_blank" rel="noreferrer" className="hover:text-zinc-300">
+          Powered by Ren’Py
+        </a>
+      </div>
     </div>
   )
 }

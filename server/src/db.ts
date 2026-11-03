@@ -32,12 +32,8 @@ export interface GameRow {
   screen_w: number
   screen_h: number
   save_dir: string
-  /** Set when the save folder was entered by hand; detection leaves it alone. */
-  save_dir_locked: number
   source: string
   build_options: string
-  tags: string
-  cover: string
   walkthrough: string
   created_at: string
   installed_at: string
@@ -88,11 +84,8 @@ const SCHEMA = `
     screen_w        INTEGER NOT NULL DEFAULT 0,
     screen_h        INTEGER NOT NULL DEFAULT 0,
     save_dir        TEXT NOT NULL DEFAULT '',
-    save_dir_locked INTEGER NOT NULL DEFAULT 0,
     source          TEXT NOT NULL DEFAULT '{}',
     build_options   TEXT NOT NULL DEFAULT '{}',
-    tags            TEXT NOT NULL DEFAULT '[]',
-    cover           TEXT NOT NULL DEFAULT '',
     walkthrough     TEXT NOT NULL DEFAULT '',
     created_at      TEXT NOT NULL,
     installed_at    TEXT NOT NULL DEFAULT '',
@@ -141,10 +134,10 @@ export class Db {
     this.raw.exec('PRAGMA synchronous = NORMAL')
     this.raw.exec('PRAGMA busy_timeout = 5000')
     const v = (this.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-    if (v === 0) {
-      this.raw.exec(SCHEMA)
-      this.raw.exec('PRAGMA user_version = 1')
-    }
+    if (v === 0) this.raw.exec(SCHEMA)
+    // 2.2: title, tags and cover come from the catalog; nothing is set by hand.
+    if (v === 1) this.raw.exec('ALTER TABLE games DROP COLUMN save_dir_locked; ALTER TABLE games DROP COLUMN tags; ALTER TABLE games DROP COLUMN cover;')
+    if (v < 2) this.raw.exec('PRAGMA user_version = 2')
   }
 
   /**

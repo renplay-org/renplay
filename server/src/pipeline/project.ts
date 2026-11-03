@@ -65,8 +65,6 @@ export interface ExtractStats {
 export interface ExtractResult {
   meta: GameMeta
   stats: ExtractStats
-  /** Main-menu-like images seen, for covers: [pack, name] or ['root', file]. */
-  coverCandidates: Array<['assets' | 'zip' | 'root', string]>
   /** Placeholders for streamed images, keyed by path relative to game/. */
   placeholders: Map<string, Placeholder>
 }
@@ -81,7 +79,6 @@ export interface ExtractTargets {
 
 const SKIP_GAME = [/^cache\//i, /^saves\//i, /\.rpyb$/i, /(^|\/)\.ds_store$/i, /(^|\/)thumbs\.db$/i, /\.bak$/i]
 const KEEP_ROOT = /^(progressive_download\.txt|web-presplash\.(png|jpe?g|webp)|web-icon\.png)$/i
-const COVER_RE = /(^|\/)(main_menu|mainmenu|main_menu_background|menu_bg|title)[^/]*\.(png|jpe?g|webp)$/i
 
 /**
  * Extracts the parts of a Ren'Py game a web build needs. Files under game/
@@ -111,7 +108,6 @@ export async function extractProject(
     archivesKept: [],
   }
   const meta: GameMeta = {}
-  const coverCandidates: ExtractResult['coverCandidates'] = []
   const written = new Set<string>()
   /** RPA byte range -> [pack, name], to store shared entries once. */
   const ranges = new Map<string, ['assets' | 'zip', string]>()
@@ -136,7 +132,6 @@ export async function extractProject(
     if (!rel.startsWith('game/')) {
       if (KEEP_ROOT.test(rel)) {
         await pipeline(await e.open(), createWriteStream(join(dest, rel)))
-        if (/^web-presplash/i.test(rel)) coverCandidates.push(['root', rel])
       }
       continue
     }
@@ -175,7 +170,6 @@ export async function extractProject(
   const put = async (pack: 'assets' | 'zip', g: string, data: Buffer) => {
     await packs[pack].add(g, data)
     stats.bytesOut += data.length
-    if (COVER_RE.test(g)) coverCandidates.push([pack, g])
     return pack
   }
 
@@ -333,7 +327,7 @@ export async function extractProject(
       }
     }
   }
-  return { meta, stats, coverCandidates, placeholders }
+  return { meta, stats, placeholders }
 }
 
 function inspectSource(src: string, meta: GameMeta): void {

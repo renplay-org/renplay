@@ -69,11 +69,3 @@ export async function transcodeImage(data: Buffer, rel: string, policy: ImagePol
   }
   return { data, changed: false }
 }
-
-/** Builds a library cover (16:9 WebP) from a main menu or presplash image. */
-export async function makeCover(data: Buffer): Promise<Buffer> {
-  return sharp(data, { failOn: 'none' })
-    .resize(1280, 720, { fit: 'cover', position: 'attention' })
-    .webp({ quality: 82 })
-    .toBuffer()
-}

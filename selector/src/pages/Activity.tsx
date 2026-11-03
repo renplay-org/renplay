@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, Button, Empty, Modal, Progress, Spinner, errorText, useToast } from '../components/ui'
 import { api, del, jobTitle, post, type Job } from '../lib/api'
-import { ago, bytes, pct } from '../lib/format'
+import { ago, bytes, pct, capitalize } from '../lib/format'
 import { useGames, useJobs } from '../lib/queries'
 
 const icon = {
@@ -16,15 +16,24 @@ const icon = {
   interrupted: <CircleSlash className="size-4 text-amber-400" />,
 }
 
+const STATUS_LABEL: Record<Job['status'], string> = {
+  queued: 'Waiting',
+  running: 'Running',
+  done: 'Done',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  interrupted: 'Interrupted',
+}
+
 function resultText(j: Job): string | null {
   const r = j.result
   if (!r) return null
   if (j.type === 'import' && r.size) {
-    const opt = r.optimized?.images ? ` · ${r.optimized.images.toLocaleString()} images ${bytes(r.optimized.before)} → ${bytes(r.optimized.after)}` : ''
+    const opt = r.images?.converted ? ` · ${r.images.converted.toLocaleString()} images ${bytes(r.images.before)} → ${bytes(r.images.after)}` : ''
     return `Installed ${bytes(r.size)}${opt}`
   }
   if (j.type === 'optimize') return `${r.converted?.toLocaleString?.() ?? 0} images, ${bytes(r.before)} → ${bytes(r.after)}`
-  if (j.type === 'analyze') return [r.saveDir && `saves to ${r.saveDir}`, r.screen && `${r.screen[0]}×${r.screen[1]}`].filter(Boolean).join(' · ') || null
+  if (j.type === 'analyze') return [r.saveDir && `Saves to ${r.saveDir}`, r.screen && `${r.screen[0]}×${r.screen[1]}`].filter(Boolean).join(' · ') || null
   if (j.type === 'hash-archive') return r.recipe ? `Matches recipe ${r.recipe}` : 'No matching recipe'
   return null
 }
@@ -83,7 +92,7 @@ export default function Activity() {
                         <span className="text-red-300">{j.error}</span>
                       ) : (
                         <>
-                          {j.status === 'queued' ? 'Waiting' : j.status} · {ago(j.finishedAt ?? j.createdAt)}
+                          {STATUS_LABEL[j.status]} · {capitalize(ago(j.finishedAt ?? j.createdAt))}
                           {res ? ` · ${res}` : ''}
                         </>
                       )}

@@ -99,6 +99,16 @@ body {
   padding-top: env(safe-area-inset-top);
 }
 
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Landscape phones: keep content clear of the camera cutout and rounded corners. */
+.safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 ::selection {
   background: rgb(244 80 138 / 0.35);
 }
