@@ -38,6 +38,62 @@ export function notchHeight(): number {
   return notch >= 24 && notch <= 48 ? notch : 0
 }
 
+export interface Insets {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 }
+
+/**
+ * The device's safe-area insets in CSS pixels: camera cutout (notch, Dynamic
+ * Island), rounded corners and the home indicator, for the current
+ * orientation. Zero on desktops. Needs viewport-fit=cover.
+ */
+export function safeInsets(): Insets {
+  const probe = document.createElement('div')
+  probe.style.cssText =
+    'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
+  document.body.appendChild(probe)
+  const cs = getComputedStyle(probe)
+  const px = (v: string) => Math.round(parseFloat(v) || 0)
+  const out = { top: px(cs.paddingTop), right: px(cs.paddingRight), bottom: px(cs.paddingBottom), left: px(cs.paddingLeft) }
+  probe.remove()
+  return out
+}
+
+/** Phones and tablets: no hover, coarse pointer. */
+export function isTouchDevice(): boolean {
+  return matchMedia('(hover: none) and (pointer: coarse)').matches
+}
+
+export function isIOS(): boolean {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+/** Opened from the home screen (no browser bars). */
+export function isStandalone(): boolean {
+  return (
+    matchMedia('(display-mode: standalone)').matches ||
+    matchMedia('(display-mode: fullscreen)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  )
+}
+
+/**
+ * How this device gets a game to fill the screen: the Fullscreen API
+ * (desktops, Android, iPad), adding Renplay to the home screen (iPhone, where
+ * Safari only lets videos go fullscreen), or nothing to do (already opened
+ * from the home screen).
+ */
+export function fullscreenMode(): 'api' | 'home-screen' | 'none' {
+  if (document.fullscreenEnabled) return 'api'
+  if (isStandalone()) return 'none'
+  return isIOS() ? 'home-screen' : 'none'
+}
+
 /**
  * In fullscreen, browsers either draw under the notch (viewport as tall as
  * the screen) or keep that strip black themselves. Only in the first case can

@@ -67,13 +67,19 @@ jobs:
         run: |
           V="${{ needs.detect.outputs.version }}"
           TAG="v$V"
+          # The release notes are the version's section of CHANGELOG.md.
+          awk -v v="$V" 'index($0, "## [" v "]") == 1 {f = 1; next} f && /^## \[/ {exit} f' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md has no section for $V"
+            exit 1
+          fi
           if gh release view "$TAG" --json name > /dev/null 2>&1; then
             echo "Release $TAG already exists — skipping"
           else
             gh release create "$TAG" \
               --target "${{ github.sha }}" \
-              --title "$TAG" \
-              --generate-notes \
+              --title "Renplay $V" \
+              --notes-file notes.md \
               --latest
           fi
 
@@ -103,4 +109,5 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ needs.detect.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.sha }}

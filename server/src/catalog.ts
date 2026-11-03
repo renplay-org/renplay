@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Config } from './config.js'
-import type { Db } from './db.js'
+import { parseJson, type Db, type GameSource } from './db.js'
 import type { JobContext } from './jobs.js'
-import { cleanRelPath } from './util/paths.js'
+import sharp from 'sharp'
+import { exists, writeFileAtomic } from './util/fsx.js'
+import { cleanRelPath, isSlug } from './util/paths.js'
 
 export interface RecipeArchive {
   name: string
@@ -42,7 +44,12 @@ export interface Recipe {
   developer?: string
   tags?: string[]
   nsfw?: boolean
-  cover?: string
+  /**
+   * The game's official cover art: a file in the catalog (safe for work only)
+   * or a URL on the developer's own hosting. The published index gives an
+   * object with the image's sha256 and size.
+   */
+  cover?: string | RecipeCover
   links?: Record<string, string>
   saveDir?: string
   /** Games whose saves this one imports (an earlier season, a prequel). */
@@ -64,6 +71,13 @@ export interface Recipe {
   _base?: string
 }
 
+export interface RecipeCover {
+  url: string
+  sha256?: string
+  width?: number
+  height?: number
+}
+
 export interface BuildSettings {
   engine?: string
   quality?: number
@@ -81,7 +95,24 @@ export interface RecipeMatch {
 }
 
 const CACHE_KEY = 'catalog_cache'
+const COVERS_KEY = 'catalog_covers'
 const MAX_AGE = 6 * 3600_000
+const MAX_COVER = 16 << 20
+/** Covers are shown as thumbnails; wider art is scaled down to this. */
+const COVER_WIDTH = 960
+
+interface CoverFile {
+  url: string
+  /** sha256 of the downloaded original, to notice when it changes. */
+  sha256: string
+  file: string
+  etag: string
+}
+
+function isImage(b: Buffer): boolean {
+  const head = b.subarray(0, 12).toString('latin1')
+  return (head.startsWith('RIFF') && head.slice(8) === 'WEBP') || head.startsWith('\x89PNG') || (b[0] === 0xff && b[1] === 0xd8) || head.startsWith('GIF8')
+}
 
 function globMatch(pattern: string, name: string): boolean {
   const re = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i')
@@ -94,6 +125,7 @@ function valid(g: any): g is Recipe {
 
 export class Catalog {
   private recipes = new Map<string, Recipe>()
+  private covers = new Map<string, string>()
   private fetchedAt = 0
   private errors: string[] = []
 
@@ -114,6 +146,8 @@ export class Catalog {
         this.load(idx.games ?? [])
       } catch {}
     }
+    this.covers = new Map(Object.entries(this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})).map(([id, c]) => [id, c.file]))
+    this.link()
     if (Date.now() - this.fetchedAt > MAX_AGE) void this.refresh().catch(() => {})
   }
 
@@ -140,8 +174,90 @@ export class Catalog {
       this.load(all)
       this.fetchedAt = Date.now()
       this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: all })
+      this.link()
+      await this.syncCovers()
     }
     return { games: this.recipes.size, errors: this.errors }
+  }
+
+  /**
+   * Links installed games to their recipe: by the game's id, its archive
+   * (checksum, name or pattern) or its save folder. Games installed before
+   * their recipe existed pick it up this way without a reinstall.
+   */
+  link(): void {
+    for (const g of this.db.allGames()) {
+      if (g.recipe_id) continue
+      const source = parseJson<GameSource>(g.source, {})
+      const recipe =
+        this.recipes.get(g.id) ??
+        (source.archive ? this.match({ name: source.archive, size: source.size, sha256: source.sha256 })?.recipe : undefined) ??
+        (g.save_dir ? [...this.recipes.values()].find((r) => r.saveDir === g.save_dir) : undefined)
+      if (recipe) this.db.updateGame(g.id, { recipe_id: recipe.id })
+    }
+  }
+
+  /**
+   * Downloads the recipes' covers into the covers folder (named by content, so
+   * they can be cached forever) and removes every other file there.
+   */
+  private async syncCovers(): Promise<void> {
+    const dir = this.cfg.coversDir
+    const known = this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})
+    const next: Record<string, CoverFile> = {}
+    await mkdir(dir, { recursive: true })
+    for (const r of this.recipes.values()) {
+      if (!r.cover || !isSlug(r.id)) continue
+      const cover: RecipeCover = typeof r.cover === 'string' ? { url: r.cover } : r.cover
+      const have = known[r.id]
+      let url = ''
+      try {
+        url = new URL(cover.url, r._base ?? this.cfg.catalogUrls[0]).toString()
+        if (!/^https?:/.test(url)) throw new Error('not an http(s) URL')
+        const cached = have?.url === url && (!cover.sha256 || have.sha256 === cover.sha256) && (await exists(join(dir, have.file)))
+        const res = await fetch(url, { signal: AbortSignal.timeout(30_000), headers: cached && have.etag ? { 'if-none-match': have.etag } : {} })
+        if (res.status === 304 && cached) {
+          next[r.id] = have
+          continue
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = Buffer.from(await res.arrayBuffer())
+        if (!isImage(data) || data.length > MAX_COVER) throw new Error('not a WebP, PNG, JPEG or GIF image under 16 MB')
+        const sha256 = createHash('sha256').update(data).digest('hex')
+        if (cover.sha256 && cover.sha256.toLowerCase() !== sha256) throw new Error('the image changed since the catalog checked it')
+        if (cached && have.sha256 === sha256) {
+          next[r.id] = { ...have, etag: res.headers.get('etag') ?? '' }
+          continue
+        }
+        // Thumbnails: WebP, at most COVER_WIDTH wide, first frame of animations.
+        const webp = await sharp(data, { failOn: 'none' }).resize({ width: COVER_WIDTH, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
+        const file = `${r.id}.${createHash('sha256').update(webp).digest('hex').slice(0, 12)}.webp`
+        if (!(await exists(join(dir, file)))) await writeFileAtomic(join(dir, file), webp)
+        next[r.id] = { url, sha256, file, etag: res.headers.get('etag') ?? '' }
+      } catch (e) {
+        if (have) next[r.id] = have
+        this.errors.push(`cover of ${r.id} (${url || cover.url}): ${(e as Error).message}`)
+      }
+    }
+    this.db.setSetting(COVERS_KEY, next)
+    this.covers = new Map(Object.entries(next).map(([id, c]) => [id, c.file]))
+    const keep = new Set(this.covers.values())
+    for (const f of await readdir(dir).catch(() => [] as string[])) {
+      if (!keep.has(f)) await rm(join(dir, f), { recursive: true, force: true }).catch(() => {})
+    }
+  }
+
+  /** URL of a recipe's cover, once downloaded. */
+  cover(id: string): string | null {
+    const file = this.covers.get(id)
+    return file ? `/api/covers/${file}` : null
+  }
+
+  /** The newest working release after the installed version, if the catalog lists one. */
+  update(recipe: Recipe, version: string): RecipeRelease | null {
+    const i = recipe.releases.findIndex((r) => r.version === version)
+    if (i <= 0) return null
+    return recipe.releases.slice(0, i).find((r) => r.status === 'verified' || r.status === 'playable') ?? null
   }
 
   list(): Recipe[] {

@@ -1,10 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Download, HardDrive, Package, RefreshCw } from 'lucide-react'
+import { Activity, Download, ExternalLink, FileCode2, HardDrive, Package, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
-import { Button, Progress, Spinner, errorText, useToast } from '../components/ui'
+import { Link } from 'react-router-dom'
+import RecipeDialog from '../components/RecipeDialog'
+import { Button, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { post } from '../lib/api'
 import { bytes } from '../lib/format'
-import { useCatalog, useSystem } from '../lib/queries'
+import { useBlurAdultCovers } from '../lib/prefs'
+import { useCatalog, useGames, useSystem } from '../lib/queries'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
   if (!disk) return null
@@ -25,9 +28,15 @@ function DiskBar({ label, disk }: { label: string; disk: { total: number; free: 
 export default function Settings() {
   const { data: sys, isLoading } = useSystem()
   const { data: catalog } = useCatalog()
+  const { data: games } = useGames()
+  const installed = (games ?? []).filter((g) => g.status === 'installed')
+  const [recipeFor, setRecipeFor] = useState('')
+  const recipeGame = installed.find((g) => g.id === recipeFor)
+  const [recipeOpen, setRecipeOpen] = useState(false)
   const qc = useQueryClient()
   const toast = useToast()
   const [persisted, setPersisted] = useState<boolean | null>(null)
+  const [blurAdult, setBlurAdult] = useBlurAdultCovers()
   if (isLoading || !sys) return <Spinner />
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
@@ -65,7 +74,7 @@ export default function Settings() {
           {sys.purging > 0 && <p className="text-xs text-zinc-500">Deleting {sys.purging} removed item{sys.purging === 1 ? '' : 's'} in the background.</p>}
           {sys.orphans.length > 0 && (
             <p className="text-xs text-amber-300/90">
-              Folders in the games folder that belong to no game: {sys.orphans.join(', ')}. renplay leaves them alone.
+              Folders in the games folder that belong to no game: {sys.orphans.join(', ')}. Renplay leaves them alone.
             </p>
           )}
         </section>
@@ -83,15 +92,15 @@ export default function Settings() {
               <div key={e.version} className="flex items-center justify-between gap-4 py-2">
                 <span className="text-zinc-100">Ren’Py {e.version}</span>
                 <span className="truncate text-right text-xs text-zinc-500">
-                  {bytes(e.bytes)} · {e.usedBy.length ? e.usedBy.join(', ') : 'unused'}
+                  {bytes(e.bytes)} · {e.usedBy.length ? e.usedBy.join(', ') : 'Unused'}
                 </span>
               </div>
             ))}
           </div>
           <p className="text-xs text-zinc-500">
-            Available: {sys.engines.available.map((e) => e.version).join(', ') || 'index unreachable'} ·{' '}
+            {sys.engines.available.length ? `Available: ${sys.engines.available.map((e) => e.version).join(', ')}` : 'The engine index is unreachable.'} ·{' '}
             <a className="hover:text-zinc-300" href="https://github.com/renplay-web/engines" target="_blank" rel="noreferrer">
-              renplay-web/engines
+              Engines on GitHub
             </a>
           </p>
           {sys.engines.installed.some((e) => !e.usedBy.length) && (
@@ -116,13 +125,53 @@ export default function Settings() {
         <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
           <h2 className="font-semibold text-white">Catalog</h2>
           <p className="text-sm text-zinc-400">
-            {catalog?.status.count ?? 0} recipes from {catalog?.status.urls.join(', ')}
+            Titles, covers and install settings come from {catalog?.status.count ?? 0} recipes in the catalog
             {catalog?.status.fetchedAt ? `, updated ${new Date(catalog.status.fetchedAt).toLocaleString()}` : ''}.
           </p>
-          <Button size="sm" icon={<RefreshCw className="size-4" />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>
-            Refresh catalog
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" icon={<RefreshCw className="size-4" />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>
+              Refresh catalog
+            </Button>
+            <a href="https://github.com/renplay-web/catalog" target="_blank" rel="noreferrer">
+              <Button size="sm" variant="ghost" icon={<ExternalLink className="size-4" />}>
+                Catalog on GitHub
+              </Button>
+            </a>
+          </div>
+          {installed.length > 0 && (
+            <div className="border-t border-white/[0.06] pt-4">
+              <p className="mb-3 text-sm text-zinc-400">Add a game to the catalog: export a recipe filled in from its installation, then open a pull request.</p>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={recipeFor}
+                  onChange={(e) => setRecipeFor(e.target.value)}
+                  className="h-9 min-w-0 flex-1 rounded-xl bg-white/[0.05] px-3 text-sm text-zinc-100 ring-1 ring-inset ring-white/10 focus:outline-none focus:ring-accent-400/60 sm:max-w-64"
+                >
+                  <option value="">Choose a game</option>
+                  {installed.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </select>
+                <Button size="sm" icon={<FileCode2 className="size-4" />} disabled={!recipeGame} onClick={() => setRecipeOpen(true)}>
+                  Export recipe
+                </Button>
+              </div>
+            </div>
+          )}
         </section>
+
+        <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
+          <h2 className="flex items-center gap-2 font-semibold text-white">
+            <Activity className="size-4" /> Activity
+          </h2>
+          <p className="text-sm text-zinc-400">Installs, mod builds and checks run in the background. Their progress and logs are kept here.</p>
+          <Link to="/activity">
+            <Button size="sm">Open activity log</Button>
+          </Link>
+        </section>
+        {recipeOpen && recipeGame && <RecipeDialog game={recipeGame} onClose={() => setRecipeOpen(false)} />}
 
         <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
           <h2 className="font-semibold text-white">This browser</h2>
@@ -139,9 +188,11 @@ export default function Settings() {
             Keep game cache
           </Button>
           {persisted !== null && <p className="text-xs text-zinc-500">{persisted ? 'The browser will keep the cache.' : 'The browser declined; it may still keep it.'}</p>}
+          <div className="border-t border-white/[0.06] pt-4">
+            <Switch checked={blurAdult} onChange={setBlurAdult} label="Blur pictures of adult games" hint="Covers and save pictures in the library, for screens other people can see. Only this browser is affected." />
+          </div>
         </section>
       </div>
-      <p className="text-xs text-zinc-600">renplay {sys.version}</p>
     </div>
   )
 }

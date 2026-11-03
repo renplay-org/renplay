@@ -5,7 +5,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import GameCard, { Cover } from '../components/GameCard'
 import { Button, Empty, cx } from '../components/ui'
 import { api, slotName, type Game, type SavesResponse } from '../lib/api'
-import { ago } from '../lib/format'
+import { ago, capitalize } from '../lib/format'
+import { useBlurAdultCovers } from '../lib/prefs'
 import { useGames } from '../lib/queries'
 
 type Filter = 'all' | 'installed' | 'not_installed'
@@ -19,11 +20,13 @@ function ContinueHero({ game }: { game: Game }) {
   })
   const latest = data?.slots.find((s) => s.kind !== 'internal' && s.valid)
   const backdrop = latest?.screenshot
+  const [blurAdult] = useBlurAdultCovers()
+  const hide = blurAdult && game.nsfw
   return (
     <section className="relative mb-10 animate-fade-in overflow-hidden rounded-[28px] ring-1 ring-white/[0.08]">
       <div className="absolute inset-0">
         {backdrop ? (
-          <img src={backdrop} alt="" className="size-full scale-105 object-cover blur-[2px]" />
+          <img src={backdrop} alt="" className={cx('size-full scale-105 object-cover', hide ? 'blur-2xl' : 'blur-[2px]')} />
         ) : (
           <Cover game={game} rounded={false} className="size-full" />
         )}
@@ -32,13 +35,13 @@ function ContinueHero({ game }: { game: Game }) {
       </div>
       <div className="relative flex min-h-[300px] flex-col justify-end gap-5 p-6 sm:min-h-[360px] sm:p-10 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-xl">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-accent-300">Continue playing</p>
+          <p className="mb-2 text-sm font-medium text-accent-300">Continue playing</p>
           <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-5xl">{game.title}</h1>
           <p className="mt-3 text-sm text-zinc-300">
             {latest ? (
               <>
                 {latest.name ? <span className="text-zinc-100">“{latest.name}” · </span> : null}
-                {latest.label} · saved {ago(latest.ctime)}
+                {latest.label} · Saved {ago(latest.ctime)}
               </>
             ) : (
               <>Last played {ago(game.lastPlayedAt)}</>
@@ -60,7 +63,7 @@ function ContinueHero({ game }: { game: Game }) {
             </Link>
           </div>
         </div>
-        {latest?.screenshot && (
+        {latest?.screenshot && !hide && (
           <div className="hidden w-80 shrink-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 lg:block">
             <img src={latest.screenshot} alt="" className="aspect-video w-full object-cover" />
           </div>
@@ -71,6 +74,8 @@ function ContinueHero({ game }: { game: Game }) {
 }
 
 const COUNT_KEY = 'renplay:library-size'
+/** Tag filters only help once there is something to filter. */
+const TAGS_FROM = 8
 
 /**
  * Placeholders while the library loads: as many as there were games last
@@ -85,9 +90,12 @@ function LoadingGrid() {
   const n = Math.min(12, Number(localStorage.getItem(COUNT_KEY) ?? 4) || 0)
   if (!show || !n) return null
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
       {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className="skeleton aspect-video animate-fade-in rounded-2xl" />
+        <div key={i} className="animate-fade-in">
+          <div className="skeleton aspect-[63/50] rounded-2xl" />
+          <div className="skeleton mt-3 h-4 w-2/3 rounded" />
+        </div>
       ))}
     </div>
   )
@@ -106,7 +114,7 @@ export default function Library() {
     () => (games ?? []).filter((g) => g.status === 'installed' && g.lastPlayedAt).sort((a, b) => Date.parse(b.lastPlayedAt!) - Date.parse(a.lastPlayedAt!))[0],
     [games],
   )
-  const tags = useMemo(() => [...new Set((games ?? []).flatMap((g) => g.tags))].sort(), [games])
+  const tags = useMemo(() => ((games?.length ?? 0) >= TAGS_FROM ? [...new Set(games!.flatMap((g) => g.tags))].sort() : []), [games])
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase()
     return (games ?? []).filter(
@@ -165,7 +173,7 @@ export default function Library() {
                 tag === t ? 'bg-accent-500/20 text-accent-300 ring-accent-500/40' : 'bg-white/[0.04] text-zinc-400 ring-white/10 hover:text-zinc-200',
               )}
             >
-              {t}
+              {capitalize(t)}
             </button>
           ))}
         </div>
@@ -190,7 +198,7 @@ export default function Library() {
       ) : !shown.length ? (
         <Empty title="No games match">Try a different search or filter.</Empty>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {shown.map((g, i) => (
             <GameCard key={g.id} game={g} index={i} />
           ))}

@@ -6,17 +6,13 @@ import YAML from 'yaml'
 import type { Builds } from '../builds.js'
 import type { Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
-import { parseJson, type BuildOptions, type Db, type GameRow, type GameSource } from '../db.js'
+import { parseJson, type Db, type GameRow, type GameSource } from '../db.js'
 import type { JobManager } from '../jobs.js'
 import type { Overlays } from '../mods.js'
-import { makeCover } from '../pipeline/optimize.js'
-import { saveCover } from '../pipeline/import.js'
-import { readSaveScreenshot } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
-import { HttpError, assertSlug, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
+import { HttpError, assertSlug, cleanRelPath, safeJoin } from '../util/paths.js'
 
-const images = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 << 20, files: 1 } })
 const pdfs = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 << 20, files: 1 } })
 const CACHE_RE = /^(bytecode-\d+|py3analysis|screens)\.rpyb$/
 
@@ -56,12 +52,17 @@ export async function toGame(row: GameRow, deps: GameDeps) {
   }
   const mods = await deps.overlays.summary(row.id)
   const recipe = row.recipe_id ? deps.catalog.recipe(row.recipe_id) : null
+  const update = recipe ? deps.catalog.update(recipe, row.version) : null
   const modded = row.build.includes('.m')
   return {
     id: row.id,
-    title: row.title,
-    tags: parseJson<string[]>(row.tags, []),
-    cover: row.cover || null,
+    // Title, developer, tags and cover come from the catalog; a game without a
+    // recipe shows the name it declares itself.
+    title: recipe?.title ?? row.title,
+    developer: recipe?.developer ?? null,
+    tags: recipe?.tags ?? [],
+    nsfw: recipe?.nsfw ?? false,
+    cover: recipe ? deps.catalog.cover(recipe.id) : null,
     walkthrough: row.walkthrough || null,
     status: row.status,
     build: row.build || null,
@@ -73,7 +74,6 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     fileCount: row.file_count,
     screen: row.screen_w ? ([row.screen_w, row.screen_h] as [number, number]) : null,
     saveDir: row.save_dir || null,
-    saveDirLocked: !!row.save_dir_locked,
     source: { archive: source.archive ?? null, url: source.url ?? null, size: source.size ?? null },
     canReinstall: !!source.archive,
     recipe: recipe
@@ -86,6 +86,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
       : row.recipe_id
         ? { id: row.recipe_id, links: {}, continuesFrom: [], status: null }
         : null,
+    update: update ? { version: update.version, date: update.date ?? null, status: update.status } : null,
     installedAt: row.installed_at || null,
     lastPlayedAt: row.last_played_at || null,
     saves,
@@ -112,44 +113,17 @@ export function createGamesRouter(deps: GameDeps): Router {
     res.json({ game: await toGame(get(req), deps) })
   })
 
-  router.patch('/:id', async (req, res) => {
-    const g = get(req)
-    const { title, tags, saveDir } = req.body ?? {}
-    const updates: Partial<GameRow> = {}
-    if (title !== undefined) {
-      if (typeof title !== 'string' || !title.trim() || title.length > 200) throw new HttpError(400, 'Title must be 1-200 characters')
-      updates.title = title.trim()
-    }
-    if (tags !== undefined) {
-      if (!Array.isArray(tags) || tags.some((t) => typeof t !== 'string' || t.length > 40) || tags.length > 30) throw new HttpError(400, 'Invalid tags')
-      updates.tags = JSON.stringify([...new Set(tags.map((t: string) => t.trim()).filter(Boolean))])
-    }
-    if (saveDir !== undefined) {
-      if (saveDir === '' || saveDir === null) {
-        updates.save_dir = ''
-        updates.save_dir_locked = 0
-      } else {
-        if (!isSaveDirName(saveDir)) throw new HttpError(400, 'Invalid save folder name')
-        updates.save_dir = saveDir
-        updates.save_dir_locked = 1
-      }
-    }
-    db.updateGame(g.id, updates)
-    res.json({ game: await toGame(db.getGame(g.id)!, deps) })
-  })
-
   router.post('/:id/played', (req, res) => {
     db.updateGame(get(req).id, { last_played_at: new Date().toISOString() })
     res.json({ ok: true })
   })
 
-  /** Uninstalls (files go, saves/mods/cover stay); `forget=1` also removes the library entry. */
+  /** Uninstalls (files go, saves and mods stay); `forget=1` also removes the library entry. */
   router.delete('/:id', async (req, res) => {
     const g = get(req)
     if (jobs.activeFor(g.id)) throw new HttpError(409, 'A job is running for this game')
     await builds.remove(g.id)
     if (req.query['forget'] === '1') {
-      if (g.cover) await unlink(join(cfg.coversDir, g.cover)).catch(() => {})
       if (g.walkthrough) await unlink(join(cfg.walkthroughsDir, g.walkthrough)).catch(() => {})
       db.deleteGame(g.id)
       res.json({ ok: true, forgotten: true })
@@ -165,14 +139,11 @@ export function createGamesRouter(deps: GameDeps): Router {
     if (!src.archive) throw new HttpError(409, 'No source archive is known for this game. Add its archive to install it.')
     if (!(await exists(join(cfg.archivesDir, cleanRelPath(src.archive))))) throw new HttpError(409, `The source archive ${src.archive} is no longer in the archives folder`)
     if (jobs.activeFor(g.id)) throw new HttpError(409, 'A job is already running for this game')
-    const opts = parseJson<BuildOptions>(g.build_options, {})
     const id = jobs.enqueue('import', g.id, {
       source: { kind: 'archive', path: src.archive },
       game: g.id,
       recipeId: g.recipe_id || undefined,
       engine: typeof req.body?.engine === 'string' ? req.body.engine : undefined,
-      optimizeImages: req.body?.optimizeImages ?? opts.optimizeImages,
-      imageQuality: req.body?.imageQuality ?? opts.imageQuality,
       reapplyMods: !!req.body?.reapplyMods,
     })
     if (g.status !== 'installed') db.updateGame(g.id, { status: 'installing' })
@@ -208,9 +179,9 @@ export function createGamesRouter(deps: GameDeps): Router {
     const existing = g.recipe_id ? deps.catalog.recipe(g.recipe_id) : null
     const recipe = {
       id: g.recipe_id || g.id,
-      title: g.title,
+      title: existing?.title ?? g.title,
       developer: existing?.developer ?? '',
-      tags: parseJson<string[]>(g.tags, []),
+      tags: existing?.tags ?? [],
       nsfw: existing?.nsfw ?? false,
       links: existing?.links ?? { website: '' },
       saveDir: g.save_dir || undefined,
@@ -232,42 +203,7 @@ export function createGamesRouter(deps: GameDeps): Router {
     res.json({ yaml: YAML.stringify(JSON.parse(JSON.stringify(recipe)), { lineWidth: 0 }), sha256Pending: !sha256, hashJob })
   })
 
-  // ---- covers & walkthroughs ---------------------------------------------
-
-  const setCover = async (g: GameRow, data: Buffer) => {
-    const name = await saveCover(cfg, g.id, data)
-    if (g.cover) await unlink(join(cfg.coversDir, g.cover)).catch(() => {})
-    db.updateGame(g.id, { cover: name })
-    return name
-  }
-
-  router.post('/:id/cover', images.single('cover'), async (req, res) => {
-    const g = get(req)
-    if (!req.file) throw new HttpError(400, 'No image uploaded')
-    let data: Buffer
-    try {
-      data = await makeCover(req.file.buffer)
-    } catch {
-      throw new HttpError(400, 'Unsupported image')
-    }
-    res.json({ ok: true, cover: await setCover(g, data) })
-  })
-
-  /** Uses a save's screenshot as the cover. */
-  router.post('/:id/cover/from-save', async (req, res) => {
-    const g = get(req)
-    if (!g.save_dir) throw new HttpError(409, 'No saves')
-    const png = await readSaveScreenshot(await deps.saves.read(g.save_dir, cleanRelPath(req.body?.file)))
-    if (!png) throw new HttpError(404, 'That save has no screenshot')
-    res.json({ ok: true, cover: await setCover(g, await makeCover(png)) })
-  })
-
-  router.delete('/:id/cover', async (req, res) => {
-    const g = get(req)
-    if (g.cover) await unlink(join(cfg.coversDir, g.cover)).catch(() => {})
-    db.updateGame(g.id, { cover: '' })
-    res.json({ ok: true })
-  })
+  // ---- walkthroughs --------------------------------------------------------
 
   router.post('/:id/walkthrough', pdfs.single('walkthrough'), async (req, res) => {
     const g = get(req)

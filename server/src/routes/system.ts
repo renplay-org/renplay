@@ -1,4 +1,4 @@
-import { readdir, statfs } from 'node:fs/promises'
+import { statfs } from 'node:fs/promises'
 import { Router } from 'express'
 import type { Builds } from '../builds.js'
 import type { Config } from '../config.js'

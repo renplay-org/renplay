@@ -1,8 +1,12 @@
 export interface Game {
   id: string
   title: string
+  developer: string | null
   tags: string[]
+  /** Curated cover from the catalog (URL), or null. */
   cover: string | null
+  /** An adult game, per its recipe. */
+  nsfw: boolean
   walkthrough: string | null
   status: 'installed' | 'not_installed' | 'installing'
   build: string | null
@@ -14,10 +18,11 @@ export interface Game {
   fileCount: number
   screen: [number, number] | null
   saveDir: string | null
-  saveDirLocked: boolean
   source: { archive: string | null; url: string | null; size: number | null }
   canReinstall: boolean
   recipe: { id: string; links: Record<string, string>; continuesFrom: string[]; status: string | null } | null
+  /** A newer working release listed in the catalog. */
+  update: { version: string; date: string | null; status: string } | null
   installedAt: string | null
   lastPlayedAt: string | null
   saves: { count: number; latest: number }
@@ -175,9 +180,6 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 export const post = <T,>(path: string, json?: unknown) => api<T>(path, { method: 'POST', json: json ?? {} })
 export const del = <T,>(path: string) => api<T>(path, { method: 'DELETE' })
 
-export function coverUrl(g: Pick<Game, 'cover'>): string | null {
-  return g.cover ? `/api/covers/${encodeURIComponent(g.cover)}` : null
-}
 
 export function slotName(file: string): string {
   return file.replace(/-LT\d+\.save$/, '').replace(/\.save$/, '')

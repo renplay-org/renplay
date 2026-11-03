@@ -2,9 +2,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Archive as ArchiveIcon, BadgeCheck, CloudUpload, ExternalLink, FileArchive, Fingerprint, Library, Link2, Pause, Play, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Cover } from '../components/GameCard'
 import { Badge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, Tabs, cx, errorText, useToast } from '../components/ui'
 import { del, post, type Archive, type ArchiveInfo, type Recipe } from '../lib/api'
-import { ago, bytes, pct } from '../lib/format'
+import { ago, bytes, capitalize, pct } from '../lib/format'
+import { recipeLinks } from '../lib/links'
 import { useArchives, useCatalog, useGames } from '../lib/queries'
 import { uploadArchive, type UploadHandle } from '../lib/upload'
 
@@ -109,10 +111,10 @@ function ArchiveRow({ archive: a, onInstall }: { archive: Archive; onInstall: ()
           {!a.installedAs && a.existingGame && <Badge tone="amber">Updates {a.existingGame}</Badge>}
         </div>
         <div className="mt-1 truncate text-xs text-zinc-500">
-          {a.path} · {bytes(a.size)} · added {ago(a.mtime)}
+          {a.path} · {bytes(a.size)} · Added {ago(a.mtime)}
           {info?.renpyVersion ? ` · Ren’Py ${info.renpyVersion}` : ''}
-          {info?.saveDir ? ` · saves to ${info.saveDir}` : ''}
-          {info && !info.layout ? ' · no Ren’Py game detected' : ''}
+          {info?.saveDir ? ` · Saves to ${info.saveDir}` : ''}
+          {info && !info.layout ? ' · No Ren’Py game detected' : ''}
         </div>
       </div>
       <div className="flex shrink-0 gap-2">
@@ -166,9 +168,6 @@ function InstallDialog({ archive, onClose }: { archive: Archive; onClose: () => 
   const { data: games } = useGames()
   const target = archive.installedAs ?? archive.existingGame ?? undefined
   const targetGame = games?.find((g) => g.id === target)
-  const [title, setTitle] = useState(archive.info?.title ?? archive.recipe?.title ?? '')
-  const [optimize, setOptimize] = useState(true)
-  const [quality, setQuality] = useState(() => Number(localStorage.getItem('renplay:quality')) || 88)
   const [reapply, setReapply] = useState(true)
   const [busy, setBusy] = useState(false)
   return (
@@ -186,14 +185,10 @@ function InstallDialog({ archive, onClose }: { archive: Archive; onClose: () => 
             loading={busy}
             onClick={async () => {
               setBusy(true)
-              localStorage.setItem('renplay:quality', String(quality))
               try {
                 await post('/api/imports', {
                   source: { kind: 'archive', path: archive.path },
                   game: target,
-                  title: target ? undefined : title || undefined,
-                  optimizeImages: optimize,
-                  imageQuality: quality,
                   reapplyMods: reapply,
                   recipeId: archive.recipe?.id,
                 })
@@ -217,26 +212,10 @@ function InstallDialog({ archive, onClose }: { archive: Archive; onClose: () => 
         <p className="text-sm text-zinc-400">
           From <span className="text-zinc-200">{archive.name}</span> ({bytes(archive.size)}). Big games take a while; it runs on the server, you can close this page.
         </p>
-        {!target && (
-          <label className="block">
-            <span className="mb-1.5 block text-xs text-zinc-400">Title</span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Detected from the game" className="h-10 w-full rounded-xl bg-white/[0.05] px-3 text-sm ring-1 ring-inset ring-white/10 focus:outline-none focus:ring-accent-400/60" />
-          </label>
-        )}
         {target && (
           <div className="rounded-xl bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-100 ring-1 ring-inset ring-amber-500/20">
             Replaces the installed version. Saves stay where they are.
           </div>
-        )}
-        <Switch checked={optimize} onChange={setOptimize} label="Convert images to WebP" hint="Usually 3–10× smaller downloads with no visible difference. Filenames stay the same." />
-        {optimize && (
-          <label className="block">
-            <span className="mb-1 flex justify-between text-xs text-zinc-400">
-              <span>Image quality</span>
-              <span className="tabular-nums text-zinc-200">{quality}</span>
-            </span>
-            <input type="range" min={70} max={98} value={quality} onChange={(e) => setQuality(Number(e.target.value))} className="w-full" />
-          </label>
         )}
         {targetGame && targetGame.mods.files > 0 && (
           <Switch checked={reapply} onChange={setReapply} label={`Re-apply my mods (${targetGame.mods.files} changes)`} hint="Mods made for the old version may not work with the new one. Off moves them aside." />
@@ -394,7 +373,7 @@ function CatalogTab() {
       {!games.length ? (
         <Empty title="The catalog is empty">No recipes are available from {data?.status.urls.join(', ')} yet.</Empty>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {games.map((r) => (
             <RecipeCard key={r.id} recipe={r} />
           ))}
@@ -409,24 +388,21 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
   const tone = latest?.status === 'verified' ? 'green' : latest?.status === 'broken' ? 'red' : latest?.status === 'playable' ? 'violet' : 'neutral'
   return (
     <div className="overflow-hidden rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.07]">
-      <div className="relative aspect-video bg-ink-800">
-        {r.cover && <img src={r.cover} alt="" loading="lazy" className="size-full object-cover" />}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-        <div className="absolute bottom-3 left-4 right-4">
-          <div className="font-display text-lg font-semibold text-white">{r.title}</div>
-          {r.developer && <div className="text-xs text-zinc-300">{r.developer}</div>}
-        </div>
-      </div>
+      <Cover game={{ title: r.title, cover: typeof r.cover === 'string' ? r.cover : null, nsfw: r.nsfw }} rounded={false} className="aspect-[63/50]" />
       <div className="space-y-3 p-4">
+        <div>
+          <div className="font-display text-lg font-semibold text-white">{r.title}</div>
+          {r.developer && <div className="text-xs text-zinc-400">{r.developer}</div>}
+        </div>
         <div className="flex flex-wrap gap-1.5">
-          {latest && <Badge tone={tone}>{latest.status}</Badge>}
+          {latest && <Badge tone={tone}>{capitalize(latest.status)}</Badge>}
           {latest && <Badge>{latest.version}</Badge>}
           {r.local && <Badge tone="accent">In your library</Badge>}
         </div>
         <div className="flex flex-wrap gap-2">
-          {Object.entries(r.links ?? {}).map(([k, v]) => (
-            <a key={k} href={v} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/10">
-              {k} <ExternalLink className="size-3" />
+          {recipeLinks(r.links).map(([k, label, url]) => (
+            <a key={k} href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/10">
+              {label} <ExternalLink className="size-3" />
             </a>
           ))}
           {r.local && (

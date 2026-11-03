@@ -26,9 +26,9 @@ import { Badge, Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner
 const CodeEditor = lazy(() => import('./CodeEditor'))
 
 const stateBadge = {
-  added: <Badge tone="green">added</Badge>,
-  modified: <Badge tone="amber">modified</Badge>,
-  deleted: <Badge tone="red">hidden</Badge>,
+  added: <Badge tone="green">Added</Badge>,
+  modified: <Badge tone="amber">Modified</Badge>,
+  deleted: <Badge tone="red">Hidden</Badge>,
   base: null,
 }
 
@@ -171,7 +171,7 @@ export default function FileBrowser({ game }: { game: Game }) {
               <button key={d.path} onClick={() => setDir(d.path)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/[0.04]">
                 <Folder className="size-4 text-accent-300/80" />
                 <span className="flex-1 truncate text-zinc-100">{d.name}</span>
-                {d.changed && <Badge tone="amber">changes</Badge>}
+                {d.changed && <Badge tone="amber">Changed</Badge>}
                 <span className="text-xs text-zinc-500">{d.count} files</span>
               </button>
             ))}

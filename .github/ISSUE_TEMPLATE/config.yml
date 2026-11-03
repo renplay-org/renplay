@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Discussion
-    url: https://github.com/renplay-web/renplay/discussions
-    about: Questions, ideas, and general discussion.
+  - name: A game does not work, or should be in the catalog
+    url: https://github.com/renplay-web/catalog/issues/new/choose
+    about: Game requests and broken games are tracked in the catalog.
