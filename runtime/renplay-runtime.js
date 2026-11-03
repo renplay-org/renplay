@@ -1140,6 +1140,18 @@
       case 'renplay:fullscreen-state':
         state.parentFullscreen = !!d.value
         break
+      case 'renplay:download-log':
+        try {
+          var blob = new Blob([FS.readFile('/log.txt')], { type: 'text/plain' })
+          var a = document.createElement('a')
+          a.href = URL.createObjectURL(blob)
+          a.download = cfg.id + '-log.txt'
+          a.click()
+          setTimeout(function () {
+            URL.revokeObjectURL(a.href)
+          }, 1000)
+        } catch (e) {}
+        break
       case 'renplay:focus':
         var c = document.getElementById('canvas')
         if (c) c.focus()

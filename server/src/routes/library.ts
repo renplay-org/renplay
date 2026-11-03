@@ -128,11 +128,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     const id = jobs.enqueue('import', b.game ?? '', {
       source,
       game: b.game || undefined,
-      title: typeof b.title === 'string' && b.title.trim() ? b.title.trim() : undefined,
       recipeId: typeof b.recipeId === 'string' ? b.recipeId : undefined,
       engine: typeof b.engine === 'string' && b.engine ? b.engine : undefined,
-      optimizeImages: b.optimizeImages !== false,
-      imageQuality: typeof b.imageQuality === 'number' ? Math.min(100, Math.max(50, b.imageQuality)) : undefined,
       reapplyMods: !!b.reapplyMods,
     })
     res.json({ jobId: id })
@@ -214,7 +211,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
       status: catalog.status(),
       games: catalog.list().map((r) => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
-        return { ...r, _base: undefined, local: local ? { id: local.id, status: local.status, version: local.version } : null }
+        return { ...r, _base: undefined, cover: catalog.cover(r.id), local: local ? { id: local.id, status: local.status, version: local.version } : null }
       }),
     })
   })

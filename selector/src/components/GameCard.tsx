@@ -1,14 +1,33 @@
-import { CloudOff, Download, Play, Puzzle, Save } from 'lucide-react'
+import { ArrowUpCircle, CloudOff, Download, Play, Puzzle, Save } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { coverUrl, type Game } from '../lib/api'
-import { ago, pct } from '../lib/format'
+import type { Game } from '../lib/api'
+import { ago, capitalize, pct } from '../lib/format'
 import { Badge, Progress, cx } from './ui'
 
-export function Cover({ game, className, rounded = true }: { game: Game; className?: string; rounded?: boolean }) {
+function hue(s: string): number {
+  let h = 0
+  for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360
+  return h
+}
+
+/** Stand-in for games without a curated cover: a tint from the title and its initial. */
+function TitleTile({ title }: { title: string }) {
+  const h = hue(title)
+  return (
+    <div
+      className="absolute inset-0 overflow-hidden"
+      style={{ background: `radial-gradient(130% 120% at 0% 0%, hsl(${h} 42% 30%), hsl(${(h + 35) % 360} 38% 14%) 55%, hsl(${(h + 60) % 360} 30% 7%))` }}
+    >
+      <span className="absolute -right-[4%] -top-[18%] select-none font-display text-[10rem] font-bold leading-none text-white/[0.07] sm:text-[12rem]">{title.trim()[0]?.toLocaleUpperCase()}</span>
+    </div>
+  )
+}
+
+export function Cover({ game, className, rounded = true }: { game: Pick<Game, 'title' | 'cover'>; className?: string; rounded?: boolean }) {
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const src = coverUrl(game)
+  const src = game.cover
   return (
     <div className={cx('relative overflow-hidden bg-ink-800', rounded && 'rounded-2xl', className)}>
       {!loaded && !failed && src && <div className="skeleton absolute inset-0" />}
@@ -23,9 +42,7 @@ export function Cover({ game, className, rounded = true }: { game: Game; classNa
           className={cx('absolute inset-0 size-full object-cover transition-opacity duration-500', loaded ? 'opacity-100' : 'opacity-0')}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-ink-700 via-ink-800 to-ink-900">
-          <span className="px-6 text-center font-display text-xl font-semibold tracking-tight text-zinc-500">{game.title}</span>
-        </div>
+        <TitleTile title={game.title} />
       )}
     </div>
   )
@@ -49,6 +66,11 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
               <CloudOff className="size-3" /> Not installed
             </Badge>
           )}
+          {game.update && !busy && (
+            <Badge tone="accent" className="glass">
+              <ArrowUpCircle className="size-3" /> Update
+            </Badge>
+          )}
           {game.mods.files > 0 && (
             <Badge tone="violet" className="glass">
               <Puzzle className="size-3" /> Modded
@@ -61,7 +83,7 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
               e.preventDefault()
               navigate(`/play/${game.id}`)
             }}
-            className="absolute right-3 top-3 flex size-11 translate-y-1 items-center justify-center rounded-full bg-white text-black opacity-0 shadow-xl transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 hover:scale-105"
+            className="absolute right-3 top-3 flex size-11 translate-y-1 items-center justify-center rounded-full bg-white text-black opacity-0 shadow-xl transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 hover:scale-105 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:opacity-100"
             aria-label={`Play ${game.title}`}
           >
             <Play className="ml-0.5 size-5 fill-black" />
@@ -85,7 +107,7 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
                   <Save className="size-3" /> {game.saves.count}
                 </span>
               )}
-              {game.lastPlayedAt ? <span className="ml-auto shrink-0">{ago(game.lastPlayedAt)}</span> : !installed && game.canReinstall ? (
+              {game.lastPlayedAt ? <span className="ml-auto shrink-0">{capitalize(ago(game.lastPlayedAt))}</span> : !installed && game.canReinstall ? (
                 <span className="ml-auto flex shrink-0 items-center gap-1 text-zinc-300">
                   <Download className="size-3" /> Install
                 </span>

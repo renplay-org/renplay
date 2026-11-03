@@ -98,7 +98,7 @@ export function createSavesRouter(store: SaveStore, db: Db): Router {
     const sd = req.body?.saveDir
     if (!isSaveDirName(sd)) throw new HttpError(400, 'Invalid save folder')
     let changed = false
-    if (g.save_dir !== sd && !g.save_dir_locked) {
+    if (g.save_dir !== sd) {
       db.updateGame(g.id, { save_dir: sd })
       changed = true
     }

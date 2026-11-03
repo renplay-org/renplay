@@ -37,6 +37,11 @@ export function duration(seconds: number | undefined): string {
   return h ? `${h}h ${m}m` : `${m}m`
 }
 
+/** Upper-cases the first letter, for text that starts a line ("Just now", "Sci-fi"). */
+export function capitalize(s: string): string {
+  return s ? s[0]!.toLocaleUpperCase() + s.slice(1) : s
+}
+
 export function pct(f: number): string {
   return `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%`
 }
