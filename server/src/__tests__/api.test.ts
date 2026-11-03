@@ -155,7 +155,7 @@ describe('HTTP API', () => {
 
   it('exports a recipe', async () => {
     const res = await request(app.app).get('/api/games/fixture-game/recipe').expect(200)
-    expect(res.body.yaml).toContain('id: fixture-game')
+    expect(res.body.yaml).toMatch(/^# yaml-language-server: \$schema=https:\/\/renplay-web\.github\.io\/catalog\/recipe\.schema\.json\nid: fixture-game\n/)
     expect(res.body.yaml).toContain('saveDir: MyGame-1234567890')
     expect(res.body.yaml).toContain('engine: 8.5.3')
   })
