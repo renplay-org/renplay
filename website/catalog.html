@@ -35,7 +35,6 @@
     .game:focus-visible { outline: none; }
     .game h3 { margin: 12px 2px 0; font-size: 17px; letter-spacing: -.01em; line-height: 1.25; }
     .game .meta { margin: 3px 2px 0; color: var(--dim); font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .issues { font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 999px; color: #fcd34d; background: rgb(252 211 77 / .1); border: 1px solid rgb(252 211 77 / .3); }
 
     .art { position: relative; aspect-ratio: 63 / 50; background: #15151c; overflow: hidden; }
     .art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: filter .4s, transform .4s; }
@@ -68,10 +67,7 @@
     .rel b { font-size: 15px; }
     .rel .when { color: var(--faint); font-size: 13px; }
     .st { font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
-    .st.verified { color: #6ee7a8; border-color: rgb(110 231 168 / .3); background: rgb(110 231 168 / .08); }
-    .st.playable { color: #fcd34d; border-color: rgb(252 211 77 / .3); background: rgb(252 211 77 / .1); }
     .st.broken { color: #fca5a5; border-color: rgb(252 165 165 / .3); background: rgb(252 165 165 / .08); }
-    .st.untested { color: var(--dim); border-color: var(--line); }
     .rel .file { margin-top: 6px; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); overflow-wrap: anywhere; }
     .rel .notes { margin-top: 6px; font-size: 14px; color: var(--dim); }
     .how { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: h; color: var(--dim); font-size: 15px; }
@@ -193,7 +189,8 @@
   const REPO = 'https://github.com/renplay-web/catalog'
   const LINKS = { itch: 'Itch.io', steam: 'Steam', patreon: 'Patreon', subscribestar: 'SubscribeStar', website: 'Website', f95: 'F95zone', discord: 'Discord', walkthrough: 'Guide' }
   const STORES = ['itch', 'steam', 'patreon', 'subscribestar', 'website']
-  const STATUS = { verified: 'Tested', playable: 'Known issues', broken: 'Does not work', untested: 'Not tested yet' }
+  // Engines by the names players know from F95zone.
+  const ENGINES = { renpy: 'Ren’Py', html: 'HTML', godot: 'Godot', unity: 'Unity' }
   const ADULT = 'renplay-site:show-adult'
   const $ = (id) => document.getElementById(id)
   const $games = $('games'), $q = $('q'), $adult = $('adult')
@@ -224,7 +221,7 @@
     return `<button class="game" data-i="${i}">
       ${art(g)}
       <h3>${esc(g.title)}</h3>
-      <div class="meta">${esc(rel?.version ?? '')}${tags ? ` · ${esc(tags)}` : ''}${rel?.status === 'playable' ? ' <span class="issues">Known issues</span>' : ''}</div>
+      <div class="meta">${esc(rel?.version ?? '')}${tags ? ` · ${esc(tags)}` : ''}</div>
     </button>`
   }
 
@@ -234,7 +231,7 @@
     const store = STORES.find((k) => g.links?.[k])
     const file = rel?.archives?.[0]
     const releases = (g.releases ?? []).map((r) => `<div class="rel">
-        <div class="top"><b>${esc(r.version)}</b><span class="st ${esc(r.status)}">${STATUS[r.status] ?? esc(r.status)}</span>${r.date ? `<span class="when">${day(r.date)}</span>` : ''}</div>
+        <div class="top"><b>${esc(r.version)}</b>${r.status === 'broken' ? '<span class="st broken">Does not work</span>' : ''}${r.date ? `<span class="when">${day(r.date)}</span>` : ''}</div>
         ${(r.archives ?? []).map((a) => `<div class="file">${esc(a.name)}${a.size ? ` · ${gb(a.size)}` : ''}</div>`).join('')}
         ${r.verified?.notes ? `<div class="notes">${esc(r.verified.notes)}</div>` : ''}
       </div>`).join('')
@@ -242,7 +239,7 @@
       <div>${art(g)}</div>
       <div>
         <h2>${esc(g.title)}</h2>
-        ${g.developer ? `<div class="by">By ${esc(g.developer)}</div>` : ''}
+        <div class="by">${g.developer ? `By ${esc(g.developer)} · ` : ''}${ENGINES[g.engine ?? 'renpy'] ?? esc(g.engine)}</div>
         ${(g.tags ?? []).length ? `<div class="chips">${g.tags.map((t) => `<span>${esc(cap(t))}</span>`).join('')}</div>` : ''}
         <div class="actions-row">
           ${store ? `<a class="btn primary sm" href="${esc(g.links[store])}" target="_blank" rel="noopener">Get it on ${LINKS[store]}</a>` : ''}
@@ -254,7 +251,7 @@
           <li><span>In Renplay, open <b>Add games</b> and upload it, or copy it into your archives folder.</span></li>
           <li><span>Press <b>Install</b>. Renplay recognizes the download and uses the cover and settings from here.</span></li>
         </ol>
-        <h4>Tested versions</h4>
+        <h4>Versions</h4>
         <div class="releases">${releases}</div>
         <a class="recipe-link" href="${REPO}/blob/main/recipes/${esc(g.id)}.yaml" target="_blank" rel="noopener">View the recipe on GitHub</a>
       </div>
@@ -271,7 +268,7 @@
   }
 
   // Only games that work are listed.
-  fetch(BASE + 'index.json')
+  fetch(BASE + 'index.v3.json')
     .then((r) => r.json())
     .then((idx) => { games = (idx.games ?? []).filter(working).sort((a, b) => a.title.localeCompare(b.title)); render() })
     .catch(() => ($games.innerHTML = `<div class="empty">The catalog could not be loaded. It is also on <a href="${REPO}">GitHub</a>.</div>`))

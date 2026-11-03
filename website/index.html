@@ -45,7 +45,7 @@
   <div class="aurora"><span></span><span></span><span></span></div>
   <div class="wrap">
     <span class="chip intro" style="--d:0ms"><b>Free</b> Open source and self-hosted</span>
-    <h1 class="intro" style="--d:80ms">Your Ren’Py games,<br><span class="rotator" aria-label="on every screen."><span class="grad-text on">on every screen.</span><span class="grad-text" aria-hidden="true">on your phone.</span><span class="grad-text" aria-hidden="true">on your laptop.</span><span class="grad-text" aria-hidden="true">on your tablet.</span></span></h1>
+    <h1 class="intro" style="--d:80ms">Your <span class="rotator" aria-label="Ren’Py and HTML"><span class="grad-text on" data-ms="5200">Ren’Py</span><span class="grad-text" aria-hidden="true" data-ms="2600">HTML</span></span> games,<br>on every screen.</h1>
     <p class="sub intro" style="--d:160ms">Renplay turns the visual novels you download into games that play in any browser: <strong>your computer, your tablet, your phone</strong>. Every save lands on your own server, so you start a chapter at your desk and finish it on the couch.</p>
     <div class="cta intro" style="--d:240ms">
       <a class="btn primary" href="#install">Set it up in a minute
@@ -228,7 +228,7 @@
       <h2>Good to know.</h2>
     </div>
     <div class="faq">
-      <details class="reveal"><summary>Which games work?</summary><p>Games made with Ren’Py 8, and most games made with Ren’Py 7, which run on the same engine. That covers almost every visual novel of the last few years. The catalog lists games that were tested; most others work too.</p></details>
+      <details class="reveal"><summary>Which games work?</summary><p>Games made with Ren’Py 8, and most games made with Ren’Py 7, which run on the same engine. That covers almost every visual novel of the last few years. HTML games, like Twine stories, play too, with fewer features. The catalog lists games that were tested; most others work too.</p></details>
       <details class="reveal"><summary>Where do I get the games?</summary><p>From their developers, as you do today: itch.io, Patreon, Steam and so on. Renplay uses the normal PC download. Neither Renplay nor its catalog hosts game files.</p></details>
       <details class="reveal"><summary>Does it need a powerful server?</summary><p>No. Installing a game uses some CPU for a few minutes; playing is just serving files. Games run in your browser, so a small home server or NAS is plenty. Plan disk space like for the downloads themselves.</p></details>
       <details class="reveal"><summary>Can I still play on desktop Ren’Py?</summary><p>Yes. Export a game’s saves and they work in the desktop version, and the other way round.</p></details>
@@ -295,17 +295,19 @@
     })
     hero.addEventListener('pointerleave', () => (stage.style.transform = ''))
   }
-  // Headline: phone, laptop, tablet, every screen.
+  // Headline: the engines Renplay plays, Ren'Py the longest.
   const words = [...document.querySelectorAll('.rotator > span')]
-  if (words.length && !still) {
+  if (words.length > 1 && !still) {
     let i = 0
-    setInterval(() => {
+    const next = () => {
       const prev = words[i]
       i = (i + 1) % words.length
       prev.classList.remove('on'); prev.classList.add('out')
       setTimeout(() => prev.classList.remove('out'), 500)
       words[i].classList.add('on')
-    }, 2600)
+      setTimeout(next, +words[i].dataset.ms || 2600)
+    }
+    setTimeout(next, +words[0].dataset.ms || 2600)
   }
   // Numbers count up when they come into view.
   const counters = new IntersectionObserver((entries) => entries.forEach((e) => {
