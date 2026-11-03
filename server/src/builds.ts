@@ -134,7 +134,9 @@ export class Builds {
     const missing: string[] = []
     for (const g of this.db.allGames()) {
       if (g.status !== 'installed') continue
-      if (!g.build || !(await exists(join(this.dir(g.id, g.build), 'game.zip')))) {
+      // HTML games (docs/engines.md) have no game.zip, only the pack and its index.
+      const marker = g.family === 'html' ? 'assets.json' : 'game.zip'
+      if (!g.build || !(await exists(join(this.dir(g.id, g.build), marker)))) {
         this.db.updateGame(g.id, { status: 'not_installed', build: '', size_bytes: 0, file_count: 0 })
         missing.push(g.id)
       }

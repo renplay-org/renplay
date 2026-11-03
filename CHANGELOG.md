@@ -7,6 +7,11 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- HTML games stay installed when Renplay restarts. The startup check looked for a `game.zip`,
+  which only Ren'Py builds have, and marked them not installed; reinstall them once.
+
 ## [2.7.0] - 2026-11-03
 
 ### Changed
