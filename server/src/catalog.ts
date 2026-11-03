@@ -96,7 +96,8 @@ export interface RecipeMatch {
 
 const CACHE_KEY = 'catalog_cache'
 const COVERS_KEY = 'catalog_covers'
-const MAX_AGE = 6 * 3600_000
+/** How often the catalog is fetched while Renplay runs (cheap: covers are fetched only when changed). */
+const REFRESH_EVERY = 3600_000
 const MAX_COVER = 16 << 20
 /** Covers are shown as thumbnails; wider art is scaled down to this. */
 const COVER_WIDTH = 960
@@ -128,6 +129,7 @@ export class Catalog {
   private covers = new Map<string, string>()
   private fetchedAt = 0
   private errors: string[] = []
+  private timer: NodeJS.Timeout | null = null
 
   constructor(
     private readonly cfg: Config,
@@ -148,7 +150,14 @@ export class Catalog {
     }
     this.covers = new Map(Object.entries(this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})).map(([id, c]) => [id, c.file]))
     this.link()
-    if (Date.now() - this.fetchedAt > MAX_AGE) void this.refresh().catch(() => {})
+    if (Date.now() - this.fetchedAt > REFRESH_EVERY) void this.refresh().catch(() => {})
+    this.timer = setInterval(() => void this.refresh().catch(() => {}), REFRESH_EVERY)
+    this.timer.unref()
+  }
+
+  stop(): void {
+    if (this.timer) clearInterval(this.timer)
+    this.timer = null
   }
 
   private load(games: unknown[]): void {

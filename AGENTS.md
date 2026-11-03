@@ -119,6 +119,10 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   tie a direct link to the browser and IP that opened it, and official stores need the user's
   login, so "install from a link" failed for real links and was removed. Games arrive by upload or
   through the archives folder.
+- **Ren'Py 7 games run on the Ren'Py 8 engine.** Ren'Py 8 loads their compiled scripts and
+  compiles all their Python at load time, so a game that starts has no Python 2 syntax; what can
+  still fail is Python 2 behaviour (xrange, iteritems, unicode). Once in a Lifetime (7.3.2)
+  played through its opening, a fight minigame and more without errors.
 - **iPhone Safari cannot make a page fullscreen.** Only a home-screen web app fills the screen;
   the player explains that instead of showing a broken button.
 

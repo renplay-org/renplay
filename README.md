@@ -95,7 +95,8 @@ The container runs as any non-root user and with a read-only root filesystem.
 
 ## Questions
 
-**Which games work?** Ren’Py 8 games (Ren’Py 7 is not supported yet). The
+**Which games work?** Ren’Py 8 games, and most Ren’Py 7 games: they run on the Ren’Py 8 engine,
+and only games with Python 2-only code have trouble. The
 [catalog](https://github.com/renplay-web/catalog) lists games that were tested; most others work
 too. If one does not, [tell the catalog](https://github.com/renplay-web/catalog/issues/new/choose).
 

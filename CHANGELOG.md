@@ -7,6 +7,22 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-03
+
+### Added
+
+- Games made with Ren'Py 7 install and play on the Ren'Py 8 engine instead of being refused. Most
+  work; Python 2-only code in a game can fail while playing. Once in a Lifetime (Ren'Py 7.3.2)
+  plays through without problems.
+
+### Changed
+
+- Install logs show progress every half minute (how much is read, files written, images
+  converted), and their times follow the server's time zone (`TZ`).
+- The catalog is refreshed every hour while Renplay runs, not only at startup.
+- Games made with Ren'Py 7, and Ren'Py 8.0 games built for both Pythons, show their Ren'Py version
+  instead of "unknown".
+
 ## [2.3.0] - 2026-11-03
 
 ### Added
@@ -108,7 +124,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.3.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.4.0...dev
+[2.4.0]: https://github.com/renplay-web/renplay/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/renplay-web/renplay/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/renplay-web/renplay/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/renplay-web/renplay/compare/v0.1.1...v2.1.0
