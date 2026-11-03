@@ -29,6 +29,7 @@ release notes say what).
 ### Fixed
 
 - Reinstall is offered only while the game's download is still on the server.
+- Exported recipes start with the catalog's schema line, so editors check them as you type.
 - .7z and .rar downloads no longer say "No Ren'Py game found" (Renplay looks inside them only
   when it installs them).
 
