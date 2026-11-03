@@ -144,7 +144,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   if (check.orphans.length) console.log(`folders in ${cfg.gamesDir} that belong to no game: ${check.orphans.join(', ')}`)
   if (opts.startJobs !== false) jobs.start()
 
-  return { app, db, jobs, builds, engines, saves, catalog, purger, close: () => db.close() }
+  return { app, db, jobs, builds, engines, saves, catalog, purger, close: () => (catalog.stop(), db.close()) }
 }
 
 /** Development server: serve *.gz engine files with their encoding, like nginx does. */

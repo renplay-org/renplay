@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { pyStringLiteral, rpycAst, saveDirFromRpyc, saveDirFromSource, nameVersionFromSource } from '../pipeline/detect.js'
+import { pyStringLiteral, rpycAst, saveDirFromRpyc, saveDirFromSource, nameVersionFromSource, renpyVersionFromVc } from '../pipeline/detect.js'
 import { parseRpaHeader } from '../pipeline/rpa.js'
 import { PyGlobal, PyObject, unpickle } from '../util/pickle.js'
 
@@ -80,3 +80,13 @@ describe('rpa header', () => {
   })
 })
 
+describe('Ren\'Py version', () => {
+  it('reads Ren\'Py 8 and Ren\'Py 7 version files', () => {
+    expect(renpyVersionFromVc("branch = 'fix'\nversion = '8.3.4.24120703'\n")).toBe('8.3.4.24120703')
+    const init = 'vc_version = 0\nversion_tuple = (7, 3, 2, vc_version)\n'
+    expect(renpyVersionFromVc('vc_version = 320', init)).toBe('7.3.2.320')
+    expect(renpyVersionFromVc('vc_version = 320')).toBeUndefined()
+    const both = 'if PY2:\n    version_tuple = (7, 5, 3, vc_version)\nelse:\n    version_tuple = (8, 0, 3, vc_version)\n'
+    expect(renpyVersionFromVc('vc_version = 22090809', both)).toBe('8.0.3.22090809')
+  })
+})

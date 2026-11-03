@@ -37,8 +37,9 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 2. **Match the catalog** (`catalog.ts`): by sha256, name and size, or a `match` pattern. The recipe
    can choose the engine, files to keep or exclude, and small patches.
 3. **Pick the engine** (`engines.ts`): the recipe's, `RENPLAY_ENGINE`, or the newest published
-   engine of the game's major version. Engine packs come from renplay-web/engines and are
-   checksum-verified.
+   engine of the game's major version. Games made with Ren'Py 7 or older get the newest Ren'Py 8
+   engine, which loads their scripts; only Python 2-only code fails. Engine packs come from
+   renplay-web/engines and are checksum-verified.
 4. **Split RPA archives** (`rpa.ts`) in one sequential pass. The archive index is a Python pickle;
    `util/pickle.ts` reads it as data only, so nothing from the game is executed.
 5. **Optimize images** (`optimize.ts`): PNG and JPEG become WebP under the same names; each

@@ -110,10 +110,9 @@ export class EngineStore {
       if (!known.has(want)) throw new Error(`Engine ${want} is not available (have: ${[...known].join(', ') || 'none'})`)
       return want
     }
-    const major = Number((gameRenpy ?? '8').split('.')[0]) || 8
-    if (major < 8) {
-      throw new Error(`This game was made with Ren'Py ${gameRenpy}. Ren'Py 7 web games are not supported yet; only Ren'Py 8 engines are available.`)
-    }
+    // Games made with Ren'Py 7 or older run on the Ren'Py 8 engine: Ren'Py 8
+    // loads their scripts, and most of their Python also runs on Python 3.
+    const major = Math.max(8, Number((gameRenpy ?? '8').split('.')[0]) || 8)
     const candidates = [...known].filter((v) => Number(v.split('.')[0]) === major).sort(cmp)
     const best = candidates[candidates.length - 1]
     if (!best) throw new Error(`No Ren'Py ${major} engine is available`)
