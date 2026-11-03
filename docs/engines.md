@@ -5,6 +5,10 @@ the app: Renplay recognizes them, installs the ones a browser can run, and gives
 features that come cheap. When a feature works for Ren'Py and not for another engine, that is
 fine.
 
+The focus is Ren'Py, plus engines whose normal download plays easily: HTML games today. Unity
+WebGL and Godot web builds install and play too, but games rarely offer them as a download (on
+itch.io they are the in-browser versions), so the catalog and the website leave them out.
+
 ## Support
 
 | Engine | Recognized | Installs | Notes |

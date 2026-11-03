@@ -23,7 +23,7 @@ export default function AddGames() {
     <div className="animate-fade-in">
       <div className="mb-6">
         <h1 className="font-display text-3xl font-bold tracking-tight text-white">Add games</h1>
-        <p className="mt-2 max-w-2xl text-sm text-zinc-400">Install a Ren’Py game from its PC download. Renplay builds it for the browser on the server.</p>
+        <p className="mt-2 max-w-2xl text-sm text-zinc-400">Install a game from its PC download: a Ren’Py game, or an HTML game such as a Twine story. Renplay builds it for the browser on the server.</p>
       </div>
       <div className="mb-6">
         <Tabs

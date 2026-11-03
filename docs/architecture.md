@@ -1,7 +1,9 @@
 # How Renplay works
 
 Renplay turns the PC release of a Ren'Py game into a web build, serves it, and keeps the player's
-saves on the server. This page explains the parts and why they are built the way they are.
+saves on the server. This page explains the parts and why they are built the way they are. HTML
+games take a shorter path through the same parts; [engines.md](engines.md) covers them and the
+engines still to come.
 
 ```
 browser ── nginx :8080 ─┬─ /                      library UI (React, selector/dist)
