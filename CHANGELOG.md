@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-03
+
 ### Added
 
 - In fullscreen, Esc opens the game's menu (Chrome and Edge); hold Esc to leave fullscreen. Other
@@ -106,7 +108,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.2.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.3.0...dev
+[2.3.0]: https://github.com/renplay-web/renplay/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/renplay-web/renplay/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/renplay-web/renplay/compare/v0.1.1...v2.1.0
 [0.1.1]: https://github.com/renplay-web/renplay/compare/v0.1.0...v0.1.1
