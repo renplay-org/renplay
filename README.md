@@ -58,7 +58,7 @@ Open http://localhost:8080. Copy a game’s PC download into `/path/to/games/_ar
 it under **Add games**, and press **Install**. The first install also downloads the Ren’Py web
 engine (about 16 MB).
 
-Pin a version (`ghcr.io/renplay-web/renplay:2.2.0`) for production; [releases](https://github.com/renplay-web/renplay/releases)
+Pin a version (`ghcr.io/renplay-web/renplay:2.9.1`) for production; [releases](https://github.com/renplay-web/renplay/releases)
 list what changed. Renplay has no user accounts, so put it behind your own sign-in (a reverse
 proxy with authentication, a VPN) if it is reachable from outside your network.
 
@@ -124,8 +124,12 @@ and they work in the desktop version, and the other way round.
 
 ## Support
 
-Renplay is free and open source. If it is useful to you, you can support it on
-[Ko-fi](https://ko-fi.com/janpuc).
+Questions, such as whether a game works, go to
+[Discussions](https://github.com/renplay-web/renplay/discussions); bugs to
+[issues](https://github.com/renplay-web/renplay/issues).
+
+Renplay is made by the Renplay Team (maintainer: Jan Puciłowski). It is free and open source. If
+it is useful to you, you can support it on [Ko-fi](https://ko-fi.com/janpuc).
 
 ## License
 
