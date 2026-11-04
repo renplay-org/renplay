@@ -1,3 +1,4 @@
+import Sheet from './Sheet'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   ChevronRight,
@@ -21,7 +22,7 @@ import { Suspense, lazy, useRef, useState } from 'react'
 import { api, del, post, type FileEntry, type Game } from '../lib/api'
 import { bytes } from '../lib/format'
 import { useFiles, useJobs } from '../lib/queries'
-import { Badge, Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, cx, errorText, useToast } from './ui'
+import { Badge, Button, Confirm, Empty, MenuItem, Modal, Progress, Spinner, cx, errorText, useToast } from './ui'
 
 const CodeEditor = lazy(() => import('./CodeEditor'))
 
@@ -100,10 +101,10 @@ export default function FileBrowser({ game }: { game: Game }) {
           <Wand2 className={cx('size-5 shrink-0', pending ? 'text-amber-300' : 'text-violet-300')} />
           <div className="min-w-0 flex-1 text-sm">
             <div className="font-medium text-zinc-100">
-              {pending ? 'Changes not applied yet' : 'This game is modded'} · {changed} change{changed === 1 ? '' : 's'}
+              {changed} file{changed === 1 ? '' : 's'} changed · {pending ? 'Ready to apply' : 'Applied'}
             </div>
             <div className="text-xs text-zinc-400">
-              Your edits are kept separately from the game. Updating the game drops them unless you choose to re-apply them.
+              Apply to build a modded version; the original stays. Your edits are kept separately from the game.
             </div>
           </div>
           {applyJob ? (
@@ -270,9 +271,9 @@ function FileRow({ game, file, onEdit, onChanged }: { game: Game; file: FileEntr
           await run(() => api(raw, { method: 'PUT', body: f }), `Replaced ${file.name}`)
         }}
       />
-      <Menu
+      <Sheet
         trigger={(toggle) => (
-          <button onClick={toggle} className="rounded-lg p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200" aria-label="File actions">
+          <button onClick={toggle} className="flex size-11 items-center justify-center rounded-lg p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200" aria-label="File actions">
             <MoreHorizontal className="size-4" />
           </button>
         )}
@@ -306,7 +307,7 @@ function FileRow({ game, file, onEdit, onChanged }: { game: Game; file: FileEntr
             ) : null}
           </>
         )}
-      </Menu>
+      </Sheet>
     </div>
   )
 }
@@ -344,6 +345,7 @@ function EditorDialog({ game, path, isNew, onClose, onSaved }: { game: Game; pat
     <Modal
       open
       wide="xl"
+      fullPhone
       onClose={() => (!dirty || confirm('Discard unsaved changes?')) && onClose()}
       title={<span className="font-mono text-[13px]">{path}</span>}
       footer={
