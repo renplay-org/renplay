@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-11-04
+
 ### Changed
 
 - Renplay says what it plays: Ren'Py games first, and HTML games too (README, the app's Add games
@@ -241,7 +243,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.9.0...dev
+[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.9.1...dev
+[2.9.1]: https://github.com/renplay-web/renplay/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/renplay-web/renplay/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/renplay-web/renplay/compare/v2.7.1...v2.8.0
 [2.7.1]: https://github.com/renplay-web/renplay/compare/v2.7.0...v2.7.1
