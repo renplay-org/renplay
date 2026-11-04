@@ -67,4 +67,4 @@ from **Settings** → **Activity**.
 ## Who makes Renplay?
 
 The Renplay Team. It is free and open source under the MIT license. If it is useful to you, you can
-support it on [Ko-fi](https://renplay.org/support).
+[support it](https://renplay.org/support).

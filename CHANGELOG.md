@@ -12,6 +12,9 @@ release notes say what).
 - The documentation now matches the Renplay website, with clearer starting points, quieter
   navigation and a grouped configuration reference that reads comfortably on phones. Install
   examples always use the current release’s image tag.
+- The documentation home is now a plain index of the guides, with search first, and the app links to
+  the matching help page from Settings, the empty library, Add games, Activity and the iPhone
+  full-screen help. The browser tab shows the game’s title while you play.
 
 ## [2.10.0] - 2026-11-04
 

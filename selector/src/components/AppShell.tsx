@@ -52,12 +52,14 @@ function Footer() {
     <footer className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 pb-28 pt-4 text-xs text-zinc-500 sm:px-8 sm:pb-8">
       <span>Renplay{data?.version ? ` ${data.version}` : ''}</span>
       <span aria-hidden="true">·</span>
+      <a href="https://renplay.org/docs" target="_blank" rel="noreferrer" className="transition-colors hover:text-zinc-300">Docs</a>
+      <span aria-hidden="true">·</span>
       <a href={REPO_URL} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 transition-colors hover:text-zinc-300">
         <GitHubMark className="size-3.5" /> GitHub
       </a>
       <span aria-hidden="true">·</span>
       <a href={KOFI_URL} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 transition-colors hover:text-accent-300">
-        <Heart className="size-3.5" /> Support on Ko-fi
+        <Heart className="size-3.5" /> Support
       </a>
     </footer>
   )
