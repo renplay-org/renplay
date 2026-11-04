@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, CircleSlash, Clock, Loader2, RotateCw, ScrollText, Square, Trash2, XCircle } from 'lucide-react'
 import { Fragment, useState } from 'react'
+import DocsLink from '../components/DocsLink'
 import { Badge, Button, Empty, Modal, Progress, Spinner, errorText, useToast } from '../components/ui'
 import { api, del, jobTitle, post, type Job, type JobsResponse } from '../lib/api'
 import { ago, bytes, pct, capitalize } from '../lib/format'
@@ -112,7 +113,7 @@ export default function Activity() {
                           {j.message ? ` · ${j.message}` : ''}
                         </>
                       ) : j.status === 'failed' || j.status === 'interrupted' ? (
-                        <span className="text-red-300">{j.error}</span>
+                        <span className="text-red-300">{j.error} <DocsLink path="troubleshooting/">Troubleshooting</DocsLink></span>
                       ) : (
                         <>
                           {STATUS_LABEL[j.status]} · {capitalize(ago(j.finishedAt ?? j.createdAt))}

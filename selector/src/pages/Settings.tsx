@@ -3,6 +3,7 @@ import { Download, ExternalLink, FileCode2, HardDrive, Package, RefreshCw } from
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import RecipeDialog from '../components/RecipeDialog'
+import DocsLink from '../components/DocsLink'
 import { Button, Confirm, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { post } from '../lib/api'
 import { ago, bytes } from '../lib/format'
@@ -68,6 +69,7 @@ export default function Settings() {
             {!content.chosen && <p className="text-xs text-zinc-500">Nothing is chosen yet, so adult games stay hidden.</p>}
           </>}
         </section>}
+        <DocsLink path="start-here/adult-games/">Adult games</DocsLink>
         <Confirm open={confirmAdult} onClose={() => setConfirmAdult(false)} title="Show adult games?" confirmLabel="Show adult games" onConfirm={() => void run(() => setAdultGames('allow'), 'Adult games are shown').then(() => setConfirmAdult(false))}>This shows games for adults.</Confirm>
         <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
           <h2 className="flex items-center gap-2 font-semibold text-white">
@@ -202,7 +204,7 @@ export default function Settings() {
             <Switch checked={blurAdult} onChange={setBlurAdult} label="Hide pictures of adult games" hint="Covers and save pictures in the library, for screens other people can see. Only this browser is affected." />
           </div>
         </section>
-        {section === 'about' && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]"><h2 className="font-semibold text-white">About Renplay</h2><p className="text-sm text-zinc-400">Version {sys.version} · Made by the Renplay Team</p><p className="text-sm text-zinc-400">Renplay is open source, under the MIT license. Game art belongs to its developers.</p><div className="flex gap-4 text-sm text-accent-300"><a href="https://github.com/renplay-org/renplay" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://ko-fi.com/janpuc" target="_blank" rel="noreferrer">Support Renplay ↗</a><a href="https://github.com/renplay-org/renplay/blob/main/LICENSE" target="_blank" rel="noreferrer">License ↗</a></div></section>}
+        {section === 'about' && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]"><h2 className="font-semibold text-white">About Renplay</h2><p className="text-sm text-zinc-400">Version {sys.version} · Made by the Renplay Team</p><p className="text-sm text-zinc-400">Renplay is open source, under the MIT license. Game art belongs to its developers.</p><div className="flex flex-wrap gap-4 text-sm text-accent-300"><DocsLink /><DocsLink path="troubleshooting/">Troubleshooting</DocsLink><a href="https://renplay.org/releases" target="_blank" rel="noreferrer">Release notes ↗</a><a href="https://renplay.org/github" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://renplay.org/support" target="_blank" rel="noreferrer">Support ↗</a><a href="https://github.com/renplay-org/renplay/blob/main/LICENSE" target="_blank" rel="noreferrer">License ↗</a></div></section>}
       </div>
       </div>
     </div>

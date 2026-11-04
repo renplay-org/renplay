@@ -3,6 +3,7 @@ import { CloudUpload, ExternalLink, FileArchive, MoreHorizontal, Pause, Play, Re
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import Sheet from '../components/Sheet'
+import DocsLink from '../components/DocsLink'
 import SegmentedControl from '../components/SegmentedControl'
 import { Cover } from '../components/GameCard'
 import TagFilters from '../components/TagFilters'
@@ -58,6 +59,7 @@ function Downloads() {
   return (
     <div className="space-y-8">
       <UploadZone />
+      {jobs?.jobs.some((j) => j.type === 'import' && (j.status === 'failed' || j.status === 'interrupted')) && <p className="text-sm text-zinc-400">An install did not finish. <Link className="text-accent-300" to="/activity">Open Activity</Link> for its log, or read <DocsLink path="troubleshooting/">Troubleshooting</DocsLink>.</p>}
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold text-white">On the server</h2><code className="break-all text-xs text-zinc-500">{data?.dir ?? sys?.paths.archives}</code></div>
       {!archives.length ? (
         <div className="flex items-center justify-between gap-4 text-sm text-zinc-500">
