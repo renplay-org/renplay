@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, CircleSlash, Clock, Loader2, RotateCw, ScrollText, Square, Trash2, XCircle } from 'lucide-react'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Badge, Button, Empty, Modal, Progress, Spinner, errorText, useToast } from '../components/ui'
 import { api, del, jobTitle, post, type Job, type JobsResponse } from '../lib/api'
 import { ago, bytes, pct, capitalize } from '../lib/format'
@@ -13,6 +13,16 @@ const icon = {
   failed: <XCircle className="size-4 text-red-400" />,
   cancelled: <CircleSlash className="size-4 text-zinc-500" />,
   interrupted: <CircleSlash className="size-4 text-amber-400" />,
+}
+
+function dayGroup(job: Job): string {
+  if (job.status === 'running' || job.status === 'queued') return 'Running'
+  const date = new Date(job.finishedAt ?? job.createdAt)
+  const today = new Date()
+  if (date.toDateString() === today.toDateString()) return 'Earlier today'
+  today.setDate(today.getDate() - 1)
+  if (date.toDateString() === today.toDateString()) return 'Yesterday'
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 const STATUS_LABEL: Record<Job['status'], string> = {
@@ -81,19 +91,21 @@ export default function Activity() {
         <Empty title="Nothing happening">Installs, updates and optimizations show up here.</Empty>
       ) : (
         <div className="space-y-3">
-          {jobs.map(({ job: j, count }) => {
+          {jobs.map(({ job: j, count }, index) => {
             const active = j.status === 'running' || j.status === 'queued'
             const res = resultText(j)
             return (
-              <div key={j.id} className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/[0.07]">
+              <Fragment key={j.id}>
+              {(index === 0 || dayGroup(jobs[index - 1].job) !== dayGroup(j)) && <h2 className="pb-1 pt-5 text-sm font-semibold text-zinc-400">{dayGroup(j)}</h2>}
+              <div className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/[0.07]">
                 <div className="flex flex-wrap items-center gap-3">
                   {icon[j.status]}
                   <div className="min-w-0 flex-1 basis-[70%] sm:basis-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 break-words font-medium text-zinc-100">{jobTitle(j, games ?? [])}</span>
-                      {count > 1 && <Badge>{count} attempts</Badge>}
+                      {(count > 1 || j.status === 'failed' || j.status === 'interrupted') && <Badge>{count} attempt{count === 1 ? '' : 's'}</Badge>}
                     </div>
-                    <div className="mt-0.5 truncate text-xs text-zinc-500">
+                    <div className="mt-0.5 break-words text-sm text-zinc-500">
                       {j.status === 'running' ? (
                         <>
                           {j.stage}
@@ -128,7 +140,7 @@ export default function Activity() {
                 </div>
                 {j.status === 'running' && <Progress value={j.progress} className="mt-3" />}
                 {j.status === 'queued' && <Badge className="mt-3">Queued</Badge>}
-              </div>
+              </div></Fragment>
             )
           })}
         </div>
