@@ -101,6 +101,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
         : null,
     update: update ? { version: update.version, date: update.date ?? null, status: update.status } : null,
     favoriteAt: row.favorite_at || null,
+    createdAt: row.created_at,
     installedAt: row.installed_at || null,
     lastPlayedAt: row.last_played_at || null,
     saves,

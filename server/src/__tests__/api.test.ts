@@ -85,6 +85,7 @@ describe('HTTP API', () => {
     expect(catalog.vocabulary).toEqual(vocabulary)
     expect(catalog.games.find((g: { id: string }) => g.id === recipe.id)).toMatchObject({ tagIds: ['sci-fi'], local: { version: '0.9.23', detectedVersion: 'Ch4Up7Public' } })
     const game = (await request(app.app).get('/api/games/metadata-game').expect(200)).body.game
+    expect(game.createdAt).toBe(app.db.getGame('metadata-game')!.created_at)
     expect(game).toMatchObject({ tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: recipe.summary, version: '0.9.23', detectedVersion: 'Ch4Up7Public', recipe: { status: 'verified' }, update: { version: '0.9.24' } })
     const legacy = (await request(app.app).get('/api/games/legacy-game').expect(200)).body.game
     expect(legacy).toMatchObject({ tags: ['romance'], tagIds: [], content: [], state: null, summary: null, version: '.510b', detectedVersion: '.510b', favoriteAt: null })
