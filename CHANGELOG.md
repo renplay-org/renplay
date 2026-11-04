@@ -28,6 +28,12 @@ release notes say what).
 
 ### Changed
 
+- Renplay moved to its own domain, renplay.org. It reads the catalog from catalog.renplay.org and
+  engines from engines.renplay.org, and its links go through renplay.org. **Upgrade to this
+  version:** older versions read both from addresses that no longer exist, so they cannot refresh
+  the catalog or download a new engine (games already installed keep working).
+- The image is `ghcr.io/renplay-org/renplay` (the organization was renamed), and also on Docker
+  Hub as `renplay/renplay`.
 - Games show the version the catalog gives their release ("0.9.23") instead of the text inside
   the download, and update offers follow the same release.
 - Tags come from the catalog's fixed list; the library shows the ones your games share.

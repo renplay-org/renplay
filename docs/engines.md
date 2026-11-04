@@ -83,7 +83,7 @@ Recipes say which engine made the game. Schema 3 names (`index.v3.json`, Renplay
 
 ```yaml
 engine: godot          # renpy (default) | html | godot | unity
-runtime: 4.6.2         # web runtime to build with, from renplay-web/engines (optional)
+runtime: 4.6.2         # web runtime to build with, from renplay-org/engines (optional)
 releases:
   - version: "0.17.0"
     madeWith: 4.6.2    # version of the engine the game was made with
@@ -128,7 +128,7 @@ with a `family` field; entries without one are Ren'Py.
    compiled for the web, which games do not ship.
 
    What building it takes, from that try:
-   - **Runtime pack**: renplay-web/engines builds `godot-<version>` from the official
+   - **Runtime pack**: renplay-org/engines builds `godot-<version>` from the official
      `Godot_v<version>-stable_export_templates.tpz` (checked against the release's SHA512-SUMS):
      `godot.js`, `godot.wasm` (gzipped), the two audio worklets and Godot's license. The index
      lists them under a separate `runtimes` key with `family: "godot"`, so Renplay 2.7 and older,

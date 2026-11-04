@@ -43,7 +43,7 @@ archives, while they are kept).
 3. **Pick the engine** (`engines.ts`): the recipe's, `RENPLAY_ENGINE`, or the newest published
    engine of the game's major version. Games made with Ren'Py 7 or older get the newest Ren'Py 8
    engine, which loads their scripts; only Python 2-only code fails. Engine packs come from
-   renplay-web/engines and are checksum-verified.
+   renplay-org/engines and are checksum-verified.
 4. **Split RPA archives** (`rpa.ts`) in one sequential pass. The archive index is a Python pickle;
    `util/pickle.ts` reads it as data only, so nothing from the game is executed.
 5. **Optimize images** (`optimize.ts`): PNG and JPEG become WebP under the same names; each

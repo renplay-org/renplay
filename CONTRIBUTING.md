@@ -3,10 +3,10 @@
 Thanks for helping with Renplay!
 
 - **A game does not work, or you got one working:** that belongs in the
-  [catalog](https://github.com/renplay-web/catalog) (requests, broken games, new recipes).
-- **A bug in Renplay itself:** open a [bug report](https://github.com/renplay-web/renplay/issues/new?template=bug_report.yml).
+  [catalog](https://github.com/renplay-org/catalog) (requests, broken games, new recipes).
+- **A bug in Renplay itself:** open a [bug report](https://github.com/renplay-org/renplay/issues/new?template=bug_report.yml).
   For a failed install, attach the job log from Settings › Activity.
-- **An idea:** open an [issue](https://github.com/renplay-web/renplay/issues/new) describing it
+- **An idea:** open an [issue](https://github.com/renplay-org/renplay/issues/new) describing it
   before writing code, so we can agree on the approach.
 
 ## Development
@@ -55,5 +55,5 @@ features, patch for fixes, major when upgrading needs action from you (the chang
 A release is a `release-X.Y.Z` branch (versions bumped, `Unreleased` moved into a dated section of
 `CHANGELOG.md`) squash-merged into `main`. CI checks the versions and the changelog; the release
 workflow tags `vX.Y.Z`, publishes the GitHub release with that changelog section, and pushes the
-image as `ghcr.io/renplay-web/renplay:X.Y.Z` and `:latest`. The full procedure is in
+image as `ghcr.io/renplay-org/renplay:X.Y.Z` and `:latest`. The full procedure is in
 [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md).

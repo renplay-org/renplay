@@ -74,7 +74,7 @@ export interface Recipe {
   match?: string[]
   /** What made the game. Ren'Py is what Renplay is for (docs/engines.md). */
   engine: 'renpy' | 'html' | 'godot' | 'unity'
-  /** Web runtime to build with, from renplay-web/engines; default the newest that fits. */
+  /** Web runtime to build with, from renplay-org/engines; default the newest that fits. */
   runtime?: string
   build?: {
     optimizeImages?: boolean

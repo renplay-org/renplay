@@ -33,7 +33,7 @@ function cacheName(raw: unknown): string {
 }
 
 /** The catalog's recipe schema, for editors that validate YAML (yaml-language-server). */
-export const RECIPE_SCHEMA_URL = 'https://renplay-web.github.io/catalog/recipe.schema.json'
+export const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json'
 
 export interface GameDeps {
   cfg: Config

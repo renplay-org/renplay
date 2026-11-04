@@ -52,9 +52,9 @@ The maintainer squash-merges with the subject `Release X.Y.Z (#N)`. Agents do no
 ## 5. Check what was published
 
 ```sh
-gh run list --repo renplay-web/renplay --branch main --limit 1          # Release workflow passed
-gh release view vX.Y.Z --repo renplay-web/renplay                        # notes = changelog section
-docker buildx imagetools inspect ghcr.io/renplay-web/renplay:X.Y.Z       # image exists; note the digest
+gh run list --repo renplay-org/renplay --branch main --limit 1          # Release workflow passed
+gh release view vX.Y.Z --repo renplay-org/renplay                        # notes = changelog section
+docker buildx imagetools inspect ghcr.io/renplay-org/renplay:X.Y.Z       # image exists; note the digest
 ```
 
 Then fast-forward `dev` to the release branch, so `dev` has the version bump and the dated
@@ -64,7 +64,7 @@ drop them.
 
 ## 6. Deployment
 
-Prepare the change that pins `ghcr.io/renplay-web/renplay:X.Y.Z@sha256:<digest>` in the deployment
+Prepare the change that pins `ghcr.io/renplay-org/renplay:X.Y.Z@sha256:<digest>` in the deployment
 (for the reference deployment: the HelmRelease in the home-ops repository; Renovate usually opens
 this PR by itself). Applying it is the maintainer's decision. After it rolls out, check
 `/api/system` reports version `X.Y.Z` and a game starts.
