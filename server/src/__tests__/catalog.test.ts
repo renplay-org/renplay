@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { Catalog, normalizeRecipe } from '../catalog.js'
+import { Catalog, installedRelease, normalizeRecipe } from '../catalog.js'
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
 
@@ -21,12 +21,17 @@ describe('catalog', () => {
     const sha = createHash('sha256').update(cover).digest('hex')
     const index = {
       schema: 2,
+      vocabulary: { 'sci-fi': { label: 'Sci-fi', group: 'story' } },
       games: [
         {
           id: 'ripples',
           title: 'Ripples',
           developer: 'Jestur',
           tags: ['sci-fi'],
+          tagIds: ['sci-fi'],
+          content: ['violence'],
+          state: 'ongoing',
+          summary: 'A journey through time.',
           cover: { url: 'https://example.invalid/ignored', sha256: sha, width: 1260, height: 1000 },
           releases: [
             { version: '0.9.24', status: 'verified', archives: [] },
@@ -38,6 +43,7 @@ describe('catalog', () => {
       ],
     }
     server = createServer((req, res) => {
+      if (req.url === '/catalog/second.json') return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ schema: 3, vocabulary: { 'sci-fi': { label: 'Overridden', group: 'art' }, adventure: { label: 'Adventure', group: 'play' } }, games: [] }))
       if (req.url === '/catalog/index.json') return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(index))
       if (req.url === '/catalog/covers/ripples.png') {
         coverRequests++
@@ -118,7 +124,7 @@ describe('catalog', () => {
     const root = mkdtempSync(join(tmpdir(), 'renplay-db-'))
     let db = Db.open(root)
     // As 2.1 left it: without the 2.6 columns, with the hand-edited ones.
-    db.raw.exec('ALTER TABLE games DROP COLUMN family; ALTER TABLE games DROP COLUMN engine_label; ALTER TABLE games DROP COLUMN entry')
+    db.raw.exec('ALTER TABLE games DROP COLUMN favorite_at; ALTER TABLE games DROP COLUMN family; ALTER TABLE games DROP COLUMN engine_label; ALTER TABLE games DROP COLUMN entry')
     db.raw.exec("ALTER TABLE games ADD COLUMN save_dir_locked INTEGER NOT NULL DEFAULT 0; ALTER TABLE games ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'; ALTER TABLE games ADD COLUMN cover TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 1")
     db.insertGame({ id: 'kept', title: 'Kept', status: 'installed' })
     db.close()
@@ -128,7 +134,64 @@ describe('catalog', () => {
     expect(cols).not.toContain('cover')
     expect(cols).not.toContain('save_dir_locked')
     expect(db.getGame('kept')).toMatchObject({ title: 'Kept', family: 'renpy', engine_label: '', entry: '' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(3)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(4)
+    db.close()
+  })
+
+  it('merges vocabulary first-wins and restores metadata on an offline start', async () => {
+    const { cfg, db, catalog } = setup()
+    cfg.catalogUrls.push(base.replace('index.json', 'second.json'))
+    await catalog.refresh()
+    expect(catalog.vocabulary).toEqual({ 'sci-fi': { label: 'Sci-fi', group: 'story' }, adventure: { label: 'Adventure', group: 'play' } })
+    expect(catalog.recipe('ripples')).toMatchObject({ tagIds: ['sci-fi'], content: ['violence'], state: 'ongoing', summary: 'A journey through time.' })
+    const restarted = new Catalog({ ...cfg, catalogUrls: ['http://127.0.0.1:9/offline'] }, db)
+    await restarted.init()
+    expect(restarted.vocabulary).toEqual(catalog.vocabulary)
+    expect(restarted.recipe('ripples')).toEqual(catalog.recipe('ripples'))
+    restarted.stop()
+    db.close()
+  })
+
+  it('reads older caches without vocabulary and preserves label-only tags', async () => {
+    const { cfg, db } = setup()
+    db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'old', title: 'Old', tags: ['romance'], releases: [] }] })
+    const catalog = new Catalog(cfg, db)
+    await catalog.init()
+    expect(catalog.vocabulary).toEqual({})
+    expect(catalog.recipe('old')?.tags).toEqual(['romance'])
+    expect(catalog.recipe('old')?.tagIds).toBeUndefined()
+    catalog.stop()
+    db.close()
+  })
+
+  it('matches installed archive names before internal versions for status and updates', () => {
+    const { db, catalog } = setup()
+    const recipe = normalizeRecipe({ id: 'example', title: 'Example', engine: 'renpy', releases: [
+      { version: '0.9.24', status: 'playable', archives: [] },
+      { version: '0.9.23', status: 'verified', archives: [{ name: 'Example-Ch4Up7Public-pc.zip' }] },
+      { version: '0.9.22', status: 'broken', archives: [{ name: 'Example-.510b-pc.zip' }] },
+    ] })
+    expect(installedRelease(recipe, 'Ch4Up7Public', 'folder/Example-Ch4Up7Public-pc.zip')).toMatchObject({ version: '0.9.23', status: 'verified' })
+    expect(installedRelease(recipe, '0.9.24', 'Example-.510b-pc.zip')?.version).toBe('0.9.22')
+    expect(catalog.update(recipe, 'Ch4Up7Public', 'Example-Ch4Up7Public-pc.zip')?.version).toBe('0.9.24')
+    expect(installedRelease(recipe, '0.9.23', 'unknown.zip')?.version).toBe('0.9.23')
+    expect(installedRelease(recipe, 'v0.20_Pre-Alpha', 'unknown.zip')).toBeNull()
+    db.close()
+  })
+
+  it('upgrades v3 in place and reopens v4 without changing favourites', () => {
+    const root = mkdtempSync(join(tmpdir(), 'renplay-db-v3-'))
+    let db = Db.open(root)
+    db.raw.exec('ALTER TABLE games DROP COLUMN favorite_at; PRAGMA user_version = 3')
+    db.insertGame({ id: 'kept', title: 'Kept', source: '{"archive":"game.zip"}' })
+    db.close()
+    db = Db.open(root)
+    expect(db.getGame('kept')).toMatchObject({ title: 'Kept', favorite_at: '', source: '{"archive":"game.zip"}' })
+    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 4 })
+    db.updateGame('kept', { favorite_at: '2026-11-04T12:00:00.000Z' })
+    db.close()
+    db = Db.open(root)
+    expect(db.getGame('kept')?.favorite_at).toBe('2026-11-04T12:00:00.000Z')
     db.close()
   })
 

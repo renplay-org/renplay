@@ -85,9 +85,15 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
   // ---- jobs ---------------------------------------------------------------
 
   router.get('/jobs', (req, res) => {
-    const limit = Math.min(200, Number(req.query['limit']) || 30)
+    const pageNumber = (value: unknown, fallback: number): number => {
+      if (typeof value !== 'string' || !/^\d+$/.test(value)) return fallback
+      const n = Number(value)
+      return Number.isSafeInteger(n) ? n : fallback
+    }
+    const limit = Math.max(1, Math.min(200, pageNumber(req.query['limit'], 30)))
+    const offset = pageNumber(req.query['offset'], 0)
     res.json({
-      jobs: db.listJobs(limit).map((j) => ({
+      jobs: db.listJobs(limit, offset).map((j) => ({
         id: j.id,
         type: j.type,
         game: j.game,
@@ -103,6 +109,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
         finishedAt: j.finished_at || null,
       })),
       busy: jobs.isBusy(),
+      total: db.countJobs(),
     })
   })
 

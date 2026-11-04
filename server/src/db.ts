@@ -45,6 +45,7 @@ export interface GameRow {
   created_at: string
   installed_at: string
   last_played_at: string
+  favorite_at: string
   updated_at: string
 }
 
@@ -151,6 +152,8 @@ export class Db {
         "ALTER TABLE games ADD COLUMN family TEXT NOT NULL DEFAULT 'renpy'; ALTER TABLE games ADD COLUMN engine_label TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN entry TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 3",
       )
     }
+    // 2.10: favourites belong to the library entry, not its installed build.
+    if (v < 4) this.raw.exec("ALTER TABLE games ADD COLUMN favorite_at TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 4")
   }
 
   /**
@@ -218,10 +221,14 @@ export class Db {
     return (this.raw.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as unknown as JobRow) ?? null
   }
 
-  listJobs(limit = 50): JobRow[] {
+  countJobs(): number {
+    return (this.raw.prepare('SELECT COUNT(*) AS total FROM jobs').get() as { total: number }).total
+  }
+
+  listJobs(limit = 50, offset = 0): JobRow[] {
     return this.raw
-      .prepare("SELECT * FROM jobs ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, created_at DESC LIMIT ?")
-      .all(limit) as unknown as JobRow[]
+      .prepare("SELECT * FROM jobs ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, created_at DESC, id DESC LIMIT ? OFFSET ?")
+      .all(limit, offset) as unknown as JobRow[]
   }
 
   updateJob(id: string, updates: Partial<JobRow>): void {
