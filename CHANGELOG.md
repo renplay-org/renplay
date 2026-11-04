@@ -9,11 +9,24 @@ release notes say what).
 
 ### Added
 
-- Server support for favourites that stay in your library when a game is uninstalled.
-- Catalog summaries, game states and richer tags, kept available even when the catalog is offline.
-- Server support for loading more activity history a page at a time.
+- Favourite games from their page and find them together at the top of your library.
+- Library sorting and tag filters, with search and filters restored when you go Back.
+- Search and tag filters in the catalog, plus game summaries, development state and optional content tags.
+- Load more games and activity without opening a long list all at once.
+- Free starter games in an empty library when the catalog has them.
+- Favourites stay in your library when a game is uninstalled.
+- Catalog summaries, game states and richer tags stay available even when the catalog is offline.
+
+### Changed
+
+- Continue playing uses a compact strip when there is no save picture to show.
+- Activity groups repeated attempts and names the archive being processed.
+- Settings shows relative update times and game titles beside each engine.
 
 ### Fixed
+
+- Portrait phones show the sideways hint while a game is loading, and keep the Save & exit label visible.
+- Game details hide save folders for non-Ren’Py games and show detected versions only when they differ.
 
 - Games matched to a catalog release show its version and playability status, even when the
   game's own version text differs. Update offers use the same matched release.

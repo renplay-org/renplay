@@ -118,6 +118,12 @@ The same release determines playability status and available updates.
 
 ## Library preferences and activity
 
+Library search, installation filter, tag and sort live in URL query parameters (`q`, `filter`,
+`tag`, `sort`), so returning from a game page restores the view. Recently added sorts by the
+library entry's `createdAt`, not the installation date. Library pages reveal 60 games initially,
+then 48 at a time; catalog pages reveal 30 at a time. Tag chips count games, include only play
+and story tags shared by at least two games, and use the catalog vocabulary for labels.
+
 Favourites live in `games.favorite_at` (database schema 4), independently of installed builds.
 `PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
 Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
