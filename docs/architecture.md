@@ -105,7 +105,28 @@ saves on uninstall or reinstall.
 `catalog.ts` fetches the index (`index.v3.json`, catalog schema 3; `normalizeRecipe` also reads
 schema 2) every hour (or from Settings). It links installed games to
 recipes (by id, archive or save folder) and reports newer working releases as updates. Library
-metadata (title, developer, tags, links, cover) comes only from recipes.
+metadata (title, developer, tags, links, cover, summary and game state) comes only from recipes.
+
+The cache stores recipes and the tag vocabulary together for offline starts. Vocabulary entries
+from multiple indexes merge in configured order, with the first definition winning.
+`GET /api/catalog` exposes it as `vocabulary: { [tagId]: { label, group } }`. Recipes retain
+`tagIds`, `content`, `state` and `summary`; legacy `tags` labels still work without a vocabulary.
+Game JSON returns empty arrays for missing `tagIds`/`content` and null for missing `state`/`summary`.
+Content tags are not library chips. Display `version` uses the release matched by the installed
+archive's file name, then by version equality; `detectedVersion` keeps the raw detected value.
+The same release determines playability status and available updates.
+
+## Library preferences and activity
+
+Favourites live in `games.favorite_at` (database schema 4), independently of installed builds.
+`PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
+Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
+its timestamp. Uninstall keeps it; forgetting the library entry removes it.
+
+`GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
+clamped to 1–200) and `offset` (default 0). Invalid or unsafe integers use the defaults.
+Jobs sort active first, then newest first, with the id breaking timestamp ties. Offset pages
+reflect the current queue; running jobs can move between pages as their status changes.
 
 Covers are the games' official cover art, linked by the catalog from the developers' own hosting
 (itch.io, Steam) with a sha256. Renplay downloads each one once, refuses it if the checksum

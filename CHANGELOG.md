@@ -7,6 +7,17 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Server support for favourites that stay in your library when a game is uninstalled.
+- Catalog summaries, game states and richer tags, kept available even when the catalog is offline.
+- Server support for loading more activity history a page at a time.
+
+### Fixed
+
+- Games matched to a catalog release show its version and playability status, even when the
+  game's own version text differs. Update offers use the same matched release.
+
 ## [2.9.1] - 2026-11-04
 
 ### Changed
