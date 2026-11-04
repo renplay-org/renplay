@@ -128,8 +128,8 @@ Questions, such as whether a game works, go to
 [Discussions](https://github.com/renplay-web/renplay/discussions); bugs to
 [issues](https://github.com/renplay-web/renplay/issues).
 
-Renplay is made by the Renplay Team (maintainer: Jan Puciłowski). It is free and open source. If
-it is useful to you, you can support it on [Ko-fi](https://ko-fi.com/janpuc).
+Renplay is made by the Renplay Team. It is free and open source. If it is useful to you, you can
+support it on [Ko-fi](https://ko-fi.com/janpuc).
 
 ## License
 
