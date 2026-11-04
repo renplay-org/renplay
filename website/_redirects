@@ -9,4 +9,6 @@
 /support               https://ko-fi.com/janpuc 302
 /catalog/request       /catalog#request 302
 /install               /#install 302
+/docs                  https://docs.renplay.org 302
+/docs/*                https://docs.renplay.org/:splat 302
 /catalog.html          /catalog 301
