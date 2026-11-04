@@ -190,7 +190,7 @@ export default function Player() {
     const ro = new ResizeObserver(() => setStage({ w: el.clientWidth, h: el.clientHeight }))
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [game?.id, isLoading])
 
   // The screen's real safe area (camera cutout, rounded corners, home indicator), per orientation.
   useEffect(() => {
@@ -436,7 +436,7 @@ export default function Player() {
       )}
 
       {/* Portrait phones: games are wide. */}
-      {ready && portrait && !portraitOk && (
+      {portrait && !portraitOk && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/85 p-8 text-center backdrop-blur-sm">
           <Smartphone className="mb-2 size-10 rotate-90 text-accent-300" />
           <p className="text-lg font-semibold">Turn your phone sideways</p>
@@ -475,7 +475,7 @@ export default function Player() {
       >
         <div className="flex items-center gap-2 bg-gradient-to-b from-black/80 via-black/50 to-transparent px-3 pb-6 pt-3 sm:px-5">
           <Button variant="glass" size="sm" icon={<ArrowLeft className="size-4" />} onClick={exit}>
-            <span className="hidden sm:inline">Save & exit</span>
+            <span>Save & exit</span>
           </Button>
           <div className="ml-2 min-w-0">
             <div className="truncate text-sm font-semibold drop-shadow">{game.title}</div>
