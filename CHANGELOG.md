@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-11-04
+
 ### Added
 
 - A library home with Up next, your latest save and play time, shelves for favourites and new
@@ -262,8 +264,8 @@ The first release since 0.1: a rebuild of the whole app.
   images converted to WebP, and the web build is assembled by Renplay. Streamed files are stored in
   one pack per build, which keeps installs fast on network storage.
 - Official Ren'Py web engines per version, downloaded on demand from
-  [renplay-web/engines](https://github.com/renplay-web/engines) and shared by games.
-- Curated catalog ([renplay-web/catalog](https://github.com/renplay-web/catalog)) with recipe
+  [renplay-org/engines](https://github.com/renplay-org/engines) and shared by games.
+- Curated catalog ([renplay-org/catalog](https://github.com/renplay-org/catalog)) with recipe
   export.
 - Mods: browse a game's files, edit scripts in the browser, upload files or a mod zip; changes are
   kept as a separate layer.
@@ -294,17 +296,18 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.9.1...dev
-[2.9.1]: https://github.com/renplay-web/renplay/compare/v2.9.0...v2.9.1
-[2.9.0]: https://github.com/renplay-web/renplay/compare/v2.8.0...v2.9.0
-[2.8.0]: https://github.com/renplay-web/renplay/compare/v2.7.1...v2.8.0
-[2.7.1]: https://github.com/renplay-web/renplay/compare/v2.7.0...v2.7.1
-[2.7.0]: https://github.com/renplay-web/renplay/compare/v2.6.0...v2.7.0
-[2.6.0]: https://github.com/renplay-web/renplay/compare/v2.5.0...v2.6.0
-[2.5.0]: https://github.com/renplay-web/renplay/compare/v2.4.0...v2.5.0
-[2.4.0]: https://github.com/renplay-web/renplay/compare/v2.3.0...v2.4.0
-[2.3.0]: https://github.com/renplay-web/renplay/compare/v2.2.0...v2.3.0
-[2.2.0]: https://github.com/renplay-web/renplay/compare/v2.1.0...v2.2.0
-[2.1.0]: https://github.com/renplay-web/renplay/compare/v0.1.1...v2.1.0
-[0.1.1]: https://github.com/renplay-web/renplay/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/renplay-web/renplay/releases/tag/v0.1.0
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.10.0...dev
+[2.10.0]: https://github.com/renplay-org/renplay/compare/v2.9.1...v2.10.0
+[2.9.1]: https://github.com/renplay-org/renplay/compare/v2.9.0...v2.9.1
+[2.9.0]: https://github.com/renplay-org/renplay/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/renplay-org/renplay/compare/v2.7.1...v2.8.0
+[2.7.1]: https://github.com/renplay-org/renplay/compare/v2.7.0...v2.7.1
+[2.7.0]: https://github.com/renplay-org/renplay/compare/v2.6.0...v2.7.0
+[2.6.0]: https://github.com/renplay-org/renplay/compare/v2.5.0...v2.6.0
+[2.5.0]: https://github.com/renplay-org/renplay/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/renplay-org/renplay/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/renplay-org/renplay/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/renplay-org/renplay/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/renplay-org/renplay/compare/v0.1.1...v2.1.0
+[0.1.1]: https://github.com/renplay-org/renplay/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/renplay-org/renplay/releases/tag/v0.1.0
