@@ -1,0 +1,64 @@
+/* The Renplay colours, from selector/src/index.css. Dark first. */
+:root {
+  --sl-font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  --sl-color-accent-low: #3a1426;
+  --sl-color-accent: #e0306f;
+  --sl-color-accent-high: #fda4c4;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-black: #07070a;
+  --sl-color-gray-6: #0d0d12;
+  --sl-color-gray-5: #17171f;
+  --sl-color-gray-4: #2e2e3a;
+  --sl-color-gray-3: #8c8c9e;
+  --sl-color-gray-2: #c3c3d0;
+  --sl-color-gray-1: #e6e6ee;
+  --sl-color-white: #ffffff;
+  --sl-color-bg: #07070a;
+  --sl-color-bg-nav: #0d0d12;
+  --sl-color-bg-sidebar: #0d0d12;
+  --sl-color-bg-inline-code: #17171f;
+  --sl-color-hairline: #22222c;
+  --sl-color-hairline-light: #22222c;
+  --sl-color-hairline-shade: #121219;
+  --sl-color-accent-low: #3a1426;
+  --sl-color-accent: #f4508a;
+  --sl-color-accent-high: #fb7aa8;
+  --sl-color-text-accent: #fb7aa8;
+  --sl-color-bg-accent: #e0306f;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #fde3ec;
+  --sl-color-accent: #e0306f;
+  --sl-color-accent-high: #a8164f;
+  --sl-color-text-accent: #c2255f;
+}
+
+.sl-markdown-content img {
+  border-radius: 0.75rem;
+  border: 1px solid var(--sl-color-hairline);
+}
+
+.sl-markdown-content .phone-shots {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.sl-markdown-content .phone-shots img {
+  max-width: 14rem;
+}
+
+/* Wide tables scroll inside the page instead of the page, so phones stay readable. */
+.sl-markdown-content table {
+  display: block;
+  overflow-x: auto;
+}
+
+/* The logo on the home page: smaller, with the app icon's rounded corners. */
+.hero img {
+  max-width: 14rem;
+  border-radius: 22%;
+  border: 0;
+}

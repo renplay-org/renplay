@@ -1,0 +1,28 @@
+---
+title: Synology
+description: Run Renplay on Synology. A ready-made package is coming.
+---
+
+:::note[Status: coming]
+There is no Renplay package for Synology yet, and Renplay is not listed in a Synology package. This page
+will link to it when it exists.
+:::
+
+## What works today
+
+DSM runs containers with Container Manager, with shared folders for the two folders. Renplay is a normal container, so you can run it there like any other:
+
+1. Create two folders on a disk with room for games: one for games, one for data.
+2. In Container Manager, create a container from the image `ghcr.io/renplay-org/renplay` (or
+   `renplay/renplay` on Docker Hub). Pin a version tag.
+3. Map port **8080** of the container to a port on the NAS.
+4. Mount the games folder at `/games` and the data folder at `/data`.
+5. Make sure the container may write to both folders. The image runs as user and group 1000; if
+   your system cannot give that user access, run the container as a user that owns the folders.
+
+The names of the screens differ between versions of the system, so these steps stay general. The
+settings are the same as in [Docker and Docker Compose](/install/docker/), which also lists the
+options.
+
+Keep `/data` in your NAS backups. Put a sign-in in front of Renplay before you open it to the
+internet: [Reverse proxy and HTTPS](/install/reverse-proxy/).

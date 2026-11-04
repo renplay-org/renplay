@@ -1,9 +1,10 @@
 # Contributing
 
-Thanks for helping with Renplay!
+Thanks for helping with Renplay! The long version is in the
+[docs](https://docs.renplay.org/developers/contributing/); this is the short one.
 
 - **A game does not work, or you got one working:** that belongs in the
-  [catalog](https://github.com/renplay-org/catalog) (requests, broken games, new recipes).
+  [catalog](https://renplay.org/github/catalog) (requests, broken games, new recipes).
 - **A bug in Renplay itself:** open a [bug report](https://github.com/renplay-org/renplay/issues/new?template=bug_report.yml).
   For a failed install, attach the job log from Settings › Activity.
 - **An idea:** open an [issue](https://github.com/renplay-org/renplay/issues/new) describing it
@@ -30,7 +31,7 @@ RENPLAY_BACKEND=https://renplay.example npm run dev
 Put a game's PC zip into `/tmp/rp/games/_archives/` and install it from the UI. `make test` runs
 the server tests and the UI type check; `make dev` runs the container with `./games` and `./data`.
 
-[docs/architecture.md](docs/architecture.md) explains how the pieces fit together, and
+[How Renplay works](https://docs.renplay.org/developers/architecture/) explains how the pieces fit together, and
 [AGENTS.md](AGENTS.md) lists the product rules and lessons learned (useful for humans too).
 
 ## Pull requests
@@ -42,6 +43,9 @@ the server tests and the UI type check; `make dev` runs the container with `./ga
 4. For UI changes, look at them on a phone size and a desktop size
    (`cd server && npm run screenshots -- http://localhost:5199 /tmp/shots`).
 5. Add a line to `CHANGELOG.md` under `Unreleased` for anything users notice.
+6. Docs live in `docs/site` (`npm ci && npm run build` there). A new or changed environment
+   variable goes in `server/src/envvars.ts`; run `npm run gen` in `docs/site` to update the
+   Configuration page, or the server tests fail.
 
 Pull requests are squash-merged.
 

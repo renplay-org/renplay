@@ -72,7 +72,7 @@ export interface Recipe {
   continuesFrom?: string[]
   /** Archive name patterns (with *) that belong to this game, for releases not listed yet. */
   match?: string[]
-  /** What made the game. Ren'Py is what Renplay is for (docs/engines.md). */
+  /** What made the game. Ren'Py is what Renplay is for (docs.renplay.org/engines). */
   engine: 'renpy' | 'html' | 'godot' | 'unity'
   /** Web runtime to build with, from renplay-org/engines; default the newest that fits. */
   runtime?: string

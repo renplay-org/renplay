@@ -12,7 +12,7 @@ export const ADULT_REASON = 'This is an adult game, and this Renplay shows safe-
  * Whether this Renplay shows adult games. RENPLAY_ADULT_GAMES locks the choice;
  * otherwise a database setting holds it. Libraries that existed before the
  * switch were given "allow" by the database migration; a fresh install has no
- * choice yet and blocks until the admin answers (docs/architecture.md).
+ * choice yet and blocks until the admin answers (docs.renplay.org/developers/architecture).
  */
 export class ContentMode {
   constructor(

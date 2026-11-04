@@ -1,0 +1,10 @@
+// The docs at https://docs.renplay.org, served by Cloudflare as static files.
+// `npm run build` writes dist/; .github/workflows/docs.yml deploys it on every push to main.
+{
+  "name": "renplay-docs",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./dist", "html_handling": "auto-trailing-slash", "not_found_handling": "404-page" },
+  "routes": [{ "pattern": "docs.renplay.org", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}

@@ -4,10 +4,10 @@ Renplay is a self-hosted web app that plays the PC releases of Ren'Py visual nov
 on desktops and phones, with saves stored on the server. A user adds a game's normal PC download;
 Renplay builds it for the web (no Ren'Py SDK, the game's code never runs on the server), streams
 its assets, and syncs every save to the server so play continues on any device. HTML games (Twine
-and similar) play too, as second-class citizens; other engines are planned (`docs/engines.md`).
+and similar) play too, as second-class citizens; other engines are planned (`docs/site/src/content/docs/engines.md`).
 
 Read this file before changing anything. `README.md` is for users, `CONTRIBUTING.md` for human
-contributors, `docs/architecture.md` explains the internals in depth, `CHANGELOG.md` records every
+contributors, `docs/site/src/content/docs/developers/architecture.md` explains the internals in depth, `CHANGELOG.md` records every
 user-visible change.
 
 ## Related repositories (organization renplay-org)
@@ -30,7 +30,7 @@ These decide most review comments. Follow them without being asked.
 - **Ren'Py first.** Renplay is a Ren'Py player. Other engines are second-class and shown as Beta:
   recognized, and supported only when their normal download plays easily (HTML games today), with
   the features that come cheap. A feature may work only for Ren'Py; never make Ren'Py worse for
-  another engine. Plan and status: `docs/engines.md`.
+  another engine. Plan and status: `docs/site/src/content/docs/engines.md`.
 - **Saves are sacred.** Never delete or rewrite save data as a side effect. Every overwrite and
   delete keeps history. Uninstall and reinstall leave saves alone.
 - **Works on phones.** Every screen must work at 390 px wide in portrait and in landscape, with
@@ -72,7 +72,8 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. N
   src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
 runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
 deploy/            nginx.conf.template and entrypoint.sh for the container
-docs/              Architecture notes, logo, screenshots
+docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
+                     page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
 ```
 
 ## How it fits together
@@ -175,7 +176,8 @@ except screenshots.
 3. UI changes are looked at on a phone size (WebKit, iPhone) and a desktop size, using
    `npm run screenshots` or Playwright directly. No page errors.
 4. User-visible changes have a line in `CHANGELOG.md` under `Unreleased`, written for users.
-5. README or `docs/` updated when setup, configuration or behavior described there changed.
+5. README or the docs (`docs/site`) updated when setup, configuration or behavior described there changed. A new
+   environment variable goes in `server/src/envvars.ts`, then `npm run gen` in `docs/site`.
 
 ## Workflow
 

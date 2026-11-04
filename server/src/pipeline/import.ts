@@ -294,7 +294,7 @@ export async function setSourcesAside(zipPackPath: string, zip: PackWriter, asse
 }
 
 /**
- * Installs an HTML game (docs/engines.md): its folder into one pack, images as
+ * Installs an HTML game (docs.renplay.org/engines): its folder into one pack, images as
  * WebP. No engine to fetch and no game.zip; the page is served from the pack.
  */
 async function installHtml(

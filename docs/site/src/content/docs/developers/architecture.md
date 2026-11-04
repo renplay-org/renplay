@@ -1,8 +1,11 @@
-# How Renplay works
+---
+title: How Renplay works
+description: How installs, builds, the player and saves fit together.
+---
 
 Renplay turns the PC release of a Ren'Py game into a web build, serves it, and keeps the player's
 saves on the server. This page explains the parts and why they are built the way they are. HTML
-games take a shorter path through the same parts; [engines.md](engines.md) covers them and the
+games take a shorter path through the same parts; [Engines](/engines/) covers them and the
 engines still to come.
 
 ```
@@ -37,7 +40,7 @@ archives, while they are kept).
 
 1. **Read the archive in place** (`archive.ts`): zip, 7z, rar or tar, without unpacking it to disk.
    Find the game folder and the Ren'Py version (`renpy/vc_version.py`). Other engines' games are
-   recognized (`family.ts`) and refused with the reason; see [engines.md](engines.md).
+   recognized (`family.ts`) and refused with the reason; see [Engines](/engines/).
 2. **Match the catalog** (`catalog.ts`): by sha256, name and size, or a `match` pattern. The recipe
    can choose the engine, files to keep or exclude, and small patches.
 3. **Pick the engine** (`engines.ts`): the recipe's, `RENPLAY_ENGINE`, or the newest published
