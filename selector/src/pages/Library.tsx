@@ -193,7 +193,7 @@ export default function Library() {
             </Link>
           }
         >
-          Drop Ren’Py game archives into the archives folder on the server, or upload one. Renplay unpacks, optimizes and prepares them for the browser.
+          Drop the downloads of Ren’Py or HTML games into the archives folder on the server, or upload one. Renplay unpacks, optimizes and prepares them for the browser.
         </Empty>
       ) : !shown.length ? (
         <Empty title="No games match">Try a different search or filter.</Empty>

@@ -3,7 +3,8 @@
 Renplay is a self-hosted web app that plays the PC releases of Ren'Py visual novels in the browser,
 on desktops and phones, with saves stored on the server. A user adds a game's normal PC download;
 Renplay builds it for the web (no Ren'Py SDK, the game's code never runs on the server), streams
-its assets, and syncs every save to the server so play continues on any device.
+its assets, and syncs every save to the server so play continues on any device. HTML games (Twine
+and similar) play too, as second-class citizens; other engines are planned (`docs/engines.md`).
 
 Read this file before changing anything. `README.md` is for users, `CONTRIBUTING.md` for human
 contributors, `docs/architecture.md` explains the internals in depth, `CHANGELOG.md` records every
@@ -26,9 +27,10 @@ These decide most review comments. Follow them without being asked.
 - **Curated, not configurable.** Title, developer, tags, links and cover come only from the game's
   catalog recipe. Users cannot edit them; there are no per-install image or engine options in the
   UI. Add a setting only when a real user need cannot be solved by better defaults or a recipe.
-- **Ren'Py first.** Renplay is a Ren'Py player. Other engines are second-class: recognized, and
-  installed where a browser can run them, with the features that come cheap. A feature may work
-  only for Ren'Py; never make Ren'Py worse for another engine. Plan and status: `docs/engines.md`.
+- **Ren'Py first.** Renplay is a Ren'Py player. Other engines are second-class and shown as Beta:
+  recognized, and supported only when their normal download plays easily (HTML games today), with
+  the features that come cheap. A feature may work only for Ren'Py; never make Ren'Py worse for
+  another engine. Plan and status: `docs/engines.md`.
 - **Saves are sacred.** Never delete or rewrite save data as a side effect. Every overwrite and
   delete keeps history. Uninstall and reinstall leave saves alone.
 - **Works on phones.** Every screen must work at 390 px wide in portrait and in landscape, with
