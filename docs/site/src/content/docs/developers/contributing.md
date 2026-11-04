@@ -91,4 +91,4 @@ from `main`, so they describe the released version. The full procedure is in the
 
 Renplay is made by the Renplay Team, under the [MIT license](https://github.com/renplay-org/renplay/blob/main/LICENSE).
 Ren’Py is © Tom Rothamel and contributors, under its own license. Games belong to their developers.
-Support Renplay on [Ko-fi](https://renplay.org/support).
+[Support Renplay](https://renplay.org/support).

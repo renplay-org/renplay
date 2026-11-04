@@ -2,7 +2,7 @@
 
 <h1 align="center">Renplay</h1>
 
-<p align="center"><b>Your Ren’Py and HTML games in the browser, on any device, with saves on your own server.</b></p>
+<p align="center"><b>Renplay is a self-hosted player for Ren’Py games in the browser, with saves on your own server.</b></p>
 
 <p align="center">
   <a href="https://github.com/renplay-org/renplay/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/renplay-org/renplay?color=e0306f"></a>
@@ -10,7 +10,7 @@
   <a href="https://renplay.org/support"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/support-Ko--fi-fb7aa8?logo=kofi&logoColor=white"></a>
 </p>
 
-<p align="center"><a href="https://docs.renplay.org">Documentation</a> · <a href="https://renplay.org">Website</a> · <a href="https://renplay.org/github/catalog">Catalog</a></p>
+<p align="center"><a href="https://renplay.org/docs">Docs</a> · <a href="https://renplay.org">Website</a> · <a href="https://renplay.org/catalog">Catalog</a> · <a href="https://renplay.org/releases">Release notes</a> · <a href="https://renplay.org/support">Support</a></p>
 
 <p align="center"><img src="docs/screenshots/desktop-library.webp" alt="The Renplay library with two games and a Continue playing banner" width="880"></p>
 
@@ -37,7 +37,7 @@ Other engines are added only when their normal download plays as easily; the
 - **One-click installs.** Drop in the PC zip (or 7z, rar). Renplay unpacks it, shrinks the images
   and prepares it for the web. No Ren’Py SDK, and the game’s code never runs on your server.
 - **A curated catalog.** Known games get their proper title, cover, links and tested settings from
-  the [catalog](https://renplay.org/github/catalog), and Renplay tells you when a newer tested
+  the [catalog](https://renplay.org/catalog), and Renplay tells you when a newer tested
   version exists.
 - **Resume in one tap.** Up next opens your latest save straight away, with play time and your
   last save on the library home. Mark a story Finished on its game page to leave it out of Up next;
@@ -90,7 +90,7 @@ else can be rebuilt from the game downloads.
 
 **Which games work?** Ren’Py 8 games, and most Ren’Py 7 games. HTML games such as Twine stories
 play too, marked Beta. See [Engines](https://docs.renplay.org/engines/) and the
-[catalog](https://renplay.org/github/catalog), which lists games that were tested.
+[catalog](https://renplay.org/catalog), which lists games that were tested.
 
 **Where do I get games?** From their developers: itch.io, Patreon, Steam and so on. Renplay and
 its catalog never host game files.
@@ -118,7 +118,7 @@ Questions, such as whether a game works, go to
 [issues](https://renplay.org/issues).
 
 Renplay is made by the Renplay Team. It is free and open source. If it is useful to you, you can
-support it on [Ko-fi](https://renplay.org/support).
+[support it](https://renplay.org/support).
 
 ## License
 

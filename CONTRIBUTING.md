@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping with Renplay! The long version is in the
+Thanks for helping with Renplay. The long version is in the
 [docs](https://docs.renplay.org/developers/contributing/); this is the short one.
 
 - **A game does not work, or you got one working:** that belongs in the
