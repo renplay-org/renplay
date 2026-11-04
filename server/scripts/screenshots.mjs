@@ -3,7 +3,7 @@
 //
 //   node scripts/screenshots.mjs <base URL> <output dir> [game id] [--sfw]
 //
-// --sfw blurs pictures of adult games (Renplay's own setting). Use it for
+// --sfw hides pictures of adult games (Renplay's own setting). Use it for
 // anything published: docs, the website, issues.
 //
 // Needs the browsers once: npx playwright install chromium webkit
@@ -47,7 +47,6 @@ const desktop = await chromium.launch()
     await shot(page, 'desktop-details', true)
   }
   await page.goto(base + '/add')
-  await page.getByRole('button', { name: 'Catalog' }).first().click()
   await shot(page, 'desktop-catalog')
   await page.goto(base + '/settings')
   await shot(page, 'desktop-settings', true)

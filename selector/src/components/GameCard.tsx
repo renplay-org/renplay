@@ -1,4 +1,4 @@
-import { ArrowUpCircle, CloudOff, Download, Heart, Play, Puzzle, Save } from 'lucide-react'
+import { ArrowUpCircle, Heart, Play } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Game } from '../lib/api'
@@ -9,21 +9,21 @@ import { Badge, BetaBadge, cx, Progress } from './ui'
 /** Shape of cover frames: itch.io's cover format (630×500), which most official art uses. */
 export const COVER_ASPECT = 'aspect-[63/50]'
 
-function hue(s: string): number {
+export function hue(s: string): number {
   let h = 0
   for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360
   return h
 }
 
 /** Stand-in for games without a cover: a tint from the title and its name. */
-function TitleTile({ title }: { title: string }) {
+export function TitleTile({ title }: { title: string }) {
   const h = hue(title)
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center overflow-hidden p-[8%]"
+      className="absolute inset-0 flex items-end justify-start overflow-hidden p-[8%]"
       style={{ background: `radial-gradient(130% 120% at 0% 0%, hsl(${h} 45% 34%), hsl(${(h + 35) % 360} 40% 16%) 55%, hsl(${(h + 60) % 360} 30% 8%))` }}
     >
-      <span className="line-clamp-3 text-balance text-center font-display text-[clamp(1rem,7cqw,2.5rem)] font-bold leading-tight tracking-tight text-white/85">{title}</span>
+      <span className="line-clamp-3 text-balance text-left font-display text-[clamp(1rem,11cqw,2.5rem)] font-bold leading-tight tracking-tight text-white/85">{title}</span>
     </div>
   )
 }
@@ -31,19 +31,19 @@ function TitleTile({ title }: { title: string }) {
 /**
  * A game's cover in a frame of any shape. Art that does not match the frame's
  * shape is shown whole, over a blurred copy of itself, so logos are never cut
- * off. Adult games' covers are blurred when this browser asks for it.
+ * off. Hidden adult covers are title cards and never request the original art.
  */
-export function Cover({ game, className, rounded = true }: { game: Pick<Game, 'title' | 'cover'> & { nsfw?: boolean }; className?: string; rounded?: boolean }) {
+export function Cover({ game, className, rounded = true }: { game: Pick<Game, 'title' | 'cover'> & { nsfw?: boolean; coverSfw?: boolean }; className?: string; rounded?: boolean }) {
   const [failed, setFailed] = useState(false)
   const [fit, setFit] = useState<'cover' | 'contain' | null>(null)
   const [blurAdult] = useBlurAdultCovers()
   const frame = useRef<HTMLDivElement>(null)
   const src = game.cover
-  const hidden = blurAdult && !!game.nsfw
+  const hidden = blurAdult && !!game.nsfw && !game.coverSfw
   return (
     <div ref={frame} className={cx('@container relative overflow-hidden bg-ink-800', rounded && 'rounded-2xl', className)}>
-      {!fit && !failed && src && <div className="skeleton absolute inset-0" />}
-      {src && !failed ? (
+      {!hidden && !fit && !failed && src && <div className="skeleton absolute inset-0" />}
+      {src && !failed && !hidden ? (
         <div className={cx('absolute inset-0 transition-opacity duration-500', fit ? 'opacity-100' : 'opacity-0', hidden && 'scale-110 blur-2xl')}>
           {fit === 'contain' && <img src={src} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover opacity-60 blur-xl" />}
           <img
@@ -65,8 +65,8 @@ export function Cover({ game, className, rounded = true }: { game: Pick<Game, 't
       ) : (
         <TitleTile title={game.title} />
       )}
-      {hidden && src && !failed && (
-        <span className="absolute inset-0 flex items-center justify-center">
+      {hidden && (
+        <span className="absolute right-2 top-2 flex">
           <span className="rounded-full bg-black/50 px-2.5 py-1 text-xs font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur">18+</span>
         </span>
       )}
@@ -82,22 +82,11 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
     <div className="group animate-rise" style={{ animationDelay: `${Math.min(index, 12) * 30}ms` }}>
       <Link to={`/game/${game.id}`} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400">
         <div className="relative overflow-hidden rounded-2xl ring-1 ring-white/[0.08] transition-all duration-300 group-hover:-translate-y-1 group-hover:ring-white/20 group-hover:shadow-[0_24px_60px_-20px_rgb(0_0_0/0.9)]">
-          <Cover game={game} rounded={false} className={cx(COVER_ASPECT, 'transition-transform duration-500 group-hover:scale-[1.03]', !installed && 'opacity-55 grayscale-[35%]')} />
+          <Cover game={game} rounded={false} className={cx(COVER_ASPECT, 'transition-transform duration-500 group-hover:scale-[1.03]', !installed && 'opacity-55')} />
           <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
-            {game.favoriteAt && <Badge className="glass"><Heart aria-label="Favourite" className="size-3 fill-current text-rose-300" /></Badge>}
-            {!installed && !busy && (
-              <Badge tone="neutral" className="glass">
-                <CloudOff className="size-3" /> Not installed
-              </Badge>
-            )}
             {game.update && !busy && (
               <Badge tone="accent" className="glass">
                 <ArrowUpCircle className="size-3" /> Update
-              </Badge>
-            )}
-            {game.mods.files > 0 && (
-              <Badge tone="violet" className="glass">
-                <Puzzle className="size-3" /> Modded
               </Badge>
             )}
           </div>
@@ -114,7 +103,7 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
             </button>
           )}
           {busy && (
-            <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-gradient-to-t from-black/90 to-black/40 p-3">
+            <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-black/80 p-3 backdrop-blur-sm">
               <div className="flex items-center justify-between text-[11px] text-zinc-200">
                 <span className="truncate">{busy.status === 'queued' ? 'Queued' : busy.stage || 'Working'}</span>
                 <span className="tabular-nums">{busy.status === 'running' ? pct(busy.progress) : ''}</span>
@@ -125,21 +114,13 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
         </div>
         <div className="px-0.5 pt-2.5">
           <h3 className="line-clamp-1 text-[15px] font-semibold tracking-tight text-white">{game.title}</h3>
-          <div className="mt-0.5 flex items-center gap-3 text-[12px] text-zinc-400">
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-zinc-400">
+            {game.favoriteAt && <Heart aria-label="Favourite" className="size-3 shrink-0 fill-current text-rose-300" />}
             <BetaBadge engine={game.family} />
-            {game.version && <span className="truncate">{game.version}</span>}
-            {game.saves.count > 0 && (
-              <span className="flex shrink-0 items-center gap-1">
-                <Save className="size-3" /> {game.saves.count}
-              </span>
-            )}
+            {game.version && <span className="max-w-20 truncate text-zinc-500">{game.version}</span>}
             {game.lastPlayedAt ? (
-              <span className="ml-auto shrink-0">{capitalize(ago(game.lastPlayedAt))}</span>
-            ) : !installed && game.canReinstall ? (
-              <span className="ml-auto flex shrink-0 items-center gap-1 text-zinc-300">
-                <Download className="size-3" /> Install
-              </span>
-            ) : null}
+              <span className="truncate">{capitalize(ago(game.lastPlayedAt))}</span>
+            ) : <span>{installed ? 'Not played yet' : 'Not installed'}</span>}
           </div>
         </div>
       </Link>

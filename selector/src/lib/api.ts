@@ -37,6 +37,11 @@ export interface Game {
   version: string | null
   detectedVersion: string | null
   favoriteAt: string | null
+  finishedAt: string | null
+  playTime: number
+  latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot'> | null
+  coverSfw?: boolean
+  free?: boolean
   renpyVersion: string | null
   engine: string | null
   sizeBytes: number
@@ -47,7 +52,7 @@ export interface Game {
   canReinstall: boolean
   recipe: { id: string; links: Record<string, string>; continuesFrom: string[]; status: string | null } | null
   /** A newer working release listed in the catalog. */
-  update: { version: string; date: string | null; status: string } | null
+  update: { version: string; date: string | null; status: string; archives?: string[] } | null
   createdAt: string
   installedAt: string | null
   lastPlayedAt: string | null
@@ -127,7 +132,7 @@ export interface Archive {
   sha256: string | null
   info: ArchiveInfo | null
   installedAs: string | null
-  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean } | null
+  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean; coverSfw?: boolean } | null
   existingGame: string | null
 }
 
@@ -151,6 +156,8 @@ export interface Recipe {
   state?: GameState
   summary?: string
   nsfw?: boolean
+  free?: boolean
+  coverSfw?: boolean
   cover?: string | null
   links?: Record<string, string>
   saveDir?: string
@@ -236,11 +243,12 @@ export function jobTitle(j: Job, games: Game[]): string {
   const name = j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? game?.source.archive?.split('/').pop() ?? game?.title ?? j.game
   switch (j.type) {
     case 'import':
-      return game && game.status === 'installed' && j.status !== 'done' ? `Updating ${name}` : `Installing ${name || 'game'}`
+      if (j.status === 'done') return `Installed ${name || 'game'}`
+      return game && game.status === 'installed' ? `Updating ${name}` : `Installing ${name || 'game'}`
     case 'apply-mods':
-      return `Applying mods to ${name}`
+      return `${j.status === 'done' ? 'Applied' : 'Applying'} mods to ${name}`
     case 'hash-archive':
-      return `Checking ${name}`
+      return `${j.status === 'done' ? 'Checked' : 'Checking'} ${name}`
     default:
       return j.type
   }

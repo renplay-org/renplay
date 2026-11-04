@@ -85,6 +85,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
                 exact: match.exact,
                 cover: catalog.cover(match.recipe.id),
                 nsfw: match.recipe.nsfw ?? false,
+                coverSfw: typeof match.recipe.cover === 'object' && match.recipe.cover.sfw === true,
               }
             : null,
           existingGame: (match ? db.gameByRecipe(match.recipe.id)?.id : null) ?? (info?.saveDir ? (db.gameBySaveDir(info.saveDir)?.id ?? null) : null),
@@ -222,7 +223,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
       vocabulary: catalog.vocabulary,
       games: catalog.list().map((r) => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
-        return { ...r, _base: undefined, cover: catalog.cover(r.id), local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
+        return { ...r, _base: undefined, cover: catalog.cover(r.id), coverSfw: typeof r.cover === 'object' && r.cover.sfw === true, local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
       }),
     })
   })

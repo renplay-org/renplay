@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
@@ -71,7 +71,7 @@ describe('HTTP API', () => {
   })
 
   it('exposes catalog vocabulary, metadata and matched display versions', async () => {
-    const recipe = { id: 'metadata-game', title: 'Metadata Game', engine: 'renpy', tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: 'A journey through time.', releases: [
+    const recipe = { id: 'metadata-game', title: 'Metadata Game', engine: 'renpy', free: true, cover: { url: 'cover.png', sfw: true }, tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: 'A journey through time.', releases: [
       { version: '0.9.24', status: 'playable', archives: [] },
       { version: '0.9.23', status: 'verified', archives: [{ name: 'Metadata-Ch4Up7Public-pc.zip' }] },
     ] }
@@ -83,10 +83,10 @@ describe('HTTP API', () => {
     app.db.insertGame({ id: 'legacy-game', title: 'Legacy', recipe_id: 'legacy-game', version: '.510b' })
     const catalog = (await request(app.app).get('/api/catalog').expect(200)).body
     expect(catalog.vocabulary).toEqual(vocabulary)
-    expect(catalog.games.find((g: { id: string }) => g.id === recipe.id)).toMatchObject({ tagIds: ['sci-fi'], local: { version: '0.9.23', detectedVersion: 'Ch4Up7Public' } })
+    expect(catalog.games.find((g: { id: string }) => g.id === recipe.id)).toMatchObject({ free: true, coverSfw: true, tagIds: ['sci-fi'], local: { version: '0.9.23', detectedVersion: 'Ch4Up7Public' } })
     const game = (await request(app.app).get('/api/games/metadata-game').expect(200)).body.game
     expect(game.createdAt).toBe(app.db.getGame('metadata-game')!.created_at)
-    expect(game).toMatchObject({ tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: recipe.summary, version: '0.9.23', detectedVersion: 'Ch4Up7Public', recipe: { status: 'verified' }, update: { version: '0.9.24' } })
+    expect(game).toMatchObject({ free: true, coverSfw: true, tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: recipe.summary, version: '0.9.23', detectedVersion: 'Ch4Up7Public', recipe: { status: 'verified' }, update: { version: '0.9.24' } })
     const legacy = (await request(app.app).get('/api/games/legacy-game').expect(200)).body.game
     expect(legacy).toMatchObject({ tags: ['romance'], tagIds: [], content: [], state: null, summary: null, version: '.510b', detectedVersion: '.510b', favoriteAt: null })
     app.db.deleteGame('metadata-game')
@@ -110,6 +110,43 @@ describe('HTTP API', () => {
     await request(app.app).put(`${path}/favorite`).send({ on: true }).expect(200)
     await request(app.app).delete(`${path}?forget=1`).expect(200)
     expect(app.db.getGame('favorite-game')).toBeNull()
+  })
+
+  it('stores finished state and measured play time without changing saves', async () => {
+    app.db.insertGame({ id: 'progress-game', title: 'Progress', save_dir: 'Progress-123' })
+    const path = '/api/games/progress-game'
+    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(5)
+    expect((await request(app.app).get(path)).body.game).toMatchObject({ playTime: 0, finishedAt: null, latestSave: null })
+    for (const on of [undefined, 'true', 1]) await request(app.app).put(`${path}/finished`).send({ on }).expect(400)
+    await request(app.app).put('/api/games/missing/finished').send({ on: true }).expect(404)
+    const timestamp = (await request(app.app).put(`${path}/finished`).send({ on: true }).expect(200)).body.game.finishedAt
+    expect(new Date(timestamp).toISOString()).toBe(timestamp)
+    expect((await request(app.app).put(`${path}/finished`).send({ on: true })).body.game.finishedAt).toBe(timestamp)
+    for (const seconds of [-1, 0, 61, 1.5, '10', null]) await request(app.app).post(`${path}/play-time`).send({ seconds }).expect(400)
+    await request(app.app).post('/api/games/missing/play-time').send({ seconds: 10 }).expect(404)
+    await request(app.app).post(`${path}/play-time`).send({ seconds: 15 }).expect(200)
+    await request(app.app).post(`${path}/play-time`).send({ seconds: 10 }).expect(200)
+    expect((await request(app.app).delete(path).expect(200)).body.game).toMatchObject({ playTime: 25, finishedAt: timestamp })
+    expect((await request(app.app).put(`${path}/finished`).send({ on: false })).body.game.finishedAt).toBeNull()
+    app.db.deleteGame('progress-game')
+  })
+
+  it('includes the newest valid save in the library and refreshes changed metadata', async () => {
+    app.db.insertGame({ id: 'latest-game', title: 'Latest', save_dir: 'Latest-123' })
+    const save = (name: string, ctime: number) => zipBuffer({ log: 'pickle', json: JSON.stringify({ _save_name: name, _ctime: ctime, _game_runtime: 42 }), 'screenshot.png': 'png' })
+    await app.saves.write('Latest-123', '1-1-LT1.save', await save('First scene', 100))
+    await app.saves.write('Latest-123', 'auto-1-LT1.save', await save('Next scene', 200))
+    await app.saves.write('Latest-123', 'quick-1-LT1.save', Buffer.from('broken'))
+    await app.saves.write('Latest-123', '_internal.save', await save('Internal', 999))
+    const latest = async () => (await request(app.app).get('/api/games').expect(200)).body.games.find((game: { id: string }) => game.id === 'latest-game')
+    expect(await latest()).toMatchObject({ playTime: 0, latestSave: { file: 'auto-1-LT1.save', name: 'Next scene', ctime: 200000, runtime: 42 } })
+    expect((await latest()).latestSave.screenshot).toContain('/api/saves/latest-game/screenshot?file=auto-1-LT1.save')
+    await app.saves.write('Latest-123', '1-1-LT1.save', await save('A newer scene', 300))
+    expect((await latest()).latestSave).toMatchObject({ file: '1-1-LT1.save', name: 'A newer scene', ctime: 300000 })
+    await app.saves.remove('Latest-123', '1-1-LT1.save', 'user-delete')
+    expect((await latest()).latestSave.name).toBe('Next scene')
+    app.db.deleteGame('latest-game')
+    rmSync(join(app.saves.root, 'Latest-123'), { recursive: true, force: true })
   })
 
   it('paginates jobs with a total and stable ordering for equal timestamps', async () => {

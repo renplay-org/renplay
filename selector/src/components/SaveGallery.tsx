@@ -1,11 +1,13 @@
+import Sheet from './Sheet'
+import SceneCard from './SceneCard'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Download, FileArchive, History, ImageIcon, MoreHorizontal, Play, Trash2, Upload } from 'lucide-react'
+import { Copy, Download, FileArchive, History, MoreHorizontal, Play, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, del, post, slotName, type Game, type SaveSlot } from '../lib/api'
 import { ago, bytes, dateTime, duration } from '../lib/format'
 import { useGames, useSaves } from '../lib/queries'
-import { Badge, Button, Confirm, Empty, Menu, MenuItem, Modal, Spinner, cx, errorText, useToast } from './ui'
+import { Badge, Button, Confirm, Empty, MenuItem, Modal, Spinner, cx, errorText, useToast } from './ui'
 
 type Kind = 'all' | 'manual' | 'auto' | 'quick'
 
@@ -93,7 +95,7 @@ export default function SaveGallery({ game }: { game: Game }) {
           Saves you make in the game are stored on the server as soon as you make them. You can also import saves from the desktop version (single <code>.save</code> files or a zip of the save folder).
         </Empty>
       ) : (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
           {slots.map((s) => (
             <div key={s.file} className="group overflow-hidden rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08] transition hover:ring-white/20">
               <button
@@ -102,13 +104,7 @@ export default function SaveGallery({ game }: { game: Game }) {
                 disabled={!game.playUrl}
                 title={game.playUrl ? 'Load this save' : 'Install the game to load saves'}
               >
-                {s.screenshot ? (
-                  <img src={s.screenshot} alt="" loading="lazy" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                ) : (
-                  <div className="flex size-full items-center justify-center text-zinc-600">
-                    <ImageIcon className="size-6" />
-                  </div>
-                )}
+                <SceneCard game={game} save={s} className="size-full rounded-none" />
                 {game.playUrl && (
                   <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                     <span className="flex size-11 items-center justify-center rounded-full bg-white text-black">
@@ -123,20 +119,21 @@ export default function SaveGallery({ game }: { game: Game }) {
               <div className="flex items-start gap-2 p-3">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-zinc-100">{s.name || <span className="text-zinc-400">Untitled</span>}</div>
-                  <div className="mt-0.5 truncate text-[11px] text-zinc-500" title={dateTime(s.ctime)}>
+                  <div className="mt-0.5 text-[11px] text-zinc-500" title={dateTime(s.ctime)}>
                     {ago(s.ctime)}
                     {duration(s.runtime) ? ` · ${duration(s.runtime)} played` : ''}
                   </div>
                 </div>
-                <Menu
+                <Sheet
                   trigger={(toggle) => (
-                    <button onClick={toggle} className="-mr-1 rounded-lg p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200" aria-label="Save actions">
+                    <button onClick={toggle} className="-mr-1 flex size-11 shrink-0 items-center justify-center rounded-lg p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200" aria-label="Save actions">
                       <MoreHorizontal className="size-4" />
                     </button>
                   )}
                 >
                   {(close) => (
                     <>
+                      <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); navigate(`/play/${game.id}?resume=${encodeURIComponent(slotName(s.file))}`) }}>Load</MenuItem>
                       <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.id}/download?file=${encodeURIComponent(s.file)}`))}>
                         Download
                       </MenuItem>
@@ -151,7 +148,7 @@ export default function SaveGallery({ game }: { game: Game }) {
                       </MenuItem>
                     </>
                   )}
-                </Menu>
+                </Sheet>
               </div>
             </div>
           ))}
@@ -159,7 +156,7 @@ export default function SaveGallery({ game }: { game: Game }) {
       )}
 
       <p className="mt-6 text-xs text-zinc-500">
-        Saves are kept on the server in <code className="text-zinc-400">{game.saveDir}</code>. Every overwrite and delete keeps a previous version you can restore.
+        Every save is stored on the server. Overwrites and deletes keep a previous version you can restore from History.
       </p>
 
       <Confirm
@@ -237,7 +234,7 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
   const reason = (r: string) =>
     ({ overwrite: 'Replaced in game', game: 'Replaced in game', 'game-delete': 'Deleted in game', 'user-delete': 'Deleted here', import: 'Replaced by import', restore: 'Before a restore', copy: 'Replaced by a copy' })[r] ?? r
   return (
-    <Modal open onClose={onClose} title={file ? `Previous versions of ${file}` : 'Save history'} wide>
+    <Modal open onClose={onClose} title={file ? `Previous versions of ${file}` : 'Save history'} wide fullPhone>
       {isLoading ? (
         <Spinner />
       ) : !data?.versions.length ? (

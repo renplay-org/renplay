@@ -46,6 +46,8 @@ export interface GameRow {
   installed_at: string
   last_played_at: string
   favorite_at: string
+  finished_at: string
+  play_time: number
   updated_at: string
 }
 
@@ -154,6 +156,8 @@ export class Db {
     }
     // 2.10: favourites belong to the library entry, not its installed build.
     if (v < 4) this.raw.exec("ALTER TABLE games ADD COLUMN favorite_at TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 4")
+    // 2.11: reading progress survives uninstall and rebuilds; saves are untouched.
+    if (v < 5) this.raw.exec("BEGIN; ALTER TABLE games ADD COLUMN finished_at TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN play_time INTEGER NOT NULL DEFAULT 0; PRAGMA user_version = 5; COMMIT")
   }
 
   /**

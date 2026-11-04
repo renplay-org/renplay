@@ -124,10 +124,34 @@ library entry's `createdAt`, not the installation date. Library pages reveal 60 
 then 48 at a time; catalog pages reveal 30 at a time. Tag chips count games, include only play
 and story tags shared by at least two games, and use the catalog vocabulary for labels.
 
-Favourites live in `games.favorite_at` (database schema 4), independently of installed builds.
+Favourites live in `games.favorite_at` (added in database schema 4), independently of installed builds.
 `PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
 Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
 its timestamp. Uninstall keeps it; forgetting the library entry removes it.
+
+Schema 5 adds `games.finished_at` (ISO timestamp or empty) and `games.play_time` (seconds,
+initially zero). The migration is transactional and changes no save files. Uninstall and rebuilds
+keep both fields; removing the library entry removes them, but not saves.
+`PUT /api/games/:id/finished` accepts `{ "on": boolean }`, preserves an existing timestamp and
+returns `{ ok, game }`. Finished stories stay in the library but leave Up next.
+`POST /api/games/:id/play-time` accepts `{ "seconds": integer }` from 1 to 60 and atomically adds
+that interval. The player samples visible, ready time, reports every 15 seconds, and flushes the
+remainder on hiding, exit or unmount with a keepalive request. Hidden tabs, loading and failures
+are not counted. Time starts at this upgrade rather than being inferred from overlapping save
+slots; a lost network report can undercount time, but never changes saves.
+
+Game JSON includes `playTime`, `finishedAt`, and `latestSave` (file, Ren'Py label, name, creation
+time in milliseconds, optional runtime in seconds, and screenshot URL, or null). Library and
+save-gallery metadata share a bounded cache keyed by store root, folder, filename, mtime and size;
+a changed or deleted save is reflected on the next list. Up next uses the newest played installed,
+non-finished game and invalidates on player exit.
+
+Optional catalog `free` and `cover.sfw` are additive to schema 3. The API keeps its existing cover
+URL field and exposes `coverSfw` alongside it, including on archive matches. Safe covers are
+allowed while adult save screenshots remain hidden. The empty library's starter is the first
+Ren'Py recipe with `free: true` that is not `nsfw` and has a working release; without one it shows
+no starter. Browser preference `renplay:blur-adult-covers` now defaults
+to hidden when absent; explicit `0` shows pictures and `1` hides them. Hidden art is not requested.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1–200) and `offset` (default 0). Invalid or unsafe integers use the defaults.

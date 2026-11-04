@@ -37,9 +37,15 @@ says what works.
 - **A curated catalog.** Known games get their proper title, cover, links and tested settings from
   the [catalog](https://github.com/renplay-web/catalog), and Renplay tells you when a newer tested
   version exists.
-- **Resume in one tap.** The library opens your latest save straight away.
+- **Resume in one tap.** Up next opens your latest save straight away, with play time and your
+  last save on the library home. Mark a story Finished on its game page to leave it out of Up next;
+  its saves stay safe.
+- **Pictures stay private.** Adult pictures start hidden in a new browser. Covers become title
+  cards and saves become scene cards, without fetching the hidden art. Catalog covers marked safe
+  for work stay visible. Change this browser's preference in Settings → This browser.
 - **Find your next game.** Keep favourites at the top of your library, sort by last played,
-  title or recently added, and search titles, developers and tags. Library filters stay in the
+  title or recently added, and search titles, developers and tags. Recent combines last played and
+  recently added. Library filters stay in the
   address so Back brings them back. The catalog has search and tag filters too; game pages show
   summaries, development state and optional content tags.
 - **Mods.** Browse a game’s files, edit scripts in the browser, or upload a mod. Your changes stay

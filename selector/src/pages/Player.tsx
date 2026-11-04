@@ -18,6 +18,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react'
+import SceneCard from '../components/SceneCard'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Cover } from '../components/GameCard'
@@ -158,6 +159,9 @@ export default function Player() {
           }
           break
         case 'renplay:exited':
+          void qc.invalidateQueries({ queryKey: ['games'] })
+          void qc.invalidateQueries({ queryKey: ['game', gameId] })
+          void qc.invalidateQueries({ queryKey: ['saves', gameId] })
           navigate(`/game/${gameId}`)
           break
         case 'renplay:error':
@@ -172,6 +176,36 @@ export default function Player() {
     return () => window.removeEventListener('message', onMessage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, resume, sandboxed, game?.saveDir, muted])
+
+  useEffect(() => {
+    if (!ready || exiting || failed) return
+    let previous = performance.now()
+    let seconds = 0
+    const report = () => {
+      const whole = Math.min(60, Math.floor(seconds))
+      if (whole < 1) return
+      seconds -= whole
+      void fetch(`/api/games/${gameId}/play-time`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seconds: whole }), keepalive: true }).catch(() => {})
+    }
+    const sample = () => {
+      const now = performance.now()
+      if (document.visibilityState === 'visible') seconds += Math.min(2, (now - previous) / 1000)
+      previous = now
+      if (seconds >= 15) report()
+    }
+    const visibility = () => { previous = performance.now(); report() }
+    const timer = window.setInterval(sample, 1000)
+    document.addEventListener('visibilitychange', visibility)
+    window.addEventListener('pagehide', report)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', visibility)
+      window.removeEventListener('pagehide', report)
+      report()
+      void qc.invalidateQueries({ queryKey: ['games'] })
+      void qc.invalidateQueries({ queryKey: ['game', gameId] })
+    }
+  }, [ready, exiting, failed, gameId, qc])
 
   useEffect(() => {
     if (game?.screen && !screenSize) setScreenSize(game.screen)
@@ -379,7 +413,7 @@ export default function Player() {
       <div className="absolute inset-x-0 top-0 z-20 h-3" onMouseEnter={showToolbar} onClick={showToolbar} onTouchStart={showToolbar} />
 
       {/* Loader */}
-      <div className={cx('absolute inset-0 z-10 flex flex-col items-center justify-center bg-black transition-opacity duration-700', ready ? 'pointer-events-none opacity-0' : 'opacity-100')}>
+      <div className={cx('absolute inset-0 z-10 flex flex-col items-center justify-center bg-black transition-opacity duration-700', ready || (portrait && !portraitOk) ? 'pointer-events-none opacity-0' : 'opacity-100')}>
         <Cover game={game} rounded={false} className="absolute inset-0 scale-110 opacity-40 blur-2xl" />
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative flex w-full max-w-md flex-col items-center px-8 text-center">
@@ -437,10 +471,11 @@ export default function Player() {
 
       {/* Portrait phones: games are wide. */}
       {portrait && !portraitOk && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/85 p-8 text-center backdrop-blur-sm">
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/95 p-8 text-center backdrop-blur-sm">
           <Smartphone className="mb-2 size-10 rotate-90 text-accent-300" />
           <p className="text-lg font-semibold">Turn your phone sideways</p>
-          <p className="max-w-xs text-sm text-zinc-400">{game.title} is made for a wide screen.</p>
+          <p className="max-w-xs text-sm text-zinc-400">{game.title} is made for a wide screen. The game loads in the meantime.</p>
+          {!ready && <div className="mt-4 w-full max-w-xs"><p className="mb-3 text-sm text-zinc-400">{failed || (!progress ? 'Starting engine' : `Loading game ${Math.round(loadPct * 100)}%`)}</p>{failed ? <Button onClick={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }}>Try again</Button> : <Progress value={loadPct} indeterminate={!progress || !progress.total} />}</div>}
           <Button variant="ghost" size="sm" className="mt-2" onClick={() => setPortraitOk(true)}>
             Play upright anyway
           </Button>
@@ -620,7 +655,7 @@ function SyncBadge({ sync }: { sync: { pending: number; online: boolean; lastSyn
         ? `Saves synced ${ago(sync.lastSync)}`
         : 'Saves are stored on the server'
   return (
-    <span title={label} className="mr-1 hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] text-zinc-300 sm:flex">
+    <span title={label} className="mr-1 flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] text-zinc-300">
       {!sync.online ? (
         <CloudOff className="size-3.5 text-amber-300" />
       ) : sync.pending ? (
@@ -628,7 +663,7 @@ function SyncBadge({ sync }: { sync: { pending: number; online: boolean; lastSyn
       ) : (
         <Check className="size-3.5 text-emerald-400" />
       )}
-      {!sync.online ? 'Offline' : sync.pending ? 'Syncing' : 'Synced'}
+      <span className="hidden sm:inline">{!sync.online ? 'Offline' : sync.pending ? 'Syncing' : 'Synced'}</span>
     </span>
   )
 }
@@ -637,7 +672,7 @@ function SidePanel({ title, onClose, children, top, narrow }: { title: string; o
   return (
     <div className="absolute inset-0 z-40" style={{ top }}>
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <aside className={cx('safe-x safe-bottom absolute bg-ink-900/95 backdrop-blur-xl bottom-0 right-0 top-0 flex w-full animate-rise flex-col border-l border-white/10', narrow ? 'sm:w-96' : 'sm:w-[440px]')}>
+      <aside className={cx('safe-x safe-bottom absolute bg-ink-900/95 backdrop-blur-xl bottom-0 right-0 max-h-[85%] sm:max-h-none sm:top-0 flex w-full animate-rise flex-col rounded-t-3xl sm:rounded-none border-l border-white/10', narrow ? 'sm:w-96' : 'sm:w-[440px]')}>
         <div className="flex items-center justify-between px-5 py-4">
           <h2 className="text-[15px] font-semibold">{title}</h2>
           <IconButton label="Close" onClick={onClose}>
@@ -652,6 +687,7 @@ function SidePanel({ title, onClose, children, top, narrow }: { title: string; o
 
 function SavesPanel({ gameId, onLoad }: { gameId: string; onLoad: (slot: string) => void }) {
   const { data, isLoading, refetch } = useSaves(gameId)
+  const { data: saveGame } = useGame(gameId)
   useEffect(() => {
     void refetch()
   }, [refetch])
@@ -662,7 +698,7 @@ function SavesPanel({ gameId, onLoad }: { gameId: string; onLoad: (slot: string)
     <div className="grid grid-cols-2 gap-3">
       {slots.map((s) => (
         <button key={s.file} onClick={() => onLoad(slotName(s.file))} className="group overflow-hidden rounded-xl bg-white/[0.04] text-left ring-1 ring-white/10 transition hover:ring-accent-400/60">
-          <div className="aspect-video bg-ink-800">{s.screenshot && <img src={s.screenshot} alt="" className="size-full object-cover" loading="lazy" />}</div>
+          {saveGame && <SceneCard game={saveGame} save={s} className="rounded-none" />}
           <div className="p-2.5">
             <div className="truncate text-xs font-medium text-zinc-100">{s.name || s.label}</div>
             <div className="truncate text-[11px] text-zinc-400">
