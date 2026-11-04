@@ -150,7 +150,7 @@ export class Db {
     // 2.2: title, tags and cover come from the catalog; nothing is set by hand.
     if (v === 1) this.raw.exec('ALTER TABLE games DROP COLUMN save_dir_locked; ALTER TABLE games DROP COLUMN tags; ALTER TABLE games DROP COLUMN cover;')
     if (v < 2) this.raw.exec('PRAGMA user_version = 2')
-    // 2.6: games of other engines (docs/engines.md). engine stays the Ren'Py runtime version.
+    // 2.6: games of other engines (docs.renplay.org/engines). engine stays the Ren'Py runtime version.
     if (v < 3) {
       this.raw.exec(
         "ALTER TABLE games ADD COLUMN family TEXT NOT NULL DEFAULT 'renpy'; ALTER TABLE games ADD COLUMN engine_label TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN entry TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 3",

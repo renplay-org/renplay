@@ -23,7 +23,7 @@ export interface BuildInfo {
   base?: string
   engine: string
   renpyVersion?: string
-  /** Other engines (docs/engines.md): family, what made it, and the page the game starts from. */
+  /** Other engines (docs.renplay.org/engines): family, what made it, and the page the game starts from. */
   family?: string
   engineLabel?: string
   entry?: string
@@ -134,7 +134,7 @@ export class Builds {
     const missing: string[] = []
     for (const g of this.db.allGames()) {
       if (g.status !== 'installed') continue
-      // Web games of other engines (docs/engines.md) have no game.zip, only the pack and its index.
+      // Web games of other engines (docs.renplay.org/engines) have no game.zip, only the pack and its index.
       const marker = g.family && g.family !== 'renpy' ? 'assets.json' : 'game.zip'
       if (!g.build || !(await exists(join(this.dir(g.id, g.build), marker)))) {
         this.db.updateGame(g.id, { status: 'not_installed', build: '', size_bytes: 0, file_count: 0 })

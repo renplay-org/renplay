@@ -98,7 +98,7 @@ export function Badge({ tone = 'neutral', children, className }: { tone?: 'neutr
   )
 }
 
-/** Games of engines other than Ren'Py play as a beta: they work, with fewer features (docs/engines.md). */
+/** Games of engines other than Ren'Py play as a beta: they work, with fewer features (docs.renplay.org/engines). */
 export function BetaBadge({ engine }: { engine?: string | null }) {
   if (!engine || engine === 'renpy') return null
   return (

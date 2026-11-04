@@ -1,0 +1,39 @@
+---
+title: Renplay docs
+description: Install, run and configure Renplay, the self-hosted player for Ren’Py and HTML games.
+template: splash
+hero:
+  tagline: Your Ren’Py and HTML games in the browser, on any device, with saves on your own server.
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Quick start
+      link: /start-here/quick-start/
+      icon: right-arrow
+    - text: What is Renplay?
+      link: /start-here/what-is-renplay/
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+
+<CardGrid>
+  <Card title="Start here" icon="rocket">
+    Renplay is one container. [Start it](/start-here/quick-start/), add a game’s normal PC download, and play.
+  </Card>
+  <Card title="Install" icon="setting">
+    [Docker and Compose](/install/docker/), [Kubernetes](/install/kubernetes/), and notes for NAS systems.
+  </Card>
+  <Card title="Play on your phone" icon="laptop">
+    Saves sync as you play. [Stop on the laptop, continue on the phone](/guides/playing/).
+  </Card>
+  <Card title="Configuration" icon="seti:config">
+    Every [environment variable](/configuration/), generated from the code.
+  </Card>
+  <Card title="Catalog" icon="open-book">
+    Proper titles, covers and tested settings come from the [catalog](/catalog/).
+  </Card>
+  <Card title="Something wrong?" icon="warning">
+    See [Troubleshooting](/troubleshooting/) or ask in [Discussions](https://renplay.org/discussions).
+  </Card>
+</CardGrid>

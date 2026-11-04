@@ -30,6 +30,8 @@ release notes say what).
 
 ### Changed
 
+- The documentation has its own site, docs.renplay.org, with install guides, a configuration
+  reference for every environment variable, upgrading, troubleshooting and a FAQ.
 - Renplay moved to its own domain, renplay.org. It reads the catalog from catalog.renplay.org and
   engines from engines.renplay.org, and its links go through renplay.org. **Upgrade to this
   version:** older versions read both from addresses that no longer exist, so they cannot refresh
