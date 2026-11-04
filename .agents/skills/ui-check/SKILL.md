@@ -25,7 +25,7 @@ npx playwright install chromium webkit     # once
 npm run screenshots -- http://localhost:5199 /tmp/shots [game-id] [--sfw]
 ```
 
-`--sfw` turns on Renplay's blur for pictures of adult games. Use it for every screenshot that is
+`--sfw` hides pictures of adult games (title cards and scene cards, Renplay's own setting, which is also the default in a browser with no stored preference). Use it for every screenshot that is
 published anywhere (docs, the website, issues, pull requests).
 
 It captures the library, a game page, details, catalog and settings on a 1440×900 desktop, the

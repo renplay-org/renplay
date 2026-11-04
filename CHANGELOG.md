@@ -9,6 +9,9 @@ release notes say what).
 
 ### Added
 
+- A library home with Up next, your latest save and play time, shelves for favourites and new
+  games, updates and interrupted installs. Mark a story Finished to leave it out of Up next.
+- A Recent sort that brings together newly added and recently played games.
 - Favourite games from their page and find them together at the top of your library. Favourites
   stay when a game is uninstalled.
 - Sort the library by last played, title or recently added, and filter it by tag. Search, filters
@@ -16,7 +19,7 @@ release notes say what).
 - Search and tag filters in the catalog.
 - Game pages show the catalog's summary, whether the game is ongoing, completed, on hold or
   abandoned, and its tags, with content tags tucked away until you open them.
-- An empty library suggests free starter games when the catalog has them.
+- An empty library suggests a free starter game when the catalog has one.
 - Long lists of games and activity load more as you ask for them.
 
 ### Changed
@@ -24,7 +27,16 @@ release notes say what).
 - Games show the version the catalog gives their release ("0.9.23") instead of the text inside
   the download, and update offers follow the same release.
 - Tags come from the catalog's fixed list; the library shows the ones your games share.
-- Continue playing is a compact strip when there is no save picture to show.
+- Hidden adult covers show title cards instead of blurred art, and save pictures show scene
+  cards. Adult pictures start hidden in browsers without a saved preference; covers marked safe
+  by the catalog stay visible.
+- Game pages put progress and updates above saves, with a play button that stays within reach
+  on phones. Save and file actions open as bottom sheets on phones.
+- Add games puts uploads, server downloads and the catalog together, without tabs. Update
+  actions name the game they update, and deleting a download is in its actions menu.
+- The player's sideways hint carries loading progress, and its saves open as a bottom sheet
+  on phones.
+- Settings separates General, This browser and About, and Activity groups work by day.
 - Activity groups repeated attempts and names the download being processed.
 - Settings shows relative update times and game titles beside each engine.
 
