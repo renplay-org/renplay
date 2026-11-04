@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { fallbackOf } from './envvars.js'
 
 function env(name: string, fallback: string): string {
   const v = process.env[name]
@@ -60,11 +61,11 @@ export interface Config {
 }
 
 export function loadConfig(): Config {
-  const dataDir = env('DATA_DIR', '/data')
-  const gamesDir = env('GAMES_DIR', '/games')
+  const dataDir = env('DATA_DIR', fallbackOf('DATA_DIR'))
+  const gamesDir = env('GAMES_DIR', fallbackOf('GAMES_DIR'))
   const internalDir = env('RENPLAY_DIR', join(gamesDir, '_renplay'))
   return {
-    port: envInt('PORT', 3000),
+    port: envInt('PORT', fallbackOf('PORT')),
     dataDir,
     savesDir: env('SAVES_DIR', join(dataDir, 'saves')),
     saveHistoryDir: env('SAVE_HISTORY_DIR', join(dataDir, 'save-history')),
@@ -74,22 +75,22 @@ export function loadConfig(): Config {
     gamesDir,
     internalDir,
     archivesDir: env('ARCHIVES_DIR', join(gamesDir, '_archives')),
-    deleteArchives: envBool('RENPLAY_DELETE_ARCHIVES', true),
+    deleteArchives: envBool('RENPLAY_DELETE_ARCHIVES', fallbackOf('RENPLAY_DELETE_ARCHIVES')),
     enginesDir: join(internalDir, 'engines'),
     workDir: join(internalDir, 'work'),
     purgeDir: join(internalDir, 'purge'),
     uploadsDir: join(internalDir, 'uploads'),
-    enginesUrl: env('RENPLAY_ENGINES_URL', 'https://engines.renplay.org/index.json'),
-    catalogUrls: env('RENPLAY_CATALOG_URLS', 'https://catalog.renplay.org/index.v3.json')
+    enginesUrl: env('RENPLAY_ENGINES_URL', fallbackOf('RENPLAY_ENGINES_URL')),
+    catalogUrls: env('RENPLAY_CATALOG_URLS', fallbackOf('RENPLAY_CATALOG_URLS'))
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
     adultGames: adultGames(),
-    defaultEngine: env('RENPLAY_ENGINE', ''),
-    keepaliveUrl: env('RENPLAY_KEEPALIVE_URL', ''),
-    keepaliveHost: env('RENPLAY_KEEPALIVE_HOST', ''),
-    imageQuality: envInt('RENPLAY_IMAGE_QUALITY', 88),
-    imageConcurrency: envInt('RENPLAY_IMAGE_CONCURRENCY', 0),
-    saveHistoryVersions: envInt('RENPLAY_SAVE_HISTORY', 20),
+    defaultEngine: env('RENPLAY_ENGINE', fallbackOf('RENPLAY_ENGINE')),
+    keepaliveUrl: env('RENPLAY_KEEPALIVE_URL', fallbackOf('RENPLAY_KEEPALIVE_URL')),
+    keepaliveHost: env('RENPLAY_KEEPALIVE_HOST', fallbackOf('RENPLAY_KEEPALIVE_HOST')),
+    imageQuality: envInt('RENPLAY_IMAGE_QUALITY', fallbackOf('RENPLAY_IMAGE_QUALITY')),
+    imageConcurrency: envInt('RENPLAY_IMAGE_CONCURRENCY', fallbackOf('RENPLAY_IMAGE_CONCURRENCY')),
+    saveHistoryVersions: envInt('RENPLAY_SAVE_HISTORY', fallbackOf('RENPLAY_SAVE_HISTORY')),
   }
 }
