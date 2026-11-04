@@ -7,6 +7,11 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- Renplay says what it plays: Ren'Py games first, and HTML games too (README, the app's Add games
+  page and empty library, the web app's description).
+
 ## [2.9.0] - 2026-11-03
 
 ### Added

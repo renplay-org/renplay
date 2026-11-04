@@ -2,7 +2,7 @@
 
 <h1 align="center">Renplay</h1>
 
-<p align="center"><b>Your Ren’Py games in the browser, on any device, with saves on your own server.</b></p>
+<p align="center"><b>Your Ren’Py and HTML games in the browser, on any device, with saves on your own server.</b></p>
 
 <p align="center">
   <a href="https://github.com/renplay-web/renplay/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/renplay-web/renplay?color=e0306f"></a>
@@ -12,10 +12,12 @@
 
 <p align="center"><img src="docs/screenshots/desktop-library.webp" alt="The Renplay library with two games and a Continue playing banner" width="880"></p>
 
-Renplay is a self-hosted library for [Ren’Py](https://www.renpy.org/) visual novels. Add a game’s
-normal PC download, press Install, and play it in any browser: on your computer, your tablet or
-your phone. Every save lands on your server the moment you make it, so you can stop on the laptop
-and continue on the phone.
+Renplay is a self-hosted library for the visual novels you download: [Ren’Py](https://www.renpy.org/)
+games first, and HTML games such as Twine stories too. Add a game’s normal PC download, press
+Install, and play it in any browser: on your computer, your tablet or your phone. Every save lands
+on your server the moment you make it, so you can stop on the laptop and continue on the phone.
+Other engines are added only when their normal download plays as easily; [docs/engines.md](docs/engines.md)
+says what works.
 
 <p align="center">
   <img src="docs/screenshots/phone-library.webp" alt="The library on a phone" width="260">
@@ -101,7 +103,8 @@ and only games with Python 2-only code have trouble. The
 [catalog](https://github.com/renplay-web/catalog) lists games that were tested; most others work
 too. If one does not, [tell the catalog](https://github.com/renplay-web/catalog/issues/new/choose).
 Some other engines work too, with fewer features: HTML games such as Twine stories install and
-play. Godot and Unity WebGL support is coming; see [docs/engines.md](docs/engines.md).
+play, marked Beta. Other engines join only when their normal download plays as easily; see
+[docs/engines.md](docs/engines.md).
 
 **Where do I get games?** From their developers: itch.io, Patreon, Steam and so on. Renplay and
 its catalog never host game files.
