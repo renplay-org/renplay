@@ -168,6 +168,14 @@ describe('HTTP API', () => {
     await request(app.app).delete('/api/jobs').expect(200)
   })
 
+  it('refuses an install into a game that is not in the library before doing any work', async () => {
+    const res = await request(app.app)
+      .post('/api/imports')
+      .send({ source: { kind: 'archive', path: 'whatever.zip' }, game: 'no-such-game' })
+    expect(res.status).toBe(404)
+    expect(res.body.error).toMatch(/not in the library/)
+  })
+
   it('offers a reinstall only while the archive is in the archives folder', async () => {
     mkdirSync(join(root, 'games', '_archives'), { recursive: true })
     writeFileSync(join(root, 'games', '_archives', 'Fixture-1.0-pc.zip'), 'zip')
