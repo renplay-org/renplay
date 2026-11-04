@@ -10,7 +10,7 @@ Create a folder for Renplay, and in it a `compose.yaml`:
 ```yaml
 services:
   renplay:
-    image: ghcr.io/renplay-org/renplay:2.9.1
+    image: ghcr.io/renplay-org/renplay:__RENPLAY_VERSION__
     container_name: renplay
     restart: unless-stopped
     ports:
@@ -32,7 +32,7 @@ Open `http://<your server>:8080`.
 
 - The image runs as user and group **1000**. If you pick other folders, they must be writable by
   that user, or set `user:` in the Compose file to one that owns them.
-- **Pin a version** (`2.9.1` above; use the newest from the
+- **Pin a version** (`__RENPLAY_VERSION__` above; use the newest from the
   [releases](https://renplay.org/releases)) instead of `latest`, so an upgrade
   happens when you decide. See [Upgrading](/upgrading/).
 - The same image is on Docker Hub as `renplay/renplay`.
@@ -45,7 +45,7 @@ Open `http://<your server>:8080`.
 docker run -d --name renplay --restart unless-stopped -p 8080:8080 \
   -v /path/to/games:/games \
   -v /path/to/data:/data \
-  ghcr.io/renplay-org/renplay:2.9.1
+  ghcr.io/renplay-org/renplay:__RENPLAY_VERSION__
 ```
 
 ## The two folders

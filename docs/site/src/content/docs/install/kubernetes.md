@@ -30,7 +30,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: renplay
-          image: ghcr.io/renplay-org/renplay:2.9.1
+          image: ghcr.io/renplay-org/renplay:__RENPLAY_VERSION__
           ports:
             - containerPort: 8080
           readinessProbe:

@@ -7,6 +7,12 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- The documentation now matches the Renplay website, with clearer starting points, quieter
+  navigation and a grouped configuration reference that reads comfortably on phones. Install
+  examples always use the current release’s image tag.
+
 ## [2.10.0] - 2026-11-04
 
 ### Added

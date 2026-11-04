@@ -11,11 +11,12 @@ Renplay is one container. Give it a folder for games and one for data:
 docker run -d --name renplay -p 8080:8080 \
   -v /path/to/games:/games \
   -v /path/to/data:/data \
-  ghcr.io/renplay-org/renplay:latest
+  ghcr.io/renplay-org/renplay:__RENPLAY_VERSION__
 ```
 
 The image runs as user 1000, so that user must be able to write to both folders. For a long-lived
-setup use [Docker Compose](/install/docker/) and pin a version.
+setup use [Docker Compose](/install/docker/). The image tag above pins this release, so upgrades
+happen when you decide. The same image is on Docker Hub as `renplay/renplay`.
 
 Open `http://localhost:8080`.
 

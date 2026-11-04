@@ -1,0 +1,31 @@
+---
+import Search from '@astrojs/starlight/components/Search.astro'
+import ThemeSelect from '@astrojs/starlight/components/ThemeSelect.astro'
+import logo from '../assets/logo.svg'
+---
+<div class="docs-header">
+  <a class="docs-brand" href="/" aria-label="Renplay documentation home">
+    <img src={logo.src} width="32" height="32" alt="" />
+    <span>Renplay</span><span class="docs-label">Docs</span>
+  </a>
+  <div class="docs-search"><Search /></div>
+  <nav class="docs-links" aria-label="Renplay links">
+    <a href="https://renplay.org">Website <span aria-hidden="true">↗</span></a>
+    <a href="https://renplay.org/github">GitHub</a>
+    <a href="https://renplay.org/support">Support</a>
+  </nav>
+  <div class="docs-theme"><ThemeSelect /></div>
+  {!Astro.locals.starlightRoute.hasSidebar && (
+    <details class="docs-home-menu">
+      <summary>Links</summary>
+      <div class="docs-home-menu-panel">
+        <nav aria-label="Renplay links">
+          <a href="https://renplay.org">Website ↗</a>
+          <a href="https://renplay.org/github">GitHub</a>
+          <a href="https://renplay.org/support">Support</a>
+        </nav>
+        <ThemeSelect />
+      </div>
+    </details>
+  )}
+</div>

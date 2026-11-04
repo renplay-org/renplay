@@ -42,7 +42,7 @@ read-only root filesystem, so any folder you point a variable at must be writabl
     const rows = ENV_VARS.filter((v) => v.group === group)
     if (!rows.length) continue
     out.push(`## ${title}\n`)
-    for (const v of rows) out.push(`**\`${v.name}\`**  \nDefault: ${shownDefault(v)}\n\n${v.description}\n`)
+    for (const v of rows) out.push(`<div class="config-entry" id="${v.name.toLowerCase().replaceAll('_', '-')}">\n\n**\`${v.name}\`**\n\n<div class="config-default">\n\nDefault: ${shownDefault(v)}\n\n</div>\n\n${v.description}\n\n</div>\n`)
     out.push('')
   }
   out.push(`## Folders inside the container
