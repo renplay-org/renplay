@@ -169,6 +169,31 @@ content-hashed name.
 new `game.zip` from the base build plus the overlay into `<build>.m<hash>/`; streamed files still
 come from the base build's pack. Updating a game can re-apply mods or move them aside.
 
+## Adult games
+
+`content.ts` holds the install-wide switch: `RENPLAY_ADULT_GAMES=allow|block` locks it, otherwise the
+`adult_games` setting does. Database version 6 stores `allow` for a library that already existed, so
+upgrading changes nothing; a fresh install has no answer, blocks, and asks once in the empty library
+(`GET`/`PUT /api/content` returns `{ adultGames, locked, chosen }`).
+
+Blocking is done where the data enters and where it leaves:
+
+- **Catalog.** Each configured URL is read from its safe-for-work sibling (`index.v3.json` becomes
+  `index.v3.sfw.json`). If that is missing, the full index is fetched and its adult recipes and
+  content tags are dropped, with a log line. Adult recipes and covers are never cached; switching to
+  block deletes the ones cached and the cached covers. Only a stub is kept per known adult recipe
+  (id, archive names, sizes and checksums, save folder, no title, tags or cover), so that
+  `match()` can recognize its archive: `POST /api/imports` and the install job refuse it with a plain
+  reason, and `GET /api/archives` marks it `blocked`.
+- **Library.** `games.adult` remembers, from the last catalog that knew the recipe, which games are
+  adult. While blocked, `ContentMode.hides` makes the games list leave them out and every route that
+  names one (game, saves, files, play pages and streamed assets, copy targets, jobs, the saves export)
+  answer 404. Nothing is deleted; switching back to allow shows them again. A game without a recipe
+  is not hidden.
+- **Not covered.** nginx serves `game.zip`, caches and presplash images straight from the games
+  folder, so those files of a hidden game stay reachable by their exact URL. Accounts (3.0) will
+  decide who may see what.
+
 ## Security notes
 
 - Game code never runs on the server: no Ren'Py SDK, no Python; archives are parsed as data.

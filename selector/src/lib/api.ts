@@ -134,6 +134,15 @@ export interface Archive {
   installedAs: string | null
   recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean; coverSfw?: boolean } | null
   existingGame: string | null
+  /** Why this download cannot be installed here (an adult game on a safe-for-work install). */
+  blocked: string | null
+}
+
+/** Whether this Renplay shows adult games; locked when the server's configuration decides. */
+export interface ContentState {
+  adultGames: 'allow' | 'block'
+  locked: boolean
+  chosen: boolean
 }
 
 export interface RecipeRelease {
@@ -231,6 +240,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 }
 
 export const post = <T,>(path: string, json?: unknown) => api<T>(path, { method: 'POST', json: json ?? {} })
+export const put = <T,>(path: string, json?: unknown) => api<T>(path, { method: 'PUT', json: json ?? {} })
 export const del = <T,>(path: string) => api<T>(path, { method: 'DELETE' })
 
 

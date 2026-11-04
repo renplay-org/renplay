@@ -7,6 +7,7 @@ import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
 import { Builds } from './builds.js'
 import { Catalog } from './catalog.js'
+import { ContentMode } from './content.js'
 import type { Config } from './config.js'
 import { Db } from './db.js'
 import { EngineStore } from './engines.js'
@@ -16,6 +17,7 @@ import { applyMods } from './pipeline/applymods.js'
 import { runImport } from './pipeline/import.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
+import { createContentRouter } from './routes/content.js'
 import { createLibraryRouter } from './routes/library.js'
 import { createPlayRouter } from './routes/play.js'
 import { createSavesExportAll, createSavesRouter } from './routes/saves.js'
@@ -67,7 +69,8 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const builds = new Builds(cfg, db, purger)
   const engines = new EngineStore(cfg, db, purger)
   const overlays = new Overlays(cfg)
-  const catalog = new Catalog(cfg, db)
+  const content = new ContentMode(cfg, db)
+  const catalog = new Catalog(cfg, db, content)
   await catalog.init()
 
   const deps = { cfg, db, builds, engines, overlays, catalog, saves, jobs, version }
@@ -101,7 +104,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     (htmlRuntime ??= Promise.all([readFile(join(dirname(htmlRuntimePath), 'vendor', 'fake-indexeddb.js'), 'utf-8'), readFile(htmlRuntimePath, 'utf-8')])
       .then((parts) => parts.join('\n;\n').replace(/<\/script/gi, '<\\/script'))
       .catch((e) => ((htmlRuntime = null), Promise.reject(e))))
-  app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath), { runtime: readHtmlRuntime, saves }))
+  app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath), { runtime: readHtmlRuntime, saves }, content))
   // Static fallbacks for development; nginx serves these paths in production.
   // resolve(): sendFile refuses paths with "..", like the $PWD/../runtime one in AGENTS.md.
   if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(resolve(opts.runtimePath!)))
@@ -110,6 +113,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m([a-z0-9]+))?\/(.+)$/, (req, res, next) => {
     const [game, base, mod, asset] = [req.params[0], req.params[1], req.params[2], req.params[3]] as string[]
     if (asset.includes('..')) return next()
+    if (content.hides(db.getGame(game))) return next(new HttpError(404, 'Game not found'))
     const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
     const tryNext = (i: number): void => {
       if (i >= candidates.length) return next()
@@ -117,10 +121,11 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     }
     tryNext(0)
   })
-  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version))
-  app.get('/api/saves-export', createSavesExportAll(saves, db))
-  app.use('/api/saves', createSavesRouter(saves, db))
-  app.use('/api/games', createFilesRouter(db, builds, overlays, jobs))
+  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content))
+  app.use('/api/content', createContentRouter(content, catalog))
+  app.get('/api/saves-export', createSavesExportAll(saves, db, content))
+  app.use('/api/saves', createSavesRouter(saves, db, content))
+  app.use('/api/games', createFilesRouter(db, builds, overlays, jobs, content))
   app.use('/api/games', createGamesRouter(deps))
   app.use('/api', createLibraryRouter(deps))
   app.use('/api/covers', express.static(cfg.coversDir, { maxAge: '365d', immutable: true, fallthrough: false }))

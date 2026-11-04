@@ -139,7 +139,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   const engine = info?.engine
   const foreign = engine && engine.family !== 'renpy' ? engine : null
   const unknown = info?.type === 'zip' && !info.layout && !engine
-  const blocked = !a.installedAs && engine?.installable === false
+  const blocked = !!a.blocked || (!a.installedAs && engine?.installable === false)
   const madeWith = foreign ? foreign.label : renpy && `Ren’Py ${renpy}`
   const meta = [bytes(a.size), madeWith, `Added ${ago(a.mtime)}`, title !== a.name && a.name].filter(Boolean).join(' · ')
   const actions = job ? (
@@ -181,7 +181,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
             {unknown && <Badge tone="amber">No game found</Badge>}
           </div>
         )}
-        {blocked && engine?.reason && <p className="mt-1.5 text-xs text-amber-200/80">{engine.reason}</p>}
+        {blocked && (a.blocked ?? engine?.reason) && <p className="mt-1.5 text-xs text-amber-200/80">{a.blocked ?? engine?.reason}</p>}
         {!blocked && !job && engine?.warnings.map((w) => (
           <p key={w} className="mt-1.5 text-xs text-amber-200/80">
             {w}

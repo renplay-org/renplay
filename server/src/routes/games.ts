@@ -133,12 +133,12 @@ export function createGamesRouter(deps: GameDeps): Router {
 
   const get = (req: Request): GameRow => {
     const g = db.getGame(assertSlug(req.params.id))
-    if (!g) throw new HttpError(404, 'Game not found')
+    if (!g || deps.catalog.content.hides(g)) throw new HttpError(404, 'Game not found')
     return g
   }
 
   router.get('/', async (_req, res) => {
-    res.json({ games: await Promise.all(db.allGames().map((r) => toGame(r, deps))) })
+    res.json({ games: await Promise.all(db.allGames().filter((r) => !deps.catalog.content.hides(r)).map((r) => toGame(r, deps))) })
   })
 
   router.get('/:id', async (req, res) => {

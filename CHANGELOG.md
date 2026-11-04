@@ -21,6 +21,10 @@ release notes say what).
   abandoned, and its tags, with content tags tucked away until you open them.
 - An empty library suggests a free starter game when the catalog has one.
 - Long lists of games and activity load more as you ask for them.
+- Choose whether this Renplay shows adult games. A new install asks once in the empty library, and
+  Settings changes it later. Safe-for-work only hides adult games, refuses their downloads and
+  leaves the library and saves untouched. Servers can fix the choice with `RENPLAY_ADULT_GAMES`.
+  Existing libraries keep showing adult games.
 
 ### Changed
 
