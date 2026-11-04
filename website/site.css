@@ -34,7 +34,7 @@ nav .links { display: flex; gap: 24px; margin-left: 12px; font-size: 15px; }
 nav .links a { color: var(--dim); text-decoration: none; transition: color .2s; }
 nav .links a:hover, nav .links a[aria-current] { color: var(--fg); }
 nav .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
-nav .menu, nav .links .in-menu { display: none; }
+nav .menu, nav .links .in-menu, nav .bar-catalog { display: none; }
 nav .menu { font: inherit; cursor: pointer; padding: 8px 10px; }
 
 /* Buttons */
@@ -121,6 +121,7 @@ h2 { font-size: clamp(32px, 4.6vw, 52px); letter-spacing: -.035em; line-height: 
 .tile { padding: 26px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); transition: transform .3s, border-color .3s; }
 .tile:hover { transform: translateY(-4px); border-color: rgb(251 122 168 / .3); }
 .tile.wide { grid-column: span 2; }
+.bento.three { grid-template-columns: repeat(3, 1fr); }
 .tile .ico { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: linear-gradient(135deg, rgb(244 80 138 / .28), rgb(124 92 255 / .28)); border: 1px solid rgb(255 255 255 / .1); margin-bottom: 16px; }
 .tile .ico svg { width: 22px; height: 22px; color: #ffd3e4; }
 .tile h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.01em; }
@@ -185,6 +186,7 @@ footer small { display: block; margin-top: 18px; line-height: 1.6; }
   .aurora { width: 100vw; max-width: 100vw; }
   nav .links { display: none; }
   nav .menu { display: inline-flex; }
+  nav .bar-catalog { display: inline-flex; }
   nav.open .links { display: flex; position: absolute; top: 68px; left: 0; right: 0; flex-direction: column; gap: 0; margin: 0; padding: 6px 24px 14px; background: var(--ink); border-bottom: 1px solid var(--line); }
   nav.open .links a { padding: 12px 0; font-size: 17px; color: var(--fg); }
   nav.open .links .in-menu { display: block; }
@@ -198,6 +200,7 @@ footer small { display: block; margin-top: 18px; line-height: 1.6; }
   .steps { grid-template-columns: 1fr; gap: 34px; }
   .steps::before { display: none; }
   .bento { grid-template-columns: 1fr 1fr; }
+  .bento.three { grid-template-columns: 1fr; }
   .numbers { grid-template-columns: 1fr 1fr; }
   .band { padding: 30px; }
   section { padding-top: 100px; }
@@ -208,9 +211,15 @@ footer small { display: block; margin-top: 18px; line-height: 1.6; }
   .tile.wide { grid-column: auto; }
   .side { padding: 24px; }
   .num b { font-size: 34px; }
+  nav .wrap { gap: 8px; padding: 0 16px; }
+  nav .right .btn.primary { padding: 8px 12px; }
+  nav .right { gap: 6px; }
+  .brand { font-size: 17px; gap: 8px; }
+  .brand img { width: 30px; height: 30px; }
   nav .right .lbl { display: none; }
   nav .right .btn:not(.primary) { padding: 8px 10px; }
-  nav .right a.btn[href*="github.com"] { display: none; }
+  nav .right a.btn[href="/github"] { display: none; }
+  nav .right a.btn[href="/support"] { display: none; }
 }
 
 /* Interactivity */
