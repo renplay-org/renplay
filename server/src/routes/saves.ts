@@ -1,5 +1,6 @@
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
+import type { ContentMode } from '../content.js'
 import type { Db, GameRow } from '../db.js'
 import { readSaveMeta, readSaveScreenshot, slotInfo } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
@@ -22,12 +23,12 @@ export async function cachedSaveMeta(store: SaveStore, dir: string, file: { name
   return meta
 }
 
-export function createSavesRouter(store: SaveStore, db: Db): Router {
+export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode): Router {
   const router = Router()
 
   const game = (req: Request): GameRow => {
     const g = db.getGame(assertSlug(req.params.id))
-    if (!g) throw new HttpError(404, 'Game not found')
+    if (!g || content.hides(g)) throw new HttpError(404, 'Game not found')
     return g
   }
   const requireSaveDir = (g: GameRow): string => {
@@ -206,7 +207,7 @@ export function createSavesRouter(store: SaveStore, db: Db): Router {
   router.post('/:id/copy', async (req, res) => {
     const g = game(req)
     const target = db.getGame(assertSlug(req.body?.target))
-    if (!target) throw new HttpError(404, 'Target game not found')
+    if (!target || content.hides(target)) throw new HttpError(404, 'Target game not found')
     const toDir = requireSaveDir(target)
     const name = await store.copySave(requireSaveDir(g), cleanRelPath(req.body?.file), toDir)
     res.json({ ok: true, file: name, target: target.id })
@@ -230,10 +231,12 @@ export function createSavesRouter(store: SaveStore, db: Db): Router {
 }
 
 /** All save folders (including ones without a game) as one zip. */
-export function createSavesExportAll(store: SaveStore, db: Db) {
+export function createSavesExportAll(store: SaveStore, db: Db, content: ContentMode) {
   return async (_req: Request, res: express.Response) => {
     const dirs = new Set(await store.listDirs())
     for (const g of db.allGames()) if (g.save_dir) dirs.add(g.save_dir)
+    // The export is of what this Renplay shows; hidden games' saves stay where they are.
+    for (const g of db.allGames()) if (g.save_dir && content.hides(g)) dirs.delete(g.save_dir)
     res.attachment(`renplay-saves-${new Date().toISOString().slice(0, 10)}.zip`)
     res.type('application/zip')
     await store.exportZip([...dirs], res, { includeTokens: true })

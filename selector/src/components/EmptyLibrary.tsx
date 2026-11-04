@@ -1,15 +1,43 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Recipe } from '../lib/api'
-import { useSystem } from '../lib/queries'
+import { useContent, useSetAdultGames, useSystem } from '../lib/queries'
 import { Cover } from './GameCard'
-import { Badge, Button } from './ui'
+import { Badge, Button, errorText, useToast } from './ui'
+
+/** A fresh install asks once which games it shows; until then it shows safe-for-work games only. */
+function ContentChoice() {
+  const setAdultGames = useSetAdultGames()
+  const toast = useToast()
+  const [busy, setBusy] = useState('')
+  const choose = async (mode: 'allow' | 'block') => {
+    setBusy(mode)
+    try {
+      await setAdultGames(mode)
+    } catch (e) {
+      toast(errorText(e), 'error')
+      setBusy('')
+    }
+  }
+  const options = [
+    { mode: 'allow' as const, title: 'Every game, including adult games', hint: 'This shows games for adults.' },
+    { mode: 'block' as const, title: 'Safe-for-work games only', hint: 'Adult games are hidden and cannot be installed.' },
+  ]
+  return <section className="mx-auto max-w-3xl">
+    <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">Which games should this Renplay show?</h1>
+    <p className="mb-8 mt-3 text-zinc-400">This applies to everyone who uses this Renplay. You can change it later in Settings.</p>
+    <div className="grid gap-4 sm:grid-cols-2">{options.map((option) => <button key={option.mode} disabled={!!busy} onClick={() => void choose(option.mode)} className="min-h-11 rounded-2xl bg-white/5 p-6 text-left ring-1 ring-white/10 transition hover:bg-white/10 disabled:opacity-60"><h2 className="font-semibold text-white">{option.title}</h2><p className="mt-2 text-sm text-zinc-400">{busy === option.mode ? 'Saving…' : option.hint}</p></button>)}</div>
+  </section>
+}
 
 export default function EmptyLibrary({ recipes }: { recipes: Recipe[] }) {
   const { data: system } = useSystem()
+  const { data: content } = useContent()
   const starter = recipes.find((game) => game.free === true && !game.nsfw && game.engine === 'renpy' && ['verified', 'playable'].includes(game.releases[0]?.status ?? ''))
   const links = starter?.links ?? {}
   const developer = links.itch ?? links.website ?? links.steam
   const source = links.itch ? 'itch.io' : 'the developer'
+  if (content && !content.chosen) return <ContentChoice />
   return <section className="mx-auto max-w-3xl">
     <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">Your library is empty.</h1>
     <p className="mb-8 mt-3 text-zinc-400">Let us fix that. Start with a story, or add a game you already have.</p>

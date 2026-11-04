@@ -48,6 +48,8 @@ export interface GameRow {
   favorite_at: string
   finished_at: string
   play_time: number
+  /** 1 when the game's recipe is adult: the last thing the catalog said, kept for when it can no longer say (content.ts). */
+  adult: number
   updated_at: string
 }
 
@@ -158,6 +160,12 @@ export class Db {
     if (v < 4) this.raw.exec("ALTER TABLE games ADD COLUMN favorite_at TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 4")
     // 2.11: reading progress survives uninstall and rebuilds; saves are untouched.
     if (v < 5) this.raw.exec("BEGIN; ALTER TABLE games ADD COLUMN finished_at TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN play_time INTEGER NOT NULL DEFAULT 0; PRAGMA user_version = 5; COMMIT")
+    // 2.12: adult games can be switched off install-wide. A library that existed before keeps showing them.
+    if (v < 6) {
+      this.raw.exec('BEGIN; ALTER TABLE games ADD COLUMN adult INTEGER NOT NULL DEFAULT 0')
+      if (v > 0) this.raw.exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('adult_games', '\"allow\"')")
+      this.raw.exec('PRAGMA user_version = 6; COMMIT')
+    }
   }
 
   /**

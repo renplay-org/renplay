@@ -2,6 +2,7 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
 import { BUILD_RE, baseOf, type Builds } from '../builds.js'
+import type { ContentMode } from '../content.js'
 import type { Db, GameRow } from '../db.js'
 import type { EngineStore } from '../engines.js'
 import { PackReader } from '../pipeline/pack.js'
@@ -31,13 +32,14 @@ export function createPlayRouter(
   engines: EngineStore,
   runtimeVersion: string,
   html: { runtime: () => Promise<string>; saves: SaveStore },
+  content: ContentMode,
 ): Router {
   const router = Router()
 
   router.get(['/g/:id/:build/', '/g/:id/:build/index.html'], async (req, res) => {
     const id = assertSlug(req.params.id)
     const game = db.getGame(id)
-    if (!game || game.status !== 'installed' || !game.build) throw new HttpError(404, 'Game not installed')
+    if (!game || game.status !== 'installed' || !game.build || content.hides(game)) throw new HttpError(404, 'Game not installed')
     if (req.params.build !== game.build || !BUILD_RE.test(req.params.build) || isWebGame(game)) {
       // Old build ids redirect to the current one, so bookmarks keep working.
       res.redirect(302, playPath(game))
@@ -67,7 +69,7 @@ export function createPlayRouter(
   router.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m[a-z0-9]+)?\/game\/(.+)$/, async (req, res) => {
     const [id, base, raw] = [req.params[0], req.params[1], req.params[2]] as string[]
     const name = safeName(raw)
-    if (!name || !isSlug(id)) throw new HttpError(404, 'Not found')
+    if (!name || !isSlug(id) || content.hides(db.getGame(id))) throw new HttpError(404, 'Not found')
     const reader = new PackReader(join(builds.dir(id, base), 'assets.pack'), join(builds.dir(id, base), 'assets.json'))
     let entry: [number, number] | null
     try {

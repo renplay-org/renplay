@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Config } from './config.js'
+import { ContentMode, sfwIndexUrl } from './content.js'
 import { parseJson, type Db, type GameSource } from './db.js'
 import type { JobContext } from './jobs.js'
 import sharp from 'sharp'
@@ -115,6 +116,8 @@ export interface RecipeMatch {
 
 const CACHE_KEY = 'catalog_cache'
 const COVERS_KEY = 'catalog_covers'
+/** What blocking needs to know about adult recipes: ids, archives and save folders, never titles, tags or covers. */
+const STUBS_KEY = 'catalog_adult_stubs'
 /** How often the catalog is fetched while Renplay runs (cheap: covers are fetched only when changed). */
 const REFRESH_EVERY = 3600_000
 const MAX_COVER = 16 << 20
@@ -159,8 +162,54 @@ export function normalizeRecipe(g: any): Recipe {
   }
 }
 
+/** An adult recipe reduced to what recognizes its archives and save folder. */
+function stub(r: Recipe): Recipe {
+  return {
+    id: r.id,
+    title: '',
+    nsfw: true,
+    engine: r.engine,
+    saveDir: r.saveDir,
+    match: r.match,
+    releases: r.releases.map((x) => ({ version: x.version, status: x.status, archives: (x.archives ?? []).map(({ name, size, sha256 }) => ({ name, size, sha256 })) })),
+  }
+}
+
+/** The catalog without its adult games: for an index that is not the safe-for-work one. */
+function withoutAdult(games: Recipe[], vocabulary: Vocabulary): { games: Recipe[]; adult: Recipe[]; vocabulary: Vocabulary } {
+  const hidden = new Set(Object.entries(vocabulary).filter(([, v]) => v.group === 'content').map(([id]) => id))
+  const labels = new Set(Object.entries(vocabulary).filter(([, v]) => v.group === 'content').map(([, v]) => v.label))
+  const safe = games.filter((g) => g.nsfw !== true).map((g) => ({
+    ...g,
+    content: [],
+    tagIds: g.tagIds?.filter((t) => !hidden.has(t)),
+    tags: g.tags?.filter((t) => !labels.has(t)),
+  }))
+  return {
+    games: safe,
+    adult: games.filter((g) => g.nsfw === true),
+    vocabulary: Object.fromEntries(Object.entries(vocabulary).filter(([id]) => !hidden.has(id))),
+  }
+}
+
+interface Index {
+  schema?: number
+  games?: unknown[]
+  vocabulary?: Vocabulary
+}
+
+async function fetchIndex(url: string): Promise<Index> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: { accept: 'application/json' } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const idx = (await res.json()) as Index
+  if ((idx.schema ?? 1) < 2) throw new Error(`catalog schema ${idx.schema ?? 1} is too old`)
+  return idx
+}
+
 export class Catalog {
   private recipes = new Map<string, Recipe>()
+  /** Adult recipes of a blocked install, reduced by stub(): enough to refuse their archives and hide their games. */
+  private adult = new Map<string, Recipe>()
   vocabulary: Vocabulary = {}
   private covers = new Map<string, string>()
   private fetchedAt = 0
@@ -170,14 +219,17 @@ export class Catalog {
   constructor(
     private readonly cfg: Config,
     private readonly db: Db,
+    readonly content: ContentMode = new ContentMode(cfg, db),
   ) {}
 
   async init(): Promise<void> {
-    const cached = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary } | null>(CACHE_KEY, null)
+    const cached = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary; adultGames?: string } | null>(CACHE_KEY, null)
+    this.adult = new Map(Object.entries(this.db.getSetting<Record<string, Recipe>>(STUBS_KEY, {})))
     if (cached && Array.isArray(cached.games)) {
       this.load(cached.games)
       this.vocabulary = cached.vocabulary ?? {}
-      this.fetchedAt = cached.at
+      // A catalog cached without its adult games is stale once they are allowed.
+      this.fetchedAt = !this.content.blocked && cached.adultGames === 'block' ? 0 : cached.at
     } else {
       try {
         const here = dirname(fileURLToPath(import.meta.url))
@@ -187,6 +239,8 @@ export class Catalog {
       } catch {}
     }
     this.covers = new Map(Object.entries(this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})).map(([id, c]) => [id, c.file]))
+    this.syncAdult()
+    if (this.content.blocked) await this.restrict()
     this.link()
     if (Date.now() - this.fetchedAt > REFRESH_EVERY) void this.refresh().catch(() => {})
     this.timer = setInterval(() => void this.refresh().catch(() => {}), REFRESH_EVERY)
@@ -198,6 +252,70 @@ export class Catalog {
     this.timer = null
   }
 
+  private setAdult(recipes: Recipe[]): void {
+    this.adult = new Map(recipes.map((r) => [r.id, r.title === '' && r.nsfw ? r : stub(r)]))
+    this.db.setSetting(STUBS_KEY, Object.fromEntries(this.adult))
+  }
+
+  /**
+   * Called after the admin changes the setting. Blocking drops the adult
+   * recipes and covers at once and fetches the safe-for-work index; allowing
+   * fetches the full one.
+   */
+  async modeChanged(): Promise<void> {
+    if (this.content.blocked) {
+      this.syncAdult()
+      await this.restrict()
+    } else {
+      this.syncAdult()
+      this.adult = new Map()
+      this.db.setSetting(STUBS_KEY, {})
+    }
+    void this.refresh().catch(() => {})
+  }
+
+  /** Moves adult recipes out of the catalog (keeping only a stub) and deletes their covers. */
+  private async restrict(): Promise<void> {
+    const gone = [...this.recipes.values()].filter((r) => r.nsfw === true)
+    if (gone.length) {
+      const kept = withoutAdult([...this.recipes.values()], this.vocabulary)
+      this.setAdult([...this.adult.values(), ...gone])
+      this.load(kept.games)
+      this.vocabulary = kept.vocabulary
+      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: kept.games, vocabulary: kept.vocabulary, adultGames: 'block' })
+    } else {
+      const cache = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary } | null>(CACHE_KEY, null)
+      if (cache) this.db.setSetting(CACHE_KEY, { ...cache, adultGames: 'block' })
+    }
+    await this.purgeCovers((id) => !this.recipes.has(id))
+  }
+
+  /** Forgets covers (and deletes their files) of recipes the catalog no longer has. */
+  private async purgeCovers(drop: (id: string) => boolean): Promise<void> {
+    const known = this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})
+    const next = Object.fromEntries(Object.entries(known).filter(([id]) => !drop(id)))
+    this.db.setSetting(COVERS_KEY, next)
+    this.covers = new Map(Object.entries(next).map(([id, c]) => [id, c.file]))
+    const keep = new Set(this.covers.values())
+    for (const f of await readdir(this.cfg.coversDir).catch(() => [] as string[])) {
+      if (!keep.has(f)) await rm(join(this.cfg.coversDir, f), { recursive: true, force: true }).catch(() => {})
+    }
+  }
+
+  /** Remembers which library games have adult recipes, for when the catalog can no longer say. */
+  syncAdult(): void {
+    for (const g of this.db.allGames()) {
+      if (!g.recipe_id) continue
+      const adult = this.recipes.has(g.recipe_id) ? (this.recipes.get(g.recipe_id)!.nsfw === true ? 1 : 0) : this.adult.has(g.recipe_id) ? 1 : g.adult
+      if (adult !== g.adult) this.db.updateGame(g.id, { adult })
+    }
+  }
+
+  /** True when this recipe id belongs to an adult game that a blocked install does not show. */
+  isAdultId(id: string): boolean {
+    return this.adult.has(id) || this.recipes.get(id)?.nsfw === true
+  }
+
   private load(games: unknown[]): void {
     this.recipes.clear()
     for (const g of games) if (valid(g)) this.recipes.set(g.id, normalizeRecipe(g))
@@ -207,16 +325,38 @@ export class Catalog {
     const all: Recipe[] = []
     const vocabulary: Vocabulary = Object.create(null)
     this.errors = []
+    const blocked = this.content.blocked
+    const adult: Recipe[] = []
     for (const url of this.cfg.catalogUrls) {
+      // A blocked install reads the safe-for-work index; where that is missing, the full one with its adult games dropped.
+      const sfw = blocked ? sfwIndexUrl(url) : null
+      let idx: Index | null = null
+      let from = url
+      if (sfw) {
+        try {
+          idx = await fetchIndex(sfw)
+          from = sfw
+        } catch (e) {
+          console.warn(`catalog: no safe-for-work index at ${sfw} (${(e as Error).message}); dropping adult games from ${url}`)
+          this.errors.push(`${sfw}: ${(e as Error).message}`)
+        }
+      } else if (blocked) {
+        console.warn(`catalog: ${url} has no safe-for-work index; dropping its adult games`)
+      }
       try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: { accept: 'application/json' } })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const idx = (await res.json()) as { schema?: number; games?: unknown[]; vocabulary?: Vocabulary }
-        if ((idx.schema ?? 1) < 2) throw new Error(`catalog schema ${idx.schema ?? 1} is too old`)
-        for (const [id, entry] of Object.entries(idx.vocabulary ?? {})) {
+        idx ??= await fetchIndex(url)
+        let games: Recipe[] = (idx.games ?? []).filter(valid).map((g) => ({ ...normalizeRecipe(g), _base: from }))
+        let vocab = idx.vocabulary ?? {}
+        if (blocked) {
+          const kept = withoutAdult(games, vocab)
+          games = kept.games
+          vocab = kept.vocabulary
+          adult.push(...kept.adult)
+        }
+        for (const [id, entry] of Object.entries(vocab)) {
           if (!Object.hasOwn(vocabulary, id)) vocabulary[id] = entry
         }
-        for (const g of idx.games ?? []) if (valid(g)) all.push({ ...normalizeRecipe(g), _base: url })
+        all.push(...games)
       } catch (e) {
         this.errors.push(`${url}: ${(e as Error).message}`)
       }
@@ -225,7 +365,9 @@ export class Catalog {
       this.load(all)
       this.vocabulary = vocabulary
       this.fetchedAt = Date.now()
-      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: all, vocabulary })
+      this.setAdult(blocked ? [...this.adult.values(), ...adult] : [])
+      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: all, vocabulary, adultGames: this.content.adultGames })
+      this.syncAdult()
       this.link()
       await this.syncCovers()
     }
@@ -243,9 +385,10 @@ export class Catalog {
       const source = parseJson<GameSource>(g.source, {})
       const recipe =
         this.recipes.get(g.id) ??
+        this.adult.get(g.id) ??
         (source.archive ? this.match({ name: source.archive, size: source.size, sha256: source.sha256 })?.recipe : undefined) ??
-        (g.save_dir ? [...this.recipes.values()].find((r) => r.saveDir === g.save_dir) : undefined)
-      if (recipe) this.db.updateGame(g.id, { recipe_id: recipe.id })
+        (g.save_dir ? [...this.recipes.values(), ...this.adult.values()].find((r) => r.saveDir === g.save_dir) : undefined)
+      if (recipe) this.db.updateGame(g.id, { recipe_id: recipe.id, adult: recipe.nsfw === true ? 1 : g.adult })
     }
   }
 
@@ -330,7 +473,7 @@ export class Catalog {
     const base = archive.name.split('/').pop() ?? archive.name
     let byName: RecipeMatch | null = null
     let byPattern: RecipeMatch | null = null
-    for (const recipe of this.recipes.values()) {
+    for (const recipe of [...this.recipes.values(), ...this.adult.values()]) {
       for (const release of recipe.releases) {
         for (const a of release.archives ?? []) {
           if (archive.sha256 && a.sha256 && a.sha256.toLowerCase() === archive.sha256.toLowerCase()) return { recipe, release, exact: true }

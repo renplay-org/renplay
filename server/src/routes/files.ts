@@ -1,6 +1,7 @@
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import type { Builds } from '../builds.js'
+import type { ContentMode } from '../content.js'
 import type { Db, GameRow } from '../db.js'
 import type { JobManager } from '../jobs.js'
 import { Overlays } from '../mods.js'
@@ -13,13 +14,13 @@ const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|c
 
 type BaseIndex = Map<string, { size: number; where: 'zip' | 'pack' }>
 
-export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jobs: JobManager): Router {
+export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jobs: JobManager, content: ContentMode): Router {
   const router = Router()
   const cache = new Map<string, { key: string; files: BaseIndex }>()
 
   const game = (req: Request): GameRow => {
     const g = db.getGame(assertSlug(req.params.id))
-    if (!g) throw new HttpError(404, 'Game not found')
+    if (!g || content.hides(g)) throw new HttpError(404, 'Game not found')
     if (g.status !== 'installed') throw new HttpError(409, 'Install the game to browse its files')
     if (g.family && g.family !== 'renpy') throw new HttpError(409, 'Files and mods are for Ren’Py games')
     return g

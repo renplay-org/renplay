@@ -97,6 +97,7 @@ Everything works without configuration. These environment variables exist for sp
 | `RENPLAY_DELETE_ARCHIVES` | `true` | Delete a download once its game installed. `false` keeps it, so the game can be reinstalled |
 | `RENPLAY_DIR` | `$GAMES_DIR/_renplay` | Engines and scratch space (same filesystem as `GAMES_DIR`) |
 | `RENPLAY_CATALOG_URLS` | the public catalog | Comma-separated catalog indexes |
+| `RENPLAY_ADULT_GAMES` | not set | `allow` or `block` adult games for the whole install, and lock the choice. Not set: an existing library keeps showing adult games, and a new install asks once in the empty library. Admins can change an unlocked choice in Settings. `block` reads the catalog's safe-for-work index and hides adult games already in the library without deleting them |
 | `RENPLAY_ENGINES_URL` | the public engine index | Where engines come from |
 | `RENPLAY_ENGINE` | newest for the game | Build every game with one engine version |
 | `RENPLAY_IMAGE_QUALITY` | `88` | WebP quality for converted images |

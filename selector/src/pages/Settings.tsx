@@ -3,11 +3,11 @@ import { Download, ExternalLink, FileCode2, HardDrive, Package, RefreshCw } from
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import RecipeDialog from '../components/RecipeDialog'
-import { Button, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
+import { Button, Confirm, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { post } from '../lib/api'
 import { ago, bytes } from '../lib/format'
 import { useBlurAdultCovers } from '../lib/prefs'
-import { useCatalog, useGames, useSystem } from '../lib/queries'
+import { useCatalog, useContent, useGames, useSetAdultGames, useSystem } from '../lib/queries'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
   if (!disk) return null
@@ -38,6 +38,9 @@ export default function Settings() {
   const toast = useToast()
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [blurAdult, setBlurAdult] = useBlurAdultCovers()
+  const { data: content } = useContent()
+  const setAdultGames = useSetAdultGames()
+  const [confirmAdult, setConfirmAdult] = useState(false)
   if (isLoading || !sys) return <Spinner />
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
@@ -55,6 +58,17 @@ export default function Settings() {
       <nav aria-label="Settings sections" className="flex shrink-0 gap-2 overflow-x-auto lg:w-44 lg:flex-col">{[['general', 'General'], ['browser', 'This browser'], ['about', 'About']].map(([value, label]) => <button key={value} onClick={() => setSection(value)} aria-current={section === value ? 'page' : undefined} className={`min-h-11 shrink-0 rounded-xl px-4 text-left text-sm ${section === value ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{label}</button>)}<Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/activity">Activity →</Link></nav>
       <div className="min-w-0 flex-1 space-y-6">
       <div className={section === 'general' ? 'space-y-6' : 'hidden'}>
+        {content && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
+          <h2 className="font-semibold text-white">Adult games</h2>
+          {content.locked ? <>
+            <p className="text-sm text-zinc-400">{content.adultGames === 'allow' ? 'This Renplay shows every game, including adult games.' : 'This Renplay shows safe-for-work games only.'}</p>
+            <p className="text-xs text-zinc-500">The server’s configuration sets this (<code className="text-zinc-400">RENPLAY_ADULT_GAMES={content.adultGames}</code>). It cannot be changed here.</p>
+          </> : <>
+            <Switch checked={content.adultGames === 'allow'} label="Show adult games" hint={content.adultGames === 'allow' ? 'This Renplay shows every game, including adult games.' : 'This Renplay shows safe-for-work games only. Adult games already in the library are hidden, not deleted.'} onChange={(on) => on ? setConfirmAdult(true) : void run(() => setAdultGames('block'), 'Adult games are hidden')} />
+            {!content.chosen && <p className="text-xs text-zinc-500">Nothing is chosen yet, so adult games stay hidden.</p>}
+          </>}
+        </section>}
+        <Confirm open={confirmAdult} onClose={() => setConfirmAdult(false)} title="Show adult games?" confirmLabel="Show adult games" onConfirm={() => void run(() => setAdultGames('allow'), 'Adult games are shown').then(() => setConfirmAdult(false))}>This shows games for adults.</Confirm>
         <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
           <h2 className="flex items-center gap-2 font-semibold text-white">
             <HardDrive className="size-4" /> Storage
