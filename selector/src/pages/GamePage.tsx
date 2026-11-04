@@ -17,19 +17,24 @@ import {
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import FileBrowser from '../components/FileBrowser'
+import FavoriteButton from '../components/FavoriteButton'
+import GameTags from '../components/GameTags'
 import { Cover } from '../components/GameCard'
 import SaveGallery from '../components/SaveGallery'
 import { Badge, BetaBadge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, Tabs, errorText, useToast } from '../components/ui'
 import { del, post, slotName, type Game } from '../lib/api'
 import { ago, bytes, capitalize, pct } from '../lib/format'
 import { recipeLinks } from '../lib/links'
-import { useGame, useSaves } from '../lib/queries'
+import { useCatalog, useGame, useSaves } from '../lib/queries'
+
+import { stateLabel } from '../lib/tags'
 
 type Tab = 'saves' | 'files' | 'details'
 
 export default function GamePage() {
   const { id: gameId = '' } = useParams()
   const { data: game, isLoading, error } = useGame(gameId)
+  const { data: catalog } = useCatalog()
   const [tab, setTab] = useState<Tab>('saves')
   const navigate = useNavigate()
   const { data: saves } = useSaves(gameId, !!game?.saveDir)
@@ -61,8 +66,12 @@ export default function GamePage() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-8">
           <Cover game={game} className="aspect-[63/50] w-full max-w-md shrink-0 shadow-[0_30px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-white/10 lg:w-[380px]" />
           <div className="min-w-0 flex-1">
-            <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">{game.title}</h1>
+            <div className="flex items-start gap-3">
+              <h1 className="min-w-0 flex-1 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">{game.title}</h1>
+              <FavoriteButton game={game} />
+            </div>
             {game.developer && <p className="mt-1 text-sm text-zinc-400">By {game.developer}</p>}
+            <GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} />
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {game.version && <Badge>{game.version}</Badge>}
               <BetaBadge engine={game.family} />
@@ -82,9 +91,6 @@ export default function GamePage() {
                   <ArrowUpCircle className="size-3" /> Update to {game.update.version}
                 </Badge>
               )}
-              {game.tags.map((t) => (
-                <Badge key={t}>{capitalize(t)}</Badge>
-              ))}
             </div>
             <p className="mt-3 text-sm text-zinc-400">
               {game.lastPlayedAt ? `Last played ${ago(game.lastPlayedAt)}` : 'Not played yet'}
@@ -255,17 +261,19 @@ function Details({ game }: { game: Game }) {
   const links = recipeLinks(game.recipe?.links)
   const recipeStatus = !game.recipe
     ? 'Not in the catalog yet. Title and cover come from the catalog once it has a recipe for this game.'
-    : game.recipe.status
-      ? `${capitalize(game.recipe.status)} for this version in the catalog.`
-      : 'This version is not in the catalog yet.'
+    : game.recipe.status === 'broken'
+      ? 'This version does not work in Renplay.'
+      : !game.recipe.status ? 'This version is not in the catalog yet.' : ''
 
   return (
     <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
       <div className="space-y-5 lg:space-y-6">
         <Card title="About">
+          {game.summary && <p className="mb-3 text-sm leading-relaxed text-zinc-300">{game.summary}</p>}
           <div className="divide-y divide-white/[0.06]">
             {game.developer && <Row label="Developer">{game.developer}</Row>}
-            {game.tags.length > 0 && <Row label="Tags">{game.tags.map(capitalize).join(', ')}</Row>}
+            {game.state && <Row label="State">{stateLabel[game.state]}</Row>}
+            {game.detectedVersion && game.detectedVersion !== game.version && <Row label="Detected version"><span className="text-zinc-500">{game.detectedVersion}</span></Row>}
             {game.update && (
               <Row label="Update">
                 <span className="text-accent-300">
@@ -316,7 +324,7 @@ function Details({ game }: { game: Game }) {
           {game.screen && <Row label="Resolution">{`${game.screen[0]} × ${game.screen[1]}`}</Row>}
           {game.engineLabel ? <Row label="Made with">{game.engineLabel}</Row> : game.renpyVersion && <Row label="Made with">{`Ren’Py ${game.renpyVersion}`}</Row>}
           {game.engine && <Row label="Plays on">{`Ren’Py ${game.engine} web`}</Row>}
-          {game.saveDir && (
+          {game.family === 'renpy' && game.saveDir && (
             <Row label="Save folder">
               <span className="font-mono text-[13px]">{game.saveDir}</span>
             </Row>

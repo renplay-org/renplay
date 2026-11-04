@@ -48,6 +48,7 @@ export interface Game {
   recipe: { id: string; links: Record<string, string>; continuesFrom: string[]; status: string | null } | null
   /** A newer working release listed in the catalog. */
   update: { version: string; date: string | null; status: string } | null
+  createdAt: string
   installedAt: string | null
   lastPlayedAt: string | null
   saves: { count: number; latest: number }
@@ -232,7 +233,7 @@ export function slotName(file: string): string {
 
 export function jobTitle(j: Job, games: Game[]): string {
   const game = games.find((g) => g.id === j.game)
-  const name = game?.title ?? j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? j.game
+  const name = j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? game?.source.archive?.split('/').pop() ?? game?.title ?? j.game
   switch (j.type) {
     case 'import':
       return game && game.status === 'installed' && j.status !== 'done' ? `Updating ${name}` : `Installing ${name || 'game'}`

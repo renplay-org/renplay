@@ -3,6 +3,8 @@ import { CloudUpload, ExternalLink, FileArchive, Library, Pause, Play, RefreshCw
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Cover } from '../components/GameCard'
+import TagFilters from '../components/TagFilters'
+import { gameTags, matchesSearch, tagChips, stateLabel } from '../lib/tags'
 import { Badge, BetaBadge, Button, Confirm, Modal, Progress, Spinner, Switch, Tabs, cx, errorText, useToast } from '../components/ui'
 import { del, post, type Archive, type ArchiveInfo, type Job, type Recipe } from '../lib/api'
 import { ago, bytes, pct } from '../lib/format'
@@ -387,8 +389,13 @@ function CatalogTab() {
   const { data, isLoading, refetch } = useCatalog()
   const qc = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
+  const [search, setSearch] = useState('')
+  const [tag, setTag] = useState<string | null>(null)
+  const [limit, setLimit] = useState(30)
   if (isLoading) return <Spinner />
-  const games = data?.games ?? []
+  const all = data?.games ?? []
+  const vocabulary = data?.vocabulary ?? {}
+  const games = all.filter((g) => matchesSearch(g, search, vocabulary) && (!tag || gameTags(g, vocabulary).some((t) => t.id === tag)))
   return (
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -418,15 +425,19 @@ function CatalogTab() {
         </div>
       </div>
       {data?.status.errors.length ? <p className="mb-4 text-xs text-amber-300">Could not reach the catalog: {data.status.errors.join('; ')}</p> : null}
+      <input aria-label="Search catalog" placeholder="Search catalog" value={search} onChange={(e) => { setSearch(e.target.value); setLimit(30) }} className="mb-4 h-11 w-full rounded-xl bg-white/5 px-4 text-sm text-white" />
+      <TagFilters tags={tagChips(all, vocabulary)} selected={tag} onSelect={(id) => { setTag(id); setLimit(30) }} />
+      <p className="mb-4 text-sm text-zinc-400">Showing {Math.min(limit, games.length)} of {games.length}</p>
       {!games.length ? (
-        <p className="text-sm text-zinc-500">No games in the catalog yet.</p>
+        <p className="text-sm text-zinc-500">{all.length ? 'No games match. Try a different search or tag.' : 'No games in the catalog yet.'}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-          {games.map((r) => (
+          {games.slice(0, limit).map((r) => (
             <RecipeCard key={r.id} recipe={r} />
           ))}
         </div>
       )}
+      {games.length > limit && <div className="mt-5 text-center"><Button onClick={() => setLimit(limit + 30)}>Show more</Button></div>}
     </div>
   )
 }
@@ -441,6 +452,7 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
         {r.developer && <div className="truncate text-xs text-zinc-400">{r.developer}</div>}
         <div className="mt-2 flex flex-wrap gap-1.5">
           {latest && <Badge>{latest.version}</Badge>}
+          {r.state && <Badge>{stateLabel[r.state]}</Badge>}
           <BetaBadge engine={r.engine} />
           {latest?.status === 'broken' && <Badge tone="red">{BROKEN}</Badge>}
           {r.local && (
