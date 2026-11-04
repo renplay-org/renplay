@@ -7,7 +7,7 @@
   <meta name="description" content="Ren’Py games tested in Renplay: where to get them, which download works, and how to add them.">
   <meta property="og:title" content="The Renplay catalog">
   <meta property="og:description" content="Ren’Py games tested in Renplay, and where to get them.">
-  <meta property="og:image" content="https://renplay-web.github.io/img/og.jpg">
+  <meta property="og:image" content="https://renplay.org/img/og.jpg">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#07070a">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
@@ -106,16 +106,16 @@
       <a href="./#how">How it works</a>
       <a href="./#phones">Phones</a>
       <a href="./#install">Install</a>
-      <a href="catalog.html" aria-current="page">Catalog</a>
+      <a href="/catalog" aria-current="page">Catalog</a>
       <a href="./#faq">FAQ</a>
-      <a class="in-menu" href="https://github.com/renplay-web/renplay">GitHub</a>
+      <a class="in-menu" href="https://github.com/renplay-org/renplay">GitHub</a>
     </div>
     <div class="right">
-      <a class="btn sm" href="https://github.com/renplay-web/renplay" aria-label="Renplay on GitHub">
+      <a class="btn sm" href="https://github.com/renplay-org/renplay" aria-label="Renplay on GitHub">
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         <span class="lbl">GitHub</span>
       </a>
-      <a class="btn sm" href="https://ko-fi.com/janpuc" aria-label="Support Renplay on Ko-fi">
+      <a class="btn sm" href="/support" aria-label="Support Renplay on Ko-fi">
         <svg viewBox="0 0 24 24" fill="#fb7aa8" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.6 2.9 5 6.3 5c2.1 0 3.5 1.2 4.2 2.4h3c.7-1.2 2.1-2.4 4.2-2.4 3.4 0 5.4 3.6 3.9 6.8C19.5 16.4 12 21 12 21Z"/></svg>
         <span class="lbl">Ko-fi</span>
       </a>
@@ -153,7 +153,7 @@
       </div>
       <div class="actions">
         <button class="btn primary" data-request>Request a game</button>
-        <a class="btn" href="https://github.com/renplay-web/catalog/blob/main/CONTRIBUTING.md">Add a game yourself</a>
+        <a class="btn" href="https://github.com/renplay-org/catalog/blob/main/CONTRIBUTING.md">Add a game yourself</a>
       </div>
     </div>
   </section>
@@ -181,9 +181,9 @@
   <div class="wrap">
     <div class="row">
       <a class="brand" href="./"><img src="logo.svg" alt="" style="width:26px;height:26px;border-radius:8px">Renplay</a>
-      <a href="https://github.com/renplay-web/renplay">GitHub</a>
-      <a href="https://github.com/renplay-web/catalog">Catalog on GitHub</a>
-      <a href="https://ko-fi.com/janpuc">Ko-fi</a>
+      <a href="https://github.com/renplay-org/renplay">GitHub</a>
+      <a href="https://github.com/renplay-org/catalog">Catalog on GitHub</a>
+      <a href="/support">Ko-fi</a>
     </div>
     <small>Renplay and its catalog are made by the Renplay Team. Covers are loaded from the developers’ own pages and belong to them. The catalog never hosts game files: get games from their developers.</small>
   </div>
@@ -197,8 +197,8 @@
     nav.querySelectorAll('.links a').forEach((a) => a.addEventListener('click', () => set(false)))
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false) })
   }
-  const BASE = 'https://renplay-web.github.io/catalog/'
-  const REPO = 'https://github.com/renplay-web/catalog'
+  const BASE = 'https://catalog.renplay.org/'
+  const REPO = 'https://github.com/renplay-org/catalog'
   const LINKS = { itch: 'Itch.io', steam: 'Steam', patreon: 'Patreon', subscribestar: 'SubscribeStar', website: 'Website', f95: 'F95zone', discord: 'Discord', walkthrough: 'Guide' }
   const STORES = ['itch', 'steam', 'patreon', 'subscribestar', 'website']
   // Engines by the names players know from F95zone.

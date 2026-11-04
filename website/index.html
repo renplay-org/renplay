@@ -7,7 +7,7 @@
   <meta name="description" content="Renplay turns the visual novels you download, Ren’Py games first and HTML games too, into games you can play in any browser, on your computer, tablet and phone, with every save kept on your own server. Free and open source.">
   <meta property="og:title" content="Renplay · Your Ren’Py games on every screen">
   <meta property="og:description" content="Play your visual novels on any device. Saves follow you. Free, open source, self-hosted.">
-  <meta property="og:image" content="https://renplay-web.github.io/img/og.jpg">
+  <meta property="og:image" content="https://renplay.org/img/og.jpg">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#07070a">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
@@ -24,16 +24,16 @@
       <a href="./#how">How it works</a>
       <a href="./#phones">Phones</a>
       <a href="./#install">Install</a>
-      <a href="catalog.html">Catalog</a>
+      <a href="/catalog">Catalog</a>
       <a href="./#faq">FAQ</a>
-      <a class="in-menu" href="https://github.com/renplay-web/renplay">GitHub</a>
+      <a class="in-menu" href="https://github.com/renplay-org/renplay">GitHub</a>
     </div>
     <div class="right">
-      <a class="btn sm" href="https://github.com/renplay-web/renplay" aria-label="Renplay on GitHub">
+      <a class="btn sm" href="https://github.com/renplay-org/renplay" aria-label="Renplay on GitHub">
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         <span class="lbl">GitHub</span>
       </a>
-      <a class="btn sm" href="https://ko-fi.com/janpuc" aria-label="Support Renplay on Ko-fi">
+      <a class="btn sm" href="/support" aria-label="Support Renplay on Ko-fi">
         <svg viewBox="0 0 24 24" fill="#fb7aa8" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.6 2.9 5 6.3 5c2.1 0 3.5 1.2 4.2 2.4h3c.7-1.2 2.1-2.4 4.2-2.4 3.4 0 5.4 3.6 3.9 6.8C19.5 16.4 12 21 12 21Z"/></svg>
         <span class="lbl">Ko-fi</span>
       </a>
@@ -191,14 +191,14 @@
           <pre><span class="k">docker</span> run -d --name renplay -p 8080:8080 \
   -v ./games:/games \
   -v ./data:/data \
-  ghcr.io/renplay-web/renplay:latest</pre>
+  ghcr.io/renplay-org/renplay:latest</pre>
           <button class="btn sm copy">Copy</button>
         </div>
         <div class="code" data-pane="compose" hidden>
           <pre><span class="c"># compose.yaml</span>
 <span class="k">services</span>:
   <span class="k">renplay</span>:
-    image: ghcr.io/renplay-web/renplay:latest
+    image: ghcr.io/renplay-org/renplay:latest
     ports: ["8080:8080"]
     volumes:
       - ./games:/games   <span class="c"># games and their downloads</span>
@@ -206,7 +206,7 @@
     restart: unless-stopped</pre>
           <button class="btn sm copy">Copy</button>
         </div>
-        <p class="fine">Renplay has no accounts, so keep it on your home network or put it behind your own sign-in. Everything else is in the <a href="https://github.com/renplay-web/renplay#install">README</a>.</p>
+        <p class="fine">Renplay has no accounts, so keep it on your home network or put it behind your own sign-in. Everything else is in the <a href="https://github.com/renplay-org/renplay#install">README</a>.</p>
       </div>
     </div>
   </section>
@@ -219,9 +219,9 @@
         <p>The community catalog lists games that work in Renplay: which download to get from the developer, its official cover, and any settings it needs. It never hosts game files. Got one working? Add it in a pull request.</p>
       </div>
       <div class="actions">
-        <a class="btn primary" href="catalog.html">Browse the catalog</a>
-        <a class="btn" href="catalog.html#request">Request a game</a>
-        <a class="btn" href="https://github.com/renplay-web/catalog/blob/main/CONTRIBUTING.md">Add one yourself</a>
+        <a class="btn primary" href="/catalog">Browse the catalog</a>
+        <a class="btn" href="/catalog#request">Request a game</a>
+        <a class="btn" href="https://github.com/renplay-org/catalog/blob/main/CONTRIBUTING.md">Add one yourself</a>
       </div>
     </div>
   </section>
@@ -237,7 +237,7 @@
       <details class="reveal"><summary>Does it need a powerful server?</summary><p>No. Installing a game uses some CPU for a few minutes; playing is just serving files. Games run in your browser, so a small home server or NAS is plenty. Plan disk space like for the downloads themselves.</p></details>
       <details class="reveal"><summary>Can I still play on desktop Ren’Py?</summary><p>Yes. Export a game’s saves and they work in the desktop version, and the other way round.</p></details>
       <details class="reveal"><summary>What about adult games?</summary><p>They work like any other. If other people can see your screen, one switch blurs the covers and save pictures of adult games in that browser.</p></details>
-      <details class="reveal"><summary>Is it really free?</summary><p>Yes, free and open source under the MIT license. If it makes your evenings better, you can support it on <a href="https://ko-fi.com/janpuc">Ko-fi</a>.</p></details>
+      <details class="reveal"><summary>Is it really free?</summary><p>Yes, free and open source under the MIT license. If it makes your evenings better, you can support it on <a href="/support">Ko-fi</a>.</p></details>
     </div>
   </section>
 
@@ -247,8 +247,8 @@
       <p class="lead" style="margin-left:auto;margin-right:auto">Set up Renplay tonight and pick up where you left off, on any screen.</p>
       <div class="cta">
         <a class="btn primary" href="#install">Get Renplay</a>
-        <a class="btn" href="https://github.com/renplay-web/renplay">Star it on GitHub</a>
-        <a class="btn" href="https://ko-fi.com/janpuc">♥ Support on Ko-fi</a>
+        <a class="btn" href="https://github.com/renplay-org/renplay">Star it on GitHub</a>
+        <a class="btn" href="/support">♥ Support on Ko-fi</a>
       </div>
     </div>
   </section>
@@ -259,12 +259,12 @@
   <div class="wrap">
     <div class="row">
       <a class="brand" href="#"><img src="logo.svg" alt="" style="width:26px;height:26px;border-radius:8px">Renplay</a>
-      <a href="https://github.com/renplay-web/renplay">GitHub</a>
-      <a href="https://github.com/renplay-web/renplay/releases">Releases</a>
-      <a href="catalog.html">Catalog</a>
-      <a href="catalog.html#request">Request a game</a>
-      <a href="https://github.com/renplay-web/engines">Engines</a>
-      <a href="https://ko-fi.com/janpuc">Ko-fi</a>
+      <a href="https://github.com/renplay-org/renplay">GitHub</a>
+      <a href="https://github.com/renplay-org/renplay/releases">Releases</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/catalog#request">Request a game</a>
+      <a href="https://github.com/renplay-org/engines">Engines</a>
+      <a href="/support">Ko-fi</a>
     </div>
     <small>Renplay is free and open source (MIT), made by the Renplay Team. It is not affiliated with Ren’Py; Ren’Py is © Tom Rothamel and contributors. Games and their art belong to their developers; the screenshots show Ripples by Jestur and Pale Carnations by Mutt &amp; Jeff.</small>
   </div>
