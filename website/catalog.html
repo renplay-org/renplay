@@ -40,7 +40,8 @@
     .art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: filter .4s, transform .4s; }
     .art.hidden img { filter: blur(22px) saturate(.8); transform: scale(1.15); }
     .art .tag18 { position: absolute; inset: 0; display: none; place-items: center; }
-    .art.hidden .tag18 { display: grid; }
+    .art.hidden .tag18 { display: grid; place-content: center; justify-items: center; gap: 12px; padding: 10%; text-align: center; background: rgb(0 0 0 / .28); }
+    .art .tag18 b { font-weight: 800; font-size: 22px; line-height: 1.15; letter-spacing: -.02em; text-shadow: 0 2px 14px rgb(0 0 0 / .7); }
     .art .tag18 span { padding: 5px 12px; border-radius: 999px; background: rgb(0 0 0 / .5); border: 1px solid rgb(255 255 255 / .18); font-size: 13px; font-weight: 700; backdrop-filter: blur(6px); }
     .art .tile-title { position: absolute; inset: 0; display: grid; place-items: center; padding: 10%; text-align: center; font-weight: 800; font-size: 22px; letter-spacing: -.02em; }
     .empty { grid-column: 1 / -1; padding: 60px 20px; text-align: center; color: var(--dim); border: 1px dashed var(--line); border-radius: 20px; }
@@ -100,13 +101,14 @@
 <nav id="nav">
   <div class="wrap">
     <a class="brand" href="./"><img src="logo.svg" alt="">Renplay</a>
-    <div class="links">
+    <div class="links" id="nav-links">
       <a href="./#why">Why</a>
       <a href="./#how">How it works</a>
       <a href="./#phones">Phones</a>
       <a href="./#install">Install</a>
       <a href="catalog.html" aria-current="page">Catalog</a>
       <a href="./#faq">FAQ</a>
+      <a class="in-menu" href="https://github.com/renplay-web/renplay">GitHub</a>
     </div>
     <div class="right">
       <a class="btn sm" href="https://github.com/renplay-web/renplay" aria-label="Renplay on GitHub">
@@ -118,6 +120,9 @@
         <span class="lbl">Ko-fi</span>
       </a>
       <a class="btn sm primary" href="./#install">Get Renplay</a>
+      <button class="btn sm menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
     </div>
   </div>
 </nav>
@@ -180,11 +185,18 @@
       <a href="https://github.com/renplay-web/catalog">Catalog on GitHub</a>
       <a href="https://ko-fi.com/janpuc">Ko-fi</a>
     </div>
-    <small>Covers are loaded from the developers’ own pages and belong to them. The catalog never hosts game files: get games from their developers.</small>
+    <small>Renplay and its catalog are made by the Renplay Team. Covers are loaded from the developers’ own pages and belong to them. The catalog never hosts game files: get games from their developers.</small>
   </div>
 </footer>
 
 <script>
+  { // Phone menu
+    const nav = document.getElementById('nav'), menu = nav.querySelector('.menu')
+    const set = (open) => { nav.classList.toggle('open', open); menu.setAttribute('aria-expanded', String(open)) }
+    menu.addEventListener('click', () => set(!nav.classList.contains('open')))
+    nav.querySelectorAll('.links a').forEach((a) => a.addEventListener('click', () => set(false)))
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false) })
+  }
   const BASE = 'https://renplay-web.github.io/catalog/'
   const REPO = 'https://github.com/renplay-web/catalog'
   const LINKS = { itch: 'Itch.io', steam: 'Steam', patreon: 'Patreon', subscribestar: 'SubscribeStar', website: 'Website', f95: 'F95zone', discord: 'Discord', walkthrough: 'Guide' }
@@ -212,7 +224,7 @@
       const h = hue(g.title)
       return `<div class="art"><div class="tile-title" style="background:radial-gradient(130% 120% at 0% 0%, hsl(${h} 45% 34%), hsl(${(h + 35) % 360} 40% 16%) 55%, hsl(${(h + 60) % 360} 30% 8%))">${esc(g.title)}</div></div>`
     }
-    return `<div class="art${hidden ? ' hidden' : ''}"><img src="${esc(new URL(cover, BASE).href)}" alt="" loading="lazy" referrerpolicy="no-referrer"><div class="tag18"><span>18+</span></div></div>`
+    return `<div class="art${hidden ? ' hidden' : ''}"><img src="${esc(new URL(cover, BASE).href)}" alt="" loading="lazy" referrerpolicy="no-referrer"><div class="tag18"><b>${esc(g.title)}</b><span>18+</span></div></div>`
   }
 
   function card(g, i) {

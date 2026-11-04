@@ -19,13 +19,14 @@
 <nav id="nav">
   <div class="wrap">
     <a class="brand" href="./"><img src="logo.svg" alt="">Renplay</a>
-    <div class="links">
+    <div class="links" id="nav-links">
       <a href="./#why">Why</a>
       <a href="./#how">How it works</a>
       <a href="./#phones">Phones</a>
       <a href="./#install">Install</a>
       <a href="catalog.html">Catalog</a>
       <a href="./#faq">FAQ</a>
+      <a class="in-menu" href="https://github.com/renplay-web/renplay">GitHub</a>
     </div>
     <div class="right">
       <a class="btn sm" href="https://github.com/renplay-web/renplay" aria-label="Renplay on GitHub">
@@ -37,6 +38,9 @@
         <span class="lbl">Ko-fi</span>
       </a>
       <a class="btn sm primary" href="./#install">Get Renplay</a>
+      <button class="btn sm menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
     </div>
   </div>
 </nav>
@@ -262,11 +266,18 @@
       <a href="https://github.com/renplay-web/engines">Engines</a>
       <a href="https://ko-fi.com/janpuc">Ko-fi</a>
     </div>
-    <small>Renplay is free and open source (MIT). It is not affiliated with Ren’Py; Ren’Py is © Tom Rothamel and contributors. Games and their art belong to their developers; the screenshots show Ripples by Jestur and Pale Carnations by Mutt &amp; Jeff.</small>
+    <small>Renplay is free and open source (MIT), made by the Renplay Team. It is not affiliated with Ren’Py; Ren’Py is © Tom Rothamel and contributors. Games and their art belong to their developers; the screenshots show Ripples by Jestur and Pale Carnations by Mutt &amp; Jeff.</small>
   </div>
 </footer>
 
 <script>
+  { // Phone menu
+    const nav = document.getElementById('nav'), menu = nav.querySelector('.menu')
+    const set = (open) => { nav.classList.toggle('open', open); menu.setAttribute('aria-expanded', String(open)) }
+    menu.addEventListener('click', () => set(!nav.classList.contains('open')))
+    nav.querySelectorAll('.links a').forEach((a) => a.addEventListener('click', () => set(false)))
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false) })
+  }
   // Reveal on scroll.
   const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) } }), { threshold: 0.12, rootMargin: '0px 0px -40px 0px' })
   document.querySelectorAll('.reveal').forEach((el, i) => { el.style.transitionDelay = (el.closest('.steps, .bento, .numbers, .versus, .faq') ? (i % 4) * 70 : 0) + 'ms'; io.observe(el) })

@@ -34,6 +34,8 @@ nav .links { display: flex; gap: 24px; margin-left: 12px; font-size: 15px; }
 nav .links a { color: var(--dim); text-decoration: none; transition: color .2s; }
 nav .links a:hover, nav .links a[aria-current] { color: var(--fg); }
 nav .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+nav .menu, nav .links .in-menu { display: none; }
+nav .menu { font: inherit; cursor: pointer; padding: 8px 10px; }
 
 /* Buttons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 13px 22px; border-radius: 14px; font-weight: 650; font-size: 16px; text-decoration: none; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); cursor: pointer; transition: transform .2s, filter .2s, background .2s; white-space: nowrap; }
@@ -182,6 +184,10 @@ footer small { display: block; margin-top: 18px; line-height: 1.6; }
 @media (max-width: 900px) {
   .aurora { width: 100vw; max-width: 100vw; }
   nav .links { display: none; }
+  nav .menu { display: inline-flex; }
+  nav.open .links { display: flex; position: absolute; top: 68px; left: 0; right: 0; flex-direction: column; gap: 0; margin: 0; padding: 6px 24px 14px; background: var(--ink); border-bottom: 1px solid var(--line); }
+  nav.open .links a { padding: 12px 0; font-size: 17px; color: var(--fg); }
+  nav.open .links .in-menu { display: block; }
   .hero { padding-top: 56px; }
   .stage { margin-top: 52px; padding-bottom: 0; }
   .laptop { width: 100%; }
@@ -204,6 +210,7 @@ footer small { display: block; margin-top: 18px; line-height: 1.6; }
   .num b { font-size: 34px; }
   nav .right .lbl { display: none; }
   nav .right .btn:not(.primary) { padding: 8px 10px; }
+  nav .right a.btn[href*="github.com"] { display: none; }
 }
 
 /* Interactivity */
