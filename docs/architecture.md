@@ -43,7 +43,7 @@ archives, while they are kept).
 3. **Pick the engine** (`engines.ts`): the recipe's, `RENPLAY_ENGINE`, or the newest published
    engine of the game's major version. Games made with Ren'Py 7 or older get the newest Ren'Py 8
    engine, which loads their scripts; only Python 2-only code fails. Engine packs come from
-   renplay-web/engines and are checksum-verified.
+   renplay-org/engines and are checksum-verified.
 4. **Split RPA archives** (`rpa.ts`) in one sequential pass. The archive index is a Python pickle;
    `util/pickle.ts` reads it as data only, so nothing from the game is executed.
 5. **Optimize images** (`optimize.ts`): PNG and JPEG become WebP under the same names; each
@@ -105,7 +105,58 @@ saves on uninstall or reinstall.
 `catalog.ts` fetches the index (`index.v3.json`, catalog schema 3; `normalizeRecipe` also reads
 schema 2) every hour (or from Settings). It links installed games to
 recipes (by id, archive or save folder) and reports newer working releases as updates. Library
-metadata (title, developer, tags, links, cover) comes only from recipes.
+metadata (title, developer, tags, links, cover, summary and game state) comes only from recipes.
+
+The cache stores recipes and the tag vocabulary together for offline starts. Vocabulary entries
+from multiple indexes merge in configured order, with the first definition winning.
+`GET /api/catalog` exposes it as `vocabulary: { [tagId]: { label, group } }`. Recipes retain
+`tagIds`, `content`, `state` and `summary`; legacy `tags` labels still work without a vocabulary.
+Game JSON returns empty arrays for missing `tagIds`/`content` and null for missing `state`/`summary`.
+Content tags are not library chips. Display `version` uses the release matched by the installed
+archive's file name, then by version equality; `detectedVersion` keeps the raw detected value.
+The same release determines playability status and available updates.
+
+## Library preferences and activity
+
+Library search, installation filter, tag and sort live in URL query parameters (`q`, `filter`,
+`tag`, `sort`), so returning from a game page restores the view. Recently added sorts by the
+library entry's `createdAt`, not the installation date. Library pages reveal 60 games initially,
+then 48 at a time; catalog pages reveal 30 at a time. Tag chips count games, include only play
+and story tags shared by at least two games, and use the catalog vocabulary for labels.
+
+Favourites live in `games.favorite_at` (added in database schema 4), independently of installed builds.
+`PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
+Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
+its timestamp. Uninstall keeps it; forgetting the library entry removes it.
+
+Schema 5 adds `games.finished_at` (ISO timestamp or empty) and `games.play_time` (seconds,
+initially zero). The migration is transactional and changes no save files. Uninstall and rebuilds
+keep both fields; removing the library entry removes them, but not saves.
+`PUT /api/games/:id/finished` accepts `{ "on": boolean }`, preserves an existing timestamp and
+returns `{ ok, game }`. Finished stories stay in the library but leave Up next.
+`POST /api/games/:id/play-time` accepts `{ "seconds": integer }` from 1 to 60 and atomically adds
+that interval. The player samples visible, ready time, reports every 15 seconds, and flushes the
+remainder on hiding, exit or unmount with a keepalive request. Hidden tabs, loading and failures
+are not counted. Time starts at this upgrade rather than being inferred from overlapping save
+slots; a lost network report can undercount time, but never changes saves.
+
+Game JSON includes `playTime`, `finishedAt`, and `latestSave` (file, Ren'Py label, name, creation
+time in milliseconds, optional runtime in seconds, and screenshot URL, or null). Library and
+save-gallery metadata share a bounded cache keyed by store root, folder, filename, mtime and size;
+a changed or deleted save is reflected on the next list. Up next uses the newest played installed,
+non-finished game and invalidates on player exit.
+
+Optional catalog `free` and `cover.sfw` are additive to schema 3. The API keeps its existing cover
+URL field and exposes `coverSfw` alongside it, including on archive matches. Safe covers are
+allowed while adult save screenshots remain hidden. The empty library's starter is the first
+Ren'Py recipe with `free: true` that is not `nsfw` and has a working release; without one it shows
+no starter. Browser preference `renplay:blur-adult-covers` now defaults
+to hidden when absent; explicit `0` shows pictures and `1` hides them. Hidden art is not requested.
+
+`GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
+clamped to 1–200) and `offset` (default 0). Invalid or unsafe integers use the defaults.
+Jobs sort active first, then newest first, with the id breaking timestamp ties. Offset pages
+reflect the current queue; running jobs can move between pages as their status changes.
 
 Covers are the games' official cover art, linked by the catalog from the developers' own hosting
 (itch.io, Steam) with a sha256. Renplay downloads each one once, refuses it if the checksum
@@ -117,6 +168,31 @@ content-hashed name.
 `mods.ts` keeps the user's files in `/data/overlays/<id>/`. Applying mods (`applymods.ts`) builds a
 new `game.zip` from the base build plus the overlay into `<build>.m<hash>/`; streamed files still
 come from the base build's pack. Updating a game can re-apply mods or move them aside.
+
+## Adult games
+
+`content.ts` holds the install-wide switch: `RENPLAY_ADULT_GAMES=allow|block` locks it, otherwise the
+`adult_games` setting does. Database version 6 stores `allow` for a library that already existed, so
+upgrading changes nothing; a fresh install has no answer, blocks, and asks once in the empty library
+(`GET`/`PUT /api/content` returns `{ adultGames, locked, chosen }`).
+
+Blocking is done where the data enters and where it leaves:
+
+- **Catalog.** Each configured URL is read from its safe-for-work sibling (`index.v3.json` becomes
+  `index.v3.sfw.json`). If that is missing, the full index is fetched and its adult recipes and
+  content tags are dropped, with a log line. Adult recipes and covers are never cached; switching to
+  block deletes the ones cached and the cached covers. Only a stub is kept per known adult recipe
+  (id, archive names, sizes and checksums, save folder, no title, tags or cover), so that
+  `match()` can recognize its archive: `POST /api/imports` and the install job refuse it with a plain
+  reason, and `GET /api/archives` marks it `blocked`.
+- **Library.** `games.adult` remembers, from the last catalog that knew the recipe, which games are
+  adult. While blocked, `ContentMode.hides` makes the games list leave them out and every route that
+  names one (game, saves, files, play pages and streamed assets, copy targets, jobs, the saves export)
+  answer 404. Nothing is deleted; switching back to allow shows them again. A game without a recipe
+  is not hidden.
+- **Not covered.** nginx serves `game.zip`, caches and presplash images straight from the games
+  folder, so those files of a hidden game stay reachable by their exact URL. Accounts (3.0) will
+  decide who may see what.
 
 ## Security notes
 

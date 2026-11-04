@@ -144,6 +144,7 @@ export function Modal({
   children,
   footer,
   wide,
+  fullPhone,
 }: {
   open: boolean
   onClose: () => void
@@ -151,6 +152,7 @@ export function Modal({
   children: ReactNode
   footer?: ReactNode
   wide?: boolean | 'xl'
+  fullPhone?: boolean
 }) {
   useEffect(() => {
     if (!open) return
@@ -173,6 +175,7 @@ export function Modal({
         className={cx(
           'relative flex max-h-[92vh] w-full animate-rise flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-ink-850 shadow-2xl sm:rounded-3xl',
           wide === 'xl' ? 'sm:max-w-6xl' : wide ? 'sm:max-w-3xl' : 'sm:max-w-lg',
+          fullPhone && 'max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none',
         )}
       >
         {title && (
@@ -274,31 +277,42 @@ export function Switch({ checked, onChange, label, hint }: { checked: boolean; o
 export function Menu({ trigger, children, align = 'right' }: { trigger: (open: () => void) => ReactNode; children: (close: () => void) => ReactNode; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ top: 0, left: 0 })
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (!ref.current?.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const onScroll = (e: Event) => { if (!menuRef.current?.contains(e.target as Node)) setOpen(false) }
+    const onResize = () => setOpen(false)
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
+    document.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onResize)
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
+      document.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onResize)
     }
   }, [open])
   return (
     <div ref={ref} className="relative">
-      {trigger(() => setOpen((v) => !v))}
-      {open && (
-        <div
-          className={cx(
-            'absolute z-50 mt-2 min-w-52 animate-rise overflow-hidden rounded-2xl border border-white/10 bg-ink-800/95 p-1.5 shadow-2xl backdrop-blur-xl',
-            align === 'right' ? 'right-0' : 'left-0',
-          )}
-        >
+      {trigger(() => {
+        const box = ref.current?.getBoundingClientRect()
+        if (box) setPosition({
+          top: Math.min(box.bottom + 8, Math.max(8, window.innerHeight - 320)),
+          left: Math.max(8, Math.min(align === 'right' ? box.right - 240 : box.left, window.innerWidth - 248)),
+        })
+        setOpen((value) => !value)
+      })}
+      {open && createPortal(
+        <div ref={menuRef} role="group" aria-label="Actions" data-actions-menu style={position} className="fixed z-[100] max-h-[calc(100dvh-16px)] w-60 animate-rise overflow-y-auto rounded-2xl border border-white/10 bg-ink-800/95 p-1.5 shadow-2xl backdrop-blur-xl">
           {children(() => setOpen(false))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
@@ -310,7 +324,7 @@ export function MenuItem({ icon, children, onClick, danger, disabled }: { icon?:
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        'flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] transition-colors disabled:opacity-40',
+        'flex min-h-11 w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] transition-colors disabled:opacity-40',
         danger ? 'text-red-300 hover:bg-red-500/15' : 'text-zinc-200 hover:bg-white/[0.08]',
       )}
     >

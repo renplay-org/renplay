@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
@@ -68,6 +68,112 @@ describe('HTTP API', () => {
   it('lists games by id with their play URL', async () => {
     const res = await request(app.app).get('/api/games').expect(200)
     expect(res.body.games[0]).toMatchObject({ id: 'fixture-game', title: 'Fixture Game', status: 'installed', engine: '8.5.3', playUrl: '/g/fixture-game/b1/', screen: [1920, 1080] })
+  })
+
+  it('exposes catalog vocabulary, metadata and matched display versions', async () => {
+    const recipe = { id: 'metadata-game', title: 'Metadata Game', engine: 'renpy', free: true, cover: { url: 'cover.png', sfw: true }, tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: 'A journey through time.', releases: [
+      { version: '0.9.24', status: 'playable', archives: [] },
+      { version: '0.9.23', status: 'verified', archives: [{ name: 'Metadata-Ch4Up7Public-pc.zip' }] },
+    ] }
+    const vocabulary = { 'sci-fi': { label: 'Sci-fi', group: 'story' } }
+    app.catalog.stop()
+    app.db.setSetting('catalog_cache', { at: Date.now(), vocabulary, games: [recipe, { id: 'legacy-game', title: 'Legacy', tags: ['romance'], releases: [] }] })
+    await app.catalog.init()
+    app.db.insertGame({ id: 'metadata-game', title: 'Internal', recipe_id: recipe.id, version: 'Ch4Up7Public', source: JSON.stringify({ archive: 'folder/Metadata-Ch4Up7Public-pc.zip' }) })
+    app.db.insertGame({ id: 'legacy-game', title: 'Legacy', recipe_id: 'legacy-game', version: '.510b' })
+    const catalog = (await request(app.app).get('/api/catalog').expect(200)).body
+    expect(catalog.vocabulary).toEqual(vocabulary)
+    expect(catalog.games.find((g: { id: string }) => g.id === recipe.id)).toMatchObject({ free: true, coverSfw: true, tagIds: ['sci-fi'], local: { version: '0.9.23', detectedVersion: 'Ch4Up7Public' } })
+    const game = (await request(app.app).get('/api/games/metadata-game').expect(200)).body.game
+    expect(game.createdAt).toBe(app.db.getGame('metadata-game')!.created_at)
+    expect(game).toMatchObject({ free: true, coverSfw: true, tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: recipe.summary, version: '0.9.23', detectedVersion: 'Ch4Up7Public', recipe: { status: 'verified' }, update: { version: '0.9.24' } })
+    const legacy = (await request(app.app).get('/api/games/legacy-game').expect(200)).body.game
+    expect(legacy).toMatchObject({ tags: ['romance'], tagIds: [], content: [], state: null, summary: null, version: '.510b', detectedVersion: '.510b', favoriteAt: null })
+    app.db.deleteGame('metadata-game')
+    app.db.deleteGame('legacy-game')
+  })
+
+  it('sets and clears favourites, preserving them on uninstall but not forget', async () => {
+    app.db.insertGame({ id: 'favorite-game', title: 'Favorite', status: 'installed' })
+    const path = '/api/games/favorite-game'
+    expect((await request(app.app).get(path).expect(200)).body.game.favoriteAt).toBeNull()
+    await request(app.app).put(`${path}/favorite`).send({ on: 'true' }).expect(400)
+    await request(app.app).put(`${path}/favorite`).send({}).expect(400)
+    await request(app.app).put('/api/games/missing/favorite').send({ on: true }).expect(404)
+    const set = (await request(app.app).put(`${path}/favorite`).send({ on: true }).expect(200)).body
+    expect(set.ok).toBe(true)
+    const timestamp = set.game.favoriteAt
+    expect(new Date(timestamp).toISOString()).toBe(timestamp)
+    expect((await request(app.app).put(`${path}/favorite`).send({ on: true }).expect(200)).body.game.favoriteAt).toBe(timestamp)
+    expect((await request(app.app).delete(path).expect(200)).body.game).toMatchObject({ status: 'not_installed', favoriteAt: timestamp })
+    expect((await request(app.app).put(`${path}/favorite`).send({ on: false }).expect(200)).body.game.favoriteAt).toBeNull()
+    await request(app.app).put(`${path}/favorite`).send({ on: true }).expect(200)
+    await request(app.app).delete(`${path}?forget=1`).expect(200)
+    expect(app.db.getGame('favorite-game')).toBeNull()
+  })
+
+  it('stores finished state and measured play time without changing saves', async () => {
+    app.db.insertGame({ id: 'progress-game', title: 'Progress', save_dir: 'Progress-123' })
+    const path = '/api/games/progress-game'
+    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(6)
+    expect((await request(app.app).get(path)).body.game).toMatchObject({ playTime: 0, finishedAt: null, latestSave: null })
+    for (const on of [undefined, 'true', 1]) await request(app.app).put(`${path}/finished`).send({ on }).expect(400)
+    await request(app.app).put('/api/games/missing/finished').send({ on: true }).expect(404)
+    const timestamp = (await request(app.app).put(`${path}/finished`).send({ on: true }).expect(200)).body.game.finishedAt
+    expect(new Date(timestamp).toISOString()).toBe(timestamp)
+    expect((await request(app.app).put(`${path}/finished`).send({ on: true })).body.game.finishedAt).toBe(timestamp)
+    for (const seconds of [-1, 0, 61, 1.5, '10', null]) await request(app.app).post(`${path}/play-time`).send({ seconds }).expect(400)
+    await request(app.app).post('/api/games/missing/play-time').send({ seconds: 10 }).expect(404)
+    await request(app.app).post(`${path}/play-time`).send({ seconds: 15 }).expect(200)
+    await request(app.app).post(`${path}/play-time`).send({ seconds: 10 }).expect(200)
+    expect((await request(app.app).delete(path).expect(200)).body.game).toMatchObject({ playTime: 25, finishedAt: timestamp })
+    expect((await request(app.app).put(`${path}/finished`).send({ on: false })).body.game.finishedAt).toBeNull()
+    app.db.deleteGame('progress-game')
+  })
+
+  it('includes the newest valid save in the library and refreshes changed metadata', async () => {
+    app.db.insertGame({ id: 'latest-game', title: 'Latest', save_dir: 'Latest-123' })
+    const save = (name: string, ctime: number) => zipBuffer({ log: 'pickle', json: JSON.stringify({ _save_name: name, _ctime: ctime, _game_runtime: 42 }), 'screenshot.png': 'png' })
+    await app.saves.write('Latest-123', '1-1-LT1.save', await save('First scene', 100))
+    await app.saves.write('Latest-123', 'auto-1-LT1.save', await save('Next scene', 200))
+    await app.saves.write('Latest-123', 'quick-1-LT1.save', Buffer.from('broken'))
+    await app.saves.write('Latest-123', '_internal.save', await save('Internal', 999))
+    const latest = async () => (await request(app.app).get('/api/games').expect(200)).body.games.find((game: { id: string }) => game.id === 'latest-game')
+    expect(await latest()).toMatchObject({ playTime: 0, latestSave: { file: 'auto-1-LT1.save', name: 'Next scene', ctime: 200000, runtime: 42 } })
+    expect((await latest()).latestSave.screenshot).toContain('/api/saves/latest-game/screenshot?file=auto-1-LT1.save')
+    await app.saves.write('Latest-123', '1-1-LT1.save', await save('A newer scene', 300))
+    expect((await latest()).latestSave).toMatchObject({ file: '1-1-LT1.save', name: 'A newer scene', ctime: 300000 })
+    await app.saves.remove('Latest-123', '1-1-LT1.save', 'user-delete')
+    expect((await latest()).latestSave.name).toBe('Next scene')
+    app.db.deleteGame('latest-game')
+    rmSync(join(app.saves.root, 'Latest-123'), { recursive: true, force: true })
+  })
+
+  it('paginates jobs with a total and stable ordering for equal timestamps', async () => {
+    for (let i = 0; i < 5; i++) {
+      app.db.insertJob({ id: `page-${i}`, type: 'test', game: '', params: '{}' })
+      app.db.updateJob(`page-${i}`, { status: 'done', created_at: '2026-11-04T12:00:00.000Z' })
+    }
+    const first = (await request(app.app).get('/api/jobs?limit=2').expect(200)).body
+    expect(first.total).toBe(5)
+    expect(first.busy).toBe(false)
+    expect(first.jobs.map((j: { id: string }) => j.id)).toEqual(['page-4', 'page-3'])
+    expect((await request(app.app).get('/api/jobs?limit=2&offset=2').expect(200)).body.jobs.map((j: { id: string }) => j.id)).toEqual(['page-2', 'page-1'])
+    expect((await request(app.app).get('/api/jobs?limit=2&offset=4').expect(200)).body.jobs).toHaveLength(1)
+    expect((await request(app.app).get('/api/jobs?limit=2&offset=5').expect(200)).body.jobs).toEqual([])
+    for (const query of ['limit=-1&offset=-2', 'limit=NaN&offset=no', 'limit=1.5&offset=2.5', 'limit=Infinity']) {
+      expect((await request(app.app).get(`/api/jobs?${query}`).expect(200)).body.jobs).toHaveLength(5)
+    }
+    expect((await request(app.app).get('/api/jobs?limit=0').expect(200)).body.jobs).toHaveLength(1)
+    await request(app.app).delete('/api/jobs').expect(200)
+  })
+
+  it('refuses an install into a game that is not in the library before doing any work', async () => {
+    const res = await request(app.app)
+      .post('/api/imports')
+      .send({ source: { kind: 'archive', path: 'whatever.zip' }, game: 'no-such-game' })
+    expect(res.status).toBe(404)
+    expect(res.body.error).toMatch(/not in the library/)
   })
 
   it('offers a reinstall only while the archive is in the archives folder', async () => {
@@ -197,7 +303,7 @@ describe('HTTP API', () => {
 
   it('exports a recipe', async () => {
     const res = await request(app.app).get('/api/games/fixture-game/recipe').expect(200)
-    expect(res.body.yaml).toMatch(/^# yaml-language-server: \$schema=https:\/\/renplay-web\.github\.io\/catalog\/recipe\.schema\.json\nid: fixture-game\n/)
+    expect(res.body.yaml).toMatch(/^# yaml-language-server: \$schema=https:\/\/catalog\.renplay\.org\/recipe\.schema\.json\nid: fixture-game\n/)
     expect(res.body.yaml).toContain('saveDir: MyGame-1234567890')
     expect(res.body.yaml).toContain('engine: renpy')
     expect(res.body.yaml).toContain('runtime: 8.5.3')

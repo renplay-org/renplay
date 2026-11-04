@@ -1,8 +1,27 @@
+export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
+export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
+
+export interface CatalogResponse {
+  status: { fetchedAt: number; urls: string[]; errors: string[]; count: number }
+  vocabulary: Vocabulary
+  games: Recipe[]
+}
+
+export interface JobsResponse {
+  jobs: Job[]
+  busy: boolean
+  total: number
+}
+
 export interface Game {
   id: string
   title: string
   developer: string | null
   tags: string[]
+  tagIds: string[]
+  content: string[]
+  state: GameState | null
+  summary: string | null
   /** Curated cover from the catalog (URL), or null. */
   cover: string | null
   /** An adult game, per its recipe. */
@@ -16,6 +35,13 @@ export interface Game {
   /** What made it, for other engines: "HTML (SugarCube 2.36.1)". */
   engineLabel: string | null
   version: string | null
+  detectedVersion: string | null
+  favoriteAt: string | null
+  finishedAt: string | null
+  playTime: number
+  latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot'> | null
+  coverSfw?: boolean
+  free?: boolean
   renpyVersion: string | null
   engine: string | null
   sizeBytes: number
@@ -26,7 +52,8 @@ export interface Game {
   canReinstall: boolean
   recipe: { id: string; links: Record<string, string>; continuesFrom: string[]; status: string | null } | null
   /** A newer working release listed in the catalog. */
-  update: { version: string; date: string | null; status: string } | null
+  update: { version: string; date: string | null; status: string; archives?: string[] } | null
+  createdAt: string
   installedAt: string | null
   lastPlayedAt: string | null
   saves: { count: number; latest: number }
@@ -105,8 +132,17 @@ export interface Archive {
   sha256: string | null
   info: ArchiveInfo | null
   installedAs: string | null
-  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean } | null
+  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean; coverSfw?: boolean } | null
   existingGame: string | null
+  /** Why this download cannot be installed here (an adult game on a safe-for-work install). */
+  blocked: string | null
+}
+
+/** Whether this Renplay shows adult games; locked when the server's configuration decides. */
+export interface ContentState {
+  adultGames: 'allow' | 'block'
+  locked: boolean
+  chosen: boolean
 }
 
 export interface RecipeRelease {
@@ -124,14 +160,20 @@ export interface Recipe {
   title: string
   developer?: string
   tags?: string[]
+  tagIds?: string[]
+  content?: string[]
+  state?: GameState
+  summary?: string
   nsfw?: boolean
-  cover?: string
+  free?: boolean
+  coverSfw?: boolean
+  cover?: string | null
   links?: Record<string, string>
   saveDir?: string
   continuesFrom?: string[]
   engine?: string
   releases: RecipeRelease[]
-  local: { id: string; status: string; version: string } | null
+  local: { id: string; status: string; version: string; detectedVersion: string } | null
 }
 
 export interface SystemInfo {
@@ -198,6 +240,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 }
 
 export const post = <T,>(path: string, json?: unknown) => api<T>(path, { method: 'POST', json: json ?? {} })
+export const put = <T,>(path: string, json?: unknown) => api<T>(path, { method: 'PUT', json: json ?? {} })
 export const del = <T,>(path: string) => api<T>(path, { method: 'DELETE' })
 
 
@@ -207,14 +250,15 @@ export function slotName(file: string): string {
 
 export function jobTitle(j: Job, games: Game[]): string {
   const game = games.find((g) => g.id === j.game)
-  const name = game?.title ?? j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? j.game
+  const name = j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? game?.source.archive?.split('/').pop() ?? game?.title ?? j.game
   switch (j.type) {
     case 'import':
-      return game && game.status === 'installed' && j.status !== 'done' ? `Updating ${name}` : `Installing ${name || 'game'}`
+      if (j.status === 'done') return `Installed ${name || 'game'}`
+      return game && game.status === 'installed' ? `Updating ${name}` : `Installing ${name || 'game'}`
     case 'apply-mods':
-      return `Applying mods to ${name}`
+      return `${j.status === 'done' ? 'Applied' : 'Applying'} mods to ${name}`
     case 'hash-archive':
-      return `Checking ${name}`
+      return `${j.status === 'done' ? 'Checked' : 'Checking'} ${name}`
     default:
       return j.type
   }

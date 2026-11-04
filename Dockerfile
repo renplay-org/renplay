@@ -14,7 +14,7 @@ RUN cd server && npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim
 # nginx serves the games volume; libarchive-tools (bsdtar) unpacks 7z/rar
-# archives. Ren'Py engines come prebuilt from renplay-web/engines.
+# archives. Ren'Py engines come prebuilt from renplay-org/engines.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools curl ca-certificates \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled /var/log/nginx \

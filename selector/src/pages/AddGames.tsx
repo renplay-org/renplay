@@ -1,41 +1,33 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { CloudUpload, ExternalLink, FileArchive, Library, Pause, Play, RefreshCw, Trash2, X } from 'lucide-react'
+import { CloudUpload, ExternalLink, FileArchive, MoreHorizontal, Pause, Play, RefreshCw, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import Sheet from '../components/Sheet'
+import SegmentedControl from '../components/SegmentedControl'
 import { Cover } from '../components/GameCard'
-import { Badge, BetaBadge, Button, Confirm, Modal, Progress, Spinner, Switch, Tabs, cx, errorText, useToast } from '../components/ui'
+import TagFilters from '../components/TagFilters'
+import { gameTags, matchesSearch, tagChips, stateLabel } from '../lib/tags'
+import { Badge, BetaBadge, Button, Confirm, Modal, Progress, Spinner, Switch, MenuItem, cx, errorText, useToast } from '../components/ui'
 import { del, post, type Archive, type ArchiveInfo, type Job, type Recipe } from '../lib/api'
 import { ago, bytes, pct } from '../lib/format'
 import { recipeLinks } from '../lib/links'
 import { useArchives, useCatalog, useGames, useJobs, useSystem } from '../lib/queries'
 import { uploadArchive, type UploadHandle } from '../lib/upload'
 
-type Tab = 'downloads' | 'catalog'
-
 // A game in the catalog works; only a release marked broken is worth a word.
 const BROKEN = 'Does not work'
 
-const REQUEST_URL = 'https://renplay-web.github.io/catalog.html#request'
+const REQUEST_URL = 'https://renplay.org/catalog/request'
 
 export default function AddGames() {
-  const [tab, setTab] = useState<Tab>('downloads')
   return (
     <div className="animate-fade-in">
       <div className="mb-6">
         <h1 className="font-display text-3xl font-bold tracking-tight text-white">Add games</h1>
         <p className="mt-2 max-w-2xl text-sm text-zinc-400">Install a game from its PC download: a Ren’Py game, or an HTML game such as a Twine story. Renplay builds it for the browser on the server.</p>
       </div>
-      <div className="mb-6">
-        <Tabs
-          value={tab}
-          onChange={setTab}
-          tabs={[
-            { id: 'downloads', label: <><FileArchive className="size-4" /> Downloads</> },
-            { id: 'catalog', label: <><Library className="size-4" /> Catalog</> },
-          ]}
-        />
-      </div>
-      {tab === 'downloads' ? <Downloads /> : <CatalogTab />}
+      <Downloads />
+      <section className="mt-12"><h2 className="mb-5 text-xl font-semibold text-white">Catalog</h2><CatalogTab /></section>
     </div>
   )
 }
@@ -65,7 +57,8 @@ function Downloads() {
   )
   return (
     <div className="space-y-8">
-      <UploadZone dir={data?.dir ?? sys?.paths.archives} />
+      <UploadZone />
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold text-white">On the server</h2><code className="break-all text-xs text-zinc-500">{data?.dir ?? sys?.paths.archives}</code></div>
       {!archives.length ? (
         <div className="flex items-center justify-between gap-4 text-sm text-zinc-500">
           <span>Downloads you add show up here.</span>
@@ -88,11 +81,11 @@ function Downloads() {
             </Section>
           )}
           {others.length > 0 && (
-            <Section title="Other engines" action={ready.length || installed.length ? undefined : refresh}>
+            <details><summary className="min-h-11 cursor-pointer text-sm text-zinc-400">Other engines ({others.length})</summary><Section title="Other engines" action={ready.length || installed.length ? undefined : refresh}>
               {others.map((a) => (
                 <ArchiveRow key={a.path} archive={a} onInstall={() => setInstalling(a)} />
               ))}
-            </Section>
+            </Section></details>
           )}
         </>
       )}
@@ -136,14 +129,17 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
       .catch(() => {})
   }, [a.path, a.info, a.name, qc])
   const title = a.recipe?.title ?? info?.title ?? a.name
-  const version = info?.version ?? a.recipe?.version
+  const version = a.recipe?.version ?? info?.version
   const broken = !a.installedAs && a.recipe?.status === 'broken'
-  const updates = !a.installedAs && a.existingGame ? (games?.find((g) => g.id === a.existingGame)?.title ?? a.existingGame) : null
+  const existing = games?.find((g) => g.id === a.existingGame)
+  const sameRelease = !!existing && !!version && (existing.version === version || existing.detectedVersion === version)
+  const reinstall = !!a.installedAs || sameRelease
+  const updates = !reinstall && a.existingGame ? (existing?.title ?? a.existingGame) : null
   const renpy = (info?.renpyVersion ?? games?.find((g) => g.id === a.installedAs)?.renpyVersion)?.split('.').slice(0, 3).join('.')
   const engine = info?.engine
   const foreign = engine && engine.family !== 'renpy' ? engine : null
   const unknown = info?.type === 'zip' && !info.layout && !engine
-  const blocked = !a.installedAs && engine?.installable === false
+  const blocked = !!a.blocked || (!a.installedAs && engine?.installable === false)
   const madeWith = foreign ? foreign.label : renpy && `Ren’Py ${renpy}`
   const meta = [bytes(a.size), madeWith, `Added ${ago(a.mtime)}`, title !== a.name && a.name].filter(Boolean).join(' · ')
   const actions = job ? (
@@ -152,10 +148,12 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
     </Link>
   ) : (
     <>
-      <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" />} onClick={() => setConfirmDelete(true)} aria-label={`Delete ${a.name}`} title="Delete download" />
+      <Sheet trigger={(open) => <Button size="sm" variant="ghost" icon={<MoreHorizontal className="size-4" />} onClick={open} aria-label={`Actions for ${a.name}`} />}>
+        {(close) => <MenuItem icon={<Trash2 />} danger onClick={() => { close(); setConfirmDelete(true) }}>Delete download… ({bytes(a.size)})</MenuItem>}
+      </Sheet>
       {!blocked && (
-        <Button size="sm" variant={a.installedAs ? 'secondary' : 'primary'} onClick={onInstall}>
-          {a.installedAs ? 'Reinstall' : updates ? 'Update' : 'Install'}
+        <Button size="sm" variant={reinstall ? 'secondary' : 'primary'} onClick={onInstall}>
+          {reinstall ? 'Reinstall' : updates ? `Update ${updates}` : 'Install'}
         </Button>
       )}
     </>
@@ -163,7 +161,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   return (
     <div className="flex gap-3 rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.07] sm:items-center sm:gap-4">
       {a.recipe?.cover ? (
-        <Cover game={{ title, cover: a.recipe.cover, nsfw: a.recipe.nsfw }} className="aspect-[63/50] w-20 shrink-0 self-start rounded-xl sm:w-24 sm:self-center" rounded={false} />
+        <Cover game={{ title, cover: a.recipe.cover, nsfw: a.recipe.nsfw, coverSfw: a.recipe.coverSfw }} className="aspect-[63/50] w-20 shrink-0 self-start rounded-xl sm:w-24 sm:self-center" rounded={false} />
       ) : (
         <div className="flex aspect-[63/50] w-20 shrink-0 items-center justify-center self-start rounded-xl bg-white/[0.05] text-zinc-500 sm:w-24 sm:self-center">
           <FileArchive className="size-6" />
@@ -171,7 +169,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
       )}
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-medium text-zinc-100">{title}</span>
+          <span className="min-w-0 break-words font-medium text-zinc-100">{a.name}</span>
           {version && <Badge className="shrink-0">{version}</Badge>}
         </div>
         <div className="mt-0.5 line-clamp-2 break-words text-xs text-zinc-500">{meta}</div>
@@ -179,11 +177,11 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
           <div className="mt-2 flex flex-wrap gap-1.5">
             {foreign && !blocked && <BetaBadge engine={foreign.family} />}
             {broken && <Badge tone="red">{BROKEN}</Badge>}
-            {updates && <Badge tone="accent">Update for {updates}</Badge>}
+            {updates && <Badge tone="accent">New version of a game you have</Badge>}
             {unknown && <Badge tone="amber">No game found</Badge>}
           </div>
         )}
-        {blocked && engine?.reason && <p className="mt-1.5 text-xs text-amber-200/80">{engine.reason}</p>}
+        {blocked && (a.blocked ?? engine?.reason) && <p className="mt-1.5 text-xs text-amber-200/80">{a.blocked ?? engine?.reason}</p>}
         {!blocked && !job && engine?.warnings.map((w) => (
           <p key={w} className="mt-1.5 text-xs text-amber-200/80">
             {w}
@@ -218,12 +216,13 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
 function JobLine({ job }: { job: Job }) {
   if (job.status === 'queued') return <div className="mt-2 text-xs text-zinc-400">Waiting for the install before it</div>
   return (
-    <div className="mt-2.5 max-w-md">
+    <div className="mt-2.5">
       <div className="mb-1.5 flex justify-between gap-3 text-xs text-zinc-400">
         <span className="truncate">{job.stage || 'Installing'}</span>
         <span className="shrink-0 tabular-nums">{pct(job.progress)}</span>
       </div>
       <Progress value={job.progress} />
+      <p className="mt-1 text-xs text-zinc-500">You can leave this page.</p>
     </div>
   )
 }
@@ -293,7 +292,7 @@ function InstallDialog({ archive, deletes, onClose }: { archive: Archive; delete
   )
 }
 
-function UploadZone({ dir }: { dir?: string }) {
+function UploadZone() {
   const qc = useQueryClient()
   const toast = useToast()
   const [drag, setDrag] = useState(false)
@@ -359,7 +358,7 @@ function UploadZone({ dir }: { dir?: string }) {
         </div>
       ) : (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
-          <div className="flex min-w-0 flex-1 gap-4">
+          <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-zinc-300">
               <CloudUpload className="size-5" />
             </div>
@@ -368,8 +367,7 @@ function UploadZone({ dir }: { dir?: string }) {
                 Upload a game’s PC download<span className="hidden sm:inline">, or drop it here</span>
               </div>
               <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">
-                A .zip, .7z or .rar of any size. On the server, you can also copy it into{' '}
-                <code className="break-all rounded bg-white/[0.06] px-1 py-0.5 text-[11px] text-zinc-300">{dir ?? 'the archives folder'}</code>.
+                A .zip, .7z or .rar of any size. If the connection drops, pick the same file again and it continues.
               </p>
             </div>
           </div>
@@ -387,8 +385,14 @@ function CatalogTab() {
   const { data, isLoading, refetch } = useCatalog()
   const qc = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
+  const [search, setSearch] = useState('')
+  const [tag, setTag] = useState<string | null>(null)
+  const [limit, setLimit] = useState(30)
+  const [filter, setFilter] = useState('all')
   if (isLoading) return <Spinner />
-  const games = data?.games ?? []
+  const all = data?.games ?? []
+  const vocabulary = data?.vocabulary ?? {}
+  const games = all.filter((g) => matchesSearch(g, search, vocabulary) && (filter === 'all' || (filter === 'free' ? g.free === true || (g.free === undefined && g.nsfw === false) : g.state === 'completed')) && (!tag || gameTags(g, vocabulary).some((t) => t.id === tag)))
   return (
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -417,16 +421,21 @@ function CatalogTab() {
           </a>
         </div>
       </div>
-      {data?.status.errors.length ? <p className="mb-4 text-xs text-amber-300">Could not reach the catalog: {data.status.errors.join('; ')}</p> : null}
+      {data?.status.errors.length ? <p className="mb-4 text-xs text-amber-300">Could not reach the catalog. Last updated {ago(data.status.fetchedAt)}.</p> : null}
+      <input aria-label="Search catalog" placeholder="Search catalog" value={search} onChange={(e) => { setSearch(e.target.value); setLimit(30) }} className="mb-4 h-11 w-full rounded-xl bg-white/5 px-4 text-sm text-white" />
+      <div className="mb-4"><SegmentedControl value={filter} onChange={(value) => { setFilter(value); setLimit(30) }} options={[{ value: 'all', label: 'All' }, { value: 'free', label: 'Free' }, { value: 'completed', label: 'Completed' }]} /></div>
+      <TagFilters tags={tagChips(all, vocabulary)} selected={tag} onSelect={(id) => { setTag(id); setLimit(30) }} />
+      <p className="mb-4 text-sm text-zinc-400">Showing {Math.min(limit, games.length)} of {games.length}</p>
       {!games.length ? (
-        <p className="text-sm text-zinc-500">No games in the catalog yet.</p>
+        <p className="text-sm text-zinc-500">{all.length ? 'No games match. Try a different search or tag.' : 'No games in the catalog yet.'}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-          {games.map((r) => (
+          {games.slice(0, limit).map((r) => (
             <RecipeCard key={r.id} recipe={r} />
           ))}
         </div>
       )}
+      {games.length > limit && <div className="mt-5 text-center"><Button onClick={() => setLimit(limit + 30)}>Show more</Button></div>}
     </div>
   )
 }
@@ -435,12 +444,13 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
   const latest = r.releases[0]
   return (
     <div className="flex min-w-0 gap-3 rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.07] sm:gap-4">
-      <Cover game={{ title: r.title, cover: typeof r.cover === 'string' ? r.cover : null, nsfw: r.nsfw }} rounded={false} className="aspect-[63/50] w-28 shrink-0 self-start rounded-xl sm:w-36" />
+      <Cover game={{ title: r.title, cover: typeof r.cover === 'string' ? r.cover : null, nsfw: r.nsfw, coverSfw: r.coverSfw }} rounded={false} className="aspect-[63/50] w-24 shrink-0 self-start rounded-xl sm:w-36" />
       <div className="min-w-0 flex-1">
         <div className="truncate font-semibold text-white">{r.title}</div>
         {r.developer && <div className="truncate text-xs text-zinc-400">{r.developer}</div>}
         <div className="mt-2 flex flex-wrap gap-1.5">
           {latest && <Badge>{latest.version}</Badge>}
+          {r.state && <Badge>{stateLabel[r.state]}</Badge>}
           <BetaBadge engine={r.engine} />
           {latest?.status === 'broken' && <Badge tone="red">{BROKEN}</Badge>}
           {r.local && (
@@ -449,14 +459,15 @@ function RecipeCard({ recipe: r }: { recipe: Recipe }) {
             </Link>
           )}
         </div>
+        {r.summary && <p className="mt-2 line-clamp-2 text-sm text-zinc-400">{r.summary}</p>}
         <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
-          {recipeLinks(r.links).map(([k, label, url]) => (
+          {!r.local && recipeLinks(r.links).slice(0, 1).map(([k, label, url]) => (
             <a key={k} href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white">
-              {label} <ExternalLink className="size-3" />
+              Get it on {label} <ExternalLink className="size-3" />
             </a>
           ))}
         </div>
-        {latest?.archives?.[0] && <p className="mt-2 truncate text-[11px] text-zinc-500">Download: {latest.archives.map((a) => a.name).join(' or ')}</p>}
+
       </div>
     </div>
   )

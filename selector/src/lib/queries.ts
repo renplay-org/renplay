@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
-import { api, type Archive, type FilesResponse, type Game, type Job, type Recipe, type SavesResponse, type SystemInfo } from './api'
+import { api, put, type CatalogResponse, type ContentState, type Archive, type FilesResponse, type Game, type Job, type SavesResponse, type SystemInfo } from './api'
 
 export function useGames() {
   return useQuery({
@@ -59,8 +59,21 @@ export function useArchives() {
 export function useCatalog() {
   return useQuery({
     queryKey: ['catalog'],
-    queryFn: () => api<{ status: { fetchedAt: number; urls: string[]; errors: string[]; count: number }; games: Recipe[] }>('/api/catalog'),
+    queryFn: () => api<CatalogResponse>('/api/catalog'),
   })
+}
+
+export function useContent() {
+  return useQuery({ queryKey: ['content'], queryFn: () => api<ContentState>('/api/content') })
+}
+
+/** Saves the choice, then reloads everything that depends on it. */
+export function useSetAdultGames() {
+  const qc = useQueryClient()
+  return async (adultGames: ContentState['adultGames']) => {
+    await put('/api/content', { adultGames })
+    await qc.invalidateQueries()
+  }
 }
 
 export function useSystem() {

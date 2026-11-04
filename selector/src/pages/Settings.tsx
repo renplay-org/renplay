@@ -1,13 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Activity, Download, ExternalLink, FileCode2, HardDrive, Package, RefreshCw } from 'lucide-react'
+import { Download, ExternalLink, FileCode2, HardDrive, Package, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import RecipeDialog from '../components/RecipeDialog'
-import { Button, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
+import { Button, Confirm, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { post } from '../lib/api'
-import { bytes } from '../lib/format'
+import { ago, bytes } from '../lib/format'
 import { useBlurAdultCovers } from '../lib/prefs'
-import { useCatalog, useGames, useSystem } from '../lib/queries'
+import { useCatalog, useContent, useGames, useSetAdultGames, useSystem } from '../lib/queries'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
   if (!disk) return null
@@ -30,6 +30,7 @@ export default function Settings() {
   const { data: catalog } = useCatalog()
   const { data: games } = useGames()
   const installed = (games ?? []).filter((g) => g.status === 'installed')
+  const [section, setSection] = useState('general')
   const [recipeFor, setRecipeFor] = useState('')
   const recipeGame = installed.find((g) => g.id === recipeFor)
   const [recipeOpen, setRecipeOpen] = useState(false)
@@ -37,6 +38,9 @@ export default function Settings() {
   const toast = useToast()
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [blurAdult, setBlurAdult] = useBlurAdultCovers()
+  const { data: content } = useContent()
+  const setAdultGames = useSetAdultGames()
+  const [confirmAdult, setConfirmAdult] = useState(false)
   if (isLoading || !sys) return <Spinner />
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
@@ -50,7 +54,21 @@ export default function Settings() {
   return (
     <div className="animate-fade-in space-y-6">
       <h1 className="font-display text-3xl font-bold tracking-tight text-white">Settings</h1>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="flex flex-col gap-6 lg:flex-row">
+      <nav aria-label="Settings sections" className="flex shrink-0 gap-2 overflow-x-auto lg:w-44 lg:flex-col">{[['general', 'General'], ['browser', 'This browser'], ['about', 'About']].map(([value, label]) => <button key={value} onClick={() => setSection(value)} aria-current={section === value ? 'page' : undefined} className={`min-h-11 shrink-0 rounded-xl px-4 text-left text-sm ${section === value ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{label}</button>)}<Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/activity">Activity →</Link></nav>
+      <div className="min-w-0 flex-1 space-y-6">
+      <div className={section === 'general' ? 'space-y-6' : 'hidden'}>
+        {content && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
+          <h2 className="font-semibold text-white">Adult games</h2>
+          {content.locked ? <>
+            <p className="text-sm text-zinc-400">{content.adultGames === 'allow' ? 'This Renplay shows every game, including adult games.' : 'This Renplay shows safe-for-work games only.'}</p>
+            <p className="text-xs text-zinc-500">The server’s configuration sets this (<code className="text-zinc-400">RENPLAY_ADULT_GAMES={content.adultGames}</code>). It cannot be changed here.</p>
+          </> : <>
+            <Switch checked={content.adultGames === 'allow'} label="Show adult games" hint={content.adultGames === 'allow' ? 'This Renplay shows every game, including adult games.' : 'This Renplay shows safe-for-work games only. Adult games already in the library are hidden, not deleted.'} onChange={(on) => on ? setConfirmAdult(true) : void run(() => setAdultGames('block'), 'Adult games are hidden')} />
+            {!content.chosen && <p className="text-xs text-zinc-500">Nothing is chosen yet, so adult games stay hidden.</p>}
+          </>}
+        </section>}
+        <Confirm open={confirmAdult} onClose={() => setConfirmAdult(false)} title="Show adult games?" confirmLabel="Show adult games" onConfirm={() => void run(() => setAdultGames('allow'), 'Adult games are shown').then(() => setConfirmAdult(false))}>This shows games for adults.</Confirm>
         <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
           <h2 className="flex items-center gap-2 font-semibold text-white">
             <HardDrive className="size-4" /> Storage
@@ -91,15 +109,15 @@ export default function Settings() {
             {sys.engines.installed.map((e) => (
               <div key={e.version} className="flex items-center justify-between gap-4 py-2">
                 <span className="text-zinc-100">Ren’Py {e.version}</span>
-                <span className="truncate text-right text-xs text-zinc-500">
-                  {bytes(e.bytes)} · {e.usedBy.length ? e.usedBy.join(', ') : 'Unused'}
+                <span className="min-w-0 break-words text-right text-xs text-zinc-500">
+                  {bytes(e.bytes)} · {e.usedBy.length ? installed.filter((g) => g.engine === e.version).map((g) => g.title).join(', ') || 'Games are loading' : 'Unused'}
                 </span>
               </div>
             ))}
           </div>
           <p className="text-xs text-zinc-500">
             {sys.engines.available.length ? `Available: ${sys.engines.available.map((e) => e.version).join(', ')}` : 'The engine index is unreachable.'} ·{' '}
-            <a className="hover:text-zinc-300" href="https://github.com/renplay-web/engines" target="_blank" rel="noreferrer">
+            <a className="hover:text-zinc-300" href="https://renplay.org/github/engines" target="_blank" rel="noreferrer">
               Engines on GitHub
             </a>
           </p>
@@ -126,13 +144,13 @@ export default function Settings() {
           <h2 className="font-semibold text-white">Catalog</h2>
           <p className="text-sm text-zinc-400">
             Titles, covers and install settings come from {catalog?.status.count ?? 0} recipes in the catalog
-            {catalog?.status.fetchedAt ? `, updated ${new Date(catalog.status.fetchedAt).toLocaleString()}` : ''}.
+            {catalog?.status.fetchedAt ? `, updated ${ago(catalog.status.fetchedAt, true)}` : ''}.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" icon={<RefreshCw className="size-4" />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>
               Refresh catalog
             </Button>
-            <a href="https://github.com/renplay-web/catalog" target="_blank" rel="noreferrer">
+            <a href="https://renplay.org/github/catalog" target="_blank" rel="noreferrer">
               <Button size="sm" variant="ghost" icon={<ExternalLink className="size-4" />}>
                 Catalog on GitHub
               </Button>
@@ -162,18 +180,10 @@ export default function Settings() {
           )}
         </section>
 
-        <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
-          <h2 className="flex items-center gap-2 font-semibold text-white">
-            <Activity className="size-4" /> Activity
-          </h2>
-          <p className="text-sm text-zinc-400">Installs, mod builds and checks run in the background. Their progress and logs are kept here.</p>
-          <Link to="/activity">
-            <Button size="sm">Open activity log</Button>
-          </Link>
-        </section>
         {recipeOpen && recipeGame && <RecipeDialog game={recipeGame} onClose={() => setRecipeOpen(false)} />}
 
-        <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
+        </div>
+        <section className={`${section === 'browser' ? '' : 'hidden'} space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]`}>
           <h2 className="font-semibold text-white">This browser</h2>
           <p className="text-sm text-zinc-400">
             Game data (not saves) is cached in the browser so games start instantly the next time. Ask the browser to keep that cache from being cleared automatically:
@@ -189,9 +199,11 @@ export default function Settings() {
           </Button>
           {persisted !== null && <p className="text-xs text-zinc-500">{persisted ? 'The browser will keep the cache.' : 'The browser declined; it may still keep it.'}</p>}
           <div className="border-t border-white/[0.06] pt-4">
-            <Switch checked={blurAdult} onChange={setBlurAdult} label="Blur pictures of adult games" hint="Covers and save pictures in the library, for screens other people can see. Only this browser is affected." />
+            <Switch checked={blurAdult} onChange={setBlurAdult} label="Hide pictures of adult games" hint="Covers and save pictures in the library, for screens other people can see. Only this browser is affected." />
           </div>
         </section>
+        {section === 'about' && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]"><h2 className="font-semibold text-white">About Renplay</h2><p className="text-sm text-zinc-400">Version {sys.version} · Made by the Renplay Team</p><p className="text-sm text-zinc-400">Renplay is open source, under the MIT license. Game art belongs to its developers.</p><div className="flex gap-4 text-sm text-accent-300"><a href="https://github.com/renplay-org/renplay" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://ko-fi.com/janpuc" target="_blank" rel="noreferrer">Support Renplay ↗</a><a href="https://github.com/renplay-org/renplay/blob/main/LICENSE" target="_blank" rel="noreferrer">License ↗</a></div></section>}
+      </div>
       </div>
     </div>
   )

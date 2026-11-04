@@ -2,6 +2,7 @@ import { statfs } from 'node:fs/promises'
 import { Router } from 'express'
 import type { Builds } from '../builds.js'
 import type { Config } from '../config.js'
+import type { ContentMode } from '../content.js'
 import type { Db } from '../db.js'
 import type { EngineStore } from '../engines.js'
 import type { JobManager } from '../jobs.js'
@@ -17,7 +18,7 @@ async function disk(path: string) {
   }
 }
 
-export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string): Router {
+export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode): Router {
   const router = Router()
 
   router.get('/health', (_req, res) => {
@@ -45,7 +46,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
   })
 
   router.get('/system', async (_req, res) => {
-    const games = db.allGames()
+    const games = db.allGames().filter((g) => !content.hides(g))
     const used = new Map<string, string[]>()
     for (const g of games) if (g.engine && g.status === 'installed') used.set(g.engine, [...(used.get(g.engine) ?? []), g.title])
     const installed = await engines.installed()
@@ -85,9 +86,15 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
   // ---- jobs ---------------------------------------------------------------
 
   router.get('/jobs', (req, res) => {
-    const limit = Math.min(200, Number(req.query['limit']) || 30)
+    const pageNumber = (value: unknown, fallback: number): number => {
+      if (typeof value !== 'string' || !/^\d+$/.test(value)) return fallback
+      const n = Number(value)
+      return Number.isSafeInteger(n) ? n : fallback
+    }
+    const limit = Math.max(1, Math.min(200, pageNumber(req.query['limit'], 30)))
+    const offset = pageNumber(req.query['offset'], 0)
     res.json({
-      jobs: db.listJobs(limit).map((j) => ({
+      jobs: db.listJobs(limit, offset).filter((j) => !content.hides(j.game ? db.getGame(j.game) : null)).map((j) => ({
         id: j.id,
         type: j.type,
         game: j.game,
@@ -103,6 +110,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
         finishedAt: j.finished_at || null,
       })),
       busy: jobs.isBusy(),
+      total: db.countJobs(),
     })
   })
 

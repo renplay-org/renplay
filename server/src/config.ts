@@ -16,6 +16,15 @@ function envBool(name: string, fallback: boolean): boolean {
   return !['0', 'false', 'no', 'off'].includes(v)
 }
 
+/** Anything but allow or block is a mistake; the safe-for-work side is the safe reading of it. */
+function adultGames(): '' | 'allow' | 'block' {
+  const v = process.env['RENPLAY_ADULT_GAMES']?.trim().toLowerCase()
+  if (!v) return ''
+  if (v === 'allow' || v === 'block') return v
+  console.warn(`RENPLAY_ADULT_GAMES=${v} is not "allow" or "block"; blocking adult games`)
+  return 'block'
+}
+
 export interface Config {
   port: number
   dataDir: string
@@ -38,6 +47,8 @@ export interface Config {
   uploadsDir: string
   enginesUrl: string
   catalogUrls: string[]
+  /** RENPLAY_ADULT_GAMES: allow or block locks the choice; empty leaves it to the admin (content.ts). */
+  adultGames: '' | 'allow' | 'block'
   /** Pin every build to this engine version instead of the latest 8.x. */
   defaultEngine: string
   /** Optional URL that routes back to this pod through the scale-to-zero proxy. */
@@ -68,11 +79,12 @@ export function loadConfig(): Config {
     workDir: join(internalDir, 'work'),
     purgeDir: join(internalDir, 'purge'),
     uploadsDir: join(internalDir, 'uploads'),
-    enginesUrl: env('RENPLAY_ENGINES_URL', 'https://renplay-web.github.io/engines/index.json'),
-    catalogUrls: env('RENPLAY_CATALOG_URLS', 'https://renplay-web.github.io/catalog/index.v3.json')
+    enginesUrl: env('RENPLAY_ENGINES_URL', 'https://engines.renplay.org/index.json'),
+    catalogUrls: env('RENPLAY_CATALOG_URLS', 'https://catalog.renplay.org/index.v3.json')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
+    adultGames: adultGames(),
     defaultEngine: env('RENPLAY_ENGINE', ''),
     keepaliveUrl: env('RENPLAY_KEEPALIVE_URL', ''),
     keepaliveHost: env('RENPLAY_KEEPALIVE_HOST', ''),

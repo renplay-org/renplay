@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: A game does not work, or should be in the catalog
-    url: https://github.com/renplay-web/catalog/issues/new/choose
+    url: https://github.com/renplay-org/catalog/issues/new/choose
     about: Game requests and broken games are tracked in the catalog.

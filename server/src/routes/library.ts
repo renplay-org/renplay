@@ -3,8 +3,9 @@ import { mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'n
 import { basename, join, relative } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
-import type { Catalog } from '../catalog.js'
+import { installedRelease, type Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
+import { ADULT_REASON } from '../content.js'
 import { parseJson, type Db, type GameSource } from '../db.js'
 import type { JobManager } from '../jobs.js'
 import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
@@ -53,7 +54,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
   router.get('/archives', async (_req, res) => {
     const files = await listArchiveFiles(cfg.archivesDir)
     const installedBy = new Map<string, string>()
-    for (const g of db.allGames()) {
+    for (const g of db.allGames().filter((g) => !catalog.content.hides(g))) {
       const s = parseJson<GameSource>(g.source, {})
       if (s.archive) installedBy.set(s.archive, g.id)
     }
@@ -68,6 +69,10 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
         const info = parsed?.v === INSPECT_VERSION ? parsed : null
         const sha256 = fresh ? row.sha256 || null : null
         const match = catalog.match({ name: f.rel, size: f.size, sha256: sha256 ?? undefined })
+        // An adult game's archive stays in the folder but cannot be installed here.
+        if (match && catalog.content.blocked && match.recipe.nsfw) {
+          return { path: f.rel, name: basename(f.rel), size: f.size, mtime: f.mtimeMs, sha256, info, installedAs: null, recipe: null, existingGame: null, blocked: ADULT_REASON }
+        }
         return {
           path: f.rel,
           name: basename(f.rel),
@@ -76,6 +81,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
           sha256,
           info,
           installedAs: installedBy.get(f.rel) ?? null,
+          blocked: null,
           recipe: match
             ? {
                 id: match.recipe.id,
@@ -85,9 +91,10 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
                 exact: match.exact,
                 cover: catalog.cover(match.recipe.id),
                 nsfw: match.recipe.nsfw ?? false,
+                coverSfw: typeof match.recipe.cover === 'object' && match.recipe.cover.sfw === true,
               }
             : null,
-          existingGame: (match ? db.gameByRecipe(match.recipe.id)?.id : null) ?? (info?.saveDir ? (db.gameBySaveDir(info.saveDir)?.id ?? null) : null),
+          existingGame: [match ? db.gameByRecipe(match.recipe.id) : null, info?.saveDir ? db.gameBySaveDir(info.saveDir) : null].find((g) => g && !catalog.content.hides(g))?.id ?? null,
         }
       }),
     })
@@ -107,7 +114,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
       sha256: prev && prev.size === st.size && prev.mtime_ms === Math.floor(st.mtimeMs) ? prev.sha256 : '',
       info: JSON.stringify(info),
     })
-    res.json({ info, existingGame: info.saveDir ? (db.gameBySaveDir(info.saveDir)?.id ?? null) : null })
+    const existing = info.saveDir ? db.gameBySaveDir(info.saveDir) : null
+    res.json({ info, existingGame: existing && !catalog.content.hides(existing) ? existing.id : null })
   })
 
   router.post('/archives/hash', (req, res) => {
@@ -126,15 +134,24 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
 
   // ---- imports ----------------------------------------------------------------
 
-  router.post('/imports', (req, res) => {
+  router.post('/imports', async (req, res) => {
     const b = req.body ?? {}
     const source = b.source
     // Games come from the archives folder (copied there or uploaded). Download
     // links are not supported: file hosts tie them to the browser that made them.
     if (!source || source.kind !== 'archive') throw new HttpError(400, 'source must be {kind:"archive",path}')
-    cleanRelPath(source.path)
+    const rel = cleanRelPath(source.path)
     if (b.game !== undefined && b.game !== null && !isSlug(b.game)) throw new HttpError(400, 'Invalid game id')
+    // `game` reinstalls into a game already in the library. Check it now: the install only gets
+    // to it after unpacking, which takes an hour for a big game.
+    if (b.game && (!db.getGame(b.game) || catalog.content.hides(db.getGame(b.game)))) throw new HttpError(404, `Game ${b.game} is not in the library`)
     if (b.game && jobs.activeFor(b.game)) throw new HttpError(409, 'A job is already running for this game')
+    // Refuse adult games before any work, while the install is safe-for-work only.
+    if (catalog.content.blocked) {
+      const st = await stat(safeJoin(cfg.archivesDir, rel)).catch(() => null)
+      const match = st ? catalog.match({ name: rel, size: st.size, sha256: db.getArchive(rel)?.sha256 || undefined }) : null
+      if (match?.recipe.nsfw || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId))) throw new HttpError(403, ADULT_REASON)
+    }
     const id = jobs.enqueue('import', b.game ?? '', {
       source,
       game: b.game || undefined,
@@ -216,12 +233,13 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
   // ---- catalog --------------------------------------------------------------
 
   router.get('/catalog', async (_req, res) => {
-    const games = db.allGames()
+    const games = db.allGames().filter((g) => !catalog.content.hides(g))
     res.json({
       status: catalog.status(),
+      vocabulary: catalog.vocabulary,
       games: catalog.list().map((r) => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
-        return { ...r, _base: undefined, cover: catalog.cover(r.id), local: local ? { id: local.id, status: local.status, version: local.version } : null }
+        return { ...r, _base: undefined, cover: catalog.cover(r.id), coverSfw: typeof r.cover === 'object' && r.cover.sfw === true, local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
       }),
     })
   })

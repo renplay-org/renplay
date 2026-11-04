@@ -51,8 +51,8 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
     >
       <p className="mb-3 text-sm text-zinc-400">
         Filled in from this installation. Add the developer, links and what you tested, set the status, then open a pull request on{' '}
-        <a className="text-accent-300 hover:underline" href="https://github.com/renplay-web/catalog" target="_blank" rel="noreferrer">
-          renplay-web/catalog
+        <a className="text-accent-300 hover:underline" href="https://renplay.org/github/catalog" target="_blank" rel="noreferrer">
+          the catalog on GitHub
         </a>
         .
       </p>

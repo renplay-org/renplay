@@ -1,5 +1,6 @@
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
+import type { ContentMode } from '../content.js'
 import type { Db, GameRow } from '../db.js'
 import { readSaveMeta, readSaveScreenshot, slotInfo } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
@@ -8,15 +9,26 @@ import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/path
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 512 << 20, files: 200 } })
 
-/** Metadata cache for parsed save files, keyed by dir/name/mtime/size. */
+/** Metadata cache shared with the library, keyed by store/dir/name/mtime/size. */
 const metaCache = new Map<string, Awaited<ReturnType<typeof readSaveMeta>>>()
 
-export function createSavesRouter(store: SaveStore, db: Db): Router {
+export async function cachedSaveMeta(store: SaveStore, dir: string, file: { name: string; mtimeMs: number; size: number }) {
+  const key = `${store.root}/${dir}/${file.name}/${file.mtimeMs}/${file.size}`
+  let meta = metaCache.get(key)
+  if (meta === undefined) {
+    meta = await readSaveMeta(await store.read(dir, file.name))
+    metaCache.set(key, meta)
+    if (metaCache.size > 5000) metaCache.delete(metaCache.keys().next().value!)
+  }
+  return meta
+}
+
+export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode): Router {
   const router = Router()
 
   const game = (req: Request): GameRow => {
     const g = db.getGame(assertSlug(req.params.id))
-    if (!g) throw new HttpError(404, 'Game not found')
+    if (!g || content.hides(g)) throw new HttpError(404, 'Game not found')
     return g
   }
   const requireSaveDir = (g: GameRow): string => {
@@ -125,13 +137,7 @@ export function createSavesRouter(store: SaveStore, db: Db): Router {
         continue
       }
       const info = slotInfo(f.name)
-      const key = `${g.save_dir}/${f.name}/${f.mtimeMs}/${f.size}`
-      let meta = metaCache.get(key)
-      if (meta === undefined) {
-        meta = await readSaveMeta(await store.read(g.save_dir, f.name))
-        metaCache.set(key, meta)
-        if (metaCache.size > 5000) metaCache.delete(metaCache.keys().next().value!)
-      }
+      const meta = await cachedSaveMeta(store, g.save_dir, f)
       slots.push({
         file: f.name,
         size: f.size,
@@ -201,7 +207,7 @@ export function createSavesRouter(store: SaveStore, db: Db): Router {
   router.post('/:id/copy', async (req, res) => {
     const g = game(req)
     const target = db.getGame(assertSlug(req.body?.target))
-    if (!target) throw new HttpError(404, 'Target game not found')
+    if (!target || content.hides(target)) throw new HttpError(404, 'Target game not found')
     const toDir = requireSaveDir(target)
     const name = await store.copySave(requireSaveDir(g), cleanRelPath(req.body?.file), toDir)
     res.json({ ok: true, file: name, target: target.id })
@@ -225,10 +231,12 @@ export function createSavesRouter(store: SaveStore, db: Db): Router {
 }
 
 /** All save folders (including ones without a game) as one zip. */
-export function createSavesExportAll(store: SaveStore, db: Db) {
+export function createSavesExportAll(store: SaveStore, db: Db, content: ContentMode) {
   return async (_req: Request, res: express.Response) => {
     const dirs = new Set(await store.listDirs())
     for (const g of db.allGames()) if (g.save_dir) dirs.add(g.save_dir)
+    // The export is of what this Renplay shows; hidden games' saves stay where they are.
+    for (const g of db.allGames()) if (g.save_dir && content.hides(g)) dirs.delete(g.save_dir)
     res.attachment(`renplay-saves-${new Date().toISOString().slice(0, 10)}.zip`)
     res.type('application/zip')
     await store.exportZip([...dirs], res, { includeTokens: true })

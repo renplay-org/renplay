@@ -7,6 +7,59 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-11-04
+
+### Added
+
+- A library home with Up next, your latest save and play time, shelves for favourites and new
+  games, updates and interrupted installs. Mark a story Finished to leave it out of Up next.
+- A Recent sort that brings together newly added and recently played games.
+- Favourite games from their page and find them together at the top of your library. Favourites
+  stay when a game is uninstalled.
+- Sort the library by last played, title or recently added, and filter it by tag. Search, filters
+  and sorting come back when you go Back.
+- Search and tag filters in the catalog.
+- Game pages show the catalog's summary, whether the game is ongoing, completed, on hold or
+  abandoned, and its tags, with content tags tucked away until you open them.
+- An empty library suggests a free starter game when the catalog has one.
+- Long lists of games and activity load more as you ask for them.
+- Choose whether this Renplay shows adult games. A new install asks once in the empty library, and
+  Settings changes it later. Safe-for-work only hides adult games, refuses their downloads and
+  leaves the library and saves untouched. Servers can fix the choice with `RENPLAY_ADULT_GAMES`.
+  Existing libraries keep showing adult games.
+
+### Changed
+
+- Renplay moved to its own domain, renplay.org. It reads the catalog from catalog.renplay.org and
+  engines from engines.renplay.org, and its links go through renplay.org. **Upgrade to this
+  version:** older versions read both from addresses that no longer exist, so they cannot refresh
+  the catalog or download a new engine (games already installed keep working).
+- The image is `ghcr.io/renplay-org/renplay` (the organization was renamed), and also on Docker
+  Hub as `renplay/renplay`.
+- Games show the version the catalog gives their release ("0.9.23") instead of the text inside
+  the download, and update offers follow the same release.
+- Tags come from the catalog's fixed list; the library shows the ones your games share.
+- Hidden adult covers show title cards instead of blurred art, and save pictures show scene
+  cards. Adult pictures start hidden in browsers without a saved preference; covers marked safe
+  by the catalog stay visible.
+- Game pages put progress and updates above saves, with a play button that stays within reach
+  on phones. Save and file actions open as bottom sheets on phones.
+- Add games puts uploads, server downloads and the catalog together, without tabs. Update
+  actions name the game they update, and deleting a download is in its actions menu.
+- The player's sideways hint carries loading progress, and its saves open as a bottom sheet
+  on phones.
+- Settings separates General, This browser and About, and Activity groups work by day.
+- Activity groups repeated attempts and names the download being processed.
+- Settings shows relative update times and game titles beside each engine.
+
+### Fixed
+
+- An install into a game that is not in the library is refused at once, instead of after it
+  has unpacked the whole download.
+- Portrait phones show the sideways hint while a game is still loading, and the player keeps its
+  Save & exit label.
+- Game details no longer show a save folder for HTML games.
+
 ## [2.9.1] - 2026-11-04
 
 ### Changed
@@ -211,8 +264,8 @@ The first release since 0.1: a rebuild of the whole app.
   images converted to WebP, and the web build is assembled by Renplay. Streamed files are stored in
   one pack per build, which keeps installs fast on network storage.
 - Official Ren'Py web engines per version, downloaded on demand from
-  [renplay-web/engines](https://github.com/renplay-web/engines) and shared by games.
-- Curated catalog ([renplay-web/catalog](https://github.com/renplay-web/catalog)) with recipe
+  [renplay-org/engines](https://github.com/renplay-org/engines) and shared by games.
+- Curated catalog ([renplay-org/catalog](https://github.com/renplay-org/catalog)) with recipe
   export.
 - Mods: browse a game's files, edit scripts in the browser, upload files or a mod zip; changes are
   kept as a separate layer.
@@ -243,17 +296,18 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-web/renplay/compare/v2.9.1...dev
-[2.9.1]: https://github.com/renplay-web/renplay/compare/v2.9.0...v2.9.1
-[2.9.0]: https://github.com/renplay-web/renplay/compare/v2.8.0...v2.9.0
-[2.8.0]: https://github.com/renplay-web/renplay/compare/v2.7.1...v2.8.0
-[2.7.1]: https://github.com/renplay-web/renplay/compare/v2.7.0...v2.7.1
-[2.7.0]: https://github.com/renplay-web/renplay/compare/v2.6.0...v2.7.0
-[2.6.0]: https://github.com/renplay-web/renplay/compare/v2.5.0...v2.6.0
-[2.5.0]: https://github.com/renplay-web/renplay/compare/v2.4.0...v2.5.0
-[2.4.0]: https://github.com/renplay-web/renplay/compare/v2.3.0...v2.4.0
-[2.3.0]: https://github.com/renplay-web/renplay/compare/v2.2.0...v2.3.0
-[2.2.0]: https://github.com/renplay-web/renplay/compare/v2.1.0...v2.2.0
-[2.1.0]: https://github.com/renplay-web/renplay/compare/v0.1.1...v2.1.0
-[0.1.1]: https://github.com/renplay-web/renplay/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/renplay-web/renplay/releases/tag/v0.1.0
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.10.0...dev
+[2.10.0]: https://github.com/renplay-org/renplay/compare/v2.9.1...v2.10.0
+[2.9.1]: https://github.com/renplay-org/renplay/compare/v2.9.0...v2.9.1
+[2.9.0]: https://github.com/renplay-org/renplay/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/renplay-org/renplay/compare/v2.7.1...v2.8.0
+[2.7.1]: https://github.com/renplay-org/renplay/compare/v2.7.0...v2.7.1
+[2.7.0]: https://github.com/renplay-org/renplay/compare/v2.6.0...v2.7.0
+[2.6.0]: https://github.com/renplay-org/renplay/compare/v2.5.0...v2.6.0
+[2.5.0]: https://github.com/renplay-org/renplay/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/renplay-org/renplay/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/renplay-org/renplay/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/renplay-org/renplay/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/renplay-org/renplay/compare/v0.1.1...v2.1.0
+[0.1.1]: https://github.com/renplay-org/renplay/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/renplay-org/renplay/releases/tag/v0.1.0

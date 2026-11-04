@@ -45,6 +45,11 @@ export interface GameRow {
   created_at: string
   installed_at: string
   last_played_at: string
+  favorite_at: string
+  finished_at: string
+  play_time: number
+  /** 1 when the game's recipe is adult: the last thing the catalog said, kept for when it can no longer say (content.ts). */
+  adult: number
   updated_at: string
 }
 
@@ -151,6 +156,16 @@ export class Db {
         "ALTER TABLE games ADD COLUMN family TEXT NOT NULL DEFAULT 'renpy'; ALTER TABLE games ADD COLUMN engine_label TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN entry TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 3",
       )
     }
+    // 2.10: favourites belong to the library entry, not its installed build.
+    if (v < 4) this.raw.exec("ALTER TABLE games ADD COLUMN favorite_at TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 4")
+    // 2.11: reading progress survives uninstall and rebuilds; saves are untouched.
+    if (v < 5) this.raw.exec("BEGIN; ALTER TABLE games ADD COLUMN finished_at TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN play_time INTEGER NOT NULL DEFAULT 0; PRAGMA user_version = 5; COMMIT")
+    // 2.12: adult games can be switched off install-wide. A library that existed before keeps showing them.
+    if (v < 6) {
+      this.raw.exec('BEGIN; ALTER TABLE games ADD COLUMN adult INTEGER NOT NULL DEFAULT 0')
+      if (v > 0) this.raw.exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('adult_games', '\"allow\"')")
+      this.raw.exec('PRAGMA user_version = 6; COMMIT')
+    }
   }
 
   /**
@@ -218,10 +233,14 @@ export class Db {
     return (this.raw.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as unknown as JobRow) ?? null
   }
 
-  listJobs(limit = 50): JobRow[] {
+  countJobs(): number {
+    return (this.raw.prepare('SELECT COUNT(*) AS total FROM jobs').get() as { total: number }).total
+  }
+
+  listJobs(limit = 50, offset = 0): JobRow[] {
     return this.raw
-      .prepare("SELECT * FROM jobs ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, created_at DESC LIMIT ?")
-      .all(limit) as unknown as JobRow[]
+      .prepare("SELECT * FROM jobs ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, created_at DESC, id DESC LIMIT ? OFFSET ?")
+      .all(limit, offset) as unknown as JobRow[]
   }
 
   updateJob(id: string, updates: Partial<JobRow>): void {

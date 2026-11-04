@@ -100,6 +100,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -111,3 +116,5 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ needs.detect.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.sha }}
+            docker.io/renplay/renplay:${{ needs.detect.outputs.version }}
+            docker.io/renplay/renplay:latest
