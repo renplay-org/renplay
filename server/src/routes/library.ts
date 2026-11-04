@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'n
 import { basename, join, relative } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
-import type { Catalog } from '../catalog.js'
+import { installedRelease, type Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
 import { parseJson, type Db, type GameSource } from '../db.js'
 import type { JobManager } from '../jobs.js'
@@ -219,9 +219,10 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     const games = db.allGames()
     res.json({
       status: catalog.status(),
+      vocabulary: catalog.vocabulary,
       games: catalog.list().map((r) => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
-        return { ...r, _base: undefined, cover: catalog.cover(r.id), local: local ? { id: local.id, status: local.status, version: local.version } : null }
+        return { ...r, _base: undefined, cover: catalog.cover(r.id), local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
       }),
     })
   })

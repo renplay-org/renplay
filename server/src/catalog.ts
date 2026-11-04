@@ -38,11 +38,25 @@ export interface RecipePatch {
   sha256: string
 }
 
+export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
+export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
+
+/** Archive names identify releases even when the game's internal version is unrelated. */
+export function installedRelease(recipe: Recipe, version: string, archive?: string): RecipeRelease | null {
+  const name = archive?.split('/').pop()
+  return (name ? recipe.releases.find((r) => r.archives?.some((a) => a.name === name)) : undefined)
+    ?? recipe.releases.find((r) => r.version === version) ?? null
+}
+
 export interface Recipe {
   id: string
   title: string
   developer?: string
   tags?: string[]
+  tagIds?: string[]
+  content?: string[]
+  state?: GameState
+  summary?: string
   nsfw?: boolean
   /**
    * The game's official cover art: a file in the catalog (safe for work only)
@@ -145,6 +159,7 @@ export function normalizeRecipe(g: any): Recipe {
 
 export class Catalog {
   private recipes = new Map<string, Recipe>()
+  vocabulary: Vocabulary = {}
   private covers = new Map<string, string>()
   private fetchedAt = 0
   private errors: string[] = []
@@ -156,15 +171,17 @@ export class Catalog {
   ) {}
 
   async init(): Promise<void> {
-    const cached = this.db.getSetting<{ at: number; games: Recipe[] } | null>(CACHE_KEY, null)
-    if (cached?.games?.length) {
+    const cached = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary } | null>(CACHE_KEY, null)
+    if (cached && Array.isArray(cached.games)) {
       this.load(cached.games)
+      this.vocabulary = cached.vocabulary ?? {}
       this.fetchedAt = cached.at
     } else {
       try {
         const here = dirname(fileURLToPath(import.meta.url))
         const idx = JSON.parse(await readFile(join(here, '..', 'catalog.json'), 'utf-8'))
         this.load(idx.games ?? [])
+        this.vocabulary = idx.vocabulary ?? {}
       } catch {}
     }
     this.covers = new Map(Object.entries(this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})).map(([id, c]) => [id, c.file]))
@@ -186,13 +203,17 @@ export class Catalog {
 
   async refresh(): Promise<{ games: number; errors: string[] }> {
     const all: Recipe[] = []
+    const vocabulary: Vocabulary = Object.create(null)
     this.errors = []
     for (const url of this.cfg.catalogUrls) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: { accept: 'application/json' } })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const idx = (await res.json()) as { schema?: number; games?: unknown[] }
+        const idx = (await res.json()) as { schema?: number; games?: unknown[]; vocabulary?: Vocabulary }
         if ((idx.schema ?? 1) < 2) throw new Error(`catalog schema ${idx.schema ?? 1} is too old`)
+        for (const [id, entry] of Object.entries(idx.vocabulary ?? {})) {
+          if (!Object.hasOwn(vocabulary, id)) vocabulary[id] = entry
+        }
         for (const g of idx.games ?? []) if (valid(g)) all.push({ ...normalizeRecipe(g), _base: url })
       } catch (e) {
         this.errors.push(`${url}: ${(e as Error).message}`)
@@ -200,8 +221,9 @@ export class Catalog {
     }
     if (all.length || !this.errors.length) {
       this.load(all)
+      this.vocabulary = vocabulary
       this.fetchedAt = Date.now()
-      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: all })
+      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: all, vocabulary })
       this.link()
       await this.syncCovers()
     }
@@ -282,8 +304,9 @@ export class Catalog {
   }
 
   /** The newest working release after the installed version, if the catalog lists one. */
-  update(recipe: Recipe, version: string): RecipeRelease | null {
-    const i = recipe.releases.findIndex((r) => r.version === version)
+  update(recipe: Recipe, version: string, archive?: string): RecipeRelease | null {
+    const release = installedRelease(recipe, version, archive)
+    const i = release ? recipe.releases.indexOf(release) : -1
     if (i <= 0) return null
     return recipe.releases.slice(0, i).find((r) => r.status === 'verified' || r.status === 'playable') ?? null
   }

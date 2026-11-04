@@ -1,4 +1,4 @@
-import { ArrowUpCircle, CloudOff, Download, Play, Puzzle, Save } from 'lucide-react'
+import { ArrowUpCircle, CloudOff, Download, Heart, Play, Puzzle, Save } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Game } from '../lib/api'
@@ -84,6 +84,7 @@ export default function GameCard({ game, index = 0 }: { game: Game; index?: numb
         <div className="relative overflow-hidden rounded-2xl ring-1 ring-white/[0.08] transition-all duration-300 group-hover:-translate-y-1 group-hover:ring-white/20 group-hover:shadow-[0_24px_60px_-20px_rgb(0_0_0/0.9)]">
           <Cover game={game} rounded={false} className={cx(COVER_ASPECT, 'transition-transform duration-500 group-hover:scale-[1.03]', !installed && 'opacity-55 grayscale-[35%]')} />
           <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
+            {game.favoriteAt && <Badge className="glass"><Heart aria-label="Favourite" className="size-3 fill-current text-rose-300" /></Badge>}
             {!installed && !busy && (
               <Badge tone="neutral" className="glass">
                 <CloudOff className="size-3" /> Not installed

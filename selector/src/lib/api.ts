@@ -1,8 +1,27 @@
+export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
+export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
+
+export interface CatalogResponse {
+  status: { fetchedAt: number; urls: string[]; errors: string[]; count: number }
+  vocabulary: Vocabulary
+  games: Recipe[]
+}
+
+export interface JobsResponse {
+  jobs: Job[]
+  busy: boolean
+  total: number
+}
+
 export interface Game {
   id: string
   title: string
   developer: string | null
   tags: string[]
+  tagIds: string[]
+  content: string[]
+  state: GameState | null
+  summary: string | null
   /** Curated cover from the catalog (URL), or null. */
   cover: string | null
   /** An adult game, per its recipe. */
@@ -16,6 +35,8 @@ export interface Game {
   /** What made it, for other engines: "HTML (SugarCube 2.36.1)". */
   engineLabel: string | null
   version: string | null
+  detectedVersion: string | null
+  favoriteAt: string | null
   renpyVersion: string | null
   engine: string | null
   sizeBytes: number
@@ -27,6 +48,7 @@ export interface Game {
   recipe: { id: string; links: Record<string, string>; continuesFrom: string[]; status: string | null } | null
   /** A newer working release listed in the catalog. */
   update: { version: string; date: string | null; status: string } | null
+  createdAt: string
   installedAt: string | null
   lastPlayedAt: string | null
   saves: { count: number; latest: number }
@@ -124,14 +146,18 @@ export interface Recipe {
   title: string
   developer?: string
   tags?: string[]
+  tagIds?: string[]
+  content?: string[]
+  state?: GameState
+  summary?: string
   nsfw?: boolean
-  cover?: string
+  cover?: string | null
   links?: Record<string, string>
   saveDir?: string
   continuesFrom?: string[]
   engine?: string
   releases: RecipeRelease[]
-  local: { id: string; status: string; version: string } | null
+  local: { id: string; status: string; version: string; detectedVersion: string } | null
 }
 
 export interface SystemInfo {
@@ -207,7 +233,7 @@ export function slotName(file: string): string {
 
 export function jobTitle(j: Job, games: Game[]): string {
   const game = games.find((g) => g.id === j.game)
-  const name = game?.title ?? j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? j.game
+  const name = j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? game?.source.archive?.split('/').pop() ?? game?.title ?? j.game
   switch (j.type) {
     case 'import':
       return game && game.status === 'installed' && j.status !== 'done' ? `Updating ${name}` : `Installing ${name || 'game'}`

@@ -1,209 +1,96 @@
 import { useQuery } from '@tanstack/react-query'
-import { Gamepad2, Play, Plus, RotateCcw, Search, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import GameCard, { Cover } from '../components/GameCard'
-import { Button, Empty, cx } from '../components/ui'
+import { Play } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import GameCard from '../components/GameCard'
+import EmptyLibrary from '../components/EmptyLibrary'
+import TagFilters from '../components/TagFilters'
+import { Button, Empty, Spinner } from '../components/ui'
 import { api, slotName, type Game, type SavesResponse } from '../lib/api'
-import { ago, capitalize } from '../lib/format'
 import { useBlurAdultCovers } from '../lib/prefs'
-import { useGames } from '../lib/queries'
+import { useCatalog, useGames } from '../lib/queries'
+import { gameTags, matchesSearch, tagChips } from '../lib/tags'
 
-type Filter = 'all' | 'installed' | 'not_installed'
-
-function ContinueHero({ game }: { game: Game }) {
-  const navigate = useNavigate()
-  const { data } = useQuery({
-    queryKey: ['saves', game.id],
-    queryFn: () => api<SavesResponse>(`/api/saves/${game.id}`),
-    enabled: game.saves.count > 0,
-  })
+function Continue({ game }: { game: Game }) {
+  const { data } = useQuery({ queryKey: ['saves', game.id], queryFn: () => api<SavesResponse>(`/api/saves/${game.id}`), enabled: game.saves.count > 0 })
   const latest = data?.slots.find((s) => s.kind !== 'internal' && s.valid)
-  const backdrop = latest?.screenshot
-  const [blurAdult] = useBlurAdultCovers()
-  const hide = blurAdult && game.nsfw
+  const [blur] = useBlurAdultCovers()
+  const screenshot = latest?.screenshot && !(blur && game.nsfw) ? latest.screenshot : null
+  const resumeUrl = `/play/${game.id}${latest ? `?resume=${encodeURIComponent(slotName(latest.file))}` : ''}`
+  if (!screenshot) return (
+    <section className="mb-8 flex items-center justify-between gap-3 rounded-2xl bg-white/[0.04] p-4">
+      <p className="min-w-0 truncate text-sm text-zinc-300">Continue playing · <Link className="font-semibold text-white" to={`/game/${game.id}`}>{game.title}</Link></p>
+      <Link className="shrink-0" to={resumeUrl}><Button icon={<Play className="size-4" />}>{latest ? 'Resume' : 'Play'}</Button></Link>
+    </section>
+  )
   return (
-    <section className="relative mb-10 animate-fade-in overflow-hidden rounded-[28px] ring-1 ring-white/[0.08]">
-      <div className="absolute inset-0">
-        {backdrop ? (
-          <img src={backdrop} alt="" className={cx('size-full scale-105 object-cover', hide ? 'blur-2xl' : 'blur-[2px]')} />
-        ) : (
-          <Cover game={game} rounded={false} className="size-full" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/80 to-ink-950/10" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink-950/90 via-transparent to-transparent" />
-      </div>
-      <div className="relative flex min-h-[300px] flex-col justify-end gap-5 p-6 sm:min-h-[360px] sm:p-10 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-xl">
-          <p className="mb-2 text-sm font-medium text-accent-300">Continue playing</p>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-white sm:text-5xl">{game.title}</h1>
-          <p className="mt-3 text-sm text-zinc-300">
-            {latest ? (
-              <>
-                {latest.name ? <span className="text-zinc-100">“{latest.name}” · </span> : null}
-                {latest.label} · Saved {ago(latest.ctime)}
-              </>
-            ) : (
-              <>Last played {ago(game.lastPlayedAt)}</>
-            )}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            {latest ? (
-              <Button variant="primary" size="lg" icon={<RotateCcw className="size-5" />} onClick={() => navigate(`/play/${game.id}?resume=${encodeURIComponent(slotName(latest.file))}`)}>
-                Resume
-              </Button>
-            ) : null}
-            <Button variant={latest ? 'glass' : 'primary'} size="lg" icon={<Play className="size-5" />} onClick={() => navigate(`/play/${game.id}`)}>
-              {latest ? 'Main menu' : 'Play'}
-            </Button>
-            <Link to={`/game/${game.id}`}>
-              <Button variant="glass" size="lg">
-                Details
-              </Button>
-            </Link>
-          </div>
+    <section className="relative mb-8 flex min-h-[300px] items-end overflow-hidden rounded-3xl p-6 sm:min-h-[360px] sm:p-10">
+      <img src={screenshot} alt="" className="absolute inset-0 size-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/80 to-ink-950/10" />
+      <div className="relative min-w-0">
+        <p className="mb-2 text-sm font-medium text-accent-300">Continue playing</p>
+        <h1 className="font-display text-3xl font-bold text-white sm:text-5xl">{game.title}</h1>
+        <p className="mt-3 text-sm text-zinc-300">{latest?.name || latest?.label}</p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link to={resumeUrl}><Button variant="primary" size="lg" icon={<Play className="size-5" />}>Resume</Button></Link>
+          <Link to={`/play/${game.id}`}><Button variant="glass" size="lg">Main menu</Button></Link>
+          <Link to={`/game/${game.id}`}><Button variant="glass" size="lg">Details</Button></Link>
         </div>
-        {latest?.screenshot && !hide && (
-          <div className="hidden w-80 shrink-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 lg:block">
-            <img src={latest.screenshot} alt="" className="aspect-video w-full object-cover" />
-          </div>
-        )}
       </div>
     </section>
   )
 }
 
-const COUNT_KEY = 'renplay:library-size'
-/** Tag filters only help once there is something to filter. */
-const TAGS_FROM = 8
-
-/**
- * Placeholders while the library loads: as many as there were games last
- * time (none for an empty library), and only if loading takes a moment.
- */
-function LoadingGrid() {
-  const [show, setShow] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setShow(true), 250)
-    return () => clearTimeout(t)
-  }, [])
-  const n = Math.min(12, Number(localStorage.getItem(COUNT_KEY) ?? 4) || 0)
-  if (!show || !n) return null
-  return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-      {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className="animate-fade-in">
-          <div className="skeleton aspect-[63/50] rounded-2xl" />
-          <div className="skeleton mt-3 h-4 w-2/3 rounded" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export default function Library() {
   const { data: games, isLoading, error } = useGames()
-  useEffect(() => {
-    if (games) localStorage.setItem(COUNT_KEY, String(games.length))
-  }, [games])
-  const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<Filter>('all')
-  const [tag, setTag] = useState<string | null>(null)
-
-  const recent = useMemo(
-    () => (games ?? []).filter((g) => g.status === 'installed' && g.lastPlayedAt).sort((a, b) => Date.parse(b.lastPlayedAt!) - Date.parse(a.lastPlayedAt!))[0],
-    [games],
-  )
-  const tags = useMemo(() => ((games?.length ?? 0) >= TAGS_FROM ? [...new Set(games!.flatMap((g) => g.tags))].sort() : []), [games])
-  const shown = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    return (games ?? []).filter(
-      (g) =>
-        (!s || g.title.toLowerCase().includes(s) || g.tags.some((t) => t.toLowerCase().includes(s))) &&
-        (filter === 'all' || (filter === 'installed' ? g.status === 'installed' || g.job : g.status !== 'installed' && !g.job)) &&
-        (!tag || g.tags.includes(tag)),
-    )
-  }, [games, q, filter, tag])
-
+  const { data: catalog } = useCatalog()
+  const vocabulary = catalog?.vocabulary ?? {}
+  const [params, setParams] = useSearchParams()
+  const q = params.get('q') ?? ''
+  const filter = params.get('filter') ?? 'all'
+  const tag = params.get('tag')
+  const sort = params.get('sort') ?? 'played'
+  const update = (key: string, value: string | null) => {
+    // Read the current URL so quick edits cannot restore an earlier navigation's filters.
+    const next = new URLSearchParams(window.location.search)
+    if (value) next.set(key, value)
+    else next.delete(key)
+    setParams(next)
+  }
+  const [limit, setLimit] = useState(60)
+  useEffect(() => setLimit(60), [q, filter, tag, sort])
+  const shown = (games ?? []).filter((g) =>
+    matchesSearch(g, q, vocabulary) &&
+    (filter === 'all' || (filter === 'installed' ? g.status === 'installed' || g.job : g.status !== 'installed' && !g.job)) &&
+    (!tag || gameTags(g, vocabulary).some((t) => t.id === tag)),
+  ).sort((a, b) => {
+    if (sort === 'title') return a.title.localeCompare(b.title)
+    if (sort === 'added') return Date.parse(b.createdAt) - Date.parse(a.createdAt) || a.title.localeCompare(b.title)
+    return (Date.parse(b.lastPlayedAt ?? '') || 0) - (Date.parse(a.lastPlayedAt ?? '') || 0) || a.title.localeCompare(b.title)
+  })
+  const recent = (games ?? []).filter((g) => g.status === 'installed' && g.lastPlayedAt).sort((a, b) => b.lastPlayedAt!.localeCompare(a.lastPlayedAt!))[0]
   if (error) return <Empty title="Could not load the library">{String(error)}</Empty>
-
-  return (
-    <div>
-      {recent && !q && <ContinueHero game={recent} />}
-
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-        <h2 className="font-display text-2xl font-semibold tracking-tight text-white">Library</h2>
-        <div className="flex flex-1 flex-wrap items-center gap-3 sm:justify-end">
-          <div className="flex rounded-xl bg-white/[0.04] p-1 ring-1 ring-inset ring-white/[0.06]">
-            {(['all', 'installed', 'not_installed'] as Filter[]).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={cx('rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors', filter === f ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-200')}
-              >
-                {f === 'all' ? 'All' : f === 'installed' ? 'Installed' : 'Not installed'}
-              </button>
-            ))}
-          </div>
-          <div className="relative w-full sm:w-72">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search your games"
-              className="h-10 w-full rounded-xl border-0 bg-white/[0.05] pl-10 pr-9 text-sm text-white ring-1 ring-inset ring-white/[0.08] placeholder:text-zinc-500 focus:outline-none focus:ring-accent-400/60"
-            />
-            {q && (
-              <button onClick={() => setQ('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200" aria-label="Clear search">
-                <X className="size-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {tags.length > 0 && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          {tags.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTag(tag === t ? null : t)}
-              className={cx(
-                'rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-colors',
-                tag === t ? 'bg-accent-500/20 text-accent-300 ring-accent-500/40' : 'bg-white/[0.04] text-zinc-400 ring-white/10 hover:text-zinc-200',
-              )}
-            >
-              {capitalize(t)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {isLoading ? (
-        <LoadingGrid />
-      ) : !games?.length ? (
-        <Empty
-          icon={<Gamepad2 className="size-10" />}
-          title="Your library is empty"
-          action={
-            <Link to="/add">
-              <Button variant="primary" icon={<Plus className="size-4" />}>
-                Add your first game
-              </Button>
-            </Link>
-          }
-        >
-          Drop the downloads of Ren’Py or HTML games into the archives folder on the server, or upload one. Renplay unpacks, optimizes and prepares them for the browser.
-        </Empty>
-      ) : !shown.length ? (
-        <Empty title="No games match">Try a different search or filter.</Empty>
-      ) : (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-          {shown.map((g, i) => (
-            <GameCard key={g.id} game={g} index={i} />
-          ))}
-        </div>
-      )}
+  return <div>
+    {recent && !q && <Continue game={recent} />}
+    <div className="mb-5 flex flex-wrap items-center gap-3">
+      <h1 className="mr-auto font-display text-2xl font-semibold text-white">Library</h1>
+      <select aria-label="Filter games" value={filter} onChange={(e) => update('filter', e.target.value)} className="h-11 rounded-xl bg-ink-800 px-3 text-sm text-white"><option value="all">All</option><option value="installed">Installed</option><option value="not_installed">Not installed</option></select>
+      <select aria-label="Sort games" value={sort} onChange={(e) => update('sort', e.target.value)} className="h-11 rounded-xl bg-ink-800 px-3 text-sm text-white"><option value="played">Last played</option><option value="title">Title</option><option value="added">Recently added</option></select>
+      <input aria-label="Search your games" placeholder="Search your games" value={q} onChange={(e) => update('q', e.target.value)} className="h-11 w-full rounded-xl bg-white/5 px-4 text-sm text-white sm:w-64" />
     </div>
-  )
+    <TagFilters tags={tagChips(games ?? [], vocabulary)} selected={tag} onSelect={(id) => update('tag', id)} />
+    {shown.some((g) => g.favoriteAt) && <section className="mb-8"><h2 className="mb-4 text-lg font-semibold text-white">Favourites</h2><div className="flex gap-4 overflow-x-auto pb-3 sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{shown.filter((g) => g.favoriteAt).map((g) => <div key={g.id} className="w-44 shrink-0 sm:w-auto"><GameCard game={g} /></div>)}</div></section>}
+    {isLoading ? (
+      <Spinner />
+    ) : !games?.length ? (
+      <EmptyLibrary recipes={catalog?.games ?? []} />
+    ) : !shown.length ? (
+      <Empty title="No games match">Try a different search or filter.</Empty>
+    ) : (
+      <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        {shown.slice(0, limit).map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+      </div>
+    )}
+    {shown.length > limit && <div className="mt-6 text-center"><Button onClick={() => setLimit(limit + 48)}>Show more</Button></div>}
+  </div>
 }

@@ -1,9 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, CircleSlash, Clock, Loader2, RotateCw, ScrollText, Square, Trash2, XCircle } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Badge, Button, Empty, Modal, Progress, Spinner, errorText, useToast } from '../components/ui'
-import { api, del, jobTitle, post, type Job } from '../lib/api'
+import { api, del, jobTitle, post, type Job, type JobsResponse } from '../lib/api'
 import { ago, bytes, pct, capitalize } from '../lib/format'
 import { useGames, useJobs } from '../lib/queries'
 
@@ -39,13 +38,29 @@ function resultText(j: Job): string | null {
 }
 
 export default function Activity() {
-  const { data, isLoading } = useJobs()
+  useJobs()
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ['jobs', 'activity'], initialPageParam: 0,
+    queryFn: ({ pageParam }) => api<JobsResponse>(`/api/jobs?limit=20&offset=${pageParam}`),
+    getNextPageParam: (last, pages) => { const loaded = pages.reduce((n, p) => n + p.jobs.length, 0); return loaded < last.total ? loaded : undefined },
+    refetchInterval: 5000,
+  })
   const { data: games } = useGames()
   const qc = useQueryClient()
   const toast = useToast()
   const [logFor, setLogFor] = useState<Job | null>(null)
   if (isLoading) return <Spinner />
-  const jobs = data?.jobs ?? []
+  const attempts = new Map<string, { job: Job; count: number }>()
+  const seen = new Set<string>()
+  for (const job of data?.pages.flatMap((p) => p.jobs) ?? []) {
+    if (seen.has(job.id)) continue
+    seen.add(job.id)
+    const key = JSON.stringify([job.type, job.game, job.params])
+    const previous = attempts.get(key)
+    if (previous) previous.count++
+    else attempts.set(key, { job, count: 1 })
+  }
+  const jobs = [...attempts.values()]
   const act = async (fn: () => Promise<unknown>) => {
     try {
       await fn()
@@ -66,21 +81,17 @@ export default function Activity() {
         <Empty title="Nothing happening">Installs, updates and optimizations show up here.</Empty>
       ) : (
         <div className="space-y-3">
-          {jobs.map((j) => {
+          {jobs.map(({ job: j, count }) => {
             const active = j.status === 'running' || j.status === 'queued'
             const res = resultText(j)
             return (
               <div key={j.id} className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/[0.07]">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   {icon[j.status]}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 basis-[70%] sm:basis-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate font-medium text-zinc-100">{jobTitle(j, games ?? [])}</span>
-                      {j.game && games?.some((g) => g.id === j.game) && (
-                        <Link to={`/game/${j.game}`} className="text-xs text-zinc-500 hover:text-zinc-300">
-                          open →
-                        </Link>
-                      )}
+                      <span className="min-w-0 break-words font-medium text-zinc-100">{jobTitle(j, games ?? [])}</span>
+                      {count > 1 && <Badge>{count} attempts</Badge>}
                     </div>
                     <div className="mt-0.5 truncate text-xs text-zinc-500">
                       {j.status === 'running' ? (
@@ -99,7 +110,7 @@ export default function Activity() {
                     </div>
                   </div>
                   {j.status === 'running' && <span className="text-sm tabular-nums text-zinc-300">{pct(j.progress)}</span>}
-                  <div className="flex gap-1">
+                  <div className="ml-auto flex gap-1">
                     <Button size="sm" variant="ghost" icon={<ScrollText className="size-4" />} onClick={() => setLogFor(j)}>
                       Log
                     </Button>
@@ -122,6 +133,7 @@ export default function Activity() {
           })}
         </div>
       )}
+      {hasNextPage && <div className="mt-6 text-center"><Button loading={isFetchingNextPage} onClick={() => void fetchNextPage()}>Show more</Button></div>}
       {logFor && <LogDialog job={logFor} onClose={() => setLogFor(null)} />}
     </div>
   )

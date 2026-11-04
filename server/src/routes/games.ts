@@ -4,7 +4,7 @@ import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import YAML from 'yaml'
 import type { Builds } from '../builds.js'
-import type { Catalog } from '../catalog.js'
+import { installedRelease, type Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
 import { parseJson, type Db, type GameRow, type GameSource } from '../db.js'
 import type { JobManager } from '../jobs.js'
@@ -56,7 +56,8 @@ export async function toGame(row: GameRow, deps: GameDeps) {
   }
   const mods = await deps.overlays.summary(row.id)
   const recipe = row.recipe_id ? deps.catalog.recipe(row.recipe_id) : null
-  const update = recipe ? deps.catalog.update(recipe, row.version) : null
+  const release = recipe ? installedRelease(recipe, row.version, source.archive) : null
+  const update = recipe ? deps.catalog.update(recipe, row.version, source.archive) : null
   const modded = row.build.includes('.m')
   return {
     id: row.id,
@@ -65,6 +66,10 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     title: recipe?.title ?? row.title,
     developer: recipe?.developer ?? null,
     tags: recipe?.tags ?? [],
+    tagIds: recipe?.tagIds ?? [],
+    content: recipe?.content ?? [],
+    state: recipe?.state ?? null,
+    summary: recipe?.summary ?? null,
     nsfw: recipe?.nsfw ?? false,
     cover: recipe ? deps.catalog.cover(recipe.id) : null,
     walkthrough: row.walkthrough || null,
@@ -74,7 +79,8 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     family: row.family || 'renpy',
     /** What made the game, for other engines ("HTML (SugarCube 2.36.1)"). */
     engineLabel: row.engine_label || null,
-    version: row.version || null,
+    version: release?.version || row.version || null,
+    detectedVersion: row.version || null,
     renpyVersion: row.renpy_version || null,
     engine: row.engine || null,
     sizeBytes: row.size_bytes,
@@ -88,12 +94,14 @@ export async function toGame(row: GameRow, deps: GameDeps) {
           id: recipe.id,
           links: recipe.links ?? {},
           continuesFrom: recipe.continuesFrom ?? [],
-          status: recipe.releases.find((r) => r.version === row.version)?.status ?? null,
+          status: release?.status ?? null,
         }
       : row.recipe_id
         ? { id: row.recipe_id, links: {}, continuesFrom: [], status: null }
         : null,
     update: update ? { version: update.version, date: update.date ?? null, status: update.status } : null,
+    favoriteAt: row.favorite_at || null,
+    createdAt: row.created_at,
     installedAt: row.installed_at || null,
     lastPlayedAt: row.last_played_at || null,
     saves,
@@ -118,6 +126,13 @@ export function createGamesRouter(deps: GameDeps): Router {
 
   router.get('/:id', async (req, res) => {
     res.json({ game: await toGame(get(req), deps) })
+  })
+
+  router.put('/:id/favorite', async (req, res) => {
+    const g = get(req)
+    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
+    db.updateGame(g.id, { favorite_at: req.body.on ? g.favorite_at || new Date().toISOString() : '' })
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
   router.post('/:id/played', (req, res) => {

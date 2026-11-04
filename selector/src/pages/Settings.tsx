@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import RecipeDialog from '../components/RecipeDialog'
 import { Button, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { post } from '../lib/api'
-import { bytes } from '../lib/format'
+import { ago, bytes } from '../lib/format'
 import { useBlurAdultCovers } from '../lib/prefs'
 import { useCatalog, useGames, useSystem } from '../lib/queries'
 
@@ -91,8 +91,8 @@ export default function Settings() {
             {sys.engines.installed.map((e) => (
               <div key={e.version} className="flex items-center justify-between gap-4 py-2">
                 <span className="text-zinc-100">Ren’Py {e.version}</span>
-                <span className="truncate text-right text-xs text-zinc-500">
-                  {bytes(e.bytes)} · {e.usedBy.length ? e.usedBy.join(', ') : 'Unused'}
+                <span className="min-w-0 break-words text-right text-xs text-zinc-500">
+                  {bytes(e.bytes)} · {e.usedBy.length ? installed.filter((g) => g.engine === e.version).map((g) => g.title).join(', ') || 'Games are loading' : 'Unused'}
                 </span>
               </div>
             ))}
@@ -126,7 +126,7 @@ export default function Settings() {
           <h2 className="font-semibold text-white">Catalog</h2>
           <p className="text-sm text-zinc-400">
             Titles, covers and install settings come from {catalog?.status.count ?? 0} recipes in the catalog
-            {catalog?.status.fetchedAt ? `, updated ${new Date(catalog.status.fetchedAt).toLocaleString()}` : ''}.
+            {catalog?.status.fetchedAt ? `, updated ${ago(catalog.status.fetchedAt, true)}` : ''}.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" icon={<RefreshCw className="size-4" />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>

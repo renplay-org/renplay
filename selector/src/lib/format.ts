@@ -12,7 +12,7 @@ export function bytes(n: number | null | undefined): string {
 
 const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 
-export function ago(ts: number | string | null | undefined): string {
+export function ago(ts: number | string | null | undefined, relativeOnly = false): string {
   if (!ts) return 'never'
   const t = typeof ts === 'string' ? Date.parse(ts) : ts
   if (!Number.isFinite(t)) return 'never'
@@ -22,6 +22,7 @@ export function ago(ts: number | string | null | undefined): string {
   if (abs < 3600) return rtf.format(Math.round(s / 60), 'minute')
   if (abs < 86400) return rtf.format(Math.round(s / 3600), 'hour')
   if (abs < 86400 * 30) return rtf.format(Math.round(s / 86400), 'day')
+  if (relativeOnly) return abs < 86400 * 365 ? rtf.format(Math.round(s / (86400 * 30)), 'month') : rtf.format(Math.round(s / (86400 * 365)), 'year')
   return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 

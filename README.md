@@ -38,6 +38,10 @@ says what works.
   the [catalog](https://github.com/renplay-web/catalog), and Renplay tells you when a newer tested
   version exists.
 - **Resume in one tap.** The library opens your latest save straight away.
+- **Find your next game.** Keep favourites at the top of your library, sort by last played,
+  title or recently added, and search titles, developers and tags. Library filters stay in the
+  address so Back brings them back. The catalog has search and tag filters too; game pages show
+  summaries, development state and optional content tags.
 - **Mods.** Browse a game’s files, edit scripts in the browser, or upload a mod. Your changes stay
   separate from the game and survive updates.
 - **Fast to start.** Games and the engine are cached in your browser, assets stream as the game

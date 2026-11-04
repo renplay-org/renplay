@@ -7,6 +7,33 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Favourite games from their page and find them together at the top of your library. Favourites
+  stay when a game is uninstalled.
+- Sort the library by last played, title or recently added, and filter it by tag. Search, filters
+  and sorting come back when you go Back.
+- Search and tag filters in the catalog.
+- Game pages show the catalog's summary, whether the game is ongoing, completed, on hold or
+  abandoned, and its tags, with content tags tucked away until you open them.
+- An empty library suggests free starter games when the catalog has them.
+- Long lists of games and activity load more as you ask for them.
+
+### Changed
+
+- Games show the version the catalog gives their release ("0.9.23") instead of the text inside
+  the download, and update offers follow the same release.
+- Tags come from the catalog's fixed list; the library shows the ones your games share.
+- Continue playing is a compact strip when there is no save picture to show.
+- Activity groups repeated attempts and names the download being processed.
+- Settings shows relative update times and game titles beside each engine.
+
+### Fixed
+
+- Portrait phones show the sideways hint while a game is still loading, and the player keeps its
+  Save & exit label.
+- Game details no longer show a save folder for HTML games.
+
 ## [2.9.1] - 2026-11-04
 
 ### Changed
