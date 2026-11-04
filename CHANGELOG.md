@@ -42,6 +42,8 @@ release notes say what).
 
 ### Fixed
 
+- An install into a game that is not in the library is refused at once, instead of after it
+  has unpacked the whole download.
 - Portrait phones show the sideways hint while a game is still loading, and the player keeps its
   Save & exit label.
 - Game details no longer show a save folder for HTML games.

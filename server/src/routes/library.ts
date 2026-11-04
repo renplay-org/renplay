@@ -135,6 +135,9 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     if (!source || source.kind !== 'archive') throw new HttpError(400, 'source must be {kind:"archive",path}')
     cleanRelPath(source.path)
     if (b.game !== undefined && b.game !== null && !isSlug(b.game)) throw new HttpError(400, 'Invalid game id')
+    // `game` reinstalls into a game already in the library. Check it now: the install only gets
+    // to it after unpacking, which takes an hour for a big game.
+    if (b.game && !db.getGame(b.game)) throw new HttpError(404, `Game ${b.game} is not in the library`)
     if (b.game && jobs.activeFor(b.game)) throw new HttpError(409, 'A job is already running for this game')
     const id = jobs.enqueue('import', b.game ?? '', {
       source,
