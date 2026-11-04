@@ -8,8 +8,19 @@ import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/path
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 512 << 20, files: 200 } })
 
-/** Metadata cache for parsed save files, keyed by dir/name/mtime/size. */
+/** Metadata cache shared with the library, keyed by store/dir/name/mtime/size. */
 const metaCache = new Map<string, Awaited<ReturnType<typeof readSaveMeta>>>()
+
+export async function cachedSaveMeta(store: SaveStore, dir: string, file: { name: string; mtimeMs: number; size: number }) {
+  const key = `${store.root}/${dir}/${file.name}/${file.mtimeMs}/${file.size}`
+  let meta = metaCache.get(key)
+  if (meta === undefined) {
+    meta = await readSaveMeta(await store.read(dir, file.name))
+    metaCache.set(key, meta)
+    if (metaCache.size > 5000) metaCache.delete(metaCache.keys().next().value!)
+  }
+  return meta
+}
 
 export function createSavesRouter(store: SaveStore, db: Db): Router {
   const router = Router()
@@ -125,13 +136,7 @@ export function createSavesRouter(store: SaveStore, db: Db): Router {
         continue
       }
       const info = slotInfo(f.name)
-      const key = `${g.save_dir}/${f.name}/${f.mtimeMs}/${f.size}`
-      let meta = metaCache.get(key)
-      if (meta === undefined) {
-        meta = await readSaveMeta(await store.read(g.save_dir, f.name))
-        metaCache.set(key, meta)
-        if (metaCache.size > 5000) metaCache.delete(metaCache.keys().next().value!)
-      }
+      const meta = await cachedSaveMeta(store, g.save_dir, f)
       slots.push({
         file: f.name,
         size: f.size,

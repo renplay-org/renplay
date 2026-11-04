@@ -58,6 +58,7 @@ export interface Recipe {
   state?: GameState
   summary?: string
   nsfw?: boolean
+  free?: boolean
   /**
    * The game's official cover art: a file in the catalog (safe for work only)
    * or a URL on the developer's own hosting. The published index gives an
@@ -89,6 +90,7 @@ export interface Recipe {
 }
 
 export interface RecipeCover {
+  sfw?: boolean
   url: string
   sha256?: string
   width?: number

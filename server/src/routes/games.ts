@@ -11,6 +11,8 @@ import type { JobManager } from '../jobs.js'
 import type { Overlays } from '../mods.js'
 import type { SaveStore } from '../saves/store.js'
 import { playPath } from './play.js'
+import { cachedSaveMeta } from './saves.js'
+import { slotInfo } from '../saves/savefile.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, safeJoin } from '../util/paths.js'
 
@@ -47,11 +49,21 @@ export interface GameDeps {
 export async function toGame(row: GameRow, deps: GameDeps) {
   const source = parseJson<GameSource>(row.source, {})
   const job = deps.jobs.activeFor(row.id)
+  let latestSave: { file: string; label: string; name: string; ctime: number; runtime: number | undefined; screenshot: string | null } | null = null
   let saves = { count: 0, latest: 0 }
   if (row.save_dir) {
     try {
       const files = (await deps.saves.list(row.save_dir)).filter((f) => f.name.endsWith('.save') && !f.name.startsWith('_') && !f.name.includes('/'))
       saves = { count: files.length, latest: files.reduce((m, f) => Math.max(m, f.mtimeMs), 0) }
+      for (const f of files) {
+        const meta = await cachedSaveMeta(deps.saves, row.save_dir, f)
+        if (!meta) continue
+        const ctime = meta.ctime ? meta.ctime * 1000 : f.mtimeMs
+        if (!latestSave || ctime > latestSave.ctime) latestSave = {
+          file: f.name, label: slotInfo(f.name).label, name: meta.name ?? '', ctime, runtime: meta.runtime,
+          screenshot: meta.hasScreenshot ? `/api/saves/${row.id}/screenshot?file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
+        }
+      }
     } catch {}
   }
   const mods = await deps.overlays.summary(row.id)
@@ -71,6 +83,8 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     state: recipe?.state ?? null,
     summary: recipe?.summary ?? null,
     nsfw: recipe?.nsfw ?? false,
+    coverSfw: typeof recipe?.cover === 'object' && recipe.cover?.sfw === true,
+    free: recipe?.free,
     cover: recipe ? deps.catalog.cover(recipe.id) : null,
     walkthrough: row.walkthrough || null,
     status: row.status,
@@ -99,8 +113,11 @@ export async function toGame(row: GameRow, deps: GameDeps) {
       : row.recipe_id
         ? { id: row.recipe_id, links: {}, continuesFrom: [], status: null }
         : null,
-    update: update ? { version: update.version, date: update.date ?? null, status: update.status } : null,
+    update: update ? { version: update.version, date: update.date ?? null, status: update.status, archives: update.archives.map((archive) => archive.name) } : null,
     favoriteAt: row.favorite_at || null,
+    finishedAt: row.finished_at || null,
+    playTime: row.play_time,
+    latestSave,
     createdAt: row.created_at,
     installedAt: row.installed_at || null,
     lastPlayedAt: row.last_played_at || null,
@@ -133,6 +150,22 @@ export function createGamesRouter(deps: GameDeps): Router {
     if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
     db.updateGame(g.id, { favorite_at: req.body.on ? g.favorite_at || new Date().toISOString() : '' })
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
+  })
+
+  router.put('/:id/finished', async (req, res) => {
+    const g = get(req)
+    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
+    db.updateGame(g.id, { finished_at: req.body.on ? g.finished_at || new Date().toISOString() : '' })
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
+  })
+
+  // The player reports visible, running time in seconds, in bounded increments.
+  router.post('/:id/play-time', (req, res) => {
+    const g = get(req)
+    const seconds = req.body?.seconds
+    if (!Number.isInteger(seconds) || seconds < 1 || seconds > 60) throw new HttpError(400, 'Seconds must be an integer from 1 to 60')
+    db.raw.prepare('UPDATE games SET play_time = play_time + ? WHERE id = ?').run(seconds, g.id)
+    res.json({ ok: true })
   })
 
   router.post('/:id/played', (req, res) => {
