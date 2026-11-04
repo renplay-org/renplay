@@ -14,107 +14,269 @@ read-only root filesystem, so any folder you point a variable at must be writabl
 
 ## Folders
 
-**`GAMES_DIR`**  
+<div class="config-entry" id="games-dir">
+
+**`GAMES_DIR`**
+
+<div class="config-default">
+
 Default: `/games`
+
+</div>
 
 Where installed games live. Put this on a big disk.
 
-**`DATA_DIR`**  
+</div>
+
+<div class="config-entry" id="data-dir">
+
+**`DATA_DIR`**
+
+<div class="config-default">
+
 Default: `/data`
+
+</div>
 
 Saves and their history, the library database, mods, covers and walkthroughs. Back this up.
 
-**`ARCHIVES_DIR`**  
+</div>
+
+<div class="config-entry" id="archives-dir">
+
+**`ARCHIVES_DIR`**
+
+<div class="config-default">
+
 Default: `$GAMES_DIR/_archives`
+
+</div>
 
 The drop folder for game downloads (zip, 7z, rar), and the source for reinstalls.
 
-**`RENPLAY_DIR`**  
+</div>
+
+<div class="config-entry" id="renplay-dir">
+
+**`RENPLAY_DIR`**
+
+<div class="config-default">
+
 Default: `$GAMES_DIR/_renplay`
+
+</div>
 
 Engines and scratch space. Keep it on the same filesystem as `GAMES_DIR`.
 
-**`SAVES_DIR`**  
+</div>
+
+<div class="config-entry" id="saves-dir">
+
+**`SAVES_DIR`**
+
+<div class="config-default">
+
 Default: `$DATA_DIR/saves`
+
+</div>
 
 Where saves are stored, laid out like desktop Ren’Py does.
 
-**`SAVE_HISTORY_DIR`**  
+</div>
+
+<div class="config-entry" id="save-history-dir">
+
+**`SAVE_HISTORY_DIR`**
+
+<div class="config-default">
+
 Default: `$DATA_DIR/save-history`
+
+</div>
 
 Earlier versions of saves that were overwritten or deleted.
 
-**`OVERLAYS_DIR`**  
+</div>
+
+<div class="config-entry" id="overlays-dir">
+
+**`OVERLAYS_DIR`**
+
+<div class="config-default">
+
 Default: `$DATA_DIR/overlays`
 
+</div>
+
 Mods: your files, layered over a game.
+
+</div>
 
 
 ## Games and catalog
 
-**`RENPLAY_DELETE_ARCHIVES`**  
+<div class="config-entry" id="renplay-delete-archives">
+
+**`RENPLAY_DELETE_ARCHIVES`**
+
+<div class="config-default">
+
 Default: `true`
+
+</div>
 
 Delete a download once its game installed. `false` keeps it, so the game can be reinstalled without uploading again.
 
-**`RENPLAY_ADULT_GAMES`**  
+</div>
+
+<div class="config-entry" id="renplay-adult-games">
+
+**`RENPLAY_ADULT_GAMES`**
+
+<div class="config-default">
+
 Default: not set
+
+</div>
 
 `allow` or `block` adult games for the whole install, and lock the choice. Not set: an existing library keeps showing adult games, a new install asks once in the empty library, and admins can change an unlocked choice in Settings. `block` reads the catalog’s safe-for-work index and hides adult games already in the library without deleting them. Any other value counts as `block`.
 
-**`RENPLAY_CATALOG_URLS`**  
+</div>
+
+<div class="config-entry" id="renplay-catalog-urls">
+
+**`RENPLAY_CATALOG_URLS`**
+
+<div class="config-default">
+
 Default: `https://catalog.renplay.org/index.v3.json`
+
+</div>
 
 Catalog indexes, separated by commas. The first one that defines a tag wins.
 
-**`RENPLAY_ENGINES_URL`**  
+</div>
+
+<div class="config-entry" id="renplay-engines-url">
+
+**`RENPLAY_ENGINES_URL`**
+
+<div class="config-default">
+
 Default: `https://engines.renplay.org/index.json`
+
+</div>
 
 Where the Ren’Py web engines come from.
 
-**`RENPLAY_ENGINE`**  
+</div>
+
+<div class="config-entry" id="renplay-engine">
+
+**`RENPLAY_ENGINE`**
+
+<div class="config-default">
+
 Default: newest for the game
 
+</div>
+
 Build every game with this one engine version, such as one the engines index lists. A game’s recipe still wins.
+
+</div>
 
 
 ## Images and saves
 
-**`RENPLAY_IMAGE_QUALITY`**  
+<div class="config-entry" id="renplay-image-quality">
+
+**`RENPLAY_IMAGE_QUALITY`**
+
+<div class="config-default">
+
 Default: `88`
+
+</div>
 
 WebP quality (1 to 100) for converted images.
 
-**`RENPLAY_IMAGE_CONCURRENCY`**  
+</div>
+
+<div class="config-entry" id="renplay-image-concurrency">
+
+**`RENPLAY_IMAGE_CONCURRENCY`**
+
+<div class="config-default">
+
 Default: CPU count (at most 16)
+
+</div>
 
 Images converted in parallel during an install. `0` picks the CPU count.
 
-**`RENPLAY_SAVE_HISTORY`**  
+</div>
+
+<div class="config-entry" id="renplay-save-history">
+
+**`RENPLAY_SAVE_HISTORY`**
+
+<div class="config-default">
+
 Default: `20`
 
+</div>
+
 Earlier versions kept per save file.
+
+</div>
 
 
 ## Behind a proxy
 
-**`RENPLAY_KEEPALIVE_URL`**  
+<div class="config-entry" id="renplay-keepalive-url">
+
+**`RENPLAY_KEEPALIVE_URL`**
+
+<div class="config-default">
+
 Default: not set
+
+</div>
 
 For scale-to-zero setups: a public URL that routes back to this server. While an install runs, Renplay keeps requesting it so the proxy does not stop the server.
 
-**`RENPLAY_KEEPALIVE_HOST`**  
+</div>
+
+<div class="config-entry" id="renplay-keepalive-host">
+
+**`RENPLAY_KEEPALIVE_HOST`**
+
+<div class="config-default">
+
 Default: not set
 
+</div>
+
 The `Host` header to send with the keep-alive requests, if the proxy routes by host name.
+
+</div>
 
 
 ## Server
 
-**`PORT`**  
+<div class="config-entry" id="port">
+
+**`PORT`**
+
+<div class="config-default">
+
 Default: `3000`
 
+</div>
+
 Port of the Renplay server inside the container. nginx listens on 8080 and forwards to it, so you rarely change this.
+
+</div>
 
 
 ## Folders inside the container

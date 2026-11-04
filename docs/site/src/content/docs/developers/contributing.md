@@ -51,6 +51,10 @@ The **Configuration** page is generated from `server/src/envvars.ts`. Add or cha
 variable there, run `npm run gen` in `docs/site`, and commit the page. A server test fails when the
 page is stale.
 
+Image examples use a `RENPLAY_VERSION` token wrapped in double underscores in their Markdown source. The
+`remark-version.mjs` plugin replaces it with `server/package.json`’s version at build time, including
+inside code blocks, so copyable commands always match the release.
+
 ## Product rules
 
 These decide most review comments:

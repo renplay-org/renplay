@@ -1,12 +1,32 @@
 import { defineConfig } from 'astro/config'
 import starlight from '@astrojs/starlight'
 import starlightLinksValidator from 'starlight-links-validator'
+import remarkVersion from './scripts/remark-version.mjs'
+import { unified } from '@astrojs/markdown-remark'
 
 export default defineConfig({
   site: 'https://docs.renplay.org',
+  markdown: { processor: unified({ remarkPlugins: [remarkVersion] }) },
   integrations: [
     starlight({
-      title: 'Renplay docs',
+      title: 'Renplay',
+      components: {
+        Header: './src/components/Header.astro',
+        Hero: './src/components/Hero.astro',
+        PageTitle: './src/components/PageTitle.astro',
+      },
+      expressiveCode: {
+        themes: ['github-dark', 'github-light'],
+        styleOverrides: {
+          borderRadius: '14px',
+          borderColor: 'var(--sl-color-hairline)',
+          codeBackground: 'var(--sl-color-gray-6)',
+          codeFontSize: '0.85rem',
+          codePaddingBlock: '1.1rem',
+          frames: { shadowColor: 'transparent' },
+        },
+        defaultProps: { frame: 'none' },
+      },
       description: 'Install, run and configure Renplay, the self-hosted player for Ren’Py and HTML games.',
       logo: { src: './src/assets/logo.svg', alt: '' },
       favicon: '/favicon.svg',
@@ -24,8 +44,9 @@ export default defineConfig({
         { tag: 'meta', attributes: { name: 'theme-color', content: '#07070a' } },
       ],
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/renplay-org/renplay' },
-        { icon: 'heart', label: 'Support on Ko-fi', href: 'https://ko-fi.com/janpuc' },
+        { icon: 'external', label: 'Renplay website', href: 'https://renplay.org' },
+        { icon: 'github', label: 'GitHub', href: 'https://renplay.org/github' },
+        { icon: 'heart', label: 'Support', href: 'https://renplay.org/support' },
       ],
       plugins: [starlightLinksValidator({ errorOnRelativeLinks: false })],
       sidebar: [
