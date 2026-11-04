@@ -59,7 +59,7 @@ describe('content mode', () => {
   })
 
   it('derives the safe-for-work index from a catalog URL', () => {
-    expect(sfwIndexUrl('https://renplay-web.github.io/catalog/index.v3.json')).toBe('https://renplay-web.github.io/catalog/index.v3.sfw.json')
+    expect(sfwIndexUrl('https://catalog.renplay.org/index.v3.json')).toBe('https://catalog.renplay.org/index.v3.sfw.json')
     expect(sfwIndexUrl('http://host/x/catalog.json?token=1')).toBe('http://host/x/catalog.sfw.json?token=1')
     expect(sfwIndexUrl('http://host/x/index.v3.sfw.json')).toBeNull()
     expect(sfwIndexUrl('http://host/x/catalog')).toBeNull()

@@ -79,8 +79,8 @@ export function loadConfig(): Config {
     workDir: join(internalDir, 'work'),
     purgeDir: join(internalDir, 'purge'),
     uploadsDir: join(internalDir, 'uploads'),
-    enginesUrl: env('RENPLAY_ENGINES_URL', 'https://renplay-web.github.io/engines/index.json'),
-    catalogUrls: env('RENPLAY_CATALOG_URLS', 'https://renplay-web.github.io/catalog/index.v3.json')
+    enginesUrl: env('RENPLAY_ENGINES_URL', 'https://engines.renplay.org/index.json'),
+    catalogUrls: env('RENPLAY_CATALOG_URLS', 'https://catalog.renplay.org/index.v3.json')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),

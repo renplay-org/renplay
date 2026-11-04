@@ -20,7 +20,7 @@
 export const WEB_COMPAT_PATH = 'renplay_web.rpy'
 
 export const WEB_COMPAT = `# Added by Renplay to the browser build: stand-ins for what a desktop game
-# expects and a browser does not have. https://github.com/renplay-web/renplay
+# expects and a browser does not have. https://github.com/renplay-org/renplay
 
 python early:
 

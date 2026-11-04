@@ -17,7 +17,7 @@ import { uploadArchive, type UploadHandle } from '../lib/upload'
 // A game in the catalog works; only a release marked broken is worth a word.
 const BROKEN = 'Does not work'
 
-const REQUEST_URL = 'https://renplay-web.github.io/catalog.html#request'
+const REQUEST_URL = 'https://renplay.org/catalog/request'
 
 export default function AddGames() {
   return (

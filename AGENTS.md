@@ -10,14 +10,14 @@ Read this file before changing anything. `README.md` is for users, `CONTRIBUTING
 contributors, `docs/architecture.md` explains the internals in depth, `CHANGELOG.md` records every
 user-visible change.
 
-## Related repositories (organization renplay-web)
+## Related repositories (organization renplay-org)
 
 | Repository | What |
 |---|---|
 | `renplay` (this one) | The app: server, library UI, in-game runtime, container image |
-| `catalog` | Curated recipes and covers, published as `https://renplay-web.github.io/catalog/index.v3.json` (schema 3) |
-| `engines` | Official Ren'Py web engines repackaged per version, index at `https://renplay-web.github.io/engines/index.json` |
-| `renplay-web.github.io` | The website |
+| `catalog` | Curated recipes and covers, published as `https://catalog.renplay.org/index.v3.json` (schema 3) |
+| `engines` | Official Ren'Py web engines repackaged per version, index at `https://engines.renplay.org/index.json` |
+| `website` | The website, https://renplay.org |
 | `.github` | Organization profile and the default `FUNDING.yml` (Ko-fi) |
 
 ## Product rules
@@ -200,7 +200,7 @@ except screenshots.
 ## Deployment
 
 The reference deployment runs on Kubernetes (Flux) and pins a released image by tag and digest
-(`ghcr.io/renplay-web/renplay:X.Y.Z@sha256:…`); Renovate proposes new releases. To try a `dev`
+(`ghcr.io/renplay-org/renplay:X.Y.Z@sha256:…`); Renovate proposes new releases. To try a `dev`
 build there first, pin its `edge@sha256:…` digest temporarily, then pin the release. Data lives in
 `/data` (a persistent volume, backed up); `/games` can be rebuilt from `/games/_archives`.
 

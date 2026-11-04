@@ -5,7 +5,7 @@
 <p align="center"><b>Your Ren’Py and HTML games in the browser, on any device, with saves on your own server.</b></p>
 
 <p align="center">
-  <a href="https://github.com/renplay-web/renplay/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/renplay-web/renplay?color=e0306f"></a>
+  <a href="https://github.com/renplay-org/renplay/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/renplay-org/renplay?color=e0306f"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-7c5cff"></a>
   <a href="https://ko-fi.com/janpuc"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/support-Ko--fi-fb7aa8?logo=kofi&logoColor=white"></a>
 </p>
@@ -35,7 +35,7 @@ says what works.
 - **One-click installs.** Drop in the PC zip (or 7z, rar). Renplay unpacks it, shrinks the images
   and prepares it for the web. No Ren’Py SDK, and the game’s code never runs on your server.
 - **A curated catalog.** Known games get their proper title, cover, links and tested settings from
-  the [catalog](https://github.com/renplay-web/catalog), and Renplay tells you when a newer tested
+  the [catalog](https://github.com/renplay-org/catalog), and Renplay tells you when a newer tested
   version exists.
 - **Resume in one tap.** Up next opens your latest save straight away, with play time and your
   last save on the library home. Mark a story Finished on its game page to leave it out of Up next;
@@ -61,14 +61,15 @@ Renplay is one container. Give it a folder for games and one for data:
 docker run -d --name renplay -p 8080:8080 \
   -v /path/to/games:/games \
   -v /path/to/data:/data \
-  ghcr.io/renplay-web/renplay:latest
+  ghcr.io/renplay-org/renplay:latest
 ```
 
 Open http://localhost:8080. Copy a game’s PC download into `/path/to/games/_archives/`, or upload
 it under **Add games**, and press **Install**. The first install also downloads the Ren’Py web
 engine (about 16 MB).
 
-Pin a version (`ghcr.io/renplay-web/renplay:2.9.1`) for production; [releases](https://github.com/renplay-web/renplay/releases)
+The same image is on Docker Hub as `renplay/renplay`. Pin a version
+(`ghcr.io/renplay-org/renplay:2.9.1`) for production; [releases](https://github.com/renplay-org/renplay/releases)
 list what changed. Renplay has no user accounts, so put it behind your own sign-in (a reverse
 proxy with authentication, a VPN) if it is reachable from outside your network.
 
@@ -96,9 +97,9 @@ Everything works without configuration. These environment variables exist for sp
 | `ARCHIVES_DIR` | `$GAMES_DIR/_archives` | Game downloads |
 | `RENPLAY_DELETE_ARCHIVES` | `true` | Delete a download once its game installed. `false` keeps it, so the game can be reinstalled |
 | `RENPLAY_DIR` | `$GAMES_DIR/_renplay` | Engines and scratch space (same filesystem as `GAMES_DIR`) |
-| `RENPLAY_CATALOG_URLS` | the public catalog | Comma-separated catalog indexes |
+| `RENPLAY_CATALOG_URLS` | `https://catalog.renplay.org/index.v3.json` | Comma-separated catalog indexes |
 | `RENPLAY_ADULT_GAMES` | not set | `allow` or `block` adult games for the whole install, and lock the choice. Not set: an existing library keeps showing adult games, and a new install asks once in the empty library. Admins can change an unlocked choice in Settings. `block` reads the catalog's safe-for-work index and hides adult games already in the library without deleting them |
-| `RENPLAY_ENGINES_URL` | the public engine index | Where engines come from |
+| `RENPLAY_ENGINES_URL` | `https://engines.renplay.org/index.json` | Where engines come from |
 | `RENPLAY_ENGINE` | newest for the game | Build every game with one engine version |
 | `RENPLAY_IMAGE_QUALITY` | `88` | WebP quality for converted images |
 | `RENPLAY_IMAGE_CONCURRENCY` | CPU count | Images converted in parallel |
@@ -111,8 +112,8 @@ The container runs as any non-root user and with a read-only root filesystem.
 
 **Which games work?** Ren’Py 8 games, and most Ren’Py 7 games: they run on the Ren’Py 8 engine,
 and only games with Python 2-only code have trouble. The
-[catalog](https://github.com/renplay-web/catalog) lists games that were tested; most others work
-too. If one does not, [tell the catalog](https://github.com/renplay-web/catalog/issues/new/choose).
+[catalog](https://github.com/renplay-org/catalog) lists games that were tested; most others work
+too. If one does not, [tell the catalog](https://github.com/renplay-org/catalog/issues/new/choose).
 Some other engines work too, with fewer features: HTML games such as Twine stories install and
 play, marked Beta. Other engines join only when their normal download plays as easily; see
 [docs/engines.md](docs/engines.md).
@@ -129,15 +130,15 @@ and they work in the desktop version, and the other way round.
 - [CONTRIBUTING.md](CONTRIBUTING.md): development setup, pull requests, releases
 - [AGENTS.md](AGENTS.md): product rules and lessons learned, for people and AI agents alike
 - [CHANGELOG.md](CHANGELOG.md): what changed in each version
-- Related: [catalog](https://github.com/renplay-web/catalog) (recipes and covers),
-  [engines](https://github.com/renplay-web/engines) (Ren’Py web engines),
-  [website](https://renplay-web.github.io)
+- Related: [catalog](https://github.com/renplay-org/catalog) (recipes and covers),
+  [engines](https://github.com/renplay-org/engines) (Ren’Py web engines),
+  [website](https://renplay.org)
 
 ## Support
 
 Questions, such as whether a game works, go to
-[Discussions](https://github.com/renplay-web/renplay/discussions); bugs to
-[issues](https://github.com/renplay-web/renplay/issues).
+[Discussions](https://github.com/renplay-org/renplay/discussions); bugs to
+[issues](https://github.com/renplay-org/renplay/issues).
 
 Renplay is made by the Renplay Team. It is free and open source. If it is useful to you, you can
 support it on [Ko-fi](https://ko-fi.com/janpuc).

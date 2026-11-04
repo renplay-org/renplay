@@ -5,8 +5,9 @@ import { pct } from '../lib/format'
 import { useGames, useJobs, useSystem } from '../lib/queries'
 import { cx } from './ui'
 
-export const REPO_URL = 'https://github.com/renplay-web/renplay'
-export const KOFI_URL = 'https://ko-fi.com/janpuc'
+// Links go through renplay.org (redirects on the website), so moving GitHub or Ko-fi needs no release.
+export const REPO_URL = 'https://renplay.org/github'
+export const KOFI_URL = 'https://renplay.org/support'
 
 export function GitHubMark({ className }: { className?: string }) {
   return (

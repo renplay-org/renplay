@@ -46,7 +46,7 @@ function cmp(a: string, b: string): number {
 }
 
 /**
- * Ren'Py web engines, one pack per version from renplay-web/engines. A pack
+ * Ren'Py web engines, one pack per version from renplay-org/engines. A pack
  * is downloaded the first time a game needs it and removed when no installed
  * game uses it any more.
  */

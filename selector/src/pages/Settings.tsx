@@ -117,7 +117,7 @@ export default function Settings() {
           </div>
           <p className="text-xs text-zinc-500">
             {sys.engines.available.length ? `Available: ${sys.engines.available.map((e) => e.version).join(', ')}` : 'The engine index is unreachable.'} ·{' '}
-            <a className="hover:text-zinc-300" href="https://github.com/renplay-web/engines" target="_blank" rel="noreferrer">
+            <a className="hover:text-zinc-300" href="https://renplay.org/github/engines" target="_blank" rel="noreferrer">
               Engines on GitHub
             </a>
           </p>
@@ -150,7 +150,7 @@ export default function Settings() {
             <Button size="sm" icon={<RefreshCw className="size-4" />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>
               Refresh catalog
             </Button>
-            <a href="https://github.com/renplay-web/catalog" target="_blank" rel="noreferrer">
+            <a href="https://renplay.org/github/catalog" target="_blank" rel="noreferrer">
               <Button size="sm" variant="ghost" icon={<ExternalLink className="size-4" />}>
                 Catalog on GitHub
               </Button>
@@ -202,7 +202,7 @@ export default function Settings() {
             <Switch checked={blurAdult} onChange={setBlurAdult} label="Hide pictures of adult games" hint="Covers and save pictures in the library, for screens other people can see. Only this browser is affected." />
           </div>
         </section>
-        {section === 'about' && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]"><h2 className="font-semibold text-white">About Renplay</h2><p className="text-sm text-zinc-400">Version {sys.version} · Made by the Renplay Team</p><p className="text-sm text-zinc-400">Renplay is open source, under the MIT license. Game art belongs to its developers.</p><div className="flex gap-4 text-sm text-accent-300"><a href="https://github.com/renplay-web/renplay" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://ko-fi.com/janpuc" target="_blank" rel="noreferrer">Support Renplay ↗</a><a href="https://github.com/renplay-web/renplay/blob/main/LICENSE" target="_blank" rel="noreferrer">License ↗</a></div></section>}
+        {section === 'about' && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]"><h2 className="font-semibold text-white">About Renplay</h2><p className="text-sm text-zinc-400">Version {sys.version} · Made by the Renplay Team</p><p className="text-sm text-zinc-400">Renplay is open source, under the MIT license. Game art belongs to its developers.</p><div className="flex gap-4 text-sm text-accent-300"><a href="https://github.com/renplay-org/renplay" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://ko-fi.com/janpuc" target="_blank" rel="noreferrer">Support Renplay ↗</a><a href="https://github.com/renplay-org/renplay/blob/main/LICENSE" target="_blank" rel="noreferrer">License ↗</a></div></section>}
       </div>
       </div>
     </div>
