@@ -82,7 +82,7 @@ export class PackWriter {
     }
     const start = this.offset
     return {
-      write: (c) => this.write(Buffer.from(c)),
+      write: (c) => this.write(c),
       end: async () => {
         this.index.set(name, [start, this.offset - start])
         release()

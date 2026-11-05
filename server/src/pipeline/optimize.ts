@@ -1,5 +1,7 @@
 import { availableParallelism } from 'node:os'
 import sharp from 'sharp'
+import { MAX_IMAGE_PIXELS, PixelBudget } from './image-memory.js'
+import { makePlaceholder, type Placeholder } from './progressive.js'
 
 sharp.cache(false)
 sharp.concurrency(1)
@@ -41,6 +43,26 @@ export interface TranscodeResult {
   changed: boolean
 }
 
+/** Limits the sum of decoded pixels, not just the number of compressed inputs. */
+export class ImageProcessor {
+  private budget = new PixelBudget()
+
+  async process(data: Buffer, rel: string, policy: ImagePolicy, placeholder = false): Promise<TranscodeResult & { placeholder: Placeholder | null }> {
+    let pixels: number
+    try {
+      const meta = await sharp(data, { limitInputPixels: MAX_IMAGE_PIXELS, animated: false }).metadata()
+      pixels = (meta.width ?? 0) * (meta.height ?? 0)
+      if (!pixels || pixels > MAX_IMAGE_PIXELS) return { data, changed: false, placeholder: null }
+    } catch {
+      return { data, changed: false, placeholder: null }
+    }
+    return this.budget.run(pixels, async () => {
+      const result = await transcodeImage(data, rel, policy)
+      return { ...result, placeholder: placeholder ? await makePlaceholder(result.data) : null }
+    })
+  }
+}
+
 /**
  * Re-encodes PNG/JPEG data as WebP while the file keeps its name. Ren'Py's
  * image loader detects the format from the file contents, so scripts that
@@ -53,7 +75,7 @@ export async function transcodeImage(data: Buffer, rel: string, policy: ImagePol
     return { data, changed: false }
   }
   try {
-    const img = sharp(data, { failOn: 'none', animated: false, limitInputPixels: 16383 * 16383 })
+    const img = sharp(data, { failOn: 'none', animated: false, limitInputPixels: MAX_IMAGE_PIXELS })
     const meta = await img.metadata()
     if (!meta.width || !meta.height || meta.width > 16383 || meta.height > 16383) return { data, changed: false }
     if ((meta.pages ?? 1) > 1) return { data, changed: false }

@@ -1,8 +1,11 @@
 import { inflateSync } from 'node:zlib'
-import type { Readable } from 'node:stream'
+import { Readable } from 'node:stream'
 import { PyObject, unpickle } from '../util/pickle.js'
 import { cleanRelPath } from '../util/paths.js'
 import { readAll, type SourceEntry } from './archive.js'
+
+const MAX_RPA_INDEX_BYTES = 32 << 20
+const MAX_RPA_INDEX_RAW_BYTES = 64 << 20
 
 export interface RpaHeader {
   version: 'RPA-3.0' | 'RPA-2.0'
@@ -56,7 +59,7 @@ function toBytes(v: unknown): Uint8Array {
 }
 
 export function parseRpaIndex(compressed: Buffer, header: RpaHeader): RpaFile[] {
-  const raw = inflateSync(compressed)
+  const raw = inflateSync(compressed, { maxOutputLength: MAX_RPA_INDEX_RAW_BYTES })
   const index = unpickle(raw)
   if (!(index instanceof Map)) throw new Error('RPA index is not a dict')
   const out: RpaFile[] = []
@@ -92,10 +95,11 @@ export async function readRpaIndex(entry: SourceEntry): Promise<{ header: RpaHea
   headStream.destroy()
   const header = parseRpaHeader(first)
   if (!header || header.indexOffset >= entry.size) return null
+  if (entry.size - header.indexOffset > MAX_RPA_INDEX_BYTES) throw new Error('RPA index too large')
 
   let compressed: Buffer
   if (entry.seekable) {
-    compressed = await readAll(await entry.open({ start: header.indexOffset, end: entry.size }))
+    compressed = await readAll(await entry.open({ start: header.indexOffset, end: entry.size }), MAX_RPA_INDEX_BYTES)
   } else {
     compressed = await readTail(await entry.open(), header.indexOffset)
   }
@@ -104,11 +108,17 @@ export async function readRpaIndex(entry: SourceEntry): Promise<{ header: RpaHea
 
 async function readTail(s: Readable, from: number): Promise<Buffer> {
   let pos = 0
+  let size = 0
   const chunks: Buffer[] = []
   for await (const c of s) {
     const buf = c as Buffer
     const end = pos + buf.length
-    if (end > from) chunks.push(pos >= from ? buf : buf.subarray(from - pos))
+    if (end > from) {
+      const tail = pos >= from ? buf : buf.subarray(from - pos)
+      size += tail.length
+      if (size > MAX_RPA_INDEX_BYTES) throw new Error('RPA index too large')
+      chunks.push(tail)
+    }
     pos = end
   }
   return Buffer.concat(chunks)
@@ -206,38 +216,31 @@ export function rangeKey(offset: number, length: number, prefix: Uint8Array): st
   return `${offset}:${length}:${Buffer.from(prefix).toString('hex')}`
 }
 
-/** Reads one file from an RPA by ranged reads; used for deferred entries. */
-export async function readRpaFile(entry: SourceEntry, file: RpaFile): Promise<Buffer> {
-  const parts: Buffer[] = []
-  for (const seg of file.segments) {
-    if (seg.prefix.length) parts.push(Buffer.from(seg.prefix))
-    if (!seg.length) continue
-    if (entry.seekable) {
-      parts.push(await readAll(await entry.open({ start: seg.offset, end: seg.offset + seg.length })))
-    } else {
-      const s = await entry.open()
-      parts.push(await readRange(s, seg.offset, seg.length))
+/** Streams shared, overlapping or multi-segment entries without retaining their contents. */
+export function streamRpaFile(entry: SourceEntry, file: RpaFile): Readable {
+  return Readable.from((async function* () {
+    for (const seg of file.segments) {
+      if (seg.prefix.length) yield Buffer.from(seg.prefix)
+      if (!seg.length) continue
+      const stream = await entry.open(entry.seekable ? { start: seg.offset, end: seg.offset + seg.length } : undefined)
+      let skip = entry.seekable ? 0 : seg.offset
+      let remaining = seg.length
+      try {
+        for await (const c of stream) {
+          const chunk = c as Buffer
+          const from = Math.min(skip, chunk.length)
+          skip -= from
+          const take = Math.min(chunk.length - from, remaining)
+          if (take) {
+            yield chunk.subarray(from, from + take)
+            remaining -= take
+          }
+          if (!remaining) break
+        }
+        if (remaining) throw new Error(`RPA ended inside ${file.name}`)
+      } finally {
+        stream.destroy()
+      }
     }
-  }
-  return Buffer.concat(parts)
-}
-
-async function readRange(s: Readable, offset: number, length: number): Promise<Buffer> {
-  let pos = 0
-  const out: Buffer[] = []
-  let need = length
-  for await (const c of s) {
-    const buf = c as Buffer
-    const end = pos + buf.length
-    if (end > offset && need > 0) {
-      const from = Math.max(0, offset - pos)
-      const piece = buf.subarray(from, Math.min(buf.length, from + need))
-      out.push(piece)
-      need -= piece.length
-    }
-    pos = end
-    if (need <= 0) break
-  }
-  s.destroy()
-  return Buffer.concat(out)
+  })(), { objectMode: false, highWaterMark: 64 << 10 })
 }

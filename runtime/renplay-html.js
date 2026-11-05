@@ -1,5 +1,5 @@
 /*
- * Renplay's runtime for HTML games (docs/engines.md), inlined at the top of
+ * Renplay's runtime for HTML games (docs.renplay.org/engines), inlined at the top of
  * the game's page before any of its scripts.
  *
  * The page runs in a sandboxed frame with an opaque origin: no access to

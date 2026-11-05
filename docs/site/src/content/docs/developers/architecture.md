@@ -1,8 +1,11 @@
-# How Renplay works
+---
+title: How Renplay works
+description: How installs, builds, the player and saves fit together.
+---
 
 Renplay turns the PC release of a Ren'Py game into a web build, serves it, and keeps the player's
 saves on the server. This page explains the parts and why they are built the way they are. HTML
-games take a shorter path through the same parts; [engines.md](engines.md) covers them and the
+games take a shorter path through the same parts; [Engines](/engines/) covers them and the
 engines still to come.
 
 ```
@@ -23,6 +26,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 | `/games/_renplay/engines/<version>/` | Engine packs, downloaded on demand |
 | `/games/_renplay/work/`, `purge/`, `uploads/` | Scratch space, deletions in progress, chunked uploads |
 | `/data/library.db` | SQLite: games, jobs, settings, the catalog cache |
+| `/data/job-logs/` | Recent job messages, appended as they happen so interrupted jobs keep their logs |
 | `/data/saves/<save folder>/` | Saves, exactly as desktop Ren'Py lays them out, with `/data/save-history/` |
 | `/data/overlays/<id>/` | Mods: the user's files layered over a game |
 | `/data/covers/` | Covers downloaded from the catalog (content-hashed names) |
@@ -37,7 +41,7 @@ archives, while they are kept).
 
 1. **Read the archive in place** (`archive.ts`): zip, 7z, rar or tar, without unpacking it to disk.
    Find the game folder and the Ren'Py version (`renpy/vc_version.py`). Other engines' games are
-   recognized (`family.ts`) and refused with the reason; see [engines.md](engines.md).
+   recognized (`family.ts`) and refused with the reason; see [Engines](/engines/).
 2. **Match the catalog** (`catalog.ts`): by sha256, name and size, or a `match` pattern. The recipe
    can choose the engine, files to keep or exclude, and small patches.
 3. **Pick the engine** (`engines.ts`): the recipe's, `RENPLAY_ENGINE`, or the newest published
@@ -47,7 +51,13 @@ archives, while they are kept).
 4. **Split RPA archives** (`rpa.ts`) in one sequential pass. The archive index is a Python pickle;
    `util/pickle.ts` reads it as data only, so nothing from the game is executed.
 5. **Optimize images** (`optimize.ts`): PNG and JPEG become WebP under the same names; each
-   streamed image gets a small placeholder.
+   streamed image gets a small placeholder. Image tasks reserve a slot before reading their input,
+   and a shared pixel budget limits simultaneous decoding to 16 megapixels (16 × 1024² pixels).
+   Inputs over 32 MiB or that pixel limit stay intact in `game.zip`, without a placeholder.
+   Concurrency remains an upper bound; high-resolution images may run with fewer tasks at once.
+   The container preloads jemalloc so glibc's allocator does not retain fragmented image-processing
+   allocations across thousands of conversions. A library symlink resolves the platform's multiarch
+   path on both amd64 and arm64.
 6. **Decide what streams** (`progressive.ts`): images, audio and video stream on demand, everything
    the engine needs at start goes into `game.zip`. A developer's `progressive_download.txt` wins.
 7. **Write the build**: streamed files are appended to `assets.pack` (with an `assets.json`
@@ -64,6 +74,17 @@ archives, while they are kept).
 
 Builds never change after that. A reinstall or update makes a new build; the old one is deleted in
 the background by `util/purge.ts`.
+
+Large files, including shared or multi-segment RPA entries and script sources moved aside, are
+copied in chunks with pack-writer backpressure. Copying an engine or mod zip advances only after
+its current entry has been consumed. RPA indexes are capped at 32 MiB compressed and 64 MiB
+uncompressed; archives with unreadable or oversized indexes are kept intact. File indexes and
+small image placeholders still scale with the number of files, but file bodies are not queued.
+
+Job logs (`joblogs.ts`) use synchronous appends under `/data/job-logs/`, with two files of at most
+96 KiB per job. The log API returns the latest 96 KiB after a restart, even if the job never finished.
+Finished jobs also retain their database log for compatibility. Clearing finished activity deletes
+its log files; startup removes any orphan files left by an interrupted cleanup.
 
 ### Why packs
 

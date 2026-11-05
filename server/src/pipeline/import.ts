@@ -1,4 +1,4 @@
-import { mkdir, open, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
+import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../builds.js'
 import type { BuildSettings, Catalog, RecipeMatch } from '../catalog.js'
@@ -10,7 +10,7 @@ import type { Overlays } from '../mods.js'
 import { dirSize, exists } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
 import { extractWithBsdtar, openDir, openZip, readAll, sniffArchive, type ArchiveSource, type SourceEntry } from './archive.js'
-import { assemble } from './assemble.js'
+import { assemble, RangeStream } from './assemble.js'
 import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit } from './detect.js'
 import { defaultImagePolicy, imageConcurrency } from './optimize.js'
 import { PackWriter, writeIndex } from './pack.js'
@@ -278,23 +278,21 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
 export async function setSourcesAside(zipPackPath: string, zip: PackWriter, assets: PackWriter): Promise<number> {
   const sources = [...zip.index.keys()].filter((n) => /\.rpym?$/i.test(n) && zip.index.has(`${n}c`))
   if (!sources.length) return 0
-  const fh = await open(zipPackPath, 'r')
-  try {
-    for (const name of sources) {
-      const [offset, size] = zip.index.get(name)!
-      const data = Buffer.alloc(size)
-      if (size) await fh.read(data, 0, size, offset)
-      await assets.add(name, data)
-      zip.index.delete(name)
+  for (const name of sources) {
+    const [offset, size] = zip.index.get(name)!
+    const writer = await assets.begin(name)
+    try {
+      for await (const chunk of new RangeStream(zipPackPath, offset, offset + size)) await writer.write(chunk as Buffer)
+    } finally {
+      await writer.end()
     }
-  } finally {
-    await fh.close()
+    zip.index.delete(name)
   }
   return sources.length
 }
 
 /**
- * Installs an HTML game (docs/engines.md): its folder into one pack, images as
+ * Installs an HTML game (docs.renplay.org/engines): its folder into one pack, images as
  * WebP. No engine to fetch and no game.zip; the page is served from the pack.
  */
 async function installHtml(
@@ -445,16 +443,14 @@ export async function inspectArchive(path: string): Promise<ArchiveInfo> {
       rpas.sort((a, b) => Number(!/script/i.test(a.path)) - Number(!/script/i.test(b.path)) || a.size - b.size)
       for (const e of rpas.slice(0, 4)) {
         const idx = await readRpaIndex(e).catch(() => null)
-        const want = idx?.files.filter((f) => /(^|\/)options\.rpyc?$/i.test(f.name)) ?? []
+        const want = idx?.files.filter((f) => /(^|\/)options\.rpyc?$/i.test(f.name) && f.segments.reduce((n, s) => n + s.length + s.prefix.length, 0) < 4 << 20) ?? []
         if (!want.length) continue
-        const got = new Map<string, Buffer>()
         await splitRpa(e, want, {
           open: async (name) => {
             const chunks: Buffer[] = []
-            return { write: (c) => void chunks.push(Buffer.from(c)), end: async () => void got.set(name, Buffer.concat(chunks)) }
+            return { write: (c) => void chunks.push(Buffer.from(c)), end: async () => consider(name, Buffer.concat(chunks)) }
           },
         })
-        for (const [n, d] of got) consider(n, d)
         if (info.saveDir) break
       }
     }

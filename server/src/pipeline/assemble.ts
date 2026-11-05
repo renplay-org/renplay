@@ -6,7 +6,6 @@ import { pipeline } from 'node:stream/promises'
 import yauzl from 'yauzl'
 import yazl from 'yazl'
 import type { JobContext } from '../jobs.js'
-import { readAll } from './archive.js'
 import type { PackIndex } from './pack.js'
 import { classify, type Placeholder, type ProgressiveRule } from './progressive.js'
 import { WEB_COMPAT, WEB_COMPAT_PATH } from './webcompat.js'
@@ -159,14 +158,12 @@ export async function copyZipEntries(path: string, into: yazl.ZipFile, skip?: (n
         zip.openReadStream(e, async (err, s) => {
           if (err || !s) return reject(err)
           try {
-            // Buffer small entries; stream big ones (game.zip of a mod base).
-            if (e.uncompressedSize < 32 << 20) {
-              into.addBuffer(await readAll(s), e.fileName, { compress: e.compressionMethod !== 0, mtime: e.getLastModDate() })
-            } else {
-              into.addReadStream(s, e.fileName, { compress: e.compressionMethod !== 0, size: e.uncompressedSize, mtime: e.getLastModDate() })
-            }
+            // Advance only when the output consumed this entry. Even a zip with
+            // thousands of small entries must not queue all their bodies in RAM.
+            s.once('error', reject)
+            s.once('end', () => zip.readEntry())
+            into.addReadStream(s, e.fileName, { compress: e.compressionMethod !== 0, size: e.uncompressedSize, mtime: e.getLastModDate() })
             names.add(e.fileName)
-            zip.readEntry()
           } catch (er) {
             reject(er)
           }

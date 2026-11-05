@@ -30,7 +30,7 @@ export interface Game {
   status: 'installed' | 'not_installed' | 'installing'
   build: string | null
   playUrl: string | null
-  /** What made the game: renpy, or another engine (docs/engines.md). */
+  /** What made the game: renpy, or another engine (docs.renplay.org/engines). */
   family: string
   /** What made it, for other engines: "HTML (SugarCube 2.36.1)". */
   engineLabel: string | null

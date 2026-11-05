@@ -1,4 +1,5 @@
 import sharp from 'sharp'
+import { MAX_IMAGE_PIXELS } from './image-memory.js'
 
 /** One rule of progressive_download.txt: (+ stream / - keep in game.zip, type, pattern). */
 export interface ProgressiveRule {
@@ -117,7 +118,7 @@ export interface Placeholder {
  */
 export async function makePlaceholder(data: Buffer): Promise<Placeholder | null> {
   try {
-    const img = sharp(data, { failOn: 'none', animated: false, limitInputPixels: 16383 * 16383 })
+    const img = sharp(data, { failOn: 'none', animated: false, limitInputPixels: MAX_IMAGE_PIXELS })
     const meta = await img.metadata()
     if (!meta.width || !meta.height) return null
     const { width, height } = meta

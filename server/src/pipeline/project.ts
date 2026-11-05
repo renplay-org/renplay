@@ -7,10 +7,11 @@ import type { JobContext } from '../jobs.js'
 import { Limiter } from '../util/limit.js'
 import { readAll, type ArchiveSource, type SourceEntry } from './archive.js'
 import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit, type GameMeta } from './detect.js'
-import { isOptimizableImage, transcodeImage, type ImagePolicy } from './optimize.js'
+import { MAX_IMAGE_BYTES } from './image-memory.js'
+import { ImageProcessor, isOptimizableImage, type ImagePolicy } from './optimize.js'
 import type { PackWriter } from './pack.js'
-import { classify, makePlaceholder, streamsImage, type Placeholder, type ProgressiveRule } from './progressive.js'
-import { rangeKey, readRpaFile, readRpaIndex, splitRpa, type RpaSink } from './rpa.js'
+import { classify, streamsImage, type Placeholder, type ProgressiveRule } from './progressive.js'
+import { rangeKey, streamRpaFile, readRpaIndex, splitRpa, type RpaSink } from './rpa.js'
 
 export type Layout = { kind: 'project'; root: string } | { kind: 'web'; root: string }
 
@@ -112,6 +113,7 @@ export async function extractProject(
   /** RPA byte range -> [pack, name], to store shared entries once. */
   const ranges = new Map<string, ['assets' | 'zip', string]>()
   const limiter = new Limiter(concurrency)
+  const images = new ImageProcessor()
   const placeholders = new Map<string, Placeholder>()
   const packs = { assets: targets.assets, zip: targets.zip }
   await mkdir(dest, { recursive: true })
@@ -184,22 +186,19 @@ export async function extractProject(
 
   const needsPlaceholder = (g: string) => streamsImage(g, rules)
   const wantsImageTask = (g: string, size: number) =>
-    size < 256 << 20 && ((policy.enabled && isOptimizableImage(g)) || needsPlaceholder(g))
+    size <= MAX_IMAGE_BYTES && ((policy.enabled && isOptimizableImage(g)) || needsPlaceholder(g))
 
   const handleImage = async (g: string, data: Buffer, key?: string) => {
-    const r = await transcodeImage(data, g, policy)
+    const r = await images.process(data, g, policy, needsPlaceholder(g))
     if (r.changed) {
       stats.imagesConverted++
       stats.imageBytesBefore += data.length
       stats.imageBytesAfter += r.data.length
     }
     let pack: 'assets' | 'zip' = 'zip'
-    if (needsPlaceholder(g)) {
-      const ph = await makePlaceholder(r.data)
-      if (ph) {
-        placeholders.set(g, ph)
-        pack = 'assets'
-      }
+    if (r.placeholder) {
+      placeholders.set(g, r.placeholder)
+      pack = 'assets'
     }
     await put(pack, g, r.data)
     if (key) ranges.set(key, [pack, g])
@@ -232,8 +231,15 @@ export async function extractProject(
       inspectSource(buf.toString('utf-8'), meta)
       await put(packFor(g), g, buf)
     } else if (wantsImageTask(g, e.size)) {
-      const buf = await readAll(await e.open())
-      await limiter.run(() => handleImage(g, buf))
+      // Reserve before reading: queued tasks must not retain another whole image.
+      await limiter.acquire()
+      try {
+        const buf = await readAll(await e.open(), MAX_IMAGE_BYTES)
+        limiter.spawn(() => handleImage(g, buf))
+      } catch (err) {
+        limiter.release()
+        throw err
+      }
     } else {
       await streamInto(g, await e.open(), e.size)
     }
@@ -272,12 +278,12 @@ export async function extractProject(
         noteFile(g)
         stats.bytesIn += size
         if (/\.rpy$/i.test(g) && size < 4 << 20)
-          return bufferSink(async (buf) => {
+          return bufferSink(size, async (buf) => {
             inspectSource(buf.toString('utf-8'), meta)
             ranges.set(key, [await put(packFor(g), g, buf), g])
           })
         if (/\.rpyc$/i.test(g) && size < 16 << 20)
-          return bufferSink(async (buf) => {
+          return bufferSink(size, async (buf) => {
             if (!meta.saveDir && /options/i.test(g)) meta.saveDir = saveDirFromRpyc(buf) ?? undefined
             ranges.set(key, [await put(packFor(g), g, buf), g])
           })
@@ -285,7 +291,7 @@ export async function extractProject(
           // Waiting for a slot here throttles the archive stream; the encode itself
           // runs in the background so the next file can be read meanwhile.
           await limiter.acquire()
-          return bufferSink(async (buf) => limiter.spawn(() => handleImage(g, buf, key)))
+          return bufferSink(size, async (buf) => limiter.spawn(() => handleImage(g, buf, key)))
         }
         const pack = packFor(g)
         const w = await packs[pack].begin(g)
@@ -312,9 +318,10 @@ export async function extractProject(
           return
         }
         ctx.log(`Re-reading ${g} from ${archiveRel} (shared or overlapping data)`)
-        const data = await readRpaFile(e, file)
-        if (wantsImageTask(g, data.length)) await handleImage(g, data)
-        else await put(packFor(g), g, data)
+        const size = file.segments.reduce((n, s) => n + s.length + s.prefix.length, 0)
+        const stream = streamRpaFile(e, file)
+        if (wantsImageTask(g, size)) await handleImage(g, await readAll(stream, MAX_IMAGE_BYTES))
+        else await streamInto(g, stream, size)
       },
     })
     tick(e.size - reported, archiveRel)
@@ -352,12 +359,18 @@ function inspectSource(src: string, meta: GameMeta): void {
   }
 }
 
-function bufferSink(done: (buf: Buffer) => Promise<void>): RpaSink {
-  const chunks: Buffer[] = []
+function bufferSink(size: number, done: (buf: Buffer) => Promise<void>): RpaSink {
+  const data = Buffer.allocUnsafe(size)
+  let offset = 0
   return {
     write(c) {
-      chunks.push(Buffer.from(c))
+      if (offset + c.length > size) throw new Error('RPA entry exceeds declared size')
+      c.copy(data, offset)
+      offset += c.length
     },
-    end: () => done(Buffer.concat(chunks)),
+    end: async () => {
+      if (offset !== size) throw new Error('RPA entry ended before declared size')
+      await done(data)
+    },
   }
 }

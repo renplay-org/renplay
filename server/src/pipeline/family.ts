@@ -5,7 +5,7 @@ import { detectLayout, type Layout } from './project.js'
 /**
  * Engine families. Ren'Py is what Renplay is for; the others are recognized so
  * a download says what it is, and some of them install (see INSTALLABLE).
- * docs/engines.md has the plan for each.
+ * docs.renplay.org/engines has the plan for each.
  */
 export type Family = 'renpy' | 'html' | 'godot' | 'unity' | 'rpgmaker-rgss' | 'wolf' | 'kirikiri' | 'unreal' | 'gamemaker' | 'flash'
 

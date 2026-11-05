@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import SceneCard from '../components/SceneCard'
+import DocsLink from '../components/DocsLink'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Cover } from '../components/GameCard'
@@ -65,6 +66,11 @@ export default function Player() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: game, isLoading } = useGame(gameId)
+
+  useEffect(() => {
+    document.title = game ? `${game.title} · Renplay` : 'Renplay'
+    return () => { document.title = 'Renplay' }
+  }, [game?.title])
 
   const shellRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -716,6 +722,7 @@ function HomeScreenHelp() {
   return (
     <div className="space-y-4 text-sm text-zinc-300">
       <p>Safari on iPhone only lets videos go full screen. Renplay can fill the whole screen when you open it from your home screen:</p>
+      <DocsLink path="guides/playing/">Playing on iPhone</DocsLink>
       <ol className="space-y-3">
         <li className="flex items-center gap-3">
           <Share className="size-5 shrink-0 text-accent-300" />

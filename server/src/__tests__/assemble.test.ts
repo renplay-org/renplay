@@ -1,15 +1,16 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import yazl from 'yazl'
 import { createWriteStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
+import { Writable } from 'node:stream'
 import type { JobContext } from '../jobs.js'
 import { openZip, readAll } from '../pipeline/archive.js'
 import yauzl from 'yauzl'
-import { assemble } from '../pipeline/assemble.js'
+import { assemble, copyZipEntries } from '../pipeline/assemble.js'
 import { PackReader, PackWriter, writeIndex } from '../pipeline/pack.js'
 import { buildRules, excluder, makePlaceholder, parseRules } from '../pipeline/progressive.js'
 
@@ -103,6 +104,41 @@ describe('assemble', () => {
     const reader = new PackReader(join(dir, 'assets.pack'), join(dir, 'assets.json'))
     expect((await reader.read('movies/intro.webm'))?.toString()).toBe('webm')
     expect((await reader.read('images/bg copy.png'))?.equals(png)).toBe(true)
+  })
+
+  it('copies many zip entries as streams, with only one source body active at a time', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'asm-backpressure-'))
+    try {
+      const source = new yazl.ZipFile()
+      const data = Buffer.alloc(128 << 10, 0x61)
+      for (let i = 0; i < 30; i++) source.addBuffer(data, `with spaces/file ${i}`, { compress: i % 2 === 0 })
+      source.end()
+      const path = join(dir, 'source.zip')
+      await pipeline(source.outputStream, createWriteStream(path))
+      const dest = new yazl.ZipFile()
+      const addBuffer = vi.spyOn(dest, 'addBuffer')
+      const original = dest.addReadStream.bind(dest)
+      let active = 0
+      let peak = 0
+      const addStream = vi.spyOn(dest, 'addReadStream').mockImplementation((stream, name, options) => {
+        active++
+        peak = Math.max(peak, active)
+        stream.once('end', () => { active-- })
+        original(stream, name, options)
+      })
+      const written = pipeline(dest.outputStream, new Writable({
+        highWaterMark: 1024,
+        write(_chunk, _encoding, cb) { setImmediate(cb) },
+      }))
+      expect((await copyZipEntries(path, dest)).size).toBe(30)
+      dest.end()
+      await written
+      expect(addStream).toHaveBeenCalledTimes(30)
+      expect(addBuffer).not.toHaveBeenCalled()
+      expect(peak).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('matches exclude globs relative to game/', () => {

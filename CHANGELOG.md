@@ -7,6 +7,26 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-11-05
+
+### Added
+
+- Documentation at docs.renplay.org: installing on each platform, adding and playing games,
+  every setting, upgrading and troubleshooting. The app links to the matching page from
+  Settings, the empty library, Add games, Activity and the iPhone full-screen help.
+
+### Changed
+
+- The browser tab shows the game's title while you play.
+
+### Fixed
+
+- Installs use far less memory. Games with thousands of high-resolution images or large videos
+  no longer run out of memory (Fresh Women Season 2 did at 4 GB). Unusually large images stay
+  in their original format.
+- Install logs survive a restart or crash, so an interrupted install still shows what happened.
+  Clearing finished activity removes its logs too.
+
 ## [2.10.0] - 2026-11-04
 
 ### Added
@@ -30,6 +50,8 @@ release notes say what).
 
 ### Changed
 
+- The documentation has its own site, docs.renplay.org, with install guides, a configuration
+  reference for every environment variable, upgrading, troubleshooting and a FAQ.
 - Renplay moved to its own domain, renplay.org. It reads the catalog from catalog.renplay.org and
   engines from engines.renplay.org, and its links go through renplay.org. **Upgrade to this
   version:** older versions read both from addresses that no longer exist, so they cannot refresh
@@ -296,7 +318,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.10.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.11.0...dev
+[2.11.0]: https://github.com/renplay-org/renplay/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/renplay-org/renplay/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/renplay-org/renplay/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/renplay-org/renplay/compare/v2.8.0...v2.9.0
