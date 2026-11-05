@@ -428,7 +428,7 @@ Default: empty
 
 </div>
 
-Exact groups claim value granting Admin. When set, role follows group membership at each OIDC sign-in and cannot be edited in Users.
+Exact groups claim value granting Admin. Provider grants follow membership at each OIDC sign-in, even for the last admin. Admin access assigned in Users is kept.
 
 </div>
 
@@ -456,7 +456,7 @@ Default: empty
 
 </div>
 
-Comma-separated provider usernames or verified OIDC emails granted Admin when no admin group/filter is configured. LDAP email is not treated as verified.
+Comma-separated provider usernames or verified OIDC emails granted Admin when no admin group/filter is configured. Grants are checked at each sign-in and removed on unlink. Admin access assigned in Users is kept. LDAP email is not treated as verified.
 
 </div>
 
@@ -610,7 +610,7 @@ Default: empty
 
 </div>
 
-Filter evaluated against the authenticated user entry, such as memberOf=cn=renplay-admins,ou=groups,dc=example,dc=org. Controls role at each LDAP sign-in.
+Filter evaluated against the authenticated user entry, such as memberOf=cn=renplay-admins,ou=groups,dc=example,dc=org. Provider grants follow membership at each LDAP sign-in, even for the last admin. Admin access assigned in Users is kept.
 
 </div>
 

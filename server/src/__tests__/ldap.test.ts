@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import request from 'supertest'
 import sharp from 'sharp'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { Client } from 'ldapts'
 import { escapeLdapFilter } from '../sign-in-providers.js'
 import { signInFixture, site } from './sign-in-fixture.js'
 
@@ -35,6 +36,27 @@ describe.skipIf(!process.env.RENPLAY_TEST_LLDAP)('LDAP against real LLDAP', () =
     for (const id of ['reader', 'both']) await gql(`mutation { deleteUser(userId: "${id}") { ok } }`)
     for (const id of [adminGroup, adultGroup]) if (id) await gql(`mutation { deleteGroup(groupId: ${id}) { ok } }`)
   })
+  it('gives missing users and wrong passwords the same error and comparable failure time', async () => {
+    const times: Record<string, number[]> = { reader: [], missing: [] }
+    const errors: unknown[] = [], binds = vi.spyOn(Client.prototype, 'bind')
+    try {
+      for (let i = 0; i < 3; i++) for (const login of ['reader', 'missing']) {
+        binds.mockClear()
+        const started = performance.now()
+        try { await app.accounts.providers.ldap(login, 'wrong password'); throw new Error('Unexpected sign-in') }
+        catch (error) { errors.push((error as Error).message) }
+        times[login]!.push(performance.now() - started)
+        expect(binds.mock.calls.map(call => call[0])).toEqual(login === 'missing' ? [app.cfg.ldapBindDn] : [app.cfg.ldapBindDn, 'uid=reader,ou=people,dc=example,dc=org'])
+      }
+    } finally { binds.mockRestore() }
+    expect(new Set(errors)).toEqual(new Set(['The username or password is wrong']))
+    const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length
+    const present = mean(times.reader!), missing = mean(times.missing!)
+    console.log('LDAP failure timing (ms)', { present, missing })
+    expect(Math.max(present, missing) / Math.min(present, missing)).toBeLessThan(1.3)
+    expect(Math.min(present, missing)).toBeGreaterThanOrEqual(450)
+    expect(Math.abs(present - missing)).toBeLessThan(150)
+  })
   it('authenticates, claims owner, maps filters, and removes mapped permissions on subsequent sign-in', async () => {
     const agent = request.agent(app.app)
     await agent.post('/api/auth/login').set(site).send({ username: 'reader', password: 'wrong' }).expect(401)
@@ -48,6 +70,12 @@ describe.skipIf(!process.env.RENPLAY_TEST_LLDAP)('LDAP against real LLDAP', () =
     await local.post('/api/auth/login').set(site).send({ username: 'both', password: 'local password' }).expect(200)
     await local.post('/api/me/identities/ldap').set(site).send({ username: 'both', password }).expect(200)
     expect((await local.get('/api/me/identities')).body.identities).toHaveLength(2)
+    app.cfg.authLocal = false
+    await local.post('/api/auth/login').set(site).send({ username: 'both', password }).expect(200)
+    const linked = (await local.get('/api/me/identities')).body.identities.find((i: { provider: string }) => i.provider !== 'local')
+    expect(linked).toMatchObject({ available: true, removable: false })
+    await local.delete('/api/me/identities').set(site).send({ provider: app.accounts.providers.ldapProvider, subject: linked.subject }).expect(409)
+    app.cfg.authLocal = true
     await agent.post('/api/me/identities/ldap').set(site).send({ username: 'both', password }).expect(409)
     await gql(`mutation { removeUserFromGroup(userId: "reader", groupId: ${adminGroup}) { ok } }`)
     await gql(`mutation { removeUserFromGroup(userId: "reader", groupId: ${adultGroup}) { ok } }`)

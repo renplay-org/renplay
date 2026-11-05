@@ -12,6 +12,7 @@ export interface Account {
   adult_access: number
   prefs: string
   avatar?: string
+  admin_source?: 'manual' | 'provider' | 'allowlist'
   roleManaged?: boolean
   adultManaged?: boolean
 }

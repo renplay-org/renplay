@@ -61,7 +61,7 @@ export function playerRoute(method: string, path: string): boolean {
 export class Accounts {
   readonly enabled: boolean
   readonly providers: SignInProviders
-  private readonly oidcFlows = new Map<string, { nonce: string; verifier: string; expires: number; session?: string; user?: number }>()
+  private readonly oidcFlows = new Map<string, { nonce: string; verifier: string; expires: number; session?: string; user?: number; bearer?: boolean }>()
   private setupCode = randomBytes(9).toString('hex').toUpperCase()
   private attempts = 10
   private setupGrant = ''
@@ -75,7 +75,7 @@ export class Accounts {
     this.enabled = (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
   }
-  get unclaimed(): boolean { return !(this.db.raw.prepare('SELECT 1 FROM identities WHERE user_id = 1').get()) }
+  get unclaimed(): boolean { return !this.db.raw.prepare('SELECT 1 FROM identities WHERE user_id = 1').get() && !this.db.raw.prepare("SELECT 1 FROM settings WHERE key = 'owner_claim'").get() }
   user(id: number): User {
     const u = this.db.raw.prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as User | undefined
     if (!u) throw new HttpError(404, 'User not found')
@@ -106,6 +106,8 @@ export class Accounts {
     await writeFile(join(root, 'user.json'), JSON.stringify({ id: u.id, name: u.name, created: u.created_at }) + '\n')
   }
   async init(): Promise<void> {
+    // A process interrupted during copying keeps all saves and can retry after restart.
+    this.db.raw.prepare("DELETE FROM settings WHERE key = 'owner_claim'").run()
     this.dummyPassword = await passwordHash(random())
     await this.providers.init()
     if (this.enabled && !this.cfg.authLocal && !this.cfg.oidcIssuer && !this.cfg.ldapUrl) throw new Error('No sign-in provider is enabled. Enable RENPLAY_AUTH_LOCAL or configure OIDC or LDAP.')
@@ -168,6 +170,13 @@ export class Accounts {
       cached.touched = now; cached.expires = now + DAYS30
     }
     return { user: u, session: key, bearer: false }
+  }
+  private requireLiveLink(user: number, session: string, bearer = false): void {
+    const row = bearer
+      ? this.db.raw.prepare('SELECT user_id FROM tokens WHERE hash = ?').get(session)
+      : this.db.raw.prepare('SELECT user_id FROM sessions WHERE hash = ? AND expires_at > ?').get(session, Date.now())
+    const liveUser = this.db.raw.prepare('SELECT disabled FROM users WHERE id = ?').get(user)
+    if (!this.enabled || !row || row.user_id !== user || !liveUser || liveUser.disabled) throw new HttpError(401, 'Sign in to the same account before linking')
   }
   private authenticate(req: Request, res: Response): Viewer | null {
     if (!this.enabled) return { user: this.user(this.cfg.authUser), session: `off-${this.cfg.authUser}`, bearer: false }
@@ -281,14 +290,25 @@ export class Accounts {
   private managed(id: number) {
     const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)
     const oidc = identities.some(i => i.provider === this.providers.oidcProvider), ldap = identities.some(i => i.provider === this.providers.ldapProvider)
-    return { roleManaged: !!(oidc && this.cfg.oidcAdminGroup || ldap && this.cfg.ldapAdminFilter), adultManaged: !!(oidc && this.cfg.oidcAdultGroup || ldap && this.cfg.ldapAdultFilter) }
+    const u = this.user(id)
+    return { roleManaged: !(u.role === 'admin' && u.admin_source === 'manual') && !!(oidc && this.cfg.oidcAdminGroup || ldap && this.cfg.ldapAdminFilter), adultManaged: !!(oidc && this.cfg.oidcAdultGroup || ldap && this.cfg.ldapAdultFilter) }
   }
-  private async external(identity: ExternalIdentity, linking?: number): Promise<number> {
+  private methodAvailable(id: number, provider: string, subject: string, removingLocal = ''): boolean {
+    if (provider === 'local') return this.cfg.authLocal
+    if (provider === this.providers.oidcProvider) return !!this.cfg.oidcIssuer
+    if (provider !== this.providers.ldapProvider || !this.cfg.ldapUrl) return false
+    const metadata = this.db.raw.prepare('SELECT username FROM identity_metadata WHERE provider = ? AND subject = ?').get(provider, subject)
+    if (!metadata) return false
+    const login = String(metadata.username).toLowerCase().slice(0, 64)
+    const local = this.db.raw.prepare("SELECT user_id FROM identities WHERE provider = 'local' AND subject = ?").get(login)
+    return login === removingLocal || !local || !this.cfg.authLocal && local.user_id === id
+  }
+  private async external(identity: ExternalIdentity, linking?: { user: number; session: string; bearer?: boolean }): Promise<number> {
     const existing = this.db.raw.prepare('SELECT user_id FROM identities WHERE provider = ? AND subject = ?').get(identity.provider, identity.subject) as { user_id: number } | undefined
-    if (linking && existing && existing.user_id !== linking) throw new HttpError(409, 'That sign-in belongs to another account. Accounts are never merged automatically.')
+    if (linking && existing && existing.user_id !== linking.user) throw new HttpError(409, 'That sign-in belongs to another account. Accounts are never merged automatically.')
     if (existing && this.user(existing.user_id).disabled) throw new HttpError(403, 'This account is disabled')
     if (!existing && !linking && identity.provider === this.providers.oidcProvider && !this.cfg.oidcAutoCreate) throw new HttpError(403, 'Ask an admin to link this sign-in to an account first')
-    let id = linking ?? existing?.user_id
+    let id = linking?.user ?? existing?.user_id
     const newOwner = id === undefined && identity.admin && this.unclaimed
     this.db.raw.exec('BEGIN IMMEDIATE')
     try {
@@ -302,11 +322,18 @@ export class Accounts {
         const unique = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login) ? `${login}-${signInRandom().slice(0, 8)}` : login
         id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, adult_access, created_at) VALUES (?, ?, ?, ?, ?)').run(unique, identity.name.slice(0, 100), identity.admin ? 'admin' : 'player', Number(identity.adult ?? (identity.admin || this.cfg.adultDefault)), new Date().toISOString()).lastInsertRowid)
       }
+      if (linking) this.requireLiveLink(linking.user, linking.session, linking.bearer)
       if (!existing) this.db.raw.prepare('INSERT INTO identities (provider, subject, user_id) VALUES (?, ?, ?)').run(identity.provider, identity.subject, id!)
+      this.db.raw.prepare('INSERT INTO identity_metadata VALUES (?, ?, ?) ON CONFLICT(provider, subject) DO UPDATE SET username = excluded.username').run(identity.provider, identity.subject, identity.username)
       const u = this.user(id!)
-      if (identity.roleManaged || identity.admin && !this.managed(id!).roleManaged) {
-        // Provider revocation must take effect even for the last admin; recovery is through the provider.
-        this.db.raw.prepare('UPDATE users SET role = ? WHERE id = ?').run(identity.admin ? 'admin' : 'player', id!)
+      const manuallyAssigned = !newOwner && (linking !== undefined || existing !== undefined) && u.role === 'admin' && u.admin_source === 'manual'
+      const sameGrant = u.admin_provider === identity.provider && u.admin_subject === identity.subject
+      if (!manuallyAssigned && (identity.roleManaged || identity.admin || sameGrant)) {
+        if (u.role === 'admin' && !identity.admin && !u.disabled) {
+          const { n } = this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }
+          if (n <= 1) console.warn(`Last enabled admin ${id!} lost the sign-in provider admin grant. Restore provider group membership or configure RENPLAY_ADMINS without an admin group or filter to recover access.`)
+        }
+        this.db.raw.prepare('UPDATE users SET role = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = ?').run(identity.admin ? 'admin' : 'player', identity.roleManaged ? 'provider' : 'allowlist', identity.provider, identity.subject, id!)
       }
       if (identity.adultManaged) this.db.raw.prepare('UPDATE users SET adult_access = ? WHERE id = ?').run(Number(identity.adult), id!)
       if (u.disabled) throw new HttpError(403, 'This account is disabled')
@@ -328,7 +355,7 @@ export class Accounts {
     for (const [key, flow] of this.oidcFlows) if (flow.expires < Date.now()) this.oidcFlows.delete(key)
     if (this.oidcFlows.size >= 10000) throw new HttpError(429, 'Too many sign-in attempts')
     const state = signInRandom(), nonce = signInRandom(), verifier = signInRandom()
-    this.oidcFlows.set(hash(state), { nonce, verifier, expires: Date.now() + 600000, ...(linking ? { session: viewer()!.session, user: this.current().id } : {}) })
+    this.oidcFlows.set(hash(state), { nonce, verifier, expires: Date.now() + 600000, ...(linking ? { session: viewer()!.session, user: this.current().id, bearer: viewer()!.bearer } : {}) })
     res.cookie('renplay_oidc', state, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/api/auth/oidc', maxAge: 600000 })
     return this.providers.authorization(state, nonce, verifier)
   }
@@ -337,6 +364,7 @@ export class Accounts {
     r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.cfg.authLocal && this.unclaimed, local: this.cfg.authLocal || !!this.cfg.ldapUrl, oidc: this.cfg.oidcIssuer ? this.cfg.oidcName : null, ldap: !!this.cfg.ldapUrl }))
     r.get('/auth/oidc/start', (req, res) => res.redirect(this.beginOidc(req, res)))
     r.get('/auth/oidc/callback', async (req, res) => {
+      if (!this.enabled || !this.cfg.oidcIssuer) throw new HttpError(403, 'Single sign-on is off')
       const state = typeof req.query.state === 'string' ? req.query.state : ''
       const cookie = req.get('cookie')?.match(/(?:^|;\s*)renplay_oidc=([^;]+)/)?.[1]
       const flow = this.oidcFlows.get(hash(state))
@@ -346,7 +374,7 @@ export class Accounts {
       if (flow.user && (viewer()?.session !== flow.session || this.current().id !== flow.user)) throw new HttpError(401, 'Sign in to the same account before linking')
       let identity: ExternalIdentity
       try { identity = await this.providers.oidc(req.query.code, flow.nonce, flow.verifier) } catch { throw new HttpError(401, 'Single sign-on failed. Try again.') }
-      const id = await this.external(identity, flow.user)
+      const id = await this.external(identity, flow.user ? { user: flow.user, session: flow.session!, bearer: flow.bearer } : undefined)
       if (!flow.user) this.newSession(req, res, id)
       res.redirect(flow.user ? '/account' : '/')
     })
@@ -355,21 +383,28 @@ export class Accounts {
       if (!this.cfg.ldapUrl) throw new HttpError(403, 'LDAP is off')
       this.limit(`ip:${req.ip}`)
       this.limit(`ldap:${String(req.body?.username).toLowerCase()}`)
-      await this.external(await this.providers.ldap(req.body?.username, req.body?.password), this.current().id)
+      const initiating = viewer()!
+      const identity = await this.providers.ldap(req.body?.username, req.body?.password)
+      await this.external(identity, { user: initiating.user.id, session: initiating.session, bearer: initiating.bearer })
       res.json({ ok: true })
     })
-    r.get('/me/identities', (_req, res) => res.json({ identities: this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(this.current().id).map(i => ({ ...i, name: i.provider === 'local' ? 'Password' : String(i.provider).startsWith('oidc:') ? this.cfg.oidcName : 'LDAP', available: i.provider === 'local' ? this.cfg.authLocal : i.provider === this.providers.oidcProvider ? !!this.cfg.oidcIssuer : i.provider === this.providers.ldapProvider && !!this.cfg.ldapUrl })) }))
+    r.get('/me/identities', (_req, res) => {
+      const id = this.current().id, methods = this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(id)
+      res.json({ identities: methods.map(i => ({ ...i, name: i.provider === 'local' ? 'Password' : String(i.provider).startsWith('oidc:') ? this.cfg.oidcName : 'LDAP', available: this.methodAvailable(id, String(i.provider), String(i.subject)), removable: methods.some(other => (other.provider !== i.provider || other.subject !== i.subject) && this.methodAvailable(id, String(other.provider), String(other.subject), i.provider === 'local' ? String(i.subject) : '')) })) })
+    })
     r.delete('/me/identities', (req, res) => {
       const id = this.current().id, provider = req.body?.provider, subject = req.body?.subject
       const methods = this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(id)
       if (typeof provider !== 'string' || typeof subject !== 'string' || !methods.some(i => i.provider === provider && i.subject === subject)) throw new HttpError(404, 'Linked sign-in not found')
-      const remaining = methods.filter(i => i.provider !== provider || i.subject !== subject).filter(i => i.provider === 'local' ? this.cfg.authLocal : i.provider === this.providers.oidcProvider ? !!this.cfg.oidcIssuer : i.provider === this.providers.ldapProvider && !!this.cfg.ldapUrl)
+      const remaining = methods.filter(i => i.provider !== provider || i.subject !== subject).filter(i => this.methodAvailable(id, String(i.provider), String(i.subject), provider === 'local' ? subject : ''))
       if (!remaining.length) throw new HttpError(409, 'Keep at least one enabled way to sign in')
-      const roleManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdminGroup || provider === this.providers.ldapProvider && !!this.cfg.ldapAdminFilter
+      const u = this.user(id)
+      const roleManaged = u.admin_source !== 'manual' && u.admin_provider === provider && u.admin_subject === subject
       const adultManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdultGroup || provider === this.providers.ldapProvider && !!this.cfg.ldapAdultFilter
-      if (roleManaged) { this.guardLastAdmin(this.current(), { role: 'player' }); this.db.raw.prepare("UPDATE users SET role = 'player' WHERE id = ?").run(id) }
+      if (roleManaged) { this.guardLastAdmin(u, { role: 'player' }); this.db.raw.prepare("UPDATE users SET role = 'player', admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(id) }
       if (adultManaged) this.db.raw.prepare('UPDATE users SET adult_access = 0 WHERE id = ?').run(id)
       this.db.raw.prepare('DELETE FROM identities WHERE user_id = ? AND provider = ? AND subject = ?').run(id, provider, subject)
+      this.db.raw.prepare('DELETE FROM identity_metadata WHERE provider = ? AND subject = ?').run(provider, subject)
       this.revoke(id, viewer()!.session); res.json({ ok: true })
     })
     r.post('/me/avatar', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '2mb' }), async (req, res) => {
@@ -402,9 +437,14 @@ export class Accounts {
       const login = typeof req.body?.username === 'string' ? req.body.username.toLowerCase().slice(0, 64) : ''
       this.limit(`user:${login}`)
       const row = this.db.raw.prepare("SELECT user_id, password FROM identities WHERE provider = 'local' AND subject = ?").get(login) as { user_id: number; password: string } | undefined
-      // A local username reserves that name, even if its password is wrong or local sign-in is off.
-      if (!row && this.cfg.ldapUrl) {
-        const id = await this.external(await this.providers.ldap(req.body?.username, req.body?.password))
+      // With local sign-in off, a reserved name can use only its explicitly linked LDAP identity.
+      if ((!row || !this.cfg.authLocal) && this.cfg.ldapUrl) {
+        const identity = await this.providers.ldap(req.body?.username, req.body?.password)
+        if (row) {
+          const linked = this.db.raw.prepare('SELECT user_id FROM identities WHERE provider = ? AND subject = ?').get(identity.provider, identity.subject)
+          if (linked?.user_id !== row.user_id) throw new HttpError(401, 'The username or password is wrong')
+        }
+        const id = await this.external(identity)
         this.newSession(req, res, id); res.json({ ok: true }); return
       }
       const valid = this.cfg.authLocal && await passwordMatches(req.body?.password, row?.password ?? this.dummyPassword)
@@ -487,6 +527,7 @@ export class Accounts {
       if (b.role !== undefined && managed.roleManaged || b.adultAccess !== undefined && managed.adultManaged) throw new HttpError(409, 'This permission is set by the sign-in provider')
       this.guardLastAdmin(target, b)
       this.db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ?, adult_access = ? WHERE id = ?').run(b.name === undefined ? target.name : name(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), b.adultAccess === undefined ? target.adult_access : Number(b.adultAccess), target.id)
+      if (b.role !== undefined) this.db.raw.prepare("UPDATE users SET admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(target.id)
       this.invalidate(); await this.tag(this.user(target.id)); res.json({ user: this.user(target.id) })
     })
     r.post('/users/:id/password', async (req, res) => {
@@ -532,6 +573,7 @@ export class Accounts {
         await rename(source, destination)
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
+          this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
           for (const table of ['sessions', 'tokens', 'identities', 'user_games']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
           this.db.raw.exec('COMMIT')
@@ -553,19 +595,31 @@ export class Accounts {
       if (!this.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
       if (u.id === 1) throw new HttpError(409, 'Use the setup code to choose the owner password')
       if (u.id === this.cfg.authUser) throw new HttpError(409, 'Choose the owner as RENPLAY_AUTH_USER before claiming it')
-      await this.copy(u.id, 1)
-      this.mergeProgress(u.id, 1)
+      const reservation = random()
       this.db.raw.exec('BEGIN IMMEDIATE')
       try {
-        this.db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
-        this.db.raw.prepare('UPDATE users SET username = ?, name = ?, adult_access = ?, avatar = ?, avatar_uploaded = ? WHERE id = 1').run(u.username, u.name, u.adult_access, u.avatar, u.avatar_uploaded)
-        this.db.raw.prepare('UPDATE identities SET user_id = 1 WHERE user_id = ?').run(u.id)
-        this.db.raw.prepare('UPDATE sessions SET user_id = 1 WHERE hash = ?').run(session)
+        if (!this.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
+        this.db.setSetting('owner_claim', reservation)
         this.db.raw.exec('COMMIT')
-      } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
-      await remove(u.id)
-      await this.tag(this.user(1)); this.setupCode = ''; this.setupGrant = ''; this.invalidate()
-      res.json({ ok: true })
+      } catch (error) { this.db.raw.exec('ROLLBACK'); throw error }
+      try {
+        await this.copy(u.id, 1)
+        this.db.raw.exec('BEGIN IMMEDIATE')
+        try {
+          this.mergeProgress(u.id, 1)
+          this.db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
+          this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', adult_access = ?, avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(u.username, u.name, u.adult_access, u.avatar, u.avatar_uploaded, u.admin_source, u.admin_provider, u.admin_subject)
+          this.db.raw.prepare('UPDATE identities SET user_id = 1 WHERE user_id = ?').run(u.id)
+          this.db.raw.prepare('UPDATE sessions SET user_id = 1 WHERE hash = ?').run(session)
+          this.db.raw.prepare('UPDATE tokens SET user_id = 1 WHERE hash = ?').run(session)
+          this.db.raw.exec('COMMIT')
+        } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
+        await remove(u.id)
+        await this.tag(this.user(1)); this.setupCode = ''; this.setupGrant = ''; this.invalidate()
+        res.json({ ok: true })
+      } finally {
+        this.db.raw.prepare("DELETE FROM settings WHERE key = 'owner_claim' AND value = ?").run(JSON.stringify(reservation))
+      }
     })
     r.post('/users/:id/merge', async (req, res) => {
       const id = Number(req.params.id), target = Number(req.body?.target)

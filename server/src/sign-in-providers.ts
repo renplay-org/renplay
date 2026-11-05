@@ -1,4 +1,5 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
+import { setTimeout as delay } from 'node:timers/promises'
 import { readFileSync } from 'node:fs'
 import { Client } from 'ldapts'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
@@ -69,7 +70,7 @@ export class SignInProviders {
     if (!tokens.id_token) throw new HttpError(401, 'No identity token was returned')
     const { payload: p } = await jwtVerify(tokens.id_token, this.jwks, { issuer: this.cfg.oidcIssuer, audience: this.cfg.oidcClientId, algorithms: ['RS256', 'ES256'], requiredClaims: ['exp', 'iat', 'sub', 'nonce'] })
     if (p.nonce !== nonce || !p.sub || (Array.isArray(p.aud) && p.aud.length > 1 && p.azp !== this.cfg.oidcClientId) || (p.azp !== undefined && p.azp !== this.cfg.oidcClientId)) throw new HttpError(401, 'The sign-in response does not match this request')
-    const groups = Array.isArray(p.groups) ? p.groups.filter((s): s is string => typeof s === 'string') : []
+    const groups: string[] = Array.isArray(p.groups) && p.groups.every(s => typeof s === 'string') ? p.groups : []
     const login = text(p.preferred_username) || p.sub
     const admin = this.cfg.oidcAdminGroup ? groups.includes(this.cfg.oidcAdminGroup) : this.isAdmin(login, text(p.email), p.email_verified === true)
     return { provider: this.oidcProvider, subject: p.sub, username: login, name: text(p.name) || login, admin, adult: this.cfg.oidcAdultGroup ? groups.includes(this.cfg.oidcAdultGroup) : undefined, roleManaged: !!this.cfg.oidcAdminGroup, adultManaged: !!this.cfg.oidcAdultGroup, picture: text(p.picture) || undefined }
@@ -87,11 +88,19 @@ export class SignInProviders {
   }
   async ldap(username: unknown, password: unknown): Promise<ExternalIdentity> {
     if (typeof username !== 'string' || !username || username.length > 256 || typeof password !== 'string' || !password || password.length > 1024) throw new HttpError(401, 'The username or password is wrong')
+    const started = performance.now()
     const c = this.cfg, client = await this.ldapClient()
     try {
       await client.bind(c.ldapBindDn, c.ldapBindPassword)
       const { searchEntries } = await client.search(c.ldapBaseDn, { scope: 'sub', filter: c.ldapUserFilter.replaceAll('{username}', escapeLdapFilter(username)), sizeLimit: 2, attributes: [c.ldapUsernameAttribute, c.ldapNameAttribute, 'cn', c.ldapEmailAttribute, c.ldapPhotoAttribute, 'entryUUID'], explicitBufferAttributes: [c.ldapPhotoAttribute] })
-      if (searchEntries.length !== 1) throw new Error('User not found')
+      if (searchEntries.length !== 1) {
+        // Local dummy verification avoids another bind that could lock a directory account.
+        await new Promise<void>((resolve, reject) => scrypt(password, 'Renplay LDAP dummy verification', 64, { N: 32768, r: 8, p: 1, maxmem: 64 << 20 }, (error, key) => {
+          if (error) reject(error)
+          else { timingSafeEqual(key, Buffer.alloc(64)); resolve() }
+        }))
+        throw new Error('User not found')
+      }
       const entry = searchEntries[0]!
       await client.bind(entry.dn, password)
       // Group checks use the service account, not the user's directory permissions.
@@ -107,8 +116,11 @@ export class SignInProviders {
       const attr = (key: string) => { const v = entry[key]; return Array.isArray(v) ? v[0] : v }
       const login = text(attr(c.ldapUsernameAttribute)) || username
       return { provider: this.ldapProvider, subject: text(attr('entryUUID')) || entry.dn, username: login, name: text(attr(c.ldapNameAttribute)) || text(attr('cn')) || login, admin: c.ldapAdminFilter ? await matches(c.ldapAdminFilter) : this.isAdmin(login, '', false), adult: c.ldapAdultFilter ? await matches(c.ldapAdultFilter) : undefined, roleManaged: !!c.ldapAdminFilter, adultManaged: !!c.ldapAdultFilter, picture: Buffer.isBuffer(attr(c.ldapPhotoAttribute)) ? attr(c.ldapPhotoAttribute) as Buffer : undefined }
-    } catch { throw new HttpError(401, 'The username or password is wrong') }
-    finally { await client.unbind().catch(() => {}) }
+    } catch {
+      // Pad both failure paths beyond normal directory verification time.
+      await delay(Math.max(0, 500 - (performance.now() - started)))
+      throw new HttpError(401, 'The username or password is wrong')
+    } finally { await client.unbind().catch(() => {}) }
   }
 }
 export const signInRandom = () => randomBytes(32).toString('base64url')

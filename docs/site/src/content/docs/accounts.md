@@ -95,7 +95,10 @@ claim a local owner before disabling local sign-in in that mode.
 
 `RENPLAY_ADMINS` is a comma-separated list of provider usernames or emails. An email only counts
 when the OIDC token has `email_verified: true`. An admin group, when configured, takes precedence
-over this list. Changing an email or name never links accounts.
+over this list. Changing an email or name never links accounts. Allowlist grants are checked again
+at each sign-in through that identity and removed when it is unlinked. Removing someone from the
+list takes effect at their next provider sign-in. Admin access assigned in **Users** is independent
+and is never removed by provider sign-in.
 
 ### Pocket ID
 
@@ -182,36 +185,51 @@ Changing the directory URL or base DN creates a different provider; link it expl
 LDAP emails do not carry OIDC's verification proof, so use usernames, not emails, in
 `RENPLAY_ADMINS` for directory admins.
 
-**A local username always takes precedence.** If it exists locally, a wrong local password does
-not fall through to LDAP, even if the directory has the same username. If local authentication
-is disabled, that name remains reserved: link the directory identity explicitly while signed in
-before disabling local sign-in. Renplay never silently merges a local and directory account.
-Other directory users are created on first sign-in.
+**An enabled local username takes precedence.** If it exists locally, a wrong local password does
+not fall through to LDAP, even if the directory has the same username. When local authentication
+is disabled, that username can use LDAP only if the authenticated directory identity is already
+explicitly linked to the same Renplay account. Link it while signed in before disabling local
+sign-in. Renplay never silently merges a local and directory account. Other directory users are
+created on first sign-in.
 
 ### Group-driven permissions
 
-Configured admin and adult groups/filters own their respective permissions. They are refreshed at
-every sign-in through that provider, including revocations. **Users** labels those permissions as
-set by the sign-in provider and does not allow editing them. An absent groups claim grants neither
-permission. A configured adult group can restrict even the owner; instance-wide blocking always
-wins. With several linked providers, the last provider sign-in that manages a permission sets it.
-Local password sign-in does not refresh directory groups. Changes are applied at the next provider
-sign-in, not continuously in the background. Revoking the last provider-managed admin is allowed;
-restore membership in the provider to recover access.
+Configured admin and adult groups/filters set their respective provider grants. They are refreshed
+at every sign-in through that provider, including revocations. **Users** shows whether admin access
+was assigned in Renplay, granted by `RENPLAY_ADMINS`, or set by a provider group. Provider-managed
+permissions cannot be edited there. Admin access assigned directly in **Users** is kept across all
+provider sign-ins and unlinking. Missing or malformed groups grant neither permission. A configured
+adult group can restrict even the owner. Instance-wide blocking always wins. With several linked
+providers, the last provider sign-in that manages a permission sets it, unless admin access was
+assigned directly in Renplay. Local password sign-in does not refresh directory groups. Changes
+are applied at the next provider sign-in, not continuously in the background.
+
+Revoking the last provider-managed admin still removes admin access. Renplay logs a warning.
+To recover, add that person back to the provider's admin group and sign in again. Alternatively,
+remove that provider's admin group/filter setting, add the person's provider username or verified
+OIDC email to `RENPLAY_ADMINS`, restart Renplay, and sign in again. The group/filter takes precedence
+while it is configured. Prefer groups or verified emails when people can choose their own usernames.
 
 The first new SSO admin claims the unclaimed owner and its existing saves. An admin who already
 signed in before becoming an admin can use **Account → Claim the owner account** while it remains
-unclaimed. Existing personal saves are copied with history, not deleted or discarded.
+unclaimed. Existing personal saves are copied with history, not deleted or discarded. Renplay
+reserves the claim before copying, so a competing claim cannot change owner saves. If copying
+fails, the reservation is released so you can retry. After a server interruption, restart Renplay
+and sign in again. If the owner is still unclaimed, retry from the original account. Partial
+copies stay recoverable in save history.
 
 ## Linked sign-ins
 
 **Account → Linked sign-ins** links OIDC after you complete the provider's sign-in, or LDAP after
 you enter your directory credentials. You must stay signed in to the same Renplay session while
 linking. An identity already belonging to another account cannot be linked or silently merged.
-You can unlink a method only when another enabled method remains. Unlinking ends other sessions.
-Unlinking a provider-controlled permission removes that grant (role becomes Player, adult access
-becomes Blocked); the last enabled admin must keep its method until another
-admin exists. Unavailable providers do not count as a working remaining sign-in method.
+You can unlink a method only when another usable method remains with the current configuration.
+A directory username reserved by another local account does not count. Unlinking ends other
+sessions. If the sign-in supplied the current admin grant, unlinking removes it, including grants
+from `RENPLAY_ADMINS`. Admin access assigned in **Users** is kept. Unlinking a provider with an adult
+access rule changes adult access to Blocked. The last enabled admin must keep its admin method
+until another admin exists. Unavailable providers and disabled local passwords do not count as
+working remaining sign-in methods.
 
 ## Profile pictures
 
@@ -250,7 +268,8 @@ See [Adult games](/start-here/adult-games/).
 Open **Settings → Users** (admins only) to add users, change roles and adult access, disable or
 re-enable an account, or reset its password. Each row shows games with save folders and the number
 of current save files (including persistent and HTML storage, excluding shared keys and history).
-The last enabled admin cannot be demoted, disabled or removed; add another admin first.
+Users cannot demote, disable or remove the last enabled admin. Add another admin first.
+Provider sign-in can still revoke the last provider-managed admin grant as described above.
 
 Use each user's actions for **Copy saves…**, **Merge into another user…**, **Export save folder**,
 **Import a save folder** or **Remove user…**. **Moving saves** also opens copy and import tools.

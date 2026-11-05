@@ -17,6 +17,7 @@ async function callback(agent: ReturnType<typeof request.agent>) { const url = a
 
 describe('OIDC authorization code sign-in', () => {
   it('uses PKCE, state, nonce, discovery and verified tokens, claims owner without moving its saves, and updates group permissions', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
     provider.setClaims({ groups: ['admins', 'adults'] })
     const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroup: 'adults' })
     await app.accounts.store(1).write('test', 'persistent', Buffer.from('owner save'))
@@ -33,10 +34,41 @@ describe('OIDC authorization code sign-in', () => {
     expect((await callback(agent)).status).toBe(302)
     expect((await agent.get('/api/me')).body.user).toMatchObject({ id: 1, role: 'player', adult_access: 0 })
     await agent.get('/api/users').expect(403)
+    expect(warning).toHaveBeenCalledWith(expect.stringMatching(/Last enabled admin.*RENPLAY_ADMINS/))
   })
   it.each([{ nonce: 'wrong' }, { iss: 'https://wrong.example' }, { aud: 'other-client' }, { exp: 1 }, { azp: 'other-client' }])('rejects invalid claims %j', async claims => {
     provider.setClaims(claims); const agent = await start()
     expect((await callback(agent)).status).toBe(401)
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM identities').get()!.n).toBe(0)
+  })
+  it.each([['RS256', true], ['HS256', false]] as const)('rejects invalid signatures and disallowed algorithms (%s, %s)', async (algorithm, invalid) => {
+    provider.setSigning(algorithm, invalid)
+    const agent = await start()
+    expect((await callback(agent)).status).toBe(401)
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM identities').get()!.n).toBe(0)
+  })
+  it.each([undefined, 'other-client', 'renplay'])('requires the client authorized party for multiple audiences (%s)', async azp => {
+    provider.setClaims({ aud: ['renplay', 'another-client'], ...(azp ? { azp } : {}) })
+    const agent = await start()
+    expect((await callback(agent)).status).toBe(azp === 'renplay' ? 302 : 401)
+  })
+  it('rejects a token at the exact expiry boundary', async () => {
+    const agent = await start()
+    const seconds = Math.floor(Date.now() / 1000)
+    vi.spyOn(Date, 'now').mockReturnValue(seconds * 1000)
+    provider.setClaims({ exp: seconds })
+    expect((await callback(agent)).status).toBe(401)
+  })
+  it.each(['admins', { admins: true }, [1, null, {}], ['admins', 123]].map(groups => ({ groups })))('does not grant malformed groups $groups', async ({ groups }) => {
+    provider.setClaims({ groups })
+    const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroup: 'adults' })
+    expect((await callback(agent)).status).toBe(302)
+    expect((await agent.get('/api/me')).body.user).toMatchObject({ role: 'player', adult_access: 0 })
+  })
+  it('rejects a previously initiated callback with sign-in off', async () => {
+    const agent = await start(), url = await authorize(agent)
+    Object.defineProperty(app.accounts, 'enabled', { value: false })
+    await agent.get(url.pathname + url.search).expect(403)
     expect(app.db.raw.prepare('SELECT COUNT(*) n FROM identities').get()!.n).toBe(0)
   })
   it.each(['client_secret_basic', 'client_secret_post'])('uses discovered client authentication: %s', async method => {
@@ -136,6 +168,40 @@ describe('OIDC authorization code sign-in', () => {
     await agent.post('/api/auth/logout').set(site).send({})
     await agent.get(url.pathname + url.search).expect(401)
     expect((await app.db.raw.prepare('SELECT COUNT(*) n FROM identities').get())!.n).toBe(1)
+  })
+  it.each(['revoked', 'expired', 'disabled', 'reassigned'])('does not link when the initiating session is %s during token exchange', async change => {
+    const agent = await start({ adminUsername: 'admin', adminPassword: 'local password' })
+    await agent.post('/api/auth/login').set(site).send({ username: 'admin', password: 'local password' })
+    const linked = await agent.post('/api/me/identities/oidc').set(site).send({})
+    const auth = await fetch(linked.body.url, { redirect: 'manual' }), url = new URL(auth.headers.get('location')!)
+    let release!: () => void, entered!: () => void
+    const waiting = new Promise<void>(r => { release = r }), exchanging = new Promise<void>(r => { entered = r })
+    const exchange = app.accounts.providers.oidc.bind(app.accounts.providers)
+    vi.spyOn(app.accounts.providers, 'oidc').mockImplementation(async (...args) => { entered(); await waiting; return exchange(...args) })
+    const pending = agent.get(url.pathname + url.search).then(r => r)
+    await exchanging
+    if (change === 'revoked') app.db.raw.exec('DELETE FROM sessions')
+    if (change === 'expired') app.db.raw.exec('UPDATE sessions SET expires_at = 0')
+    if (change === 'disabled') app.db.raw.exec('UPDATE users SET disabled = 1 WHERE id = 1')
+    if (change === 'reassigned') app.db.raw.exec("INSERT INTO users (id, username, name, role, created_at) VALUES (999, 'other', 'Other', 'player', ''); UPDATE sessions SET user_id = 999")
+    release()
+    expect((await pending).status).toBe(401)
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM identities').get()!.n).toBe(1)
+  })
+  it('refreshes OIDC allowlist membership and preserves a Users admin assignment', async () => {
+    const agent = await start({ admins: ['alex'] })
+    expect((await callback(agent)).status).toBe(302)
+    expect((await agent.get('/api/me')).body.user.role).toBe('admin')
+    app.cfg.admins = []
+    expect((await callback(agent)).status).toBe(302)
+    expect((await agent.get('/api/me')).body.user.role).toBe('player')
+    app.cfg.admins = ['alex']
+    expect((await callback(agent)).status).toBe(302)
+    expect((await agent.get('/api/me')).body.user.admin_source).toBe('allowlist')
+    await agent.put('/api/users/1').set(site).send({ role: 'admin' }).expect(200)
+    app.cfg.admins = []
+    expect((await callback(agent)).status).toBe(302)
+    expect((await agent.get('/api/me')).body.user).toMatchObject({ role: 'admin', admin_source: 'manual' })
   })
   it('allows SSO-only setup but refuses no provider or no admin rule', async () => {
     const agent = await start({ authLocal: false, oidcAdminGroup: 'admins' })

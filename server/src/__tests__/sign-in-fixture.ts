@@ -17,6 +17,8 @@ export async function mockOidc(authMethods = ['client_secret_basic']) {
   const { privateKey, publicKey } = await generateKeyPair('RS256'), jwk = { ...await exportJWK(publicKey), kid: 'test', alg: 'RS256' }
   let issuer = '', authorize: URL | undefined, tokenBody: URLSearchParams | undefined
   let claims: Record<string, unknown> = {}, nonce = '', tokenAuthorization: string | undefined
+  let signing = { algorithm: 'RS256', invalidSignature: false }
+  const otherKey = await generateKeyPair('RS256')
   const server = createServer(async (req, res) => {
     const u = new URL(req.url!, issuer)
     res.setHeader('Content-Type', 'application/json')
@@ -32,10 +34,11 @@ export async function mockOidc(authMethods = ['client_secret_basic']) {
       const { createHash } = await import('node:crypto')
       const challenge = createHash('sha256').update(tokenBody.get('code_verifier') || '').digest('base64url')
       if (challenge !== authorize?.searchParams.get('code_challenge') || tokenBody.get('code') !== 'test-code') { res.statusCode = 400; res.end('{}'); return }
-      const id_token = await new SignJWT({ sub: 'subject-1', preferred_username: 'alex', name: 'Alex Reader', nonce, ...claims }).setProtectedHeader({ alg: 'RS256', kid: 'test' }).setIssuer(typeof claims.iss === 'string' ? claims.iss : issuer).setAudience(typeof claims.aud === 'string' ? claims.aud : 'renplay').setIssuedAt().setExpirationTime(typeof claims.exp === 'number' ? claims.exp : '5m').sign(privateKey)
+      const key = signing.algorithm === 'HS256' ? new TextEncoder().encode('test symmetric key with enough bytes') : signing.invalidSignature ? otherKey.privateKey : privateKey
+      const id_token = await new SignJWT({ sub: 'subject-1', preferred_username: 'alex', name: 'Alex Reader', nonce, ...claims }).setProtectedHeader({ alg: signing.algorithm, kid: 'test' }).setIssuer(typeof claims.iss === 'string' ? claims.iss : issuer).setAudience(Array.isArray(claims.aud) ? claims.aud as string[] : typeof claims.aud === 'string' ? claims.aud : 'renplay').setIssuedAt().setExpirationTime(typeof claims.exp === 'number' ? claims.exp : '5m').sign(key)
       res.end(JSON.stringify({ id_token }))
     } else { res.statusCode = 404; res.end('{}') }
   })
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r)); issuer = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  return { get issuer() { return issuer }, get authorize() { return authorize }, get tokenBody() { return tokenBody }, get tokenAuthorization() { return tokenAuthorization }, setClaims: (c: Record<string, unknown>) => { claims = c }, close: () => new Promise<void>(r => server.close(() => r())) }
+  return { get issuer() { return issuer }, get authorize() { return authorize }, get tokenBody() { return tokenBody }, get tokenAuthorization() { return tokenAuthorization }, setClaims: (c: Record<string, unknown>) => { claims = c }, setSigning: (algorithm: string, invalidSignature = false) => { signing = { algorithm, invalidSignature } }, close: () => new Promise<void>(r => server.close(() => r())) }
 }

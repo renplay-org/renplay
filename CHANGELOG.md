@@ -7,6 +7,14 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- Linking a sign-in now stops if the session or access token that started it has been revoked or expired, or the account is disabled.
+- Admin access from `RENPLAY_ADMINS` is checked again at provider sign-in and removed when its sign-in is unlinked. Users shows where admin access came from. Admin access assigned in Users is kept.
+- Explicitly linked LDAP accounts can sign in when local passwords are disabled, including when both use the same username. Unlinking checks that another usable sign-in remains.
+- Only one person can claim the owner account at a time. Competing claims are rejected before copying any saves, and an interrupted claim can be retried.
+- LDAP sign-in failures take comparable time for missing users and wrong passwords, without extra directory binds.
+
 ## [3.0.0] - 2026-11-05
 
 Renplay 3.0 adds accounts. **Before you upgrade:** back up `/data`. On its first start 3.0 moves

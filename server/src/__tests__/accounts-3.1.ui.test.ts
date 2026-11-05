@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { createServer } from 'node:http'
 import express from 'express'
+import request from 'supertest'
 import sharp from 'sharp'
 import { chromium, webkit, devices } from 'playwright'
 import { expect, it } from 'vitest'
@@ -15,6 +16,12 @@ it.skipIf(!process.env.RENPLAY_UI_SHOTS)('checks SSO, avatar, provider-managed U
   app.app.get(/.*/, (_req, res) => res.sendFile(resolve('../selector/dist/index.html')))
   const server = createServer(app.app)
   await new Promise<void>(r => server.listen(3991, '127.0.0.1', r))
+  const groupAdmin = request.agent(app.app)
+  provider.setClaims({ sub: 'group-admin', preferred_username: 'group-admin', name: 'Group admin', groups: ['admins', 'adults'] })
+  const flow = await groupAdmin.get('/api/auth/oidc/start')
+  const authorization = await fetch(flow.headers.location, { redirect: 'manual' }), callback = new URL(authorization.headers.get('location')!)
+  await groupAdmin.get(callback.pathname + callback.search).expect(302)
+  provider.setClaims({ groups: ['admins', 'adults'] })
   const out = process.env.RENPLAY_UI_SHOTS!, errors: string[] = []
   await mkdir(out, { recursive: true })
   const photo = await sharp({ create: { width: 320, height: 200, channels: 3, background: '#ab3a6c' } }).png().toBuffer()
@@ -59,9 +66,12 @@ it.skipIf(!process.env.RENPLAY_UI_SHOTS)('checks SSO, avatar, provider-managed U
       await page.waitForTimeout(350)
       await page.screenshot({ path: join(out, `${prefix}-account.png`), fullPage: true })
       await page.goto('http://127.0.0.1:3991/settings/users')
-      await page.getByText('Role and adult access set by the sign-in provider.').waitFor()
+      await page.getByText('Admin access set in Renplay.').waitFor()
+      await page.getByText('Adult access set by the sign-in provider.', { exact: true }).waitFor()
+      await page.getByText('Admin access set by the sign-in provider.', { exact: true }).waitFor()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
       await page.screenshot({ path: join(out, `${prefix}-users.png`), fullPage: true })
-      await page.getByRole('button', { name: 'Actions for admin' }).click()
+      await page.getByRole('button', { name: 'Actions for Group admin' }).click()
       await page.getByRole('button', { name: 'Edit role and access' }).click()
       expect(await page.getByLabel('Role', { exact: true }).isDisabled()).toBe(true)
       expect(await page.getByLabel('Allow adult games', { exact: true }).isDisabled()).toBe(true)
