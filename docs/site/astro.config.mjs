@@ -81,6 +81,7 @@ export default defineConfig({
         'accounts',
         'configuration',
         'upgrading',
+        'stability',
         'catalog',
         'engines',
         'troubleshooting',

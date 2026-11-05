@@ -17,7 +17,7 @@ FROM node:24-bookworm-slim
 # archives. Ren'Py engines come prebuilt from renplay-org/engines.
 # jemalloc avoids glibc retaining fragmented sharp/libvips image allocations.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools curl ca-certificates libjemalloc2 \
+ && apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools curl ca-certificates libjemalloc2 util-linux \
  && ln -s /usr/lib/*-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so.2 \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled /var/log/nginx \
  && mkdir -p /app
@@ -42,4 +42,6 @@ ENV NODE_ENV=production \
 
 USER 1000:1000
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl --fail --silent --show-error http://127.0.0.1:8080/api/health || exit 1
 ENTRYPOINT ["/app/deploy/entrypoint.sh"]

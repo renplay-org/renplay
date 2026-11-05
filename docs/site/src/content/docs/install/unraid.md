@@ -17,12 +17,18 @@ Unraid runs containers from its Docker tab, with host paths for the two folders.
    `renplay/renplay` on Docker Hub). Pin a version tag.
 3. Map port **8080** of the container to a port on the NAS.
 4. Mount the games folder at `/games` and the data folder at `/data`.
-5. Make sure the container may write to both folders. The image runs as user and group 1000; if
-   your system cannot give that user access, run the container as a user that owns the folders.
+5. Make both folders writable by the container's user. To use Unraid's 99:100, set the container
+   user to `99:100`. Alternatively start as `0:0` with `PUID=99` and `PGID=100`; the entrypoint
+   drops root before starting the app. Setting these variables alone does not override the image's
+   default non-root 1000:1000 user. Renplay does not change your folders' ownership.
 
 The names of the screens differ between versions of the system, so these steps stay general. The
 settings are the same as in [Docker and Docker Compose](/install/docker/), which also lists the
 options.
 
-Keep `/data` in your NAS backups. Put a sign-in in front of Renplay before you open it to the
+Keep `/data` on local disk and in your NAS backups; its SQLite database must not be on a
+network share. `/games` and the archives folder can be shares. Put a sign-in in front of Renplay before you open it to the
 internet: [Reverse proxy and HTTPS](/install/reverse-proxy/).
+
+The image names, ports, paths and upgrade promise are covered by the
+[3.x stability contract](/stability/).

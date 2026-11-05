@@ -38,7 +38,7 @@ Default: `/data`
 
 </div>
 
-Saves and their history, the library database, mods, covers and walkthroughs. Back this up.
+Saves and their history, the library database, mods, covers and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.
 
 </div>
 
@@ -139,7 +139,7 @@ Default: `true`
 
 </div>
 
-Delete a download once its game installed. `false` keeps it, so the game can be reinstalled without uploading again.
+Delete downloads uploaded through Renplay after a successful install. Files copied into the archives folder are never deleted automatically, including downloads from before 3.0 whose origin is unknown. `false` keeps everything for reinstalls.
 
 </div>
 
@@ -306,6 +306,34 @@ The `Host` header to send with the keep-alive requests, if the proxy routes by h
 
 ## Server
 
+<div class="config-entry" id="puid">
+
+**`PUID`**
+
+<div class="config-default">
+
+Default: `1000`
+
+</div>
+
+Container only: when started as root, drop to this non-root user ID before starting Renplay. Ignored when started with --user. Make the mounted folders writable by this user; Renplay does not change their ownership.
+
+</div>
+
+<div class="config-entry" id="pgid">
+
+**`PGID`**
+
+<div class="config-default">
+
+Default: `1000`
+
+</div>
+
+Container only: group ID to use with PUID when started as root. Ignored when started with --user.
+
+</div>
+
 <div class="config-entry" id="renplay-auth">
 
 **`RENPLAY_AUTH`**
@@ -409,6 +437,6 @@ Port of the Renplay server inside the container. nginx listens on 8080 and forwa
 
 | Folder | What is in it |
 |---|---|
-| `/data` | Saves and their history, the library, mods, covers, walkthroughs. **Back this up.** |
-| `/games/_archives` | The game downloads you added. Each is deleted once its game installs, unless `RENPLAY_DELETE_ARCHIVES=false`. |
+| `/data` | Saves and their history, accounts, the SQLite library, mods, covers, walkthroughs. **Local disk only. Back this up.** |
+| `/games/_archives` | Game downloads. Only completed Renplay uploads are deleted after install, unless `RENPLAY_DELETE_ARCHIVES=false`. Files you copied here stay here. |
 | `/games` (the rest) | Installed games. Renplay can rebuild them from the archives, while they are kept. |

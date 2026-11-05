@@ -185,6 +185,11 @@ export class Db {
         PRAGMA user_version = 7; COMMIT;
       `)
     }
+    // Upload ownership is separate from the scan cache: rescans must not claim copied files.
+    if (v < 8) this.raw.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS uploaded_archives (path TEXT PRIMARY KEY, identity TEXT NOT NULL);
+      PRAGMA user_version = 8; COMMIT;
+    `)
     } catch (error) { this.raw.close(); throw error }
   }
 
@@ -300,8 +305,17 @@ export class Db {
       .run(a.path, a.size, a.mtime_ms, a.sha256 ?? '', a.info ?? '{}', now())
   }
 
+  markUploadedArchive(path: string, identity: string): void {
+    this.raw.prepare('INSERT OR REPLACE INTO uploaded_archives (path, identity) VALUES (?, ?)').run(path, identity)
+  }
+
+  isUploadedArchive(path: string, identity: string): boolean {
+    return !!this.raw.prepare('SELECT 1 FROM uploaded_archives WHERE path = ? AND identity = ?').get(path, identity)
+  }
+
   deleteArchive(path: string): void {
     this.raw.prepare('DELETE FROM archives WHERE path = ?').run(path)
+    this.raw.prepare('DELETE FROM uploaded_archives WHERE path = ?').run(path)
   }
 
   allArchives(): ArchiveRow[] {

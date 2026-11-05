@@ -55,7 +55,7 @@ export interface Config {
   internalDir: string
   /** Original game archives (zip/7z/rar): drop folder and reinstall source. */
   archivesDir: string
-  /** Delete an archive once it installed. Off keeps it for reinstalls. */
+  /** Delete completed uploads after install, never files copied into the archives folder. */
   deleteArchives: boolean
   enginesDir: string
   workDir: string

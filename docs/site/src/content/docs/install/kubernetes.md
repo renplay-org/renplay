@@ -77,3 +77,6 @@ the library) as PersistentVolumeClaims of your storage class.
 - **Ingress.** Put sign-in in front of it. See [Reverse proxy and HTTPS](/install/reverse-proxy/).
 - **Scale to zero.** If a proxy stops the pod when it is idle, set `RENPLAY_KEEPALIVE_URL` so it
   stays up during an install. See [Configuration](/configuration/).
+
+The image names, ports, paths and upgrade promise are covered by the
+[3.x stability contract](/stability/).

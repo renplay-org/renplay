@@ -9,6 +9,12 @@ release notes say what).
 
 ### Added
 
+- A stable installation contract for 3.x: image names, port, folders, configuration and upgrade
+  promises are documented in the new Stability page. Container health checks now check the app
+  through nginx.
+- Containers support arbitrary non-root user IDs, including TrueNAS's 568:568, with a read-only
+  root filesystem. Unraid-style `PUID` and `PGID` work when started as root; the app always drops
+  to a non-root user before starting.
 - Accounts. Turn on sign-in with `RENPLAY_AUTH=on` and everyone gets their own saves, save
   history, favourites, Finished stories and play time; the library is shared. A new install asks
   for a setup code from the server log before creating the owner account. Upgraded installs keep
@@ -30,6 +36,9 @@ release notes say what).
 
 ### Changed
 
+- After installation, automatic archive cleanup deletes only downloads uploaded through Renplay.
+  Files you copied into the archives folder, and older downloads whose origin is unknown, are
+  never automatically deleted. `RENPLAY_DELETE_ARCHIVES=false` still keeps everything.
 - Saves move to `/data/users/<id>/` on the first start. The upgrade backs up saves, save history
   and the library first (`/data/backups/pre-3.0/`), and leaves the old folders as links, so
   2.11 still runs on the same data if you go back.

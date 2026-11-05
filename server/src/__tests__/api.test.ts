@@ -1,9 +1,10 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import yazl from 'yazl'
+import { archiveIdentity } from '../archive-origin.js'
 import { createApp, type App } from '../app.js'
 import { loadConfig } from '../config.js'
 import { renderPage } from '../routes/play.js'
@@ -115,7 +116,7 @@ describe('HTTP API', () => {
   it('stores finished state and measured play time without changing saves', async () => {
     app.db.insertGame({ id: 'progress-game', title: 'Progress', save_dir: 'Progress-123' })
     const path = '/api/games/progress-game'
-    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(7)
+    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(8)
     expect((await request(app.app).get(path)).body.game).toMatchObject({ playTime: 0, finishedAt: null, latestSave: null })
     for (const on of [undefined, 'true', 1]) await request(app.app).put(`${path}/finished`).send({ on }).expect(400)
     await request(app.app).put('/api/games/missing/finished').send({ on: true }).expect(404)
@@ -319,6 +320,11 @@ describe('HTTP API', () => {
   it('creates uploads at /api/uploads without a trailing slash', async () => {
     const r = await request(app.app).post('/api/uploads').send({ name: 'Game-1.0-pc.zip', size: 10 }).expect(200)
     expect(r.body.id).toMatch(/^u/)
+    await request(app.app).put(`/api/uploads/${r.body.id}?offset=0`).set('Content-Type', 'application/octet-stream').send(Buffer.from('0123456789')).expect(200)
+    expect(app.db.isUploadedArchive('Game-1.0-pc.zip', archiveIdentity(statSync(join(root, 'games', '_renplay', 'uploads', `${r.body.id}.part`))))).toBe(false)
+    const completed = await request(app.app).post(`/api/uploads/${r.body.id}/complete`).expect(200)
+    const path = completed.body.path
+    expect(app.db.isUploadedArchive(path, archiveIdentity(statSync(join(root, 'games', '_archives', path))))).toBe(true)
   })
 
   it('keeps saves when a game is uninstalled', async () => {

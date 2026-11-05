@@ -75,8 +75,51 @@ jobs:
         run: npm run build
         working-directory: selector
 
+  install-contract:
+    name: Install contract (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: renplay:contract
+          cache-from: type=gha,scope=contract-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=contract-${{ matrix.arch }}
+      - name: User IDs and read-only root filesystem
+        run: python3 deploy/test-contract.py renplay:contract users
+      - name: Native Ren'Py install and game HTTP smoke test
+        run: python3 deploy/test-contract.py renplay:contract smoke
+      - name: Upgrade and downgrade from 2.11.1
+        run: python3 deploy/test-contract.py renplay:contract upgrade
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: docs/site
+      - name: Generated configuration stays current
+        run: npm run gen && git diff --exit-code -- src/content/docs/configuration.md
+        working-directory: docs/site
+      - run: npm run build
+        working-directory: docs/site
+
   build:
-    needs: [check]
+    needs: [check, install-contract, docs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

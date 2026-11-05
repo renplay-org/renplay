@@ -55,11 +55,33 @@ docker run -d --name renplay --restart unless-stopped -p 8080:8080 \
 | `/data` | Saves and their history, the library, mods, covers, walkthroughs. **Back this up.** |
 | `/games` | Installed games, and `_archives/`, where game downloads are dropped. Renplay can rebuild installed games from the archives, while they are kept. |
 
-Keep both on local disks if you can. Network shares work, but creating many small files is slow on
-them; see [Troubleshooting](/troubleshooting/#network-storage-is-slow).
+**Keep `/data` on local disk.** Its SQLite database must not be on a network share. `/games`
+and the optional archives folder can be shares; see
+[Troubleshooting](/troubleshooting/#network-storage-is-slow). Allow about twice a game's download
+size free while it installs. By default only uploads through Renplay are deleted after install;
+files copied into the archives folder stay there. `RENPLAY_DELETE_ARCHIVES=false` keeps uploads too.
 
 The container can also run with a read-only root filesystem: it writes only to `/games`, `/data`
 and `/tmp`. Add `read_only: true` and `tmpfs: [/tmp]` to the Compose service if you want that.
+
+## Other user IDs
+
+To use the owner of your folders directly, add `user: "568:568"` to the Compose service,
+or `--user 568:568` to `docker run`. Arbitrary non-root IDs work without a passwd entry.
+Make both mounted folders writable by that user and group first.
+
+For Unraid's `PUID`/`PGID` convention, use:
+
+```yaml
+    user: "0:0"
+    environment:
+      PUID: "99"
+      PGID: "100"
+```
+
+The entrypoint drops root with `setpriv` before starting the application or nginx. Starting as root
+without those variables drops to 1000:1000. `PUID=0` is refused; when started non-root, both
+variables are ignored. Renplay never changes the ownership of your mounted folders.
 
 ## Options
 
@@ -74,3 +96,6 @@ docker logs renplay
 ```
 
 Next: [Add a game](/guides/adding-games/).
+
+The image names, ports, paths and upgrade promise are covered by the
+[3.x stability contract](/stability/).
