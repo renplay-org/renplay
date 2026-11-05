@@ -7,6 +7,39 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Local accounts with separate saves, history, favourites, Finished and play time. New installs
+  ask for a setup code from the server log before creating the owner account. Upgrades keep
+  sign-in off with an admin reminder; turning it on keeps every existing save with the owner.
+- Admin and player roles, long-lived sign-in sessions and access tokens for scripts. Game files,
+  covers and walkthroughs require the same access as the library. A game asks you to sign back in
+  if its session ends, keeping unsent Ren'Py saves with the account that made them.
+- Per-account adult access, and Show, Hide pictures or Hide adult games preferences with a device
+  override. New users start without adult access; the first admin has it.
+- Server tools for users and passwords, copying or merging saves between accounts, and exporting
+  and importing whole save folders. Overwrites keep history; removed accounts' folders are archived.
+
+### Changed
+
+- Saves now live in `/data/users/<id>/`. The upgrade backs up saves, history and `library.db`,
+  resumes interrupted moves, and leaves the owner's old paths as symlinks for rollback to 2.10.
+  Back up `/data` before upgrading. Full Account and Users screens follow in stage B.
+
+### Fixed
+
+- Account permissions and content restrictions now reject ambiguous resource paths consistently,
+  including files served directly by the web server. HTML games and their popups stay isolated
+  from accounts, including when opened outside the player.
+- Switching accounts keeps unsent Ren'Py and HTML saves on this device for their owner. HTML
+  saves are kept locally even while an earlier upload is stalled. Older browser saves with no
+  known owner are kept for recovery, not discarded.
+- Game assets with spaces, percent signs, question marks or hash signs in their filenames load
+  correctly through protected game URLs.
+- Passwords use stronger hashing, with older hashes upgraded at the next successful sign-in.
+  Save imports have bounded file sizes, archive contents and concurrent work. Sign-in return
+  links cannot take you to another website.
+
 ## [2.11.1] - 2026-11-05
 
 ### Fixed

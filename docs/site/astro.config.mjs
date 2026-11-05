@@ -78,6 +78,7 @@ export default defineConfig({
           ],
         },
         { label: 'Guides', items: ['guides/adding-games', 'guides/playing'] },
+        'accounts',
         'configuration',
         'upgrading',
         'catalog',
@@ -86,7 +87,7 @@ export default defineConfig({
         'faq',
         {
           label: 'Developers',
-          items: ['developers/architecture', 'developers/contributing'],
+          items: ['developers/architecture', 'developers/accounts-api', 'developers/contributing'],
         },
       ],
     }),
