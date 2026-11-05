@@ -37,6 +37,27 @@ export interface Config {
   auth: '' | 'on' | 'off'
   authUser: number
   authLocal: boolean
+  oidcIssuer: string
+  oidcClientId: string
+  oidcClientSecret: string
+  oidcName: string
+  oidcAutoCreate: boolean
+  oidcAdminGroup: string
+  oidcAdultGroup: string
+  admins: string[]
+  ldapUrl: string
+  ldapBindDn: string
+  ldapBindPassword: string
+  ldapBaseDn: string
+  ldapUserFilter: string
+  ldapUsernameAttribute: string
+  ldapNameAttribute: string
+  ldapEmailAttribute: string
+  ldapPhotoAttribute: string
+  ldapAdminFilter: string
+  ldapAdultFilter: string
+  ldapStartTls: boolean
+  ldapCaFile: string
   adminUsername: string
   adminPassword: string
   publicUrl: string
@@ -85,6 +106,27 @@ export function loadConfig(): Config {
     auth: auth as '' | 'on' | 'off',
     authUser: envInt('RENPLAY_AUTH_USER', 1),
     authLocal: envBool('RENPLAY_AUTH_LOCAL', true),
+    oidcIssuer: env('RENPLAY_OIDC_ISSUER', ''),
+    oidcClientId: env('RENPLAY_OIDC_CLIENT_ID', ''),
+    oidcClientSecret: secret('RENPLAY_OIDC_CLIENT_SECRET'),
+    oidcName: env('RENPLAY_OIDC_NAME', 'Single sign-on'),
+    oidcAutoCreate: envBool('RENPLAY_OIDC_AUTO_CREATE', true),
+    oidcAdminGroup: env('RENPLAY_OIDC_ADMIN_GROUP', ''),
+    oidcAdultGroup: env('RENPLAY_OIDC_ADULT_GROUP', ''),
+    admins: env('RENPLAY_ADMINS', '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+    ldapUrl: env('RENPLAY_LDAP_URL', ''),
+    ldapBindDn: env('RENPLAY_LDAP_BIND_DN', ''),
+    ldapBindPassword: secret('RENPLAY_LDAP_BIND_PASSWORD'),
+    ldapBaseDn: env('RENPLAY_LDAP_BASE_DN', ''),
+    ldapUserFilter: env('RENPLAY_LDAP_USER_FILTER', '(&(objectClass=person)(uid={username}))'),
+    ldapUsernameAttribute: env('RENPLAY_LDAP_USERNAME_ATTRIBUTE', 'uid'),
+    ldapNameAttribute: env('RENPLAY_LDAP_NAME_ATTRIBUTE', 'displayName'),
+    ldapEmailAttribute: env('RENPLAY_LDAP_EMAIL_ATTRIBUTE', 'mail'),
+    ldapPhotoAttribute: env('RENPLAY_LDAP_PHOTO_ATTRIBUTE', 'jpegPhoto'),
+    ldapAdminFilter: env('RENPLAY_LDAP_ADMIN_FILTER', ''),
+    ldapAdultFilter: env('RENPLAY_LDAP_ADULT_FILTER', ''),
+    ldapStartTls: envBool('RENPLAY_LDAP_STARTTLS', false),
+    ldapCaFile: env('RENPLAY_LDAP_CA_FILE', ''),
     adminUsername: env('RENPLAY_ADMIN_USERNAME', ''),
     adminPassword: secret('RENPLAY_ADMIN_PASSWORD'),
     publicUrl: env('RENPLAY_PUBLIC_URL', ''),

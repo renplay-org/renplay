@@ -3,8 +3,10 @@ title: Accounts API
 description: Local accounts, sessions, tokens, permissions and save transfers.
 ---
 
-These endpoints back the Account and Users screens. OIDC, LDAP and avatars are not included. `identities` is keyed by `(provider, subject)` so later providers
-can link explicitly without relying on a display name or an unverified email.
+These endpoints back the Account and Users screens. `identities` is keyed by `(provider, subject)`:
+OIDC providers include the issuer and use the token subject; LDAP providers include directory URL
+and base DN and use entryUUID (or DN). Linking is explicit, never based on an email or name.
+See [Accounts](/accounts/) for provider configuration.
 
 ## Authenticate scripts
 
@@ -36,15 +38,23 @@ are rejected rather than matched differently by authorization and routing.
 
 | Method and path | Body or result |
 |---|---|
-| `GET /auth/providers` | `{ enabled, setup, local }`; public |
+| `GET /auth/providers` | `{ enabled, setup, local, oidc, ldap }`; public. `local` means the password form is available (local or LDAP); `oidc` is its button name or null |
 | `POST /auth/setup/verify` | `{ code }` → `{ grant }`; public, ten attempts per boot |
 | `POST /auth/setup` | `{ grant, username, name, password }`; claims owner and sets a cookie |
 | `POST /auth/login` | `{ username, password }`; rate limited per address and account |
+| `GET /auth/oidc/start` | Starts sign-in; sets a ten-minute httpOnly state cookie and redirects to the provider |
+| `GET /auth/oidc/callback` | Single-use state plus bound cookie; exchanges code with PKCE, verifies ID token, sets a session and redirects home |
+| `GET /me/identities` | Linked `{ provider, subject, name, available, removable }` methods. Availability reflects current configuration and reserved usernames. Removability checks the methods usable after unlinking. Never includes passwords |
+| `POST /me/identities/oidc` | Returns `{ url }`. Linking rechecks the initiating session or token in live storage after the provider exchange |
+| `POST /me/identities/ldap` | `{ username, password }`. Verifies credentials and rechecks the initiating session or token before linking |
+| `DELETE /me/identities` | `{ provider, subject }`. Keeps a usable method, removes current grants from that identity and ends other sessions. Admin access assigned in Users is kept |
+| `POST /me/avatar` | Raw JPEG, PNG or WebP, up to 2 MiB and 16 megapixels; returns `{ avatar }` filename |
+| `GET /avatars/:file` | Authenticated WebP; private/no-store |
 | `POST /auth/logout` | Revokes the current cookie session |
 | `GET /me` | `{ user, auth, unclaimed, hasPassword }` |
 | `PUT /me` | `{ name }` |
 | `POST /me/password` | `{ current, password }`; ends other sessions |
-| `POST /me/claim-owner` | Admin only, while unclaimed; copies saves with history, moves identities, archives the old folder |
+| `POST /me/claim-owner` | Admin only, while unclaimed. Atomically reserves ownership before copying saves with history, moving identities and archiving the old folder. Competing claims return 409 before copying. A failed or interrupted claim can be retried |
 | `GET /me/prefs` | `{ adultPictures }`, absent means `hide-pictures` |
 | `PUT /me/prefs` | `{ adultPictures: "show" \| "hide-pictures" \| "hide-games" }` |
 | `GET /me/sessions` | `{ sessions }`, including `current` and creation, touch and expiry times |
@@ -53,7 +63,7 @@ are rejected rather than matched differently by authorization and routing.
 | `GET /me/tokens` | `{ tokens }`; never includes secrets |
 | `POST /me/tokens` | `{ name }` → `{ id, token }` |
 | `DELETE /me/tokens/:id` | Revokes that token |
-| `GET /users` | `{ users, adultDefault }`; `adultDefault` is the new-user adult-access default; each user includes `games` (nonempty save folders), `saves` (current files in those folders, excluding shared keys and history), `protected` (owner or no-sign-in account) |
+| `GET /users` | `{ users, adultDefault }`. Each user includes `avatar`, `admin_source` (`manual`, `provider`, `allowlist`), `roleManaged`, `adultManaged`, `games` (nonempty save folders), `saves` (current files in those folders, excluding shared keys and history), and `protected` (owner or no-sign-in account). `adultDefault` is the new-user adult-access default |
 | `POST /users` | `{ username, name?, password, role?, adultAccess? }` → `{ user }`; role defaults to `player` |
 | `PUT /users/:id` | `{ name?, role?, disabled?, adultAccess? }` |
 | `POST /users/:id/password` | `{ password }`; ends all target sessions |
@@ -84,7 +94,12 @@ extended and tested.
 
 ## Database and request boundary
 
-Schema **7** (2.10 already uses schema 6) adds `users`, `identities`, `sessions`, `tokens`,
+Schema **10** records each user's current admin grant source and its provider and subject.
+`manual` covers admin access assigned in Renplay, including accounts upgraded from 3.0.
+It also adds `identity_metadata` to record the directory username used by a linked identity.
+An `owner_claim` setting reserves ownership during copying. Startup clears an interrupted reservation
+without deleting copied saves or history. Schema **9** adds `avatar` and `avatar_uploaded` to users.
+Schema 8 records uploaded archive ownership. Schema 7 (2.10 already uses schema 6) adds `users`, `identities`, `sessions`, `tokens`,
 `user_games` and `safe_games`. Owner 1 receives existing library progress. Account ids are never
 reused. The migration backs up the checkpointed database and both save trees before moving any
 folder and only commits the new schema after folder migration succeeds.

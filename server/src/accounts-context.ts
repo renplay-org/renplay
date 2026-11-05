@@ -5,10 +5,15 @@ export interface User {
   username: string
   name: string
   role: 'admin' | 'player'
+  admin_source: 'manual' | 'provider' | 'allowlist'
+  admin_provider: string
+  admin_subject: string
   adult_access: number
   disabled: number
   created_at: string
   prefs: string
+  avatar: string
+  avatar_uploaded: number
 }
 export interface Viewer { user: User; session: string; bearer: boolean }
 /** Request-local permissions; background installs deliberately have no viewer. */

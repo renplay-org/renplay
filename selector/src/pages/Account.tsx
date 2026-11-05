@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Avatar from '../components/Avatar'
+import AvatarUpload from '../components/AvatarUpload'
+import LinkedSignIns from '../components/LinkedSignIns'
 import AdultPreferences, { accountInput } from '../components/AdultPreferences'
 import { Button, Confirm, Modal, Spinner, errorText, useToast } from '../components/ui'
 import { api, del, post, put } from '../lib/api'
@@ -34,18 +36,21 @@ export default function Account() {
     finally { setBusy(false) }
   }
   return <div className="animate-fade-in space-y-6">
-    <header className="flex items-center gap-4"><Avatar name={me.user.name} className="size-16 text-xl" /><div className="min-w-0"><h1 className="font-display text-3xl font-bold text-white">Account</h1><p className="break-words text-sm text-zinc-400">{me.user.name} · {me.user.role === 'admin' ? 'Admin' : 'Player'}{me.auth ? ' · Password sign-in' : ' · Sign-in is off'}</p></div></header>
+    <header className="flex items-center gap-4"><Avatar name={me.user.name} avatar={me.user.avatar} className="size-16 text-xl" /><div className="min-w-0"><h1 className="font-display text-3xl font-bold text-white">Account</h1><p className="break-words text-sm text-zinc-400">{me.user.name} · {me.user.role === 'admin' ? 'Admin' : 'Player'}{me.auth ? '' : ' · Sign-in is off'}</p></div></header>
     {!me.auth && <AccountSection title="Sign-in is off"><p className="text-sm text-zinc-300">Everyone uses this account ({me.user.name}). Other users’ saves stay separate and untouched.</p><a className="inline-flex min-h-11 items-center text-sm text-accent-300 underline" href="https://renplay.org/docs/accounts/" target="_blank" rel="noreferrer">How to turn on sign-in</a></AccountSection>}
+    {me.unclaimed && me.user.role === 'admin' && me.user.id !== 1 && <AccountSection title="Claim the owner account"><p className="text-sm text-zinc-400">Keep the saves made before sign-in and bring your current saves with you. Replaced files stay in history.</p><Button onClick={() => setConfirm({ title: 'Claim the owner account?', action: async () => { await post('/api/me/claim-owner'); window.location.reload() } })}>Claim the owner account</Button></AccountSection>}
     <div className="grid items-start gap-5 lg:grid-cols-2">
       <AccountSection title="Profile">
         <form onSubmit={(e) => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(() => put('/api/me', { name: form.get('name') }), 'Display name saved') }} className="space-y-4">
           <label className="block text-sm text-zinc-300">Display name<input key={me.user.name} name="name" autoComplete="name" required maxLength={100} defaultValue={me.user.name} className={accountInput} /></label>
           <Button className="min-h-11" type="submit" loading={busy}>Save name</Button>
         </form>
-        <p className="text-sm text-zinc-400">Username: {me.user.username}. Your picture uses your initials.</p>
+        <p className="text-sm text-zinc-400">Username: {me.user.username}. </p>
+        <AvatarUpload />
         {me.hasPassword && <Button className="min-h-11" onClick={() => { setError(''); setDialog('password') }}>Change password</Button>}
       </AccountSection>
       {me.user.adult_access === 1 && <AccountSection title="Adult pictures"><AdultPreferences /></AccountSection>}
+      <AccountSection title="Linked sign-ins"><LinkedSignIns /></AccountSection>
       <AccountSection title="Where you are signed in">
         {sessions.isPending ? <Spinner /> : sessions.isError ? <p role="alert" className="text-sm text-rose-300">{errorText(sessions.error)}</p> : <div className="divide-y divide-white/10">{sessions.data.sessions.map((session) => <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
           <div className="min-w-0 flex-1"><p className="break-words text-sm text-zinc-200">{session.current ? 'This session' : sessionLabel(session.label)}</p><p className="text-xs text-zinc-400">Active {ago(session.touched_at)} · Expires {ago(session.expires_at, true)}</p></div>

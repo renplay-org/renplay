@@ -7,6 +7,14 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- Linking a sign-in now stops if the session or access token that started it has been revoked or expired, or the account is disabled.
+- Admin access from `RENPLAY_ADMINS` is checked again at provider sign-in and removed when its sign-in is unlinked. Users shows where admin access came from. Admin access assigned in Users is kept.
+- Explicitly linked LDAP accounts can sign in when local passwords are disabled, including when both use the same username. Unlinking checks that another usable sign-in remains.
+- Only one person can claim the owner account at a time. Competing claims are rejected before copying any saves, and an interrupted claim can be retried.
+- LDAP sign-in failures take comparable time for missing users and wrong passwords, without extra directory binds.
+
 ## [3.0.0] - 2026-11-05
 
 Renplay 3.0 adds accounts. **Before you upgrade:** back up `/data`. On its first start 3.0 moves
@@ -16,6 +24,13 @@ reverse proxy with HTTPS, also set `RENPLAY_PUBLIC_URL`. Nothing else needs chan
 
 ### Added
 
+- Single sign-on with OpenID Connect (including Pocket ID) and directory passwords through LDAP.
+  Link sign-ins from Account without merging people or their saves. Groups can set admin roles
+  and adult access automatically at sign-in.
+- Profile pictures: crop and upload your own in Account, or copy your sign-in provider's picture.
+  Pictures stay on your server and appear in the account menu, phone You tab and Users.
+- Search games, the catalog, pages and actions from the header or phone search button. Use ⌘K
+  on Apple devices or Ctrl+K elsewhere, then arrow keys and Enter or a tap to choose a result.
 - Accounts. Turn on sign-in with `RENPLAY_AUTH=on` and everyone gets their own saves, save
   history, favourites, Finished stories and play time; the library is shared. A new install asks
   for a setup code from the server log before creating the owner account. Upgraded installs keep
