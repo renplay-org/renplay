@@ -7,23 +7,25 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-11-05
+
+### Added
+
+- Documentation at docs.renplay.org: installing on each platform, adding and playing games,
+  every setting, upgrading and troubleshooting. The app links to the matching page from
+  Settings, the empty library, Add games, Activity and the iPhone full-screen help.
+
 ### Changed
 
-- The documentation now matches the Renplay website, with clearer starting points, quieter
-  navigation and a grouped configuration reference that reads comfortably on phones. Install
-  examples always use the current release’s image tag.
-- The documentation home is now a plain index of the guides, with search first, and the app links to
-  the matching help page from Settings, the empty library, Add games, Activity and the iPhone
-  full-screen help. The browser tab shows the game’s title while you play.
+- The browser tab shows the game's title while you play.
 
 ### Fixed
 
-- Installing large games uses less memory, especially when they contain many high-resolution
-  images or large videos. Unusually large images stay in their original format.
-- The container releases image-processing memory more readily, reducing memory use during long
-  installs of games with thousands of images.
-- Job logs survive a server restart or crash, so interrupted installs keep their recent messages.
-  Clearing finished activity removes its saved logs too.
+- Installs use far less memory. Games with thousands of high-resolution images or large videos
+  no longer run out of memory (Fresh Women Season 2 did at 4 GB). Unusually large images stay
+  in their original format.
+- Install logs survive a restart or crash, so an interrupted install still shows what happened.
+  Clearing finished activity removes its logs too.
 
 ## [2.10.0] - 2026-11-04
 
@@ -316,7 +318,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.10.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.11.0...dev
+[2.11.0]: https://github.com/renplay-org/renplay/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/renplay-org/renplay/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/renplay-org/renplay/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/renplay-org/renplay/compare/v2.8.0...v2.9.0
