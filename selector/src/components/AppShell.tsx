@@ -4,6 +4,7 @@ import { api, jobTitle } from '../lib/api'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../lib/auth'
 import AccountMenu from './AccountMenu'
+import SearchPalette from './SearchPalette'
 import { pct } from '../lib/format'
 import { useGames, useJobs } from '../lib/queries'
 import { cx } from './ui'
@@ -97,8 +98,9 @@ export default function AppShell() {
             ))}
           </nav>
           <div className="ml-auto flex min-w-0 items-center gap-2">
+            <SearchPalette />
             {admin && <JobIndicator />}
-            <AccountMenu />
+            <div className="hidden sm:block"><AccountMenu /></div>
             <NavLink to="/settings" className={(s) => cx(item(s), 'hidden sm:flex')} aria-label="Settings">
               <Settings className="size-4" />
             </NavLink>

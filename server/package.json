@@ -1,7 +1,7 @@
 {
   "name": "renplay-server",
   "private": true,
-  "version": "3.0.0",
+  "version": "3.1.0",
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "express": "^5.1.0",
+    "jose": "^6.2.15",
+    "ldapts": "^9.2.0",
     "multer": "^2.0.0",
     "sharp": "^0.35.5",
     "yaml": "^2.9.1",

@@ -334,6 +334,328 @@ Container only: group ID to use with PUID when started as root. Ignored when sta
 
 </div>
 
+<div class="config-entry" id="renplay-oidc-issuer">
+
+**`RENPLAY_OIDC_ISSUER`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+OIDC issuer URL. Enables discovery and single sign-on. Requires HTTPS, except loopback test servers.
+
+</div>
+
+<div class="config-entry" id="renplay-oidc-client-id">
+
+**`RENPLAY_OIDC_CLIENT_ID`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+OIDC client id. Register /api/auth/oidc/callback on RENPLAY_PUBLIC_URL as the callback URL.
+
+</div>
+
+<div class="config-entry" id="renplay-oidc-client-secret">
+
+**`RENPLAY_OIDC_CLIENT_SECRET`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+OIDC client secret. Prefer the _FILE variant. Empty supports public clients with PKCE.
+
+</div>
+
+<div class="config-entry" id="renplay-oidc-client-secret-file">
+
+**`RENPLAY_OIDC_CLIENT_SECRET_FILE`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Read the OIDC client secret from this file. Set this or RENPLAY_OIDC_CLIENT_SECRET, not both.
+
+</div>
+
+<div class="config-entry" id="renplay-oidc-name">
+
+**`RENPLAY_OIDC_NAME`**
+
+<div class="config-default">
+
+Default: `Single sign-on`
+
+</div>
+
+Name on the sign-in and account buttons.
+
+</div>
+
+<div class="config-entry" id="renplay-oidc-auto-create">
+
+**`RENPLAY_OIDC_AUTO_CREATE`**
+
+<div class="config-default">
+
+Default: `true`
+
+</div>
+
+Create accounts at first OIDC sign-in. If false, people must explicitly link their identity while signed in first.
+
+</div>
+
+<div class="config-entry" id="renplay-oidc-admin-group">
+
+**`RENPLAY_OIDC_ADMIN_GROUP`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Exact groups claim value granting Admin. Provider grants follow membership at each OIDC sign-in, even for the last admin. Admin access assigned in Users is kept.
+
+</div>
+
+<div class="config-entry" id="renplay-oidc-adult-group">
+
+**`RENPLAY_OIDC_ADULT_GROUP`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Exact groups claim value granting adult access. When set, access follows membership at each OIDC sign-in and cannot be edited in Users.
+
+</div>
+
+<div class="config-entry" id="renplay-admins">
+
+**`RENPLAY_ADMINS`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Comma-separated provider usernames or verified OIDC emails granted Admin when no admin group/filter is configured. Grants are checked at each sign-in and removed on unlink. Admin access assigned in Users is kept. LDAP email is not treated as verified.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-url">
+
+**`RENPLAY_LDAP_URL`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+LDAP directory URL, ldap:// or ldaps://. Prefer TLS. Enables directory password sign-in.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-bind-dn">
+
+**`RENPLAY_LDAP_BIND_DN`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Directory service account DN used to search for users and check groups.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-bind-password">
+
+**`RENPLAY_LDAP_BIND_PASSWORD`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Directory service account password. Prefer the _FILE variant.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-bind-password-file">
+
+**`RENPLAY_LDAP_BIND_PASSWORD_FILE`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Read the LDAP bind password from this file. Set this or RENPLAY_LDAP_BIND_PASSWORD, not both.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-base-dn">
+
+**`RENPLAY_LDAP_BASE_DN`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Base DN under which user entries are searched.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-user-filter">
+
+**`RENPLAY_LDAP_USER_FILTER`**
+
+<div class="config-default">
+
+Default: `(&(objectClass=person)(uid={username}))`
+
+</div>
+
+User search filter. Every {username} is escaped before substitution. Exactly one entry must match.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-username-attribute">
+
+**`RENPLAY_LDAP_USERNAME_ATTRIBUTE`**
+
+<div class="config-default">
+
+Default: `uid`
+
+</div>
+
+Directory attribute for the username.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-name-attribute">
+
+**`RENPLAY_LDAP_NAME_ATTRIBUTE`**
+
+<div class="config-default">
+
+Default: `displayName`
+
+</div>
+
+Directory display-name attribute; falls back to cn, then username.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-email-attribute">
+
+**`RENPLAY_LDAP_EMAIL_ATTRIBUTE`**
+
+<div class="config-default">
+
+Default: `mail`
+
+</div>
+
+Directory email attribute. LDAP email never grants admin access through RENPLAY_ADMINS.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-photo-attribute">
+
+**`RENPLAY_LDAP_PHOTO_ATTRIBUTE`**
+
+<div class="config-default">
+
+Default: `jpegPhoto`
+
+</div>
+
+Directory binary photo attribute, copied locally at sign-in.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-admin-filter">
+
+**`RENPLAY_LDAP_ADMIN_FILTER`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Filter evaluated against the authenticated user entry, such as memberOf=cn=renplay-admins,ou=groups,dc=example,dc=org. Provider grants follow membership at each LDAP sign-in, even for the last admin. Admin access assigned in Users is kept.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-adult-filter">
+
+**`RENPLAY_LDAP_ADULT_FILTER`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Filter evaluated against the authenticated user entry. Controls adult access at each LDAP sign-in.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-starttls">
+
+**`RENPLAY_LDAP_STARTTLS`**
+
+<div class="config-default">
+
+Default: `false`
+
+</div>
+
+Require StartTLS before sending any credentials over ldap://. A failed TLS upgrade refuses sign-in.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-ca-file">
+
+**`RENPLAY_LDAP_CA_FILE`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+PEM CA certificate file for directory TLS. Certificate verification is always enabled.
+
+</div>
+
 <div class="config-entry" id="renplay-auth">
 
 **`RENPLAY_AUTH`**

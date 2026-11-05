@@ -7,6 +7,26 @@ release notes say what).
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-11-05
+
+### Added
+
+- Single sign-on with OpenID Connect (Pocket ID, Authentik, Authelia, Keycloak and others): set
+  `RENPLAY_OIDC_ISSUER`, the client ID and secret. People are created at their first sign-in
+  unless `RENPLAY_OIDC_AUTO_CREATE=false`. A group can make people admins
+  (`RENPLAY_OIDC_ADMIN_GROUP`) or give them adult games (`RENPLAY_OIDC_ADULT_GROUP`), checked at
+  every sign-in.
+- Sign-in with an LDAP directory such as LLDAP, with filters for admins and adult games, StartTLS
+  or LDAPS.
+- Link and unlink your sign-in methods on the Account page. You always keep at least one way in,
+  and `RENPLAY_AUTH_LOCAL=false` hides the password form when single sign-on is set up.
+- Avatars: upload one, or Renplay copies the picture from your sign-in provider. Everyone else
+  sees your initials.
+- Search everything from one place: press ⌘K on a Mac or Ctrl+K elsewhere, or the search button
+  on phones. It finds games in your library and the catalog, pages and actions.
+- An admin who signs in through a provider before the owner account is claimed can claim it from
+  the Account page.
+
 ## [3.0.0] - 2026-11-05
 
 Renplay 3.0 adds accounts. **Before you upgrade:** back up `/data`. On its first start 3.0 moves
@@ -16,6 +36,13 @@ reverse proxy with HTTPS, also set `RENPLAY_PUBLIC_URL`. Nothing else needs chan
 
 ### Added
 
+- Single sign-on with OpenID Connect (including Pocket ID) and directory passwords through LDAP.
+  Link sign-ins from Account without merging people or their saves. Groups can set admin roles
+  and adult access automatically at sign-in.
+- Profile pictures: crop and upload your own in Account, or copy your sign-in provider's picture.
+  Pictures stay on your server and appear in the account menu, phone You tab and Users.
+- Search games, the catalog, pages and actions from the header or phone search button. Use ⌘K
+  on Apple devices or Ctrl+K elsewhere, then arrow keys and Enter or a tap to choose a result.
 - Accounts. Turn on sign-in with `RENPLAY_AUTH=on` and everyone gets their own saves, save
   history, favourites, Finished stories and play time; the library is shared. A new install asks
   for a setup code from the server log before creating the owner account. Upgraded installs keep
@@ -371,7 +398,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v3.0.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v3.1.0...dev
+[3.1.0]: https://github.com/renplay-org/renplay/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/renplay-org/renplay/compare/v2.11.1...v3.0.0
 [2.11.1]: https://github.com/renplay-org/renplay/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/renplay-org/renplay/compare/v2.10.0...v2.11.0

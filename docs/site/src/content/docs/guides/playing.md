@@ -3,6 +3,14 @@ title: Playing
 description: Play on phones and computers, install the home-screen app, and move saves to and from desktop Ren’Py.
 ---
 
+## Find a game
+
+Open **Search** in the header (also available on phones), or press **⌘K** on Apple devices and
+**Ctrl+K** elsewhere. Search titles, developers and tags across your library and the catalog,
+open a page, or resume your Up next game. Use arrow keys and Enter or tap a result. Catalog
+results show where to get the game; only admins see Add games, Activity and Users.
+The same adult-access and hidden-picture choices apply in search as in the library.
+
 ## On a computer
 
 Open the game and press **Play**. The game paces itself to your display. A toolbar offers saves,

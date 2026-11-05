@@ -13,7 +13,7 @@ export default function AccountMenu({ tab = false }: { tab?: boolean }) {
   const admin = data.user.role === 'admin'
   return <div>
     <button aria-expanded={open} onClick={() => setOpen(!open)} className={tab ? 'flex min-h-14 w-full flex-col items-center gap-1 py-2 text-[11px] text-zinc-300' : 'flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-zinc-200'}>
-      <Avatar name={data.user.name} className="size-8" />
+      <Avatar name={data.user.name} avatar={data.user.avatar} className="size-8" />
       <span className="max-w-24 truncate">{tab ? 'You' : data.user.name}</span>
     </button>
     <Modal open={open} onClose={() => setOpen(false)} title="Your account" footer={<>
