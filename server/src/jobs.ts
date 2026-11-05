@@ -3,6 +3,7 @@ import https from 'node:https'
 import type { Config } from './config.js'
 import { parseJson, type Db, type JobRow } from './db.js'
 import { newId } from './util/fsx.js'
+import { JOB_LOG_LIMIT, JobLogs } from './joblogs.js'
 
 export interface JobContext<P = any> {
   id: string
@@ -16,12 +17,12 @@ export interface JobContext<P = any> {
 
 export type JobHandler = (ctx: JobContext) => Promise<unknown>
 
-const LOG_LIMIT = 96 * 1024
-
 export class JobManager {
   private handlers = new Map<string, JobHandler>()
   private running: { id: string; abort: AbortController } | null = null
-  private logs = new Map<string, string>()
+  private logs: JobLogs
+  private liveLog = ''
+  private logWriteFailed = false
   private pending: Partial<JobRow> & { id?: string } = {}
   private flushTimer: NodeJS.Timeout | null = null
   private keepalive: { stop: () => void } | null = null
@@ -30,7 +31,9 @@ export class JobManager {
   constructor(
     private readonly db: Db,
     private readonly cfg: Config,
-  ) {}
+  ) {
+    this.logs = new JobLogs(cfg.dataDir)
+  }
 
   register(type: string, handler: JobHandler): void {
     this.handlers.set(type, handler)
@@ -38,6 +41,7 @@ export class JobManager {
 
   /** Marks jobs left running by a previous process and resumes the queue. */
   start(): void {
+    this.logs.clean((id) => !!this.db.getJob(id))
     for (const j of this.db.listJobs(500)) {
       if (j.status === 'running') {
         this.db.updateJob(j.id, {
@@ -86,7 +90,13 @@ export class JobManager {
   }
 
   getLog(id: string): string {
-    return this.logs.get(id) ?? this.db.getJob(id)?.log ?? ''
+    if (this.running?.id === id) return this.liveLog
+    return this.db.getJob(id)?.log || this.logs.read(id) || ''
+  }
+
+  clearFinished(): void {
+    this.db.deleteFinishedJobs()
+    this.logs.clean((id) => !!this.db.getJob(id))
   }
 
   isBusy(): boolean {
@@ -111,8 +121,9 @@ export class JobManager {
     const handler = this.handlers.get(next.type)
     const abort = new AbortController()
     this.running = { id: next.id, abort }
+    this.liveLog = ''
+    this.logWriteFailed = false
     this.keepalive ??= startKeepalive(this.cfg)
-    this.logs.set(next.id, '')
     this.db.updateJob(next.id, { status: 'running', started_at: new Date().toISOString(), stage: 'Starting', progress: 0 })
     this.notify()
 
@@ -127,9 +138,15 @@ export class JobManager {
       log: (line) => {
         // Local time of the server (TZ), as people read the log.
         const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false })
-        let l = (this.logs.get(next.id) ?? '') + `[${stamp}] ${line}\n`
-        if (l.length > LOG_LIMIT) l = l.slice(l.length - LOG_LIMIT)
-        this.logs.set(next.id, l)
+        const text = `[${stamp}] ${line}\n`
+        this.liveLog = (this.liveLog + text).slice(-JOB_LOG_LIMIT)
+        try {
+          this.logs.append(next.id, text)
+        } catch (err) {
+          // A full disk must not turn a log message into an unhandled job failure.
+          if (!this.logWriteFailed) console.error(`Could not persist job ${next.id} log:`, err)
+          this.logWriteFailed = true
+        }
       },
       checkAbort: () => {
         if (abort.signal.aborted) throw abort.signal.reason ?? new Error('Cancelled')
@@ -145,7 +162,7 @@ export class JobManager {
         progress: 1,
         stage: 'Done',
         result: JSON.stringify(result ?? {}),
-        log: this.logs.get(next.id) ?? '',
+        log: this.getLog(next.id),
         finished_at: new Date().toISOString(),
       })
     } catch (e) {
@@ -157,11 +174,11 @@ export class JobManager {
       this.db.updateJob(next.id, {
         status: cancelled ? 'cancelled' : 'failed',
         error: msg,
-        log: this.logs.get(next.id) ?? '',
+        log: this.getLog(next.id),
         finished_at: new Date().toISOString(),
       })
     } finally {
-      this.logs.delete(next.id)
+      this.liveLog = ''
       this.running = null
       this.notify()
       setImmediate(() => void this.pump())

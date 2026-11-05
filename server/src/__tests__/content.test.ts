@@ -245,6 +245,8 @@ describe('hiding adult games in the API', () => {
     expect(listed.find((a) => a.name === 'safe.zip')?.blocked).toBeNull()
     expect((await request(app.app).post('/api/imports').send({ source: { kind: 'archive', path: 'safe.zip' } })).status).toBe(200)
     expect(app.db.listJobs().filter((j) => j.type === 'import')).toHaveLength(1)
+    // The accepted fixture is not a real archive. Let its job finish before afterAll closes SQLite.
+    await expect.poll(() => app.jobs.isBusy()).toBe(false)
   })
 
   it('shows the games again when adult games are allowed, and asks for a valid answer', async () => {

@@ -1,7 +1,8 @@
 import type { JobContext } from '../jobs.js'
 import { Limiter } from '../util/limit.js'
 import { readAll, type ArchiveSource } from './archive.js'
-import { isOptimizableImage, transcodeImage, type ImagePolicy } from './optimize.js'
+import { MAX_IMAGE_BYTES } from './image-memory.js'
+import { ImageProcessor, isOptimizableImage, type ImagePolicy } from './optimize.js'
 import type { PackWriter } from './pack.js'
 
 const SKIP = [/(^|\/)\.ds_store$/i, /(^|\/)thumbs\.db$/i, /(^|\/)desktop\.ini$/i, /\.(exe|dll|so|dylib|pdb)$/i, /(^|\/)__MACOSX\//]
@@ -33,6 +34,7 @@ export async function extractHtml(
   const entries = src.entries.filter((e) => e.path.startsWith(root) && !e.path.endsWith('/') && !SKIP.some((r) => r.test(e.path)) && !isExcluded(e.path.slice(root.length)))
   const total = entries.reduce((n, e) => n + e.size, 0)
   const limiter = new Limiter(concurrency)
+  const images = new ImageProcessor()
   let done = 0
   let reported = Date.now()
   const tick = (n: number) => {
@@ -47,10 +49,17 @@ export async function extractHtml(
   for (const e of entries) {
     ctx.signal.throwIfAborted()
     const rel = e.path.slice(root.length)
-    if (policy.enabled && isOptimizableImage(rel) && e.size < 256 << 20) {
-      const data = await readAll(await e.open(), 256 << 20)
-      await limiter.run(async () => {
-        const r = await transcodeImage(data, rel, policy)
+    if (policy.enabled && isOptimizableImage(rel) && e.size <= MAX_IMAGE_BYTES) {
+      await limiter.acquire()
+      let data: Buffer
+      try {
+        data = await readAll(await e.open(), MAX_IMAGE_BYTES)
+      } catch (err) {
+        limiter.release()
+        throw err
+      }
+      limiter.spawn(async () => {
+        const r = await images.process(data, rel, policy)
         if (r.changed) {
           stats.imagesConverted++
           stats.imageBytesBefore += data.length

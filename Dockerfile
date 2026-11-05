@@ -15,8 +15,10 @@ RUN cd server && npm run build && npm prune --omit=dev
 FROM node:24-bookworm-slim
 # nginx serves the games volume; libarchive-tools (bsdtar) unpacks 7z/rar
 # archives. Ren'Py engines come prebuilt from renplay-org/engines.
+# jemalloc avoids glibc retaining fragmented sharp/libvips image allocations.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools curl ca-certificates \
+ && apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools curl ca-certificates libjemalloc2 \
+ && ln -s /usr/lib/*-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so.2 \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled /var/log/nginx \
  && mkdir -p /app
 
@@ -31,6 +33,7 @@ COPY deploy/nginx.conf.template deploy/entrypoint.sh /app/deploy/
 RUN chmod +x /app/deploy/entrypoint.sh
 
 ENV NODE_ENV=production \
+    LD_PRELOAD=/usr/local/lib/libjemalloc.so.2 \
     GAMES_DIR=/games \
     DATA_DIR=/data \
     HOME=/tmp/home \
