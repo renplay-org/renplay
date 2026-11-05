@@ -3,8 +3,10 @@ title: Accounts API
 description: Local accounts, sessions, tokens, permissions and save transfers.
 ---
 
-These endpoints back the Account and Users screens. OIDC, LDAP and avatars are not included. `identities` is keyed by `(provider, subject)` so later providers
-can link explicitly without relying on a display name or an unverified email.
+These endpoints back the Account and Users screens. `identities` is keyed by `(provider, subject)`:
+OIDC providers include the issuer and use the token subject; LDAP providers include directory URL
+and base DN and use entryUUID (or DN). Linking is explicit, never based on an email or name.
+See [Accounts](/accounts/) for provider configuration.
 
 ## Authenticate scripts
 
@@ -36,10 +38,18 @@ are rejected rather than matched differently by authorization and routing.
 
 | Method and path | Body or result |
 |---|---|
-| `GET /auth/providers` | `{ enabled, setup, local }`; public |
+| `GET /auth/providers` | `{ enabled, setup, local, oidc, ldap }`; public. `local` means the password form is available (local or LDAP); `oidc` is its button name or null |
 | `POST /auth/setup/verify` | `{ code }` → `{ grant }`; public, ten attempts per boot |
 | `POST /auth/setup` | `{ grant, username, name, password }`; claims owner and sets a cookie |
 | `POST /auth/login` | `{ username, password }`; rate limited per address and account |
+| `GET /auth/oidc/start` | Starts sign-in; sets a ten-minute httpOnly state cookie and redirects to the provider |
+| `GET /auth/oidc/callback` | Single-use state plus bound cookie; exchanges code with PKCE, verifies ID token, sets a session and redirects home |
+| `GET /me/identities` | Linked `{ provider, subject, name, available }` methods; never passwords |
+| `POST /me/identities/oidc` | Returns `{ url }`; starts explicit linking bound to the current session |
+| `POST /me/identities/ldap` | `{ username, password }`; verifies credentials before linking |
+| `DELETE /me/identities` | `{ provider, subject }`; keeps an enabled method, removes provider grants and ends other sessions |
+| `POST /me/avatar` | Raw JPEG, PNG or WebP, up to 2 MiB and 16 megapixels; returns `{ avatar }` filename |
+| `GET /avatars/:file` | Authenticated WebP; private/no-store |
 | `POST /auth/logout` | Revokes the current cookie session |
 | `GET /me` | `{ user, auth, unclaimed, hasPassword }` |
 | `PUT /me` | `{ name }` |
@@ -53,7 +63,7 @@ are rejected rather than matched differently by authorization and routing.
 | `GET /me/tokens` | `{ tokens }`; never includes secrets |
 | `POST /me/tokens` | `{ name }` → `{ id, token }` |
 | `DELETE /me/tokens/:id` | Revokes that token |
-| `GET /users` | `{ users, adultDefault }`; `adultDefault` is the new-user adult-access default; each user includes `games` (nonempty save folders), `saves` (current files in those folders, excluding shared keys and history), `protected` (owner or no-sign-in account) |
+| `GET /users` | `{ users, adultDefault }`; `adultDefault` is the new-user adult-access default; each user includes `avatar`, `roleManaged`, `adultManaged`, `games` (nonempty save folders), `saves` (current files in those folders, excluding shared keys and history), `protected` (owner or no-sign-in account) |
 | `POST /users` | `{ username, name?, password, role?, adultAccess? }` → `{ user }`; role defaults to `player` |
 | `PUT /users/:id` | `{ name?, role?, disabled?, adultAccess? }` |
 | `POST /users/:id/password` | `{ password }`; ends all target sessions |
@@ -84,7 +94,7 @@ extended and tested.
 
 ## Database and request boundary
 
-Schema **7** (2.10 already uses schema 6) adds `users`, `identities`, `sessions`, `tokens`,
+Schema **8** adds `avatar` and `avatar_uploaded` to users; schema 7 (2.10 already uses schema 6) adds `users`, `identities`, `sessions`, `tokens`,
 `user_games` and `safe_games`. Owner 1 receives existing library progress. Account ids are never
 reused. The migration backs up the checkpointed database and both save trees before moving any
 folder and only commits the new schema after folder migration succeeds.

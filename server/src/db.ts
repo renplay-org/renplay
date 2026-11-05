@@ -190,6 +190,13 @@ export class Db {
       CREATE TABLE IF NOT EXISTS uploaded_archives (path TEXT PRIMARY KEY, identity TEXT NOT NULL);
       PRAGMA user_version = 8; COMMIT;
     `)
+    if (v < 9) {
+      const columns = this.raw.prepare('PRAGMA table_info(users)').all().map(c => c.name)
+      this.raw.exec('BEGIN')
+      if (!columns.includes('avatar')) this.raw.exec("ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT ''")
+      if (!columns.includes('avatar_uploaded')) this.raw.exec('ALTER TABLE users ADD COLUMN avatar_uploaded INTEGER NOT NULL DEFAULT 0')
+      this.raw.exec('PRAGMA user_version = 9; COMMIT')
+    }
     } catch (error) { this.raw.close(); throw error }
   }
 

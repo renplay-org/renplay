@@ -16,6 +16,13 @@ reverse proxy with HTTPS, also set `RENPLAY_PUBLIC_URL`. Nothing else needs chan
 
 ### Added
 
+- Single sign-on with OpenID Connect (including Pocket ID) and directory passwords through LDAP.
+  Link sign-ins from Account without merging people or their saves. Groups can set admin roles
+  and adult access automatically at sign-in.
+- Profile pictures: crop and upload your own in Account, or copy your sign-in provider's picture.
+  Pictures stay on your server and appear in the account menu, phone You tab and Users.
+- Search games, the catalog, pages and actions from the header or phone search button. Use ⌘K
+  on Apple devices or Ctrl+K elsewhere, then arrow keys and Enter or a tap to choose a result.
 - Accounts. Turn on sign-in with `RENPLAY_AUTH=on` and everyone gets their own saves, save
   history, favourites, Finished stories and play time; the library is shared. A new install asks
   for a setup code from the server log before creating the owner account. Upgraded installs keep

@@ -3,7 +3,7 @@ title: Accounts
 description: Sign-in, separate saves, shared libraries and moving between accounts.
 ---
 
-Renplay 3.0 adds local accounts. Everyone shares the games, but saves, save history, favourites,
+Renplay supports local accounts, OpenID Connect (OIDC) and LDAP. Everyone shares the games, but saves, save history, favourites,
 Finished, play time and last played belong to each person. HTML games' stored progress is separate
 too. Admins manage games and users; players play and manage their own saves.
 
@@ -53,6 +53,176 @@ Use HTTPS outside a trusted local network. Cookies are httpOnly and SameSite=Lax
 `Secure` over HTTPS, but work on plain HTTP for local NAS installs. Set `RENPLAY_PUBLIC_URL` to
 your HTTPS address when a proxy terminates HTTPS. See [Reverse proxy and HTTPS](/install/reverse-proxy/).
 
+## Local passwords
+
+Local sign-in is enabled by default. Passwords have at least 10 characters. Admins can add local
+users and reset their passwords in **Users**. Password changes end the other sessions.
+
+Set `RENPLAY_AUTH_LOCAL=false` to disable local password authentication when another provider is
+configured. With OIDC only, this hides the password form. LDAP still uses the directory password
+form. Renplay checks OIDC discovery and the LDAP service bind at startup; invalid provider settings
+stop startup rather than leaving an unusable sign-in page. SSO-only configurations must also set
+an admin group, filter or `RENPLAY_ADMINS`.
+
+## OpenID Connect
+
+Register Renplay as an OIDC application in your provider. Its callback URL is exactly:
+
+```text
+https://play.example.org/api/auth/oidc/callback
+```
+
+Set `RENPLAY_PUBLIC_URL` to your Renplay address, not the provider's. Renplay discovers endpoints
+from the issuer, requests `openid profile email groups`, and uses the authorization code flow with
+PKCE (S256), state and nonce. The signed identity token must match the issuer, client and request.
+The issuer, authorization, token and key endpoints require HTTPS (loopback HTTP is allowed for local
+tests). Keep the client secret in a secret file where possible; do not put it in a public compose file.
+
+```sh
+RENPLAY_PUBLIC_URL=https://play.example.org
+RENPLAY_OIDC_ISSUER=https://id.example.org
+RENPLAY_OIDC_CLIENT_ID=renplay
+RENPLAY_OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc-client-secret
+RENPLAY_OIDC_NAME="Pocket ID"
+RENPLAY_OIDC_ADMIN_GROUP=renplay-admins
+RENPLAY_OIDC_ADULT_GROUP=renplay-adults
+```
+
+Accounts are matched by issuer and subject, never by email or display name. First sign-in creates
+a player unless an admin rule matches. Set `RENPLAY_OIDC_AUTO_CREATE=false` to require linking from
+an existing signed-in account first. This also prevents creating the first owner through OIDC;
+claim a local owner before disabling local sign-in in that mode.
+
+`RENPLAY_ADMINS` is a comma-separated list of provider usernames or emails. An email only counts
+when the OIDC token has `email_verified: true`. An admin group, when configured, takes precedence
+over this list. Changing an email or name never links accounts.
+
+### Pocket ID
+
+Create an OIDC client, set the exact callback above, and copy its client id and secret. Use Pocket
+ID's published issuer URL (normally its root address) as `RENPLAY_OIDC_ISSUER`. Add the two groups
+to Pocket ID and assign people to them. Ensure they are present as strings in the ID token's
+`groups` array; use their exact values in the two Renplay group settings. The button name can be
+`Pocket ID` as in the example.
+
+### Authentik
+
+Create an OAuth2/OpenID provider with a confidential client, the exact callback, and the
+`openid`, `profile`, `email` and `groups` scope mappings. Associate it with an application whose
+slug is `renplay`. Use the issuer shown on its provider page, for example:
+
+```sh
+RENPLAY_OIDC_ISSUER=https://auth.example.org/application/o/renplay/
+RENPLAY_OIDC_NAME=Authentik
+```
+
+If the standard mappings omit groups from the ID token, add a `groups` scope mapping returning
+`{"groups": [group.name for group in request.user.ak_groups.all()]}`. Assign group names matching
+`RENPLAY_OIDC_ADMIN_GROUP` and `RENPLAY_OIDC_ADULT_GROUP`.
+
+### Authelia
+
+Register a confidential OIDC client with the exact callback and scopes
+`openid`, `profile`, `email`, `groups`. Enable the authorization code grant, response type `code`,
+PKCE S256 and `client_secret_basic` token authentication. Use the Authelia root URL as issuer:
+
+```sh
+RENPLAY_OIDC_ISSUER=https://auth.example.org
+RENPLAY_OIDC_NAME=Authelia
+```
+
+Make the `groups` claim available in the ID token, including it through a claims policy if required
+by your Authelia version. A claim only in the user-info response does not control Renplay permissions.
+The trusted `Remote-User` header is not a supported sign-in provider.
+
+### Keycloak
+
+Create an OpenID Connect client in your realm with standard flow enabled, direct access grants
+disabled, client authentication enabled and the exact callback. Set PKCE to S256. Add a client
+scope named `groups` with a Group Membership mapper, token claim name `groups`, full group path
+**off**, and **Add to ID token** enabled. Make that scope available to this client.
+
+```sh
+RENPLAY_OIDC_ISSUER=https://id.example.org/realms/home
+RENPLAY_OIDC_NAME=Keycloak
+```
+
+If you keep full group paths enabled, use values such as `/renplay-admins` in Renplay instead.
+All examples also need `RENPLAY_PUBLIC_URL`, the client id and the client secret from the common
+example. Consult your provider's current documentation for its configuration file syntax.
+
+## LDAP and LLDAP
+
+LDAP uses the password form. Renplay searches with its service account, binds as the matching
+person to check the password, then checks group filters with the service account. The default
+user filter works with LLDAP. Start with a dedicated read-only service account with permission
+to see users, photos and groups (the example DN must exist in your directory):
+
+```sh
+RENPLAY_LDAP_URL=ldaps://ldap.example.org:636
+RENPLAY_LDAP_BIND_DN=uid=renplay,ou=people,dc=example,dc=org
+RENPLAY_LDAP_BIND_PASSWORD_FILE=/run/secrets/ldap-password
+RENPLAY_LDAP_BASE_DN=dc=example,dc=org
+RENPLAY_LDAP_USER_FILTER='(&(objectClass=person)(uid={username}))'
+RENPLAY_LDAP_ADMIN_FILTER='memberOf=cn=renplay-admins,ou=groups,dc=example,dc=org'
+RENPLAY_LDAP_ADULT_FILTER='memberOf=cn=renplay-adults,ou=groups,dc=example,dc=org'
+```
+
+For LLDAP's default internal listener use `ldap://lldap:3890` only on a trusted private network.
+For other directories offering StartTLS, use `ldap://` with `RENPLAY_LDAP_STARTTLS=true`. TLS is
+verified; `RENPLAY_LDAP_CA_FILE` accepts your private PEM CA. A failed TLS upgrade never falls
+back to plaintext. Do not send directory passwords over an untrusted plaintext network.
+
+Attribute settings are `RENPLAY_LDAP_USERNAME_ATTRIBUTE=uid`,
+`RENPLAY_LDAP_NAME_ATTRIBUTE=displayName` (falls back to `cn`),
+`RENPLAY_LDAP_EMAIL_ATTRIBUTE=mail` and `RENPLAY_LDAP_PHOTO_ATTRIBUTE=jpegPhoto`.
+`{username}` is escaped wherever it appears in the user filter. Exactly one entry must match.
+The identity uses `entryUUID`, falling back to the entry DN if the directory does not supply it.
+Changing the directory URL or base DN creates a different provider; link it explicitly again.
+LDAP emails do not carry OIDC's verification proof, so use usernames, not emails, in
+`RENPLAY_ADMINS` for directory admins.
+
+**A local username always takes precedence.** If it exists locally, a wrong local password does
+not fall through to LDAP, even if the directory has the same username. If local authentication
+is disabled, that name remains reserved: link the directory identity explicitly while signed in
+before disabling local sign-in. Renplay never silently merges a local and directory account.
+Other directory users are created on first sign-in.
+
+### Group-driven permissions
+
+Configured admin and adult groups/filters own their respective permissions. They are refreshed at
+every sign-in through that provider, including revocations. **Users** labels those permissions as
+set by the sign-in provider and does not allow editing them. An absent groups claim grants neither
+permission. A configured adult group can restrict even the owner; instance-wide blocking always
+wins. With several linked providers, the last provider sign-in that manages a permission sets it.
+Local password sign-in does not refresh directory groups. Changes are applied at the next provider
+sign-in, not continuously in the background. Revoking the last provider-managed admin is allowed;
+restore membership in the provider to recover access.
+
+The first new SSO admin claims the unclaimed owner and its existing saves. An admin who already
+signed in before becoming an admin can use **Account → Claim the owner account** while it remains
+unclaimed. Existing personal saves are copied with history, not deleted or discarded.
+
+## Linked sign-ins
+
+**Account → Linked sign-ins** links OIDC after you complete the provider's sign-in, or LDAP after
+you enter your directory credentials. You must stay signed in to the same Renplay session while
+linking. An identity already belonging to another account cannot be linked or silently merged.
+You can unlink a method only when another enabled method remains. Unlinking ends other sessions.
+Unlinking a provider-controlled permission removes that grant (role becomes Player, adult access
+becomes Blocked); the last enabled admin must keep its method until another
+admin exists. Unavailable providers do not count as a working remaining sign-in method.
+
+## Profile pictures
+
+Upload a JPEG, PNG or WebP up to 2 MiB in **Account**, preview a square crop, adjust its zoom and
+save. Images are limited to 16 megapixels and stored as content-addressed 256 px WebP files under
+`/data/avatars/`. Pictures have the same sign-in protection as the library. Otherwise Renplay copies
+OIDC `picture` or LDAP `jpegPhoto` at sign-in; it never hotlinks the provider. Remote pictures must
+use HTTPS on port 443, cannot redirect or access private network addresses, and have a 2 MiB cap.
+Unavailable or invalid provider pictures do not prevent sign-in. Your own upload takes precedence
+over later provider pictures. Without a picture, Renplay uses initials on the accent gradient.
+
 ## Without sign-in
 
 `RENPLAY_AUTH=off` lets everyone play as the owner (account 1). `RENPLAY_AUTH_USER` can choose a
@@ -65,7 +235,8 @@ trusted network or behind your own authentication. Disabling sign-in is not a wa
 ## Adult games
 
 The instance's choice still comes first. An admin grants adult access per account; new accounts
-are blocked unless `RENPLAY_ADULT_DEFAULT=allow`. The first admin has access. Games with no recipe
+are blocked unless `RENPLAY_ADULT_DEFAULT=allow`. The first admin has access unless a provider's
+group rule restricts it. Games with no recipe
 count as adult for restricted accounts until an admin marks them safe.
 
 **Account → Adult pictures** has **Show**, **Hide pictures** (the default) and **Hide adult games**.

@@ -31,7 +31,7 @@ Other engines are added only when their normal download plays as easily; the
 
 - **Play anywhere.** Smooth, full-speed playback in the browser. On phones the game fills the
   screen around the camera cutout, and on iPhone it runs full screen from the home screen.
-- **Separate accounts.** Local sign-in keeps each person's saves and progress separate. Admins
+- **Separate accounts.** Local sign-in, OpenID Connect and LDAP keep each person's saves and progress separate. Admins
   manage the shared library; players play. Sign-in can be switched off for a trusted home network.
 - **Saves on your server.** Saves, autosaves and progress sync as you play, with earlier versions
   kept. Sequels find the previous season’s saves, just like on desktop. Import saves from the
@@ -118,7 +118,12 @@ Cookies work on plain HTTP for a local NAS and are marked `Secure` over HTTPS. B
 termination, set `RENPLAY_PUBLIC_URL` to the public HTTPS address. Keep proxy hop counts correct
 with `RENPLAY_TRUSTED_HOPS` (the included nginx is one hop).
 
-Open **Account** from the account menu (the **You** tab on phones) to change your name, password
+Single sign-on supports OIDC providers such as Pocket ID, Authentik, Authelia and Keycloak, plus
+LDAP directories such as LLDAP. Groups can control roles and adult access. Register OIDC's exact
+callback `/api/auth/oidc/callback`; see the [provider examples](https://docs.renplay.org/accounts/).
+Local usernames take precedence over LDAP and accounts are only linked explicitly while signed in.
+
+Open **Account** from the account menu (the **You** tab on phones) to upload a profile picture, link sign-ins, change your name, password
 and adult-picture preferences, manage sessions and script tokens, or export your saves. Admins use
 **Settings → Users** to add users, change roles and adult access, disable accounts, reset passwords,
 and copy, merge, export or import save folders. Overwrites keep history; removing a user archives

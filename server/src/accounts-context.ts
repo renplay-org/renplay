@@ -9,6 +9,8 @@ export interface User {
   disabled: number
   created_at: string
   prefs: string
+  avatar: string
+  avatar_uploaded: number
 }
 export interface Viewer { user: User; session: string; bearer: boolean }
 /** Request-local permissions; background installs deliberately have no viewer. */

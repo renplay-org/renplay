@@ -11,6 +11,8 @@ import { SaveStore, SHARED_DIRS } from './saves/store.js'
 import { readZipEntries } from './saves/savefile.js'
 import { saveImport } from './saves/import-upload.js'
 import { HttpError, cleanRelPath, isSaveDirName } from './util/paths.js'
+import { SignInProviders, signInRandom, type ExternalIdentity } from './sign-in-providers.js'
+import { fetchAvatar, storeAvatar } from './avatars.js'
 
 // Measured locally at 207 ms (N=65536: 105 ms); explicit 128 MiB work factor.
 const PASSWORD_PREFIX = 'scrypt$1$131072$8$1$'
@@ -50,7 +52,7 @@ function name(value: unknown): string {
 
 /** A closed player allowlist makes new management endpoints admin-only by default. */
 export function playerRoute(method: string, path: string): boolean {
-  if (/^\/api\/me(?:\/|$)/.test(path)) return true
+  if (/^\/api\/me(?:\/|$)/.test(path) || /^\/api\/avatars\/[a-f0-9]{64}\.webp$/.test(path) && ['GET', 'HEAD'].includes(method)) return true
   if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export') return true
   if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(covers|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+$/.test(path))) return true
   return /^(PUT \/api\/games\/[^/]+\/(favorite|finished)|POST \/api\/games\/[^/]+\/(played|play-time))$/.test(`${method} ${path}`)
@@ -58,6 +60,8 @@ export function playerRoute(method: string, path: string): boolean {
 
 export class Accounts {
   readonly enabled: boolean
+  readonly providers: SignInProviders
+  private readonly oidcFlows = new Map<string, { nonce: string; verifier: string; expires: number; session?: string; user?: number }>()
   private setupCode = randomBytes(9).toString('hex').toUpperCase()
   private attempts = 10
   private setupGrant = ''
@@ -69,6 +73,7 @@ export class Accounts {
   private dummyPassword = ''
   constructor(readonly db: Db, readonly cfg: Config) {
     this.enabled = (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
+    this.providers = new SignInProviders(cfg)
   }
   get unclaimed(): boolean { return !(this.db.raw.prepare('SELECT 1 FROM identities WHERE user_id = 1').get()) }
   user(id: number): User {
@@ -102,10 +107,12 @@ export class Accounts {
   }
   async init(): Promise<void> {
     this.dummyPassword = await passwordHash(random())
-    if (this.enabled && !this.cfg.authLocal) throw new Error('No sign-in provider is enabled. Enable RENPLAY_AUTH_LOCAL or set RENPLAY_AUTH=off.')
+    await this.providers.init()
+    if (this.enabled && !this.cfg.authLocal && !this.cfg.oidcIssuer && !this.cfg.ldapUrl) throw new Error('No sign-in provider is enabled. Enable RENPLAY_AUTH_LOCAL or configure OIDC or LDAP.')
+    if (this.enabled && !this.cfg.authLocal && !this.cfg.admins.length && !this.cfg.oidcAdminGroup && !this.cfg.ldapAdminFilter) throw new Error('SSO-only sign-in needs RENPLAY_ADMINS or an admin group or filter.')
     if (!!this.cfg.adminUsername !== !!this.cfg.adminPassword) throw new Error('Set both RENPLAY_ADMIN_USERNAME and RENPLAY_ADMIN_PASSWORD (or its _FILE variant)')
     if (this.unclaimed && this.cfg.adminUsername) await this.claim(this.cfg.adminUsername, this.cfg.adminUsername, this.cfg.adminPassword)
-    if (this.enabled && this.unclaimed) console.log(`Setup code: ${this.setupCode}`)
+    if (this.enabled && this.cfg.authLocal && this.unclaimed) console.log(`Setup code: ${this.setupCode}`)
     if (!this.enabled && this.user(this.cfg.authUser).disabled) throw new Error('RENPLAY_AUTH_USER is disabled')
     for (const u of this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]) await this.tag(u)
     for (const [legacy, target] of [[this.cfg.savesDir, this.store(1).root], [this.cfg.saveHistoryDir, this.store(1).historyRoot]]) {
@@ -271,11 +278,112 @@ export class Accounts {
     this.db.raw.prepare(`INSERT INTO user_games SELECT ?, game, favorite_at, finished_at, last_played_at, play_time FROM user_games WHERE user_id = ?
       ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time)`).run(to, from)
   }
+  private managed(id: number) {
+    const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)
+    const oidc = identities.some(i => i.provider === this.providers.oidcProvider), ldap = identities.some(i => i.provider === this.providers.ldapProvider)
+    return { roleManaged: !!(oidc && this.cfg.oidcAdminGroup || ldap && this.cfg.ldapAdminFilter), adultManaged: !!(oidc && this.cfg.oidcAdultGroup || ldap && this.cfg.ldapAdultFilter) }
+  }
+  private async external(identity: ExternalIdentity, linking?: number): Promise<number> {
+    const existing = this.db.raw.prepare('SELECT user_id FROM identities WHERE provider = ? AND subject = ?').get(identity.provider, identity.subject) as { user_id: number } | undefined
+    if (linking && existing && existing.user_id !== linking) throw new HttpError(409, 'That sign-in belongs to another account. Accounts are never merged automatically.')
+    if (existing && this.user(existing.user_id).disabled) throw new HttpError(403, 'This account is disabled')
+    if (!existing && !linking && identity.provider === this.providers.oidcProvider && !this.cfg.oidcAutoCreate) throw new HttpError(403, 'Ask an admin to link this sign-in to an account first')
+    let id = linking ?? existing?.user_id
+    const newOwner = id === undefined && identity.admin && this.unclaimed
+    this.db.raw.exec('BEGIN IMMEDIATE')
+    try {
+      if (newOwner) {
+        id = 1
+        const ownerLogin = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != 1').get(identity.username) ? `sso-${signInRandom().slice(0, 12)}` : identity.username.slice(0, 64)
+        this.db.raw.prepare('UPDATE users SET username = ?, name = ?, adult_access = 1 WHERE id = 1').run(ownerLogin, identity.name.slice(0, 100))
+      } else if (id === undefined) {
+        // Display names and emails are never used to match or merge accounts.
+        const login = identity.username.toLowerCase().replace(/[^a-z0-9._-]/g, '-').slice(0, 48) || 'player'
+        const unique = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login) ? `${login}-${signInRandom().slice(0, 8)}` : login
+        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, adult_access, created_at) VALUES (?, ?, ?, ?, ?)').run(unique, identity.name.slice(0, 100), identity.admin ? 'admin' : 'player', Number(identity.adult ?? (identity.admin || this.cfg.adultDefault)), new Date().toISOString()).lastInsertRowid)
+      }
+      if (!existing) this.db.raw.prepare('INSERT INTO identities (provider, subject, user_id) VALUES (?, ?, ?)').run(identity.provider, identity.subject, id!)
+      const u = this.user(id!)
+      if (identity.roleManaged || identity.admin && !this.managed(id!).roleManaged) {
+        // Provider revocation must take effect even for the last admin; recovery is through the provider.
+        this.db.raw.prepare('UPDATE users SET role = ? WHERE id = ?').run(identity.admin ? 'admin' : 'player', id!)
+      }
+      if (identity.adultManaged) this.db.raw.prepare('UPDATE users SET adult_access = ? WHERE id = ?').run(Number(identity.adult), id!)
+      if (u.disabled) throw new HttpError(403, 'This account is disabled')
+      this.db.raw.exec('COMMIT')
+    } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
+    if (identity.picture && !this.user(id!).avatar_uploaded) {
+      try {
+        const picture = typeof identity.picture === 'string' ? await fetchAvatar(identity.picture) : identity.picture
+        const avatar = await storeAvatar(this.cfg.dataDir, picture)
+        this.db.raw.prepare('UPDATE users SET avatar = ? WHERE id = ? AND avatar_uploaded = 0').run(avatar, id!)
+      } catch { /* An unavailable provider picture must not prevent sign-in. */ }
+    }
+    this.invalidate(); await this.tag(this.user(id!))
+    return id!
+  }
+  private beginOidc(req: Request, res: Response, linking = false): string {
+    if (!this.enabled || !this.cfg.oidcIssuer) throw new HttpError(403, 'Single sign-on is off')
+    this.limit(`oidc:${req.ip}`)
+    for (const [key, flow] of this.oidcFlows) if (flow.expires < Date.now()) this.oidcFlows.delete(key)
+    if (this.oidcFlows.size >= 10000) throw new HttpError(429, 'Too many sign-in attempts')
+    const state = signInRandom(), nonce = signInRandom(), verifier = signInRandom()
+    this.oidcFlows.set(hash(state), { nonce, verifier, expires: Date.now() + 600000, ...(linking ? { session: viewer()!.session, user: this.current().id } : {}) })
+    res.cookie('renplay_oidc', state, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/api/auth/oidc', maxAge: 600000 })
+    return this.providers.authorization(state, nonce, verifier)
+  }
   router(): Router {
     const r = Router({ caseSensitive: true, strict: true })
-    r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.unclaimed, local: this.cfg.authLocal }))
+    r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.cfg.authLocal && this.unclaimed, local: this.cfg.authLocal || !!this.cfg.ldapUrl, oidc: this.cfg.oidcIssuer ? this.cfg.oidcName : null, ldap: !!this.cfg.ldapUrl }))
+    r.get('/auth/oidc/start', (req, res) => res.redirect(this.beginOidc(req, res)))
+    r.get('/auth/oidc/callback', async (req, res) => {
+      const state = typeof req.query.state === 'string' ? req.query.state : ''
+      const cookie = req.get('cookie')?.match(/(?:^|;\s*)renplay_oidc=([^;]+)/)?.[1]
+      const flow = this.oidcFlows.get(hash(state))
+      this.oidcFlows.delete(hash(state))
+      res.clearCookie('renplay_oidc', { path: '/api/auth/oidc' })
+      if (!state || cookie !== state || !flow || flow.expires < Date.now() || typeof req.query.code !== 'string') throw new HttpError(401, 'This sign-in request expired or does not match. Try again.')
+      if (flow.user && (viewer()?.session !== flow.session || this.current().id !== flow.user)) throw new HttpError(401, 'Sign in to the same account before linking')
+      let identity: ExternalIdentity
+      try { identity = await this.providers.oidc(req.query.code, flow.nonce, flow.verifier) } catch { throw new HttpError(401, 'Single sign-on failed. Try again.') }
+      const id = await this.external(identity, flow.user)
+      if (!flow.user) this.newSession(req, res, id)
+      res.redirect(flow.user ? '/account' : '/')
+    })
+    r.post('/me/identities/oidc', (req, res) => res.json({ url: this.beginOidc(req, res, true) }))
+    r.post('/me/identities/ldap', async (req, res) => {
+      if (!this.cfg.ldapUrl) throw new HttpError(403, 'LDAP is off')
+      this.limit(`ip:${req.ip}`)
+      this.limit(`ldap:${String(req.body?.username).toLowerCase()}`)
+      await this.external(await this.providers.ldap(req.body?.username, req.body?.password), this.current().id)
+      res.json({ ok: true })
+    })
+    r.get('/me/identities', (_req, res) => res.json({ identities: this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(this.current().id).map(i => ({ ...i, name: i.provider === 'local' ? 'Password' : String(i.provider).startsWith('oidc:') ? this.cfg.oidcName : 'LDAP', available: i.provider === 'local' ? this.cfg.authLocal : i.provider === this.providers.oidcProvider ? !!this.cfg.oidcIssuer : i.provider === this.providers.ldapProvider && !!this.cfg.ldapUrl })) }))
+    r.delete('/me/identities', (req, res) => {
+      const id = this.current().id, provider = req.body?.provider, subject = req.body?.subject
+      const methods = this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(id)
+      if (typeof provider !== 'string' || typeof subject !== 'string' || !methods.some(i => i.provider === provider && i.subject === subject)) throw new HttpError(404, 'Linked sign-in not found')
+      const remaining = methods.filter(i => i.provider !== provider || i.subject !== subject).filter(i => i.provider === 'local' ? this.cfg.authLocal : i.provider === this.providers.oidcProvider ? !!this.cfg.oidcIssuer : i.provider === this.providers.ldapProvider && !!this.cfg.ldapUrl)
+      if (!remaining.length) throw new HttpError(409, 'Keep at least one enabled way to sign in')
+      const roleManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdminGroup || provider === this.providers.ldapProvider && !!this.cfg.ldapAdminFilter
+      const adultManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdultGroup || provider === this.providers.ldapProvider && !!this.cfg.ldapAdultFilter
+      if (roleManaged) { this.guardLastAdmin(this.current(), { role: 'player' }); this.db.raw.prepare("UPDATE users SET role = 'player' WHERE id = ?").run(id) }
+      if (adultManaged) this.db.raw.prepare('UPDATE users SET adult_access = 0 WHERE id = ?').run(id)
+      this.db.raw.prepare('DELETE FROM identities WHERE user_id = ? AND provider = ? AND subject = ?').run(id, provider, subject)
+      this.revoke(id, viewer()!.session); res.json({ ok: true })
+    })
+    r.post('/me/avatar', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '2mb' }), async (req, res) => {
+      if (!Buffer.isBuffer(req.body)) throw new HttpError(400, 'Upload a JPEG, PNG or WebP picture')
+      const avatar = await storeAvatar(this.cfg.dataDir, req.body)
+      this.db.raw.prepare('UPDATE users SET avatar = ?, avatar_uploaded = 1 WHERE id = ?').run(avatar, this.current().id)
+      res.json({ avatar })
+    })
+    r.get('/avatars/:file', (req, res) => {
+      if (!/^[a-f0-9]{64}\.webp$/.test(req.params.file)) throw new HttpError(404, 'Picture not found')
+      res.sendFile(join(this.cfg.dataDir, 'avatars', req.params.file))
+    })
     r.post('/auth/setup/verify', (req, res) => {
-      if (!this.enabled || !this.unclaimed) throw new HttpError(409, 'Setup is complete')
+      if (!this.enabled || !this.cfg.authLocal || !this.unclaimed) throw new HttpError(409, 'Setup is complete')
       if (this.attempts <= 0) throw new HttpError(429, 'Restart Renplay to get a new setup code')
       this.attempts--
       if (typeof req.body?.code !== 'string' || !equal(req.body.code, this.setupCode)) throw new HttpError(403, 'That setup code is wrong')
@@ -289,12 +397,17 @@ export class Accounts {
       res.json({ ok: true })
     })
     r.post('/auth/login', async (req, res) => {
-      if (!this.enabled || !this.cfg.authLocal) throw new HttpError(403, 'Local sign-in is off')
+      if (!this.enabled || !this.cfg.authLocal && !this.cfg.ldapUrl) throw new HttpError(403, 'Password sign-in is off')
       this.limit(`ip:${req.ip}`)
       const login = typeof req.body?.username === 'string' ? req.body.username.toLowerCase().slice(0, 64) : ''
       this.limit(`user:${login}`)
       const row = this.db.raw.prepare("SELECT user_id, password FROM identities WHERE provider = 'local' AND subject = ?").get(login) as { user_id: number; password: string } | undefined
-      const valid = await passwordMatches(req.body?.password, row?.password ?? this.dummyPassword)
+      // A local username reserves that name, even if its password is wrong or local sign-in is off.
+      if (!row && this.cfg.ldapUrl) {
+        const id = await this.external(await this.providers.ldap(req.body?.username, req.body?.password))
+        this.newSession(req, res, id); res.json({ ok: true }); return
+      }
+      const valid = this.cfg.authLocal && await passwordMatches(req.body?.password, row?.password ?? this.dummyPassword)
       if (!valid || !row || this.user(row.user_id).disabled) throw new HttpError(401, 'The username or password is wrong')
       if (!row.password.startsWith(PASSWORD_PREFIX)) {
         const upgraded = await passwordHash(req.body.password)
@@ -347,7 +460,7 @@ export class Accounts {
       const users = await Promise.all((this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]).map(async (u) => {
         const store = this.store(u.id), dirs = await store.listDirs()
         const files = await Promise.all(dirs.map((dir) => store.list(dir)))
-        return { ...u, games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser }
+        return { ...u, games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser, ...this.managed(u.id) }
       }))
       res.json({ users, adultDefault: this.cfg.adultDefault })
     })
@@ -370,6 +483,8 @@ export class Accounts {
       if (this.removing.has(target.id)) throw new HttpError(409, 'This account is being archived')
       if (b.role !== undefined && !['admin', 'player'].includes(b.role)) throw new HttpError(400, 'Choose Admin or Player')
       for (const key of ['disabled', 'adultAccess']) if (b[key] !== undefined && typeof b[key] !== 'boolean') throw new HttpError(400, `${key} must be a boolean`)
+      const managed = this.managed(target.id)
+      if (b.role !== undefined && managed.roleManaged || b.adultAccess !== undefined && managed.adultManaged) throw new HttpError(409, 'This permission is set by the sign-in provider')
       this.guardLastAdmin(target, b)
       this.db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ?, adult_access = ? WHERE id = ?').run(b.name === undefined ? target.name : name(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), b.adultAccess === undefined ? target.adult_access : Number(b.adultAccess), target.id)
       this.invalidate(); await this.tag(this.user(target.id)); res.json({ user: this.user(target.id) })
@@ -443,7 +558,7 @@ export class Accounts {
       this.db.raw.exec('BEGIN IMMEDIATE')
       try {
         this.db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
-        this.db.raw.prepare('UPDATE users SET username = ?, name = ?, adult_access = 1 WHERE id = 1').run(u.username, u.name)
+        this.db.raw.prepare('UPDATE users SET username = ?, name = ?, adult_access = ?, avatar = ?, avatar_uploaded = ? WHERE id = 1').run(u.username, u.name, u.adult_access, u.avatar, u.avatar_uploaded)
         this.db.raw.prepare('UPDATE identities SET user_id = 1 WHERE user_id = ?').run(u.id)
         this.db.raw.prepare('UPDATE sessions SET user_id = 1 WHERE hash = ?').run(session)
         this.db.raw.exec('COMMIT')
