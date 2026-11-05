@@ -37,9 +37,10 @@ default (`RENPLAY_ADULT_DEFAULT=block`); the first admin has access. For restric
 games without recipes also count as adult until an admin marks them safe. This is enforced by
 the server, including saves and play routes.
 
-The account menu chooses **Show**, **Hide pictures** (the default) or **Hide adult games**. With
-pictures hidden, covers become title cards and save pictures become scene cards; hidden art is
-not fetched. **Settings → This browser** can override the account preference on one device.
+**Account → Adult pictures** chooses **Show**, **Hide pictures** (the default) or **Hide adult games**.
+With pictures hidden, covers become title cards and save pictures become scene cards; hidden art is
+not fetched. **On this device**, also in **Settings → This browser**, can hide more but never show
+more than the account allows. These controls only appear for accounts with adult access.
 A preference cannot grant access that the instance or account denies.
 
 ## In these docs

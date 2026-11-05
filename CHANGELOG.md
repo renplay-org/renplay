@@ -17,14 +17,17 @@ release notes say what).
   if its session ends, keeping unsent Ren'Py saves with the account that made them.
 - Per-account adult access, and Show, Hide pictures or Hide adult games preferences with a device
   override. New users start without adult access; the first admin has it.
-- Server tools for users and passwords, copying or merging saves between accounts, and exporting
-  and importing whole save folders. Overwrites keep history; removed accounts' folders are archived.
+- Account screen for your name, password, adult pictures, sessions, access tokens and save export.
+  A device can hide more adult content, but cannot show more than your account allows.
+- Users in Settings for admins: add users, change roles and adult access, disable accounts, reset
+  passwords, and copy, merge, export or import saves. Overwrites keep history; removed accounts'
+  folders are archived. These tools also work with sign-in off.
 
 ### Changed
 
 - Saves now live in `/data/users/<id>/`. The upgrade backs up saves, history and `library.db`,
   resumes interrupted moves, and leaves the owner's old paths as symlinks for rollback to 2.10.
-  Back up `/data` before upgrading. Full Account and Users screens follow in stage B.
+  Back up `/data` before upgrading.
 
 ### Fixed
 

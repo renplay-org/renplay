@@ -13,7 +13,7 @@ export interface Account {
   prefs: string
 }
 export function useAuth() {
-  return useQuery({ queryKey: ['me'], queryFn: () => api<{ user: Account; auth: boolean; unclaimed: boolean }>('/api/me'), retry: false })
+  return useQuery({ queryKey: ['me'], queryFn: () => api<{ user: Account; auth: boolean; unclaimed: boolean; hasPassword: boolean }>('/api/me'), retry: false })
 }
 export function AuthGuard({ admin = false }: { admin?: boolean }) {
   const me = useAuth(), location = useLocation()
@@ -24,8 +24,8 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
   }, [me.refetch])
   const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ enabled: boolean; setup: boolean }>('/api/auth/providers') })
   if (providers.data?.setup && !me.isPending && !(me.data?.user.role === 'admin' && me.data.user.id !== 1)) return <Navigate to="/setup" replace />
-  if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />
   if (me.isPending || providers.isPending) return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
+  if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />
   if (!me.data) return <p className="p-6 text-zinc-300">Could not reach Renplay. Reload to try again.</p>
   if (admin && me.data.user.role !== 'admin') return <Navigate to="/" replace />
   return <Outlet />

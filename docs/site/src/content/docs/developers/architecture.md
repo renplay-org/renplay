@@ -178,7 +178,7 @@ allowed while adult save screenshots remain hidden. The empty library's starter 
 Ren'Py recipe with `free: true` that is not `nsfw` and has a working release; without one it shows
 no starter. Account preference `adultPictures` defaults to `hide-pictures`; `show` and `hide-games`
 are the other values. Device overrides use `renplay:adult-pictures:<user id>`. A device cannot grant
-adult access the account lacks. Hidden art is not requested.
+adult access the account lacks, or widen the account's picture preference. Hidden art is not requested.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1–200) and `offset` (default 0). Invalid or unsafe integers use the defaults.

@@ -313,7 +313,7 @@ export class Accounts {
       this.invalidate(); this.cookie(req, res, '')
       res.json({ ok: true })
     })
-    r.get('/me', (_req, res) => res.json({ user: this.current(), auth: this.enabled, unclaimed: this.unclaimed }))
+    r.get('/me', (_req, res) => res.json({ user: this.current(), auth: this.enabled, unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) }))
     r.put('/me', async (req, res) => {
       this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(name(req.body?.name), this.current().id)
       await this.tag(this.user(this.current().id)); res.json({ ok: true })
@@ -343,7 +343,14 @@ export class Accounts {
       res.json({ id, token })
     })
     r.delete('/me/tokens/:id', (req, res) => { this.db.raw.prepare('DELETE FROM tokens WHERE user_id = ? AND id = ?').run(this.current().id, req.params.id); res.json({ ok: true }) })
-    r.get('/users', (_req, res) => res.json({ users: this.db.raw.prepare('SELECT * FROM users').all() }))
+    r.get('/users', async (_req, res) => {
+      const users = await Promise.all((this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]).map(async (u) => {
+        const store = this.store(u.id), dirs = await store.listDirs()
+        const files = await Promise.all(dirs.map((dir) => store.list(dir)))
+        return { ...u, games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser }
+      }))
+      res.json({ users, adultDefault: this.cfg.adultDefault })
+    })
     r.post('/users', async (req, res) => {
       const login = username(req.body?.username), display = name(req.body?.name || login), encoded = await passwordHash(req.body?.password)
       if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login)) throw new HttpError(409, 'That username is taken')

@@ -46,8 +46,9 @@ Other engines are added only when their normal download plays as easily; the
   its saves stay safe.
 - **Pictures stay private.** Adult pictures start hidden in a new browser. Covers become title
   cards and saves become scene cards, without fetching the hidden art. Catalog covers marked safe
-  for work stay visible. Choose Show, Hide pictures or Hide adult games in the account menu, with
-  a device override in Settings → This browser. An admin decides who has adult access.
+  for work stay visible. Choose Show, Hide pictures or Hide adult games in Account, with a device
+  override that can hide more but never show more than the account allows. An admin decides who
+  has adult access.
 - **Find your next game.** Keep favourites at the top of your library, sort by last played,
   title or recently added, and search titles, developers and tags. Recent combines last played and
   recently added. Library filters stay in the
@@ -106,9 +107,12 @@ Cookies work on plain HTTP for a local NAS and are marked `Secure` over HTTPS. B
 termination, set `RENPLAY_PUBLIC_URL` to the public HTTPS address. Keep proxy hop counts correct
 with `RENPLAY_TRUSTED_HOPS` (the included nginx is one hop).
 
-The full Account and Users screens follow in stage B; [server tools](https://docs.renplay.org/developers/accounts-api/)
-already create users, reset passwords, issue script tokens, and copy, merge, export and import
-save folders without losing overwritten saves. More in [Accounts](https://docs.renplay.org/accounts/).
+Open **Account** from the account menu (the **You** tab on phones) to change your name, password
+and adult-picture preferences, manage sessions and script tokens, or export your saves. Admins use
+**Settings → Users** to add users, change roles and adult access, disable accounts, reset passwords,
+and copy, merge, export or import save folders. Overwrites keep history; removing a user archives
+their folder. These tools work with sign-in off too. More in [Accounts](https://docs.renplay.org/accounts/)
+and the [Accounts API](https://docs.renplay.org/developers/accounts-api/).
 
 ## Questions
 

@@ -77,7 +77,7 @@ const TABS = [
 export default function AppShell() {
   const { data } = useAuth()
   const admin = data?.user.role === 'admin'
-  const tabs = TABS.filter((t) => t.to !== '/add' || admin).map((t) => t.to === '/settings' ? { ...t, label: data?.auth ? 'You' : 'Settings' } : t)
+  const tabs = TABS.filter((t) => t.to !== '/add' || admin).map((t) => t.to === '/settings' ? { ...t, label: 'You' } : t)
   const item = ({ isActive }: { isActive: boolean }) =>
     cx(
       'relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
@@ -106,14 +106,14 @@ export default function AppShell() {
         </div>
       </header>
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 pt-5 sm:px-8 sm:pt-6">
-        {admin && data && !data.auth && <aside className="mb-5 rounded-xl bg-amber-400/10 p-4 text-sm text-amber-200">Sign-in is off. Everyone plays as {data.user.name}. <a className="underline" href="https://docs.renplay.org/accounts/">Turn on sign-in</a>.</aside>}
+        {admin && data && !data.auth && <aside className="mb-5 rounded-xl bg-amber-400/10 p-4 text-sm text-amber-200">Sign-in is off. Everyone plays as {data.user.name}. <a className="underline" href="https://renplay.org/docs/accounts/">Turn on sign-in</a>.</aside>}
         <Outlet />
       </main>
       <Footer />
       {/* Tab bar on phones. */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-ink-950/85 backdrop-blur-xl sm:hidden">
         <div className={`grid ${admin ? 'grid-cols-3' : 'grid-cols-2'}`}>
-          {tabs.map((t) => t.to === '/settings' && data?.auth ? <AccountMenu key="you" tab /> : (
+          {tabs.map((t) => t.to === '/settings' ? <AccountMenu key="you" tab /> : (
             <NavLink
               key={t.to}
               to={t.to}

@@ -15,6 +15,8 @@ const Player = lazy(() => import('./pages/Player'))
 const AddGames = lazy(() => import('./pages/AddGames'))
 const Activity = lazy(() => import('./pages/Activity'))
 const Settings = lazy(() => import('./pages/Settings'))
+const Account = lazy(() => import('./pages/Account'))
+const Users = lazy(() => import('./pages/Users'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: true } },
@@ -51,8 +53,10 @@ createRoot(document.getElementById('root')!).render(
                 <Route element={<AuthGuard admin />}>
                   <Route path="/add" element={<AddGames />} />
                   <Route path="/activity" element={<Activity />} />
+                  <Route path="/settings/users" element={<Users />} />
                 </Route>
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/account" element={<Account />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
               </Route>

@@ -47,6 +47,23 @@ async function add(a: App, cookie: string, username = 'player') {
 function game(a: App, id = 'safe', extras = {}) { a.db.insertGame({ id, title: id, recipe_id: `recipe-${id}`, status: 'installed', build: 'b1', save_dir: id, ...extras }) }
 
 describe('accounts authentication and security', () => {
+  it('supplies Account password state and Users save counts and protected accounts', async () => {
+    const a = await start(), admin = await login(a), id = await add(a, admin)
+    expect((await request(a.app).get('/api/me').set('Cookie', admin).expect(200)).body.hasPassword).toBe(true)
+    await a.accounts.store(id).write('one-game', '1-1.save', Buffer.from('save'))
+    await a.accounts.store(id).write('one-game', 'persistent', Buffer.from('persistent'))
+    await a.accounts.store(id).write('tokens', 'security_keys.txt', Buffer.from('keys'))
+    const response = await request(a.app).get('/api/users').set('Cookie', admin).expect(200)
+    expect(response.body.adultDefault).toBe(false)
+    expect(response.body.users.find((u: { id: number }) => u.id === id)).toMatchObject({ games: 1, saves: 2, protected: false })
+    expect(response.body.users.find((u: { id: number }) => u.id === 1)).toMatchObject({ games: 0, saves: 0, protected: true })
+    const player = await login(a, 'player', 'player password')
+    await request(a.app).get('/api/users').set('Cookie', player).expect(403)
+    const cfg = config(); cfg.auth = 'off'; cfg.adultDefault = true
+    const off = await start(cfg, false)
+    expect((await request(off.app).get('/api/me').expect(200)).body.hasPassword).toBe(false)
+    expect((await request(off.app).get('/api/users').expect(200)).body.adultDefault).toBe(true)
+  })
   it('rejects noncanonical routing before authentication, roles or CSRF can disagree', async () => {
     const a = await start(), admin = await login(a)
     await add(a, admin)

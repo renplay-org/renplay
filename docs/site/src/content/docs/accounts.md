@@ -28,8 +28,16 @@ ready. The first admin claims the owner and all the saves made without sign-in.
 
 ## Sign-in and sessions
 
-Sign-in lasts 30 days from your last use. The account menu shows your name, the adult-picture
-preference, and **Sign out**. If sign-in ends during play, the player asks you to sign in in another
+Sign-in lasts 30 days from your last use. Open **Account** from the account menu or the phone's
+**You** tab. Change your display name or password, see where you are signed in, and sign out of
+individual sessions or everywhere else. Changing your password ends your other sessions.
+
+**Access tokens** creates named tokens for scripts. Copy a new token immediately: it is only shown
+once. Revoke it from the same list when it is no longer needed. **Your saves → Export all my saves**
+downloads current save folders for games you can see as one zip; hidden saves and history stay on
+the server.
+
+The account menu also has **Sign out**. If sign-in ends during play, the player asks you to sign in in another
 tab. Return and press **Continue** to sync without losing the scene. Use the same account that
 started that game. A shared browser never uploads another account's queued saves. Unsent Ren'Py
 and HTML saves stay on that device under their owner's account until the same account returns.
@@ -60,15 +68,25 @@ The instance's choice still comes first. An admin grants adult access per accoun
 are blocked unless `RENPLAY_ADULT_DEFAULT=allow`. The first admin has access. Games with no recipe
 count as adult for restricted accounts until an admin marks them safe.
 
-The account menu has **Show**, **Hide pictures** (the default) and **Hide adult games**. **Settings →
-This browser** can override that choice on this device, but cannot grant access the account lacks.
+**Account → Adult pictures** has **Show**, **Hide pictures** (the default) and **Hide adult games**.
+**On this device** (also in **Settings → This browser**) can narrow that choice, never widen it:
+a device cannot show pictures hidden by the account, or show adult games the account hides.
+These controls only appear for users with adult access.
 See [Adult games](/start-here/adult-games/).
 
-## Admin tools in this stage
+## Users
 
-The sign-in and setup screens are included. Full Account and Users screens follow in stage B;
-until then the [server endpoints](/developers/accounts-api/) manage users, passwords, sessions,
-access tokens and save transfers.
+Open **Settings → Users** (admins only) to add users, change roles and adult access, disable or
+re-enable an account, or reset its password. Each row shows games with save folders and the number
+of current save files (including persistent and HTML storage, excluding shared keys and history).
+The last enabled admin cannot be demoted, disabled or removed; add another admin first.
+
+Use each user's actions for **Copy saves…**, **Merge into another user…**, **Export save folder**,
+**Import a save folder** or **Remove user…**. **Moving saves** also opens copy and import tools.
+The [Accounts API](/developers/accounts-api/) offers the same operations for scripts.
+
+With sign-in off, **Account** explains which account everyone uses. **Users** still works for
+admins, so accounts and saves can be prepared before sign-in is turned on.
 
 An admin can copy one game's saves or all save folders to another account, merge accounts, or
 export and import a whole save folder as a zip. Overwrites go into the target's history. Removing

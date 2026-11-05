@@ -2,6 +2,14 @@ import { useSyncExternalStore } from 'react'
 import { useAuth } from './auth'
 
 export type AdultPictures = 'show' | 'hide-pictures' | 'hide-games'
+export const adultPictureModes: AdultPictures[] = ['show', 'hide-pictures', 'hide-games']
+export function accountAdultPictures(prefs?: string): AdultPictures {
+  try {
+    const mode = JSON.parse(prefs || '{}').adultPictures
+    if (adultPictureModes.includes(mode)) return mode
+  } catch { /* Default hides pictures. */ }
+  return 'hide-pictures'
+}
 const EVENT = 'renplay:prefs'
 function subscribe(cb: () => void) {
   window.addEventListener('storage', cb); window.addEventListener(EVENT, cb)
@@ -11,16 +19,17 @@ export function useAdultPictures(): [AdultPictures, (mode: AdultPictures | '') =
   const { data } = useAuth()
   const key = `renplay:adult-pictures:${data?.user.id ?? ''}`
   const override = useSyncExternalStore(subscribe, () => localStorage.getItem(key))
-  let account: AdultPictures = 'hide-pictures'
-  try { account = JSON.parse(data?.user.prefs || '{}').adultPictures || account } catch { /* Default hides pictures. */ }
+  const account = accountAdultPictures(data?.user.prefs)
+  const device = adultPictureModes.includes(override as AdultPictures) ? override as AdultPictures : account
+  const effective = adultPictureModes[Math.max(adultPictureModes.indexOf(account), adultPictureModes.indexOf(device))]!
   const set = (mode: AdultPictures | '') => {
     if (mode) localStorage.setItem(key, mode)
     else localStorage.removeItem(key)
     window.dispatchEvent(new Event(EVENT))
   }
-  return [(override || account) as AdultPictures, set, !!override]
+  return [effective, set, !!override]
 }
-/** Device choices can narrow, never grant, the server's adult access. */
+/** Device choices can only narrow the account's visibility and picture preferences. */
 export function useBlurAdultCovers(): [boolean, (on: boolean) => void] {
   const [mode, set] = useAdultPictures()
   return [mode !== 'show', (on) => set(on ? 'hide-pictures' : 'show')]

@@ -8,7 +8,7 @@ import { Button, Confirm, Progress, Spinner, Switch, errorText, useToast } from 
 import { post } from '../lib/api'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
-import { useAdultPictures } from '../lib/prefs'
+import { DeviceAdultPreference } from '../components/AdultPreferences'
 import { useCatalog, useContent, useGames, useSetAdultGames, useSystem } from '../lib/queries'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
@@ -33,8 +33,7 @@ export default function Settings() {
 }
 
 function BrowserSettings() {
-  const [mode, set, override] = useAdultPictures()
-  return <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6"><h1 className="text-2xl font-bold text-white">This browser</h1><label className="block text-sm text-zinc-300">Adult games on this device<select className="mt-2 h-12 w-full rounded-xl bg-zinc-900 px-3" value={override ? mode : ''} onChange={(e) => set(e.target.value as typeof mode | '')}><option value="">Use account preference</option><option value="show">Show</option><option value="hide-pictures">Hide pictures</option><option value="hide-games">Hide adult games</option></select></label><Button onClick={() => void navigator.storage?.persist?.()}>Keep game cache</Button></section>
+  return <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6"><h1 className="text-2xl font-bold text-white">This browser</h1><DeviceAdultPreference /><Button onClick={() => void navigator.storage?.persist?.()}>Keep game cache</Button></section>
 }
 
 function AdminSettings() {
@@ -66,7 +65,7 @@ function AdminSettings() {
     <div className="animate-fade-in space-y-6">
       <h1 className="font-display text-3xl font-bold tracking-tight text-white">Settings</h1>
       <div className="flex flex-col gap-6 lg:flex-row">
-      <nav aria-label="Settings sections" className="flex shrink-0 gap-2 overflow-x-auto lg:w-44 lg:flex-col">{[['general', 'General'], ['browser', 'This browser'], ['about', 'About']].map(([value, label]) => <button key={value} onClick={() => setSection(value)} aria-current={section === value ? 'page' : undefined} className={`min-h-11 shrink-0 rounded-xl px-4 text-left text-sm ${section === value ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{label}</button>)}<Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/activity">Activity →</Link></nav>
+      <nav aria-label="Settings sections" className="flex shrink-0 gap-2 overflow-x-auto lg:w-44 lg:flex-col">{[['general', 'General'], ['browser', 'This browser'], ['about', 'About']].map(([value, label]) => <button key={value} onClick={() => setSection(value)} aria-current={section === value ? 'page' : undefined} className={`min-h-11 shrink-0 rounded-xl px-4 text-left text-sm ${section === value ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{label}</button>)}<Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/settings/users">Users →</Link><Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/activity">Activity →</Link></nav>
       <div className="min-w-0 flex-1 space-y-6">
       <div className={section === 'general' ? 'space-y-6' : 'hidden'}>
         {content && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
@@ -211,7 +210,7 @@ function AdminSettings() {
           </Button>
           {persisted !== null && <p className="text-xs text-zinc-500">{persisted ? 'The browser will keep the cache.' : 'The browser declined; it may still keep it.'}</p>}
           <div className="border-t border-white/[0.06] pt-4">
-            <BrowserSettings />
+            <DeviceAdultPreference />
           </div>
         </section>
         {section === 'about' && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]"><h2 className="font-semibold text-white">About Renplay</h2><p className="text-sm text-zinc-400">Version {sys.version} · Made by the Renplay Team</p><p className="text-sm text-zinc-400">Renplay is open source, under the MIT license. Game art belongs to its developers.</p><div className="flex flex-wrap gap-4 text-sm text-accent-300"><DocsLink /><DocsLink path="troubleshooting/">Troubleshooting</DocsLink><a href="https://renplay.org/releases" target="_blank" rel="noreferrer">Release notes ↗</a><a href="https://renplay.org/github" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://renplay.org/support" target="_blank" rel="noreferrer">Support ↗</a><a href="https://github.com/renplay-org/renplay/blob/main/LICENSE" target="_blank" rel="noreferrer">License ↗</a></div></section>}

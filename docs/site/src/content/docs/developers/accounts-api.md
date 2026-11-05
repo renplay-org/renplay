@@ -1,10 +1,9 @@
 ---
 title: Accounts API
-description: Local accounts, sessions, tokens, permissions and save transfers in stage A.
+description: Local accounts, sessions, tokens, permissions and save transfers.
 ---
 
-Stage A provides the server endpoints for the Account and Users screens coming in stage B. OIDC,
-LDAP and avatars are not included. `identities` is keyed by `(provider, subject)` so later providers
+These endpoints back the Account and Users screens. OIDC, LDAP and avatars are not included. `identities` is keyed by `(provider, subject)` so later providers
 can link explicitly without relying on a display name or an unverified email.
 
 ## Authenticate scripts
@@ -42,7 +41,7 @@ are rejected rather than matched differently by authorization and routing.
 | `POST /auth/setup` | `{ grant, username, name, password }`; claims owner and sets a cookie |
 | `POST /auth/login` | `{ username, password }`; rate limited per address and account |
 | `POST /auth/logout` | Revokes the current cookie session |
-| `GET /me` | `{ user, auth, unclaimed }` |
+| `GET /me` | `{ user, auth, unclaimed, hasPassword }` |
 | `PUT /me` | `{ name }` |
 | `POST /me/password` | `{ current, password }`; ends other sessions |
 | `POST /me/claim-owner` | Admin only, while unclaimed; copies saves with history, moves identities, archives the old folder |
@@ -54,7 +53,7 @@ are rejected rather than matched differently by authorization and routing.
 | `GET /me/tokens` | `{ tokens }`; never includes secrets |
 | `POST /me/tokens` | `{ name }` → `{ id, token }` |
 | `DELETE /me/tokens/:id` | Revokes that token |
-| `GET /users` | `{ users }` |
+| `GET /users` | `{ users, adultDefault }`; `adultDefault` is the new-user adult-access default; each user includes `games` (nonempty save folders), `saves` (current files in those folders, excluding shared keys and history), `protected` (owner or no-sign-in account) |
 | `POST /users` | `{ username, name?, password, role?, adultAccess? }` → `{ user }`; role defaults to `player` |
 | `PUT /users/:id` | `{ name?, role?, disabled?, adultAccess? }` |
 | `POST /users/:id/password` | `{ password }`; ends all target sessions |
