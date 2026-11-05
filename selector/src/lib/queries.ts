@@ -1,10 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
+import { useAuth } from './auth'
+import { useAdultPictures } from './prefs'
 import { api, put, type CatalogResponse, type ContentState, type Archive, type FilesResponse, type Game, type Job, type SavesResponse, type SystemInfo } from './api'
 
 export function useGames() {
+  const [mode] = useAdultPictures()
   return useQuery({
     queryKey: ['games'],
+    select: (games) => mode === 'hide-games' ? games.filter((g) => !g.nsfw) : games,
     queryFn: () => api<{ games: Game[] }>('/api/games').then((r) => r.games),
     refetchInterval: (q) => (q.state.data?.some((g) => g.job) ? 2000 : false),
   })
@@ -28,9 +32,11 @@ export function useSaves(id: string | undefined, enabled = true) {
 }
 
 export function useJobs() {
+  const admin = useAuth().data?.user.role === 'admin'
   const qc = useQueryClient()
   const q = useQuery({
     queryKey: ['jobs'],
+    enabled: admin,
     queryFn: () => api<{ jobs: Job[]; busy: boolean }>('/api/jobs?limit=40'),
     refetchInterval: (q) => (q.state.data?.jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 1500 : 15000),
   })
@@ -57,8 +63,10 @@ export function useArchives() {
 }
 
 export function useCatalog() {
+  const [mode] = useAdultPictures()
   return useQuery({
     queryKey: ['catalog'],
+    select: (catalog) => mode === 'hide-games' ? { ...catalog, games: catalog.games.filter((g) => !g.nsfw) } : catalog,
     queryFn: () => api<CatalogResponse>('/api/catalog'),
   })
 }
@@ -77,7 +85,8 @@ export function useSetAdultGames() {
 }
 
 export function useSystem() {
-  return useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('/api/system') })
+  const admin = useAuth().data?.user.role === 'admin'
+  return useQuery({ enabled: admin, queryKey: ['system'], queryFn: () => api<SystemInfo>('/api/system') })
 }
 
 export function useFiles(id: string, dir: string) {

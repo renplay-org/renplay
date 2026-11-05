@@ -228,6 +228,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   })
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith('/api/auth/') && path !== '/api/me') window.dispatchEvent(new Event('renplay:signed-out'))
     let msg = `${res.status} ${res.statusText}`
     try {
       const j = await res.json()

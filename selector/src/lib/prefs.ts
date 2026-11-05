@@ -1,25 +1,27 @@
 import { useSyncExternalStore } from 'react'
+import { useAuth } from './auth'
 
-/** Preferences of this browser (not synced: a phone used in public can differ from the TV). */
-const BLUR_ADULT = 'renplay:blur-adult-covers'
+export type AdultPictures = 'show' | 'hide-pictures' | 'hide-games'
 const EVENT = 'renplay:prefs'
-
 function subscribe(cb: () => void) {
-  window.addEventListener('storage', cb)
-  window.addEventListener(EVENT, cb)
-  return () => {
-    window.removeEventListener('storage', cb)
-    window.removeEventListener(EVENT, cb)
-  }
+  window.addEventListener('storage', cb); window.addEventListener(EVENT, cb)
+  return () => { window.removeEventListener('storage', cb); window.removeEventListener(EVENT, cb) }
 }
-
-/** Blur the covers of adult games, for screens other people can see. */
-export function useBlurAdultCovers(): [boolean, (on: boolean) => void] {
-  const on = useSyncExternalStore(subscribe, () => localStorage.getItem(BLUR_ADULT) !== '0')
-  const set = (v: boolean) => {
-    if (v) localStorage.setItem(BLUR_ADULT, '1')
-    else localStorage.setItem(BLUR_ADULT, '0')
+export function useAdultPictures(): [AdultPictures, (mode: AdultPictures | '') => void, boolean] {
+  const { data } = useAuth()
+  const key = `renplay:adult-pictures:${data?.user.id ?? ''}`
+  const override = useSyncExternalStore(subscribe, () => localStorage.getItem(key))
+  let account: AdultPictures = 'hide-pictures'
+  try { account = JSON.parse(data?.user.prefs || '{}').adultPictures || account } catch { /* Default hides pictures. */ }
+  const set = (mode: AdultPictures | '') => {
+    if (mode) localStorage.setItem(key, mode)
+    else localStorage.removeItem(key)
     window.dispatchEvent(new Event(EVENT))
   }
-  return [on, set]
+  return [(override || account) as AdultPictures, set, !!override]
+}
+/** Device choices can narrow, never grant, the server's adult access. */
+export function useBlurAdultCovers(): [boolean, (on: boolean) => void] {
+  const [mode, set] = useAdultPictures()
+  return [mode !== 'show', (on) => set(on ? 'hide-pictures' : 'show')]
 }
