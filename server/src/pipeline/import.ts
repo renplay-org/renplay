@@ -41,6 +41,20 @@ export interface ImportDeps {
   catalog: Catalog
 }
 
+/**
+ * The library entry an install goes into: the one asked for, the one linked to the matched
+ * recipe, or one with the same save folder. Seasons and spin-offs often share a save folder (that
+ * is how a sequel reads the earlier saves), so a game already linked to another recipe is never
+ * taken over through its save folder.
+ */
+export function existingGame(db: Db, game: string | undefined, recipeId: string | undefined, saveDir: string | undefined): GameRow | null {
+  if (game) return db.getGame(game)
+  const byRecipe = recipeId ? db.gameByRecipe(recipeId) : null
+  if (byRecipe) return byRecipe
+  if (!saveDir) return null
+  return db.gamesBySaveDir(saveDir).find((g) => !recipeId || !g.recipe_id || g.recipe_id === recipeId) ?? null
+}
+
 export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<unknown> {
   const result = await install(ctx, deps)
   // After install() closed the archive: on NFS, deleting an open file leaves a hidden copy behind.
@@ -181,10 +195,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     const saveDir = match?.recipe.saveDir ?? meta.saveDir
 
     // 6. Game id: the existing game, the recipe, or the title.
-    const existing =
-      (p.game ? db.getGame(p.game) : null) ??
-      (match ? db.gameByRecipe(match.recipe.id) : null) ??
-      (saveDir ? db.gameBySaveDir(saveDir) : null)
+    const existing = existingGame(db, p.game, match?.recipe.id, saveDir)
     if (p.game && !existing) throw new HttpError(404, `Game ${p.game} not found`)
     const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(match?.recipe.title || meta.title || basename(archivePath).replace(/\.[^.]+$/, '')))
     if (!isSlug(id)) throw new Error(`Invalid game id ${id}`)
@@ -327,7 +338,7 @@ async function installHtml(
   const version = match?.release?.version ?? versionFromName(o.archiveName)
   // Where the story keeps its saves: SugarCube uses its title's slug.
   const saveDir = match?.recipe.saveDir ?? storyId(engine.title ?? title)
-  const existing = (p.game ? db.getGame(p.game) : null) ?? (match ? db.gameByRecipe(match.recipe.id) : null) ?? (saveDir ? db.gameBySaveDir(saveDir) : null)
+  const existing = existingGame(db, p.game, match?.recipe.id, saveDir)
   if (p.game && !existing) throw new HttpError(404, `Game ${p.game} not found`)
   const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(title))
   if (!isSlug(id)) throw new Error(`Invalid game id ${id}`)

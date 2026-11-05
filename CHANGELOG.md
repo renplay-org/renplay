@@ -7,6 +7,12 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- A season or spin-off that shares its save folder with a game already in the library installs
+  beside it instead of replacing it (Fresh Women Season 2 replaced Season 1). Saves were never
+  touched.
+
 ## [2.11.0] - 2026-11-05
 
 ### Added
