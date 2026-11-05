@@ -279,6 +279,14 @@ try {
       }
       // These are disposable local copies: exercise storage, never touch the installed game's saves.
       if (id === 'college-daze') assert.equal(await frame.evaluate(() => SugarCube.Save.slots.save(0, 'Local security fixture')), true)
+      if (id === 'risky-stream') {
+        // Use its bundled persistence library and normal IndexedDB driver, not a substitute.
+        assert.equal(await frame.evaluate(async () => {
+          await localforage.setItem('renplay-security-idb', { progress: 'durable IndexedDB fixture' })
+          return localforage.driver()
+        }), 'asyncStorage')
+        await until(async () => (await readFile(join(dataDir, 'users', '1', 'saves', id, 'indexedDB.json'), 'utf-8').catch(() => '')).includes('durable IndexedDB fixture'))
+      }
       await frame.evaluate(() => localStorage.setItem('renplay-security-save', 'durable fixture'))
       const localSave = join(dataDir, 'users', '1', 'saves', id, 'localStorage.json')
       await until(async () => (await readFile(localSave, 'utf-8').catch(() => '')).includes('durable fixture'))
@@ -290,7 +298,10 @@ try {
       if (id === 'college-daze') {
         await until(() => frame.evaluate(() => !!window.SugarCube))
         assert.equal(await frame.evaluate(() => SugarCube.Save.slots.has(0)), true)
+      } else {
+        assert.deepEqual(await frame.evaluate(() => localforage.getItem('renplay-security-idb')), { progress: 'durable IndexedDB fixture' })
       }
+      console.log(`${name}: ${id} localStorage and ${id === 'college-daze' ? 'SugarCube slot' : 'localForage IndexedDB'} saves survived reload`)
       // Exercise the game environment's native popup behavior without following any external website.
       await frame.evaluate(() => {
         const button = document.createElement('button'); button.id = 'renplay-test-popup'; button.textContent = 'Test popup'
