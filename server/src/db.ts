@@ -217,6 +217,10 @@ export class Db {
     return (this.raw.prepare('SELECT * FROM games WHERE save_dir = ? LIMIT 1').get(saveDir) as unknown as GameRow) ?? null
   }
 
+  gamesBySaveDir(saveDir: string): GameRow[] {
+    return this.raw.prepare('SELECT * FROM games WHERE save_dir = ? ORDER BY created_at, id').all(saveDir) as unknown as GameRow[]
+  }
+
   gameByRecipe(recipeId: string): GameRow | null {
     return (this.raw.prepare('SELECT * FROM games WHERE recipe_id = ? LIMIT 1').get(recipeId) as unknown as GameRow) ?? null
   }

@@ -7,6 +7,14 @@ release notes say what).
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-11-05
+
+### Fixed
+
+- A season or spin-off that shares its save folder with a game already in the library installs
+  beside it instead of replacing it (Fresh Women Season 2 replaced Season 1). Saves were never
+  touched.
+
 ## [2.11.0] - 2026-11-05
 
 ### Added
@@ -318,7 +326,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.11.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.11.1...dev
+[2.11.1]: https://github.com/renplay-org/renplay/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/renplay-org/renplay/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/renplay-org/renplay/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/renplay-org/renplay/compare/v2.9.0...v2.9.1
