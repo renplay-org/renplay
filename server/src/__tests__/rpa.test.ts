@@ -6,9 +6,10 @@ import { describe, expect, it } from 'vitest'
 import yazl from 'yazl'
 import { createWriteStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
-import { openZip } from '../pipeline/archive.js'
+import { Readable } from 'node:stream'
+import { openZip, type SourceEntry } from '../pipeline/archive.js'
 import { detectLayout } from '../pipeline/project.js'
-import { readRpaIndex, splitRpa } from '../pipeline/rpa.js'
+import { readRpaIndex, splitRpa, streamRpaFile } from '../pipeline/rpa.js'
 
 /** Minimal protocol-2 pickle writer for {str: [(int, int, bytes)]}. */
 function pickleIndex(index: Record<string, Array<[number, number, Buffer]>>): Buffer {
@@ -98,6 +99,58 @@ describe('RPA streaming split', () => {
       src.close()
     })
   }
+
+  for (const seekable of [true, false]) {
+    it(`streams a 600 MiB deferred entry with bounded read-ahead (seekable: ${seekable})`, async () => {
+      const size = 600 * 1024 * 1024
+      const chunk = Buffer.alloc(64 << 10, 0x61)
+      let produced = 0
+      let consumed = 0
+      let peakAhead = 0
+      const entry: SourceEntry = {
+        path: 'archive.rpa', size, seekable,
+        open: async () => Readable.from((async function* () {
+          for (let n = 0; n < size; n += chunk.length) {
+            produced += chunk.length
+            peakAhead = Math.max(peakAhead, produced - consumed)
+            yield chunk
+          }
+        })(), { objectMode: false, highWaterMark: chunk.length }),
+      }
+      for await (const c of streamRpaFile(entry, { name: 'images with spaces/large.webm', segments: [{ offset: 0, length: size, prefix: new Uint8Array() }] })) {
+        consumed += c.length
+        expect(c.length).toBeLessThanOrEqual(3 * chunk.length)
+        if (consumed % (16 << 20) === 0) await new Promise((resolve) => setImmediate(resolve))
+      }
+      expect(consumed).toBe(size)
+      expect(peakAhead).toBeLessThanOrEqual(5 * chunk.length)
+    })
+  }
+
+  it('rejects an oversized index before reading its body', async () => {
+    let opens = 0
+    const header = Buffer.from('RPA-3.0 0000000000000040 00000000\n'.padEnd(64, ' '))
+    const entry: SourceEntry = {
+      path: 'huge-index.rpa', size: 64 + (33 << 20), seekable: true,
+      open: async () => { opens++; return Readable.from([header]) },
+    }
+    await expect(readRpaIndex(entry)).rejects.toThrow('RPA index too large')
+    expect(opens).toBe(1)
+  })
+
+  it('streams prefixes and multiple segments and rejects truncated entries', async () => {
+    const data = Buffer.from('0123456789')
+    const entry: SourceEntry = { path: 'a.rpa', size: data.length, seekable: false, open: async () => Readable.from([data]) }
+    const chunks: Buffer[] = []
+    for await (const c of streamRpaFile(entry, { name: 'multi', segments: [
+      { offset: 2, length: 3, prefix: Buffer.from('a') },
+      { offset: 8, length: 2, prefix: Buffer.from('b') },
+    ] })) chunks.push(c)
+    expect(Buffer.concat(chunks).toString()).toBe('a234b89')
+    await expect(async () => {
+      for await (const _ of streamRpaFile(entry, { name: 'short', segments: [{ offset: 9, length: 2, prefix: new Uint8Array() }] })) { /* drain */ }
+    }).rejects.toThrow('RPA ended inside short')
+  })
 
   it('detects prebuilt web builds', async () => {
     const zip = await zipOf({ 'x/index.html': Buffer.from('<html>'), 'x/game.zip': Buffer.from('PK'), 'x/renpy.wasm': Buffer.from('w') }, true)

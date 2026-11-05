@@ -16,6 +16,15 @@ release notes say what).
   the matching help page from Settings, the empty library, Add games, Activity and the iPhone
   full-screen help. The browser tab shows the game’s title while you play.
 
+### Fixed
+
+- Installing large games uses less memory, especially when they contain many high-resolution
+  images or large videos. Unusually large images stay in their original format.
+- The container releases image-processing memory more readily, reducing memory use during long
+  installs of games with thousands of images.
+- Job logs survive a server restart or crash, so interrupted installs keep their recent messages.
+  Clearing finished activity removes its saved logs too.
+
 ## [2.10.0] - 2026-11-04
 
 ### Added

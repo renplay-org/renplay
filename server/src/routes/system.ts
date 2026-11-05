@@ -132,7 +132,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
   })
 
   router.delete('/jobs', (_req, res) => {
-    db.deleteFinishedJobs()
+    jobs.clearFinished()
     res.json({ ok: true })
   })
 
