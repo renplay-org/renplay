@@ -133,6 +133,24 @@ describe('atomic owner claiming', () => {
     expect((await app.accounts.store(1).list('test')).map(f => f.name)).toEqual(['first.save'])
     expect(app.db.raw.prepare('SELECT user_id FROM identities WHERE subject = ?').get('second')!.user_id).toBe(3)
   })
+  it('does not restore admin rights removed while the claim was copying saves', async () => {
+    app = await signInFixture()
+    const id = Number(app.db.raw.prepare("INSERT INTO users (username, name, role, created_at) VALUES ('claimant', 'Claimant', 'admin', '')").run().lastInsertRowid)
+    app.db.raw.prepare("INSERT INTO identities VALUES ('local', 'claimant', ?, '')").run(id)
+    app.db.raw.prepare('INSERT INTO tokens VALUES (?, ?, ?, ?, ?)').run((await import('node:crypto')).createHash('sha256').update('claimant').digest('hex'), 'claimant', id, 'claimant', Date.now())
+    await app.accounts.store(id).write('test', 'claimant.save', Buffer.from('claimant'))
+    const entered = deferred(), finish = deferred(), source = app.accounts.store(id), list = source.listDirs.bind(source)
+    vi.spyOn(source, 'listDirs').mockImplementation(async () => { entered.release(); await finish.promise; return list() })
+    const claim = request(app.app).post('/api/me/claim-owner').auth('claimant', { type: 'bearer' }).send({}).then(r => r)
+    await entered.promise
+    // The identity provider takes the admin role away while the saves are being copied.
+    app.db.raw.prepare("UPDATE users SET role = 'player' WHERE id = ?").run(id)
+    finish.release()
+    expect((await claim).status).toBe(403)
+    expect(app.accounts.unclaimed).toBe(true)
+    expect(app.db.raw.prepare('SELECT user_id FROM identities WHERE subject = ?').get('claimant')!.user_id).toBe(id)
+    expect(app.db.raw.prepare('SELECT role FROM users WHERE id = ?').get(id)!.role).toBe('player')
+  })
   it('recovers a reservation left by an interrupted process on startup', async () => {
     app = await signInFixture()
     app.db.setSetting('owner_claim', 'interrupted')

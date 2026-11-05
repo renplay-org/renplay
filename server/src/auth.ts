@@ -590,7 +590,7 @@ export class Accounts {
       } finally { this.removing.delete(id) }
     }
     r.post('/me/claim-owner', async (_req, res) => {
-      const u = this.current(), session = viewer()!.session
+      const u = this.current(), { session, bearer } = viewer()!
       if (u.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
       if (!this.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
       if (u.id === 1) throw new HttpError(409, 'Use the setup code to choose the owner password')
@@ -606,9 +606,15 @@ export class Accounts {
         await this.copy(u.id, 1)
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
+          // The copy can take a while. Check again that the claimant is still signed in, enabled
+          // and an admin, and carry over their permissions as they are now, so a role or grant
+          // removed meanwhile is not restored through the owner account.
+          this.requireLiveLink(u.id, session, bearer)
+          const now = this.db.raw.prepare('SELECT * FROM users WHERE id = ?').get(u.id) as unknown as User | undefined
+          if (!now || now.disabled || now.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
           this.mergeProgress(u.id, 1)
           this.db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
-          this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', adult_access = ?, avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(u.username, u.name, u.adult_access, u.avatar, u.avatar_uploaded, u.admin_source, u.admin_provider, u.admin_subject)
+          this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', adult_access = ?, avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(now.username, now.name, now.adult_access, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject)
           this.db.raw.prepare('UPDATE identities SET user_id = 1 WHERE user_id = ?').run(u.id)
           this.db.raw.prepare('UPDATE sessions SET user_id = 1 WHERE hash = ?').run(session)
           this.db.raw.prepare('UPDATE tokens SET user_id = 1 WHERE hash = ?').run(session)
