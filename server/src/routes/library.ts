@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'n
 import { basename, join, relative } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
+import { archiveIdentity } from '../archive-origin.js'
 import { installedRelease, type Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
 import { ADULT_REASON } from '../content.js'
@@ -47,7 +48,7 @@ async function listArchiveFiles(root: string): Promise<Array<{ rel: string; size
 
 export function createLibraryRouter(deps: LibraryDeps): Router {
   const { cfg, db, jobs, catalog } = deps
-  const router = Router()
+  const router = Router({ caseSensitive: true, strict: true })
 
   // ---- archives -------------------------------------------------------------
 
@@ -70,7 +71,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
         const sha256 = fresh ? row.sha256 || null : null
         const match = catalog.match({ name: f.rel, size: f.size, sha256: sha256 ?? undefined })
         // An adult game's archive stays in the folder but cannot be installed here.
-        if (match && catalog.content.blocked && match.recipe.nsfw) {
+        if (match && catalog.content.hidesRecipe(match.recipe.nsfw)) {
           return { path: f.rel, name: basename(f.rel), size: f.size, mtime: f.mtimeMs, sha256, info, installedAs: null, recipe: null, existingGame: null, blocked: ADULT_REASON }
         }
         return {
@@ -147,10 +148,10 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     if (b.game && (!db.getGame(b.game) || catalog.content.hides(db.getGame(b.game)))) throw new HttpError(404, `Game ${b.game} is not in the library`)
     if (b.game && jobs.activeFor(b.game)) throw new HttpError(409, 'A job is already running for this game')
     // Refuse adult games before any work, while the install is safe-for-work only.
-    if (catalog.content.blocked) {
+    {
       const st = await stat(safeJoin(cfg.archivesDir, rel)).catch(() => null)
       const match = st ? catalog.match({ name: rel, size: st.size, sha256: db.getArchive(rel)?.sha256 || undefined }) : null
-      if (match?.recipe.nsfw || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId))) throw new HttpError(403, ADULT_REASON)
+      if (catalog.content.hidesRecipe(match?.recipe.nsfw) || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId) && catalog.content.hidesRecipe(true))) throw new HttpError(403, ADULT_REASON)
     }
     const id = jobs.enqueue('import', b.game ?? '', {
       source,
@@ -219,6 +220,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     let i = 1
     while (await exists(dest)) dest = join(cfg.archivesDir, meta.name.replace(/(\.[^.]+)?$/, `-${++i}$1`))
     await rename(uploadPart(id), dest)
+    db.markUploadedArchive(relative(cfg.archivesDir, dest), archiveIdentity(await stat(dest)))
     await unlink(uploadMeta(id)).catch(() => {})
     res.json({ path: relative(cfg.archivesDir, dest) })
   })
@@ -235,8 +237,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
   router.get('/catalog', async (_req, res) => {
     const games = db.allGames().filter((g) => !catalog.content.hides(g))
     res.json({
-      status: catalog.status(),
-      vocabulary: catalog.vocabulary,
+      status: { ...catalog.status(), count: catalog.list().length },
+      vocabulary: catalog.content.hidesRecipe(true) ? Object.fromEntries(Object.entries(catalog.vocabulary).filter(([, v]) => v.group !== 'content')) : catalog.vocabulary,
       games: catalog.list().map((r) => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
         return { ...r, _base: undefined, cover: catalog.cover(r.id), coverSfw: typeof r.cover === 'object' && r.cover.sfw === true, local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }

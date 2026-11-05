@@ -38,7 +38,7 @@ Default: `/data`
 
 </div>
 
-Saves and their history, the library database, mods, covers and walkthroughs. Back this up.
+Saves and their history, the library database, mods, covers and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.
 
 </div>
 
@@ -115,6 +115,20 @@ Mods: your files, layered over a game.
 
 ## Games and catalog
 
+<div class="config-entry" id="renplay-adult-default">
+
+**`RENPLAY_ADULT_DEFAULT`**
+
+<div class="config-default">
+
+Default: `block`
+
+</div>
+
+`allow` gives newly created accounts access to adult games. `block` (and any other value) does not. The first admin always has access; admins can change access per account.
+
+</div>
+
 <div class="config-entry" id="renplay-delete-archives">
 
 **`RENPLAY_DELETE_ARCHIVES`**
@@ -125,7 +139,7 @@ Default: `true`
 
 </div>
 
-Delete a download once its game installed. `false` keeps it, so the game can be reinstalled without uploading again.
+Delete downloads uploaded through Renplay after a successful install. Files copied into the archives folder are never deleted automatically, including downloads from before 3.0 whose origin is unknown. `false` keeps everything for reinstalls.
 
 </div>
 
@@ -233,6 +247,34 @@ Earlier versions kept per save file.
 
 ## Behind a proxy
 
+<div class="config-entry" id="renplay-public-url">
+
+**`RENPLAY_PUBLIC_URL`**
+
+<div class="config-default">
+
+Default: not set
+
+</div>
+
+Public address, such as https://play.example.org. Used to check request origins and secure cookies. Plain HTTP works too, but HTTPS protects passwords and saves in transit.
+
+</div>
+
+<div class="config-entry" id="renplay-trusted-hops">
+
+**`RENPLAY_TRUSTED_HOPS`**
+
+<div class="config-default">
+
+Default: `1`
+
+</div>
+
+Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly; never trust arbitrary forwarded headers.
+
+</div>
+
 <div class="config-entry" id="renplay-keepalive-url">
 
 **`RENPLAY_KEEPALIVE_URL`**
@@ -264,6 +306,118 @@ The `Host` header to send with the keep-alive requests, if the proxy routes by h
 
 ## Server
 
+<div class="config-entry" id="puid">
+
+**`PUID`**
+
+<div class="config-default">
+
+Default: `1000`
+
+</div>
+
+Container only: when started as root, drop to this non-root user ID before starting Renplay. Ignored when started with --user. Make the mounted folders writable by this user; Renplay does not change their ownership.
+
+</div>
+
+<div class="config-entry" id="pgid">
+
+**`PGID`**
+
+<div class="config-default">
+
+Default: `1000`
+
+</div>
+
+Container only: group ID to use with PUID when started as root. Ignored when started with --user.
+
+</div>
+
+<div class="config-entry" id="renplay-auth">
+
+**`RENPLAY_AUTH`**
+
+<div class="config-default">
+
+Default: on for new installs, off after an upgrade
+
+</div>
+
+`on` requires sign-in. `off` lets everyone play as one account. Saves always stay separate per account. Upgraded installs show an admin reminder while sign-in is off.
+
+</div>
+
+<div class="config-entry" id="renplay-auth-user">
+
+**`RENPLAY_AUTH_USER`**
+
+<div class="config-default">
+
+Default: `1`
+
+</div>
+
+Account id used without sign-in. The owner is 1; other accounts and their saves stay untouched.
+
+</div>
+
+<div class="config-entry" id="renplay-auth-local">
+
+**`RENPLAY_AUTH_LOCAL`**
+
+<div class="config-default">
+
+Default: `true`
+
+</div>
+
+Enable username and password sign-in. With sign-in on, disabling the only provider refuses startup.
+
+</div>
+
+<div class="config-entry" id="renplay-admin-username">
+
+**`RENPLAY_ADMIN_USERNAME`**
+
+<div class="config-default">
+
+Default: not set
+
+</div>
+
+Claim the owner account at first start with this username and RENPLAY_ADMIN_PASSWORD. Otherwise use the setup code printed in the server log.
+
+</div>
+
+<div class="config-entry" id="renplay-admin-password">
+
+**`RENPLAY_ADMIN_PASSWORD`**
+
+<div class="config-default">
+
+Default: not set
+
+</div>
+
+Initial owner password (at least 10 characters). Only used while the owner is unclaimed. Prefer RENPLAY_ADMIN_PASSWORD_FILE.
+
+</div>
+
+<div class="config-entry" id="renplay-admin-password-file">
+
+**`RENPLAY_ADMIN_PASSWORD_FILE`**
+
+<div class="config-default">
+
+Default: not set
+
+</div>
+
+Read the initial owner password from this secret file. Set this or RENPLAY_ADMIN_PASSWORD, not both.
+
+</div>
+
 <div class="config-entry" id="port">
 
 **`PORT`**
@@ -283,6 +437,6 @@ Port of the Renplay server inside the container. nginx listens on 8080 and forwa
 
 | Folder | What is in it |
 |---|---|
-| `/data` | Saves and their history, the library, mods, covers, walkthroughs. **Back this up.** |
-| `/games/_archives` | The game downloads you added. Each is deleted once its game installs, unless `RENPLAY_DELETE_ARCHIVES=false`. |
+| `/data` | Saves and their history, accounts, the SQLite library, mods, covers, walkthroughs. **Local disk only. Back this up.** |
+| `/games/_archives` | Game downloads. Only completed Renplay uploads are deleted after install, unless `RENPLAY_DELETE_ARCHIVES=false`. Files you copied here stay here. |
 | `/games` (the rest) | Installed games. Renplay can rebuild them from the archives, while they are kept. |

@@ -38,5 +38,6 @@ Screen first. See [Playing](/guides/playing/).
 
 ## Before you share it
 
-Renplay has no accounts. Do not expose it to the internet as it is. Put it behind a reverse proxy
-with sign-in, or a VPN. See [Reverse proxy and HTTPS](/install/reverse-proxy/).
+Keep `RENPLAY_AUTH=on` to separate people's saves. New installs ask for the setup code from
+`docker logs renplay`; upgrades keep sign-in off until you enable it. See [Accounts](/accounts/)
+and [Reverse proxy and HTTPS](/install/reverse-proxy/) before exposing it outside your network.

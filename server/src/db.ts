@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
+import { migrateAccountFolders } from './accounts-migration.js'
 
 export type GameStatus = 'installed' | 'not_installed' | 'installing'
 
@@ -139,13 +140,17 @@ const SCHEMA = `
 export class Db {
   readonly raw: DatabaseSync
 
-  constructor(path: string) {
+  constructor(path: string, folders?: { saves: string; history: string }) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
     this.raw = new DatabaseSync(path)
     this.raw.exec('PRAGMA journal_mode = WAL')
     this.raw.exec('PRAGMA synchronous = NORMAL')
     this.raw.exec('PRAGMA busy_timeout = 5000')
+    try {
     const v = (this.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+    const oldSaves = folders?.saves ?? join(dirname(path), 'saves'), oldHistory = folders?.history ?? join(dirname(path), 'save-history')
+    const upgraded = v > 0 || path !== ':memory:' && (existsSync(oldSaves) || existsSync(oldHistory))
+    if (upgraded && v < 7 && path !== ':memory:') migrateAccountFolders(this.raw, dirname(path), oldSaves, oldHistory)
     if (v === 0) this.raw.exec(SCHEMA)
     // 2.2: title, tags and cover come from the catalog; nothing is set by hand.
     if (v === 1) this.raw.exec('ALTER TABLE games DROP COLUMN save_dir_locked; ALTER TABLE games DROP COLUMN tags; ALTER TABLE games DROP COLUMN cover;')
@@ -166,13 +171,33 @@ export class Db {
       if (v > 0) this.raw.exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('adult_games', '\"allow\"')")
       this.raw.exec('PRAGMA user_version = 6; COMMIT')
     }
+    if (v < 7) {
+      this.raw.exec(`BEGIN;
+        CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','player')), adult_access INTEGER NOT NULL DEFAULT 0, disabled INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, prefs TEXT NOT NULL DEFAULT '{}');
+        CREATE TABLE IF NOT EXISTS identities (provider TEXT NOT NULL, subject TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id), password TEXT NOT NULL DEFAULT '', PRIMARY KEY(provider, subject));
+        CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), created_at INTEGER NOT NULL, touched_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '');
+        CREATE TABLE IF NOT EXISTS tokens (hash TEXT PRIMARY KEY, id TEXT NOT NULL UNIQUE, user_id INTEGER NOT NULL REFERENCES users(id), name TEXT NOT NULL, created_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS user_games (user_id INTEGER NOT NULL REFERENCES users(id), game TEXT NOT NULL, favorite_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', last_played_at TEXT NOT NULL DEFAULT '', play_time INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, game));
+        CREATE TABLE IF NOT EXISTS safe_games (game TEXT PRIMARY KEY);
+        INSERT OR IGNORE INTO users (id, username, name, role, adult_access, created_at) VALUES (1, 'owner', 'Owner', 'admin', 1, '${now()}');
+        INSERT OR IGNORE INTO user_games SELECT 1, id, favorite_at, finished_at, last_played_at, play_time FROM games;
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('auth_default', '${JSON.stringify(upgraded ? 'off' : 'on')}');
+        PRAGMA user_version = 7; COMMIT;
+      `)
+    }
+    // Upload ownership is separate from the scan cache: rescans must not claim copied files.
+    if (v < 8) this.raw.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS uploaded_archives (path TEXT PRIMARY KEY, identity TEXT NOT NULL);
+      PRAGMA user_version = 8; COMMIT;
+    `)
+    } catch (error) { this.raw.close(); throw error }
   }
 
   /**
    * Opens library.db. The database of renplay 1.x / 2.0 (renplay.db) described
    * the old build layout and is dropped; saves live in files and are untouched.
    */
-  static open(dataDir: string): Db {
+  static open(dataDir: string, folders?: { saves: string; history: string }): Db {
     for (const old of ['renplay.db', 'renplay.db-wal', 'renplay.db-shm']) {
       const p = join(dataDir, old)
       if (existsSync(p)) {
@@ -180,7 +205,7 @@ export class Db {
         if (old === 'renplay.db') console.log('removed the old library database (renplay.db)')
       }
     }
-    return new Db(join(dataDir, 'library.db'))
+    return new Db(join(dataDir, 'library.db'), folders)
   }
 
   // ---- games -------------------------------------------------------------
@@ -210,7 +235,14 @@ export class Db {
   }
 
   deleteGame(id: string): boolean {
-    return Number(this.raw.prepare('DELETE FROM games WHERE id = ?').run(id).changes) > 0
+    this.raw.exec('BEGIN IMMEDIATE')
+    try {
+      this.raw.prepare('DELETE FROM user_games WHERE game = ?').run(id)
+      this.raw.prepare('DELETE FROM safe_games WHERE game = ?').run(id)
+      const removed = Number(this.raw.prepare('DELETE FROM games WHERE id = ?').run(id).changes) > 0
+      this.raw.exec('COMMIT')
+      return removed
+    } catch (error) { this.raw.exec('ROLLBACK'); throw error }
   }
 
   gameBySaveDir(saveDir: string): GameRow | null {
@@ -273,8 +305,17 @@ export class Db {
       .run(a.path, a.size, a.mtime_ms, a.sha256 ?? '', a.info ?? '{}', now())
   }
 
+  markUploadedArchive(path: string, identity: string): void {
+    this.raw.prepare('INSERT OR REPLACE INTO uploaded_archives (path, identity) VALUES (?, ?)').run(path, identity)
+  }
+
+  isUploadedArchive(path: string, identity: string): boolean {
+    return !!this.raw.prepare('SELECT 1 FROM uploaded_archives WHERE path = ? AND identity = ?').get(path, identity)
+  }
+
   deleteArchive(path: string): void {
     this.raw.prepare('DELETE FROM archives WHERE path = ?').run(path)
+    this.raw.prepare('DELETE FROM uploaded_archives WHERE path = ?').run(path)
   }
 
   allArchives(): ArchiveRow[] {

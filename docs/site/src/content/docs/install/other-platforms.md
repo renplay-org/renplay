@@ -14,7 +14,7 @@ Anything that runs a container can run Renplay. You need:
 | Image | `ghcr.io/renplay-org/renplay:<version>` or `renplay/renplay:<version>` |
 | Port | `8080` |
 | Volume | a folder for games at `/games` |
-| Volume | a folder for data at `/data` |
+| Volume | a folder on local disk for data at `/data` (SQLite must not be on a network share) |
 | User | `1000:1000`, or any user that owns both folders |
 
 That is the same as [Docker and Docker Compose](/install/docker/). Portainer and Dockge can use
@@ -22,3 +22,6 @@ that Compose file as it is.
 
 Want a package for your platform? Say so in
 [Discussions](https://renplay.org/discussions).
+
+The image names, ports, paths and upgrade promise are covered by the
+[3.x stability contract](/stability/).

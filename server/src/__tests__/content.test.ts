@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
 import sharp from 'sharp'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '../app.js'
 import { Catalog } from '../catalog.js'
 import { loadConfig } from '../config.js'
@@ -247,6 +247,7 @@ describe('hiding adult games in the API', () => {
     expect(app.db.listJobs().filter((j) => j.type === 'import')).toHaveLength(1)
     // The accepted fixture is not a real archive. Let its job finish before afterAll closes SQLite.
     await expect.poll(() => app.jobs.isBusy()).toBe(false)
+    expect(app.db.listJobs()[0]!.status).toBe('failed')
   })
 
   it('shows the games again when adult games are allowed, and asks for a valid answer', async () => {

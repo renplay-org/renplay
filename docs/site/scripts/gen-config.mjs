@@ -49,8 +49,8 @@ read-only root filesystem, so any folder you point a variable at must be writabl
 
 | Folder | What is in it |
 |---|---|
-| \`/data\` | Saves and their history, the library, mods, covers, walkthroughs. **Back this up.** |
-| \`/games/_archives\` | The game downloads you added. Each is deleted once its game installs, unless \`RENPLAY_DELETE_ARCHIVES=false\`. |
+| \`/data\` | Saves and their history, accounts, the SQLite library, mods, covers, walkthroughs. **Local disk only. Back this up.** |
+| \`/games/_archives\` | Game downloads. Only completed Renplay uploads are deleted after install, unless \`RENPLAY_DELETE_ARCHIVES=false\`. Files you copied here stay here. |
 | \`/games\` (the rest) | Installed games. Renplay can rebuild them from the archives, while they are kept. |
 `)
   return out.join('\n')

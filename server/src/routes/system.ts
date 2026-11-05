@@ -1,3 +1,4 @@
+import { keepaliveToken } from '../auth.js'
 import { statfs } from 'node:fs/promises'
 import { Router } from 'express'
 import type { Builds } from '../builds.js'
@@ -19,7 +20,7 @@ async function disk(path: string) {
 }
 
 export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode): Router {
-  const router = Router()
+  const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/health', (_req, res) => {
     res.json({ ok: true, uptime: process.uptime(), version })
@@ -31,6 +32,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
    * headers take longer than their header timeout, but stream bodies fine.
    */
   router.get('/keepalive', (req, res) => {
+    if (req.get('authorization') !== `Bearer ${keepaliveToken}`) throw new HttpError(401, 'Invalid keepalive token')
     const hold = Math.min(150, Math.max(0, Number(req.query['hold']) || 0))
     res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' })
     res.flushHeaders()

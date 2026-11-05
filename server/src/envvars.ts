@@ -16,6 +16,17 @@ export interface EnvVar {
 }
 
 export const ENV_VARS: readonly EnvVar[] = [
+  { name: 'PUID', group: 'Server', kind: 'number', fallback: 1000, description: 'Container only: when started as root, drop to this non-root user ID before starting Renplay. Ignored when started with --user. Make the mounted folders writable by this user; Renplay does not change their ownership.' },
+  { name: 'PGID', group: 'Server', kind: 'number', fallback: 1000, description: 'Container only: group ID to use with PUID when started as root. Ignored when started with --user.' },
+  { name: 'RENPLAY_AUTH', group: 'Server', kind: 'choice', fallback: '', shown: 'on for new installs, off after an upgrade', description: '`on` requires sign-in. `off` lets everyone play as one account. Saves always stay separate per account. Upgraded installs show an admin reminder while sign-in is off.' },
+  { name: 'RENPLAY_AUTH_USER', group: 'Server', kind: 'number', fallback: 1, description: 'Account id used without sign-in. The owner is 1; other accounts and their saves stay untouched.' },
+  { name: 'RENPLAY_AUTH_LOCAL', group: 'Server', kind: 'yes/no', fallback: true, description: 'Enable username and password sign-in. With sign-in on, disabling the only provider refuses startup.' },
+  { name: 'RENPLAY_ADMIN_USERNAME', group: 'Server', kind: 'text', fallback: '', shown: 'not set', description: 'Claim the owner account at first start with this username and RENPLAY_ADMIN_PASSWORD. Otherwise use the setup code printed in the server log.' },
+  { name: 'RENPLAY_ADMIN_PASSWORD', group: 'Server', kind: 'text', fallback: '', shown: 'not set', description: 'Initial owner password (at least 10 characters). Only used while the owner is unclaimed. Prefer RENPLAY_ADMIN_PASSWORD_FILE.' },
+  { name: 'RENPLAY_ADMIN_PASSWORD_FILE', group: 'Server', kind: 'text', fallback: '', shown: 'not set', description: 'Read the initial owner password from this secret file. Set this or RENPLAY_ADMIN_PASSWORD, not both.' },
+  { name: 'RENPLAY_PUBLIC_URL', group: 'Behind a proxy', kind: 'text', fallback: '', shown: 'not set', description: 'Public address, such as https://play.example.org. Used to check request origins and secure cookies. Plain HTTP works too, but HTTPS protects passwords and saves in transit.' },
+  { name: 'RENPLAY_TRUSTED_HOPS', group: 'Behind a proxy', kind: 'number', fallback: 1, description: 'Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly; never trust arbitrary forwarded headers.' },
+  { name: 'RENPLAY_ADULT_DEFAULT', group: 'Games and catalog', kind: 'choice', fallback: 'block', description: '`allow` gives newly created accounts access to adult games. `block` (and any other value) does not. The first admin always has access; admins can change access per account.' },
   {
     name: 'PORT',
     group: 'Server',
@@ -36,7 +47,7 @@ export const ENV_VARS: readonly EnvVar[] = [
     group: 'Folders',
     kind: 'text',
     fallback: '/data',
-    description: 'Saves and their history, the library database, mods, covers and walkthroughs. Back this up.',
+    description: 'Saves and their history, the library database, mods, covers and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.',
   },
   {
     name: 'ARCHIVES_DIR',
@@ -84,7 +95,7 @@ export const ENV_VARS: readonly EnvVar[] = [
     kind: 'yes/no',
     fallback: true,
     description:
-      'Delete a download once its game installed. `false` keeps it, so the game can be reinstalled without uploading again.',
+      'Delete downloads uploaded through Renplay after a successful install. Files copied into the archives folder are never deleted automatically, including downloads from before 3.0 whose origin is unknown. `false` keeps everything for reinstalls.',
   },
   {
     name: 'RENPLAY_ADULT_GAMES',

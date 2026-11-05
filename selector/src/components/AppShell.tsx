@@ -1,8 +1,11 @@
 import { Heart, Library, Loader2, Plus, Settings } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
-import { jobTitle } from '../lib/api'
+import { api, jobTitle } from '../lib/api'
+import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../lib/auth'
+import AccountMenu from './AccountMenu'
 import { pct } from '../lib/format'
-import { useGames, useJobs, useSystem } from '../lib/queries'
+import { useGames, useJobs } from '../lib/queries'
 import { cx } from './ui'
 
 // Links go through renplay.org (redirects on the website), so moving GitHub or Ko-fi needs no release.
@@ -47,7 +50,7 @@ function JobIndicator() {
 }
 
 function Footer() {
-  const { data } = useSystem()
+  const { data } = useQuery({ queryKey: ['health'], queryFn: () => api<{ version: string }>('/api/health') })
   return (
     <footer className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 pb-28 pt-4 text-xs text-zinc-500 sm:px-8 sm:pb-8">
       <span>Renplay{data?.version ? ` ${data.version}` : ''}</span>
@@ -72,6 +75,9 @@ const TABS = [
 ]
 
 export default function AppShell() {
+  const { data } = useAuth()
+  const admin = data?.user.role === 'admin'
+  const tabs = TABS.filter((t) => t.to !== '/add' || admin).map((t) => t.to === '/settings' ? { ...t, label: 'You' } : t)
   const item = ({ isActive }: { isActive: boolean }) =>
     cx(
       'relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
@@ -83,7 +89,7 @@ export default function AppShell() {
         <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-6 px-4 sm:h-16 sm:px-8">
           <Logo />
           <nav className="hidden items-center gap-1 sm:flex">
-            {TABS.slice(0, 2).map((t) => (
+            {tabs.filter((t) => t.to !== '/settings').map((t) => (
               <NavLink key={t.to} to={t.to} end={t.end} className={item}>
                 <t.icon className="size-4" />
                 {t.label}
@@ -91,7 +97,8 @@ export default function AppShell() {
             ))}
           </nav>
           <div className="ml-auto flex min-w-0 items-center gap-2">
-            <JobIndicator />
+            {admin && <JobIndicator />}
+            <AccountMenu />
             <NavLink to="/settings" className={(s) => cx(item(s), 'hidden sm:flex')} aria-label="Settings">
               <Settings className="size-4" />
             </NavLink>
@@ -99,13 +106,14 @@ export default function AppShell() {
         </div>
       </header>
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 pt-5 sm:px-8 sm:pt-6">
+        {admin && data && !data.auth && <aside className="mb-5 rounded-xl bg-amber-400/10 p-4 text-sm text-amber-200">Sign-in is off. Everyone plays as {data.user.name}. <a className="underline" href="https://renplay.org/docs/accounts/">Turn on sign-in</a>.</aside>}
         <Outlet />
       </main>
       <Footer />
       {/* Tab bar on phones. */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-ink-950/85 backdrop-blur-xl sm:hidden">
-        <div className="grid grid-cols-3">
-          {TABS.map((t) => (
+        <div className={`grid ${admin ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {tabs.map((t) => t.to === '/settings' ? <AccountMenu key="you" tab /> : (
             <NavLink
               key={t.to}
               to={t.to}

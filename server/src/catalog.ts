@@ -457,11 +457,17 @@ export class Catalog {
   }
 
   list(): Recipe[] {
-    return [...this.recipes.values()].sort((a, b) => a.title.localeCompare(b.title))
+    return [...this.recipes.values()].filter((r) => !this.content.hidesRecipe(r.nsfw)).sort((a, b) => a.title.localeCompare(b.title))
   }
 
   recipe(id: string): Recipe | null {
-    return this.recipes.get(id) ?? null
+    const recipe = this.recipes.get(id)
+    return recipe && !this.content.hidesRecipe(recipe.nsfw) ? recipe : null
+  }
+
+  /** Static cover permissions are checked by node and nginx's auth subrequest alike. */
+  canReadCover(file: string): boolean {
+    return [...this.covers].some(([id, name]) => name === file && !!this.recipe(id))
   }
 
   status(): { fetchedAt: number; urls: string[]; errors: string[]; count: number } {

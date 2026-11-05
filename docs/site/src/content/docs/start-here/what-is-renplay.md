@@ -32,8 +32,8 @@ host game files.
 
 ## What it does not do
 
-- It has **no user accounts**. If Renplay is reachable from outside your network, put your own
-  sign-in in front of it. See [Reverse proxy and HTTPS](/install/reverse-proxy/).
+- It does not include OIDC or LDAP yet. Local [accounts](/accounts/) keep saves separate;
+  use [HTTPS](/install/reverse-proxy/) outside your trusted network.
 - It does not download games for you. Add the file yourself.
 - It does not play every engine. Programs made for Windows only, such as RPG Maker XP or Wolf RPG,
   cannot run in a browser.

@@ -31,6 +31,8 @@ Other engines are added only when their normal download plays as easily; the
 
 - **Play anywhere.** Smooth, full-speed playback in the browser. On phones the game fills the
   screen around the camera cutout, and on iPhone it runs full screen from the home screen.
+- **Separate accounts.** Local sign-in keeps each person's saves and progress separate. Admins
+  manage the shared library; players play. Sign-in can be switched off for a trusted home network.
 - **Saves on your server.** Saves, autosaves and progress sync as you play, with earlier versions
   kept. Sequels find the previous season’s saves, just like on desktop. Import saves from the
   desktop version, export them back, or copy them between games.
@@ -44,7 +46,9 @@ Other engines are added only when their normal download plays as easily; the
   its saves stay safe.
 - **Pictures stay private.** Adult pictures start hidden in a new browser. Covers become title
   cards and saves become scene cards, without fetching the hidden art. Catalog covers marked safe
-  for work stay visible. Change this browser's preference in Settings → This browser.
+  for work stay visible. Choose Show, Hide pictures or Hide adult games in Account, with a device
+  override that can hide more but never show more than the account allows. An admin decides who
+  has adult access.
 - **Find your next game.** Keep favourites at the top of your library, sort by last played,
   title or recently added, and search titles, developers and tags. Recent combines last played and
   recently added. Library filters stay in the
@@ -66,25 +70,60 @@ docker run -d --name renplay -p 8080:8080 \
   ghcr.io/renplay-org/renplay:latest
 ```
 
-Open http://localhost:8080. Copy a game’s PC download into `/path/to/games/_archives/`, or upload
+Open http://localhost:8080. On a new install, enter the setup code from `docker logs renplay`
+and create the owner account. Copy a game’s PC download into `/path/to/games/_archives/`, or upload
 it under **Add games**, and press **Install**. The first install also downloads the Ren’Py web
 engine (about 16 MB).
 
 The same image is on Docker Hub as `renplay/renplay`. Pin a version
 (`ghcr.io/renplay-org/renplay:2.9.1`) for production; [releases](https://renplay.org/releases)
-list what changed. Renplay has no user accounts, so put it behind your own sign-in (a reverse
-proxy with authentication, a VPN) if it is reachable from outside your network.
+list what changed. Use HTTPS outside a trusted local network. See [Accounts](#accounts) before
+sharing an upgraded install.
 
 More in the docs: [Docker Compose](https://docs.renplay.org/install/docker/),
 [Kubernetes](https://docs.renplay.org/install/kubernetes/),
 [adding games](https://docs.renplay.org/guides/adding-games/),
 [playing on your phone](https://docs.renplay.org/guides/playing/),
 [configuration](https://docs.renplay.org/configuration/) (every environment variable),
-[upgrading and backups](https://docs.renplay.org/upgrading/) and
+[upgrading and backups](https://docs.renplay.org/upgrading/),
+[the 3.x stability contract](https://docs.renplay.org/stability/) and
 [troubleshooting](https://docs.renplay.org/troubleshooting/).
 
-**Back up `/data`:** it holds your saves and their history, the library, mods and covers. Everything
-else can be rebuilt from the game downloads.
+**Back up `/data` and keep it on local disk:** it holds your saves and their history, accounts,
+the SQLite library, mods and covers. SQLite must not be on a network share. `/games` and the
+archives folder can be shares. Allow about twice the game's download size free during install.
+By default only downloads uploaded through Renplay are deleted after install; files you copy into
+the archives folder stay there. `RENPLAY_DELETE_ARCHIVES=false` keeps uploads too.
+
+The image defaults to user `1000:1000`. You can use any non-root IDs with `--user 568:568`, or
+start as root with `--user 0:0 -e PUID=99 -e PGID=100`; the entrypoint drops root before starting
+the app. Root without these variables drops to `1000:1000`. Make both mounted folders writable
+by the chosen user first; Renplay does not change their ownership. A read-only root filesystem
+works with writable `/data`, `/games` and a `/tmp` tmpfs. The image includes a health check through
+nginx on port 8080. See the [Docker guide](https://docs.renplay.org/install/docker/).
+
+## Accounts
+
+New data folders require sign-in. Upgrades keep sign-in off and show an admin reminder. Set
+`RENPLAY_AUTH=on` to turn it on; the first admin claims the owner and all existing saves. You can
+seed the owner with `RENPLAY_ADMIN_USERNAME` and `RENPLAY_ADMIN_PASSWORD_FILE` instead of a setup
+code. Passwords must have at least 10 characters. The account menu shows your name and Sign out.
+
+`RENPLAY_AUTH=off` lets everyone play as the owner, or the account id in `RENPLAY_AUTH_USER`.
+Changing modes never moves or deletes other people's saves. All saves and history live under
+`/data/users/<id>/`; old owner paths remain symlinks for rollback to 2.10. The upgrade first backs
+up saves, save history and the database under `/data/backups/pre-3.0/`. Back up `/data` yourself too.
+
+Cookies work on plain HTTP for a local NAS and are marked `Secure` over HTTPS. Behind HTTPS
+termination, set `RENPLAY_PUBLIC_URL` to the public HTTPS address. Keep proxy hop counts correct
+with `RENPLAY_TRUSTED_HOPS` (the included nginx is one hop).
+
+Open **Account** from the account menu (the **You** tab on phones) to change your name, password
+and adult-picture preferences, manage sessions and script tokens, or export your saves. Admins use
+**Settings → Users** to add users, change roles and adult access, disable accounts, reset passwords,
+and copy, merge, export or import save folders. Overwrites keep history; removing a user archives
+their folder. These tools work with sign-in off too. More in [Accounts](https://docs.renplay.org/accounts/)
+and the [Accounts API](https://docs.renplay.org/developers/accounts-api/).
 
 ## Questions
 

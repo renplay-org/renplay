@@ -38,7 +38,8 @@ function isJunk(name: string): boolean {
  *   <historyRoot>/<save_directory>/<file>/<ts>__<reason>__<sha>   previous versions
  */
 export class SaveStore {
-  private locks = new Map<string, Promise<unknown>>()
+  private static locks = new Map<string, Promise<unknown>>()
+  private acceptingWrites = true
 
   constructor(
     readonly root: string,
@@ -51,15 +52,24 @@ export class SaveStore {
     return safeJoin(this.root, saveDir)
   }
 
+  /** Drain accepted writes before archiving an account; stale requests may not recreate its folder. */
+  async pauseWrites(): Promise<void> {
+    this.acceptingWrites = false
+    await Promise.all([...SaveStore.locks].filter(([key]) => key.startsWith(this.root + '/')).map(([, operation]) => operation.catch(() => {})))
+  }
+
+  resumeWrites(): void { this.acceptingWrites = true }
+
   /** Serializes operations on one file. */
   private async locked<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    const prev = this.locks.get(key) ?? Promise.resolve()
+    if (!this.acceptingWrites) throw new HttpError(409, 'This account is being archived')
+    const prev = SaveStore.locks.get(key) ?? Promise.resolve()
     const next = prev.catch(() => {}).then(fn)
-    this.locks.set(key, next)
+    SaveStore.locks.set(key, next)
     try {
       return await next
     } finally {
-      if (this.locks.get(key) === next) this.locks.delete(key)
+      if (SaveStore.locks.get(key) === next) SaveStore.locks.delete(key)
     }
   }
 
@@ -254,6 +264,7 @@ export class SaveStore {
       }
       if (!add.length) return 0
       const next = (current && !current.endsWith('\n') ? current + '\n' : current) + add.join('\n') + '\n'
+      if (current) await this.snapshot(TOKENS_DIR, 'security_keys.txt', Buffer.from(current), 'merge-keys')
       await writeFileAtomic(path, next)
       return add.length
     })

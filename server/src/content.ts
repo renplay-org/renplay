@@ -1,3 +1,5 @@
+import { viewer } from './accounts-context.js'
+import { parseJson } from './db.js'
 import type { Config } from './config.js'
 import type { Db, GameRow } from './db.js'
 import { HttpError } from './util/paths.js'
@@ -44,8 +46,18 @@ export class ContentMode {
   }
 
   /** Adult games stay in the library but are not shown or played while blocked. */
-  hides(game: Pick<GameRow, 'adult'> | null | undefined): boolean {
-    return !!game && game.adult === 1 && this.blocked
+  hides(game: Pick<GameRow, 'adult'> & Partial<Pick<GameRow, 'id' | 'recipe_id'>> | null | undefined): boolean {
+    if (!game) return false
+    if (game.adult === 1 && this.blocked) return true
+    const u = viewer()?.user
+    if (!u) return false
+    const adult = game.adult === 1 || (game.recipe_id === '' && !(game.id && this.db.raw.prepare('SELECT 1 FROM safe_games WHERE game = ?').get(game.id)))
+    return adult && (!u.adult_access || parseJson<{ adultPictures?: string }>(u.prefs, {}).adultPictures === 'hide-games')
+  }
+
+  hidesRecipe(adult: boolean | undefined): boolean {
+    const u = viewer()?.user
+    return adult === true && (this.blocked || !!u && (!u.adult_access || parseJson<{ adultPictures?: string }>(u.prefs, {}).adultPictures === 'hide-games'))
   }
 
   private stored(): AdultGames | null {
