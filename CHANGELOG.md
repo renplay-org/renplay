@@ -9,39 +9,32 @@ release notes say what).
 
 ### Added
 
-- Local accounts with separate saves, history, favourites, Finished and play time. New installs
-  ask for a setup code from the server log before creating the owner account. Upgrades keep
-  sign-in off with an admin reminder; turning it on keeps every existing save with the owner.
-- Admin and player roles, long-lived sign-in sessions and access tokens for scripts. Game files,
-  covers and walkthroughs require the same access as the library. A game asks you to sign back in
-  if its session ends, keeping unsent Ren'Py saves with the account that made them.
-- Per-account adult access, and Show, Hide pictures or Hide adult games preferences with a device
-  override. New users start without adult access; the first admin has it.
-- Account screen for your name, password, adult pictures, sessions, access tokens and save export.
-  A device can hide more adult content, but cannot show more than your account allows.
-- Users in Settings for admins: add users, change roles and adult access, disable accounts, reset
-  passwords, and copy, merge, export or import saves. Overwrites keep history; removed accounts'
-  folders are archived. These tools also work with sign-in off.
+- Accounts. Turn on sign-in with `RENPLAY_AUTH=on` and everyone gets their own saves, save
+  history, favourites, Finished stories and play time; the library is shared. A new install asks
+  for a setup code from the server log before creating the owner account. Upgraded installs keep
+  sign-in off, with a reminder for admins, and every existing save stays with the owner.
+- Admin and player roles. Players play; admins also install games, manage mods and users, and see
+  Activity and the server settings. Game files, covers and walkthroughs need the same access as
+  the library.
+- An Account page: your name, password, adult pictures, where you are signed in, access tokens for
+  scripts, and an export of all your saves.
+- Users in Settings, for admins: add people, set their role and whether they may see adult games,
+  disable accounts, reset passwords, and copy, merge, export or import saves between people.
+  Anything a copy would overwrite is kept in the save history. These tools work with sign-in off
+  too, to prepare a library before turning it on.
+- Adult games per person: new people start without them unless the server sets
+  `RENPLAY_ADULT_DEFAULT`. Everyone chooses Show, Hide pictures or Hide adult games, and a device
+  can hide more than its account allows, never less.
+- A game asks you to sign back in when your session ends, and keeps saves it has not sent yet for
+  the account that made them.
 
 ### Changed
 
-- Saves now live in `/data/users/<id>/`. The upgrade backs up saves, history and `library.db`,
-  resumes interrupted moves, and leaves the owner's old paths as symlinks for rollback to 2.10.
-  Back up `/data` before upgrading.
-
-### Fixed
-
-- Account permissions and content restrictions now reject ambiguous resource paths consistently,
-  including files served directly by the web server. HTML games and their popups stay isolated
-  from accounts, including when opened outside the player.
-- Switching accounts keeps unsent Ren'Py and HTML saves on this device for their owner. HTML
-  saves are kept locally even while an earlier upload is stalled. Older browser saves with no
-  known owner are kept for recovery, not discarded.
-- Game assets with spaces, percent signs, question marks or hash signs in their filenames load
-  correctly through protected game URLs.
-- Passwords use stronger hashing, with older hashes upgraded at the next successful sign-in.
-  Save imports have bounded file sizes, archive contents and concurrent work. Sign-in return
-  links cannot take you to another website.
+- Saves move to `/data/users/<id>/` on the first start. The upgrade backs up saves, save history
+  and the library first (`/data/backups/pre-3.0/`), and leaves the old folders as links, so
+  2.11 still runs on the same data if you go back.
+- HTML games run fully isolated from Renplay, including any page they open, and passwords use
+  stronger hashing.
 
 ## [2.11.1] - 2026-11-05
 
