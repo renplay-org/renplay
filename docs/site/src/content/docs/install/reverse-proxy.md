@@ -59,3 +59,6 @@ are not included in this stage.
 - HTTP/3 can drop long downloads through some gateways. The player resumes by itself; see
   [Troubleshooting](/troubleshooting/#downloads-stop-with-a-network-error-http3).
 - Scale-to-zero proxies: see `RENPLAY_KEEPALIVE_URL` in [Configuration](/configuration/).
+
+The image names, ports, paths and upgrade promise are covered by the
+[3.x stability contract](/stability/).

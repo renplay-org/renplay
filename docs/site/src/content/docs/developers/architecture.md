@@ -71,8 +71,10 @@ archives, while they are kept).
    with a stricter parser and Python 3.12. Every build also gets `game/renplay_web.rpy`
    (`webcompat.ts`), stand-ins for what desktop games expect and a browser lacks (`ssl`, threads,
    Unix sockets, old import hooks, Python 2 print statements and octal numbers).
-8. **Delete the archive** once the archive is closed (on NFS, deleting an open file leaves a
-   hidden copy), unless `RENPLAY_DELETE_ARCHIVES=false`. Failed installs keep it.
+8. **Delete an uploaded archive** once the archive is closed (on NFS, deleting an open file
+   leaves a hidden copy), unless `RENPLAY_DELETE_ARCHIVES=false`. The upload completion records
+   the file identity separately from scan metadata; copied, replaced, edited and unknown archives
+   are never automatically deleted. Failed installs keep their archive.
 
 Builds never change after that. A reinstall or update makes a new build; the old one is deleted in
 the background by `util/purge.ts`.

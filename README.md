@@ -85,11 +85,22 @@ More in the docs: [Docker Compose](https://docs.renplay.org/install/docker/),
 [adding games](https://docs.renplay.org/guides/adding-games/),
 [playing on your phone](https://docs.renplay.org/guides/playing/),
 [configuration](https://docs.renplay.org/configuration/) (every environment variable),
-[upgrading and backups](https://docs.renplay.org/upgrading/) and
+[upgrading and backups](https://docs.renplay.org/upgrading/),
+[the 3.x stability contract](https://docs.renplay.org/stability/) and
 [troubleshooting](https://docs.renplay.org/troubleshooting/).
 
-**Back up `/data`:** it holds your saves and their history, the library, mods and covers. Everything
-else can be rebuilt from the game downloads.
+**Back up `/data` and keep it on local disk:** it holds your saves and their history, accounts,
+the SQLite library, mods and covers. SQLite must not be on a network share. `/games` and the
+archives folder can be shares. Allow about twice the game's download size free during install.
+By default only downloads uploaded through Renplay are deleted after install; files you copy into
+the archives folder stay there. `RENPLAY_DELETE_ARCHIVES=false` keeps uploads too.
+
+The image defaults to user `1000:1000`. You can use any non-root IDs with `--user 568:568`, or
+start as root with `--user 0:0 -e PUID=99 -e PGID=100`; the entrypoint drops root before starting
+the app. Root without these variables drops to `1000:1000`. Make both mounted folders writable
+by the chosen user first; Renplay does not change their ownership. A read-only root filesystem
+works with writable `/data`, `/games` and a `/tmp` tmpfs. The image includes a health check through
+nginx on port 8080. See the [Docker guide](https://docs.renplay.org/install/docker/).
 
 ## Accounts
 

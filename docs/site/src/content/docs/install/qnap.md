@@ -24,5 +24,9 @@ The names of the screens differ between versions of the system, so these steps s
 settings are the same as in [Docker and Docker Compose](/install/docker/), which also lists the
 options.
 
-Keep `/data` in your NAS backups. Put a sign-in in front of Renplay before you open it to the
+Keep `/data` on local disk and in your NAS backups; its SQLite database must not be on a
+network share. `/games` and the archives folder can be shares. Put a sign-in in front of Renplay before you open it to the
 internet: [Reverse proxy and HTTPS](/install/reverse-proxy/).
+
+The image names, ports, paths and upgrade promise are covered by the
+[3.x stability contract](/stability/).

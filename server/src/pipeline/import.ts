@@ -1,5 +1,6 @@
 import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
+import { archiveIdentity } from '../archive-origin.js'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../builds.js'
 import type { BuildSettings, Catalog, RecipeMatch } from '../catalog.js'
 import type { Config } from '../config.js'
@@ -58,17 +59,18 @@ export function existingGame(db: Db, game: string | undefined, recipeId: string 
 export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<unknown> {
   const result = await install(ctx, deps)
   // After install() closed the archive: on NFS, deleting an open file leaves a hidden copy behind.
-  if (deps.cfg.deleteArchives) await deleteSource(ctx, deps)
+  await deleteSource(ctx, deps)
   return result
 }
 
-/** Removes the archive a game was installed from. Failing to only costs space. */
+/** Removes only a completed, unchanged upload. Failure only costs space. */
 export async function deleteSource(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<void> {
+  if (!deps.cfg.deleteArchives) return
   const rel = cleanRelPath(ctx.params.source.path)
   const path = safeJoin(deps.cfg.archivesDir, rel)
   try {
     const st = await stat(path)
-    if (!st.isFile()) return
+    if (!st.isFile() || !deps.db.isUploadedArchive(rel, archiveIdentity(st))) return
     await unlink(path)
     deps.db.deleteArchive(rel)
     ctx.log(`Deleted ${rel} (${(st.size / 1e9).toFixed(2)} GB) from the archives folder; add it again to reinstall`)
