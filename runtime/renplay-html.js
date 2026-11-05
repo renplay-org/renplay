@@ -24,7 +24,7 @@
   var cfg = window.__renplay || {}
   var parentWin = window.parent
   function post(type, data) {
-    var msg = { type: 'renplay:' + type, game: cfg.id }
+    var msg = { type: 'renplay:' + type, game: cfg.id, userId: cfg.userId }
     if (data) for (var k in data) msg[k] = data[k]
     // The player is the only window that listens; an opaque origin cannot name it.
     parentWin.postMessage(msg, '*')
@@ -86,7 +86,7 @@
     if (timer) clearTimeout(timer)
     timer = null
     if (!dirty) return
-    dirty = false
+    // Keep the snapshot dirty until the trusted parent confirms durable, owner-keyed storage.
     post('storage', { data: JSON.stringify(local) })
   }
   function changed() {
@@ -137,6 +137,9 @@
 
   var IDB = window.__renplayIDB
   var idbDirty = false
+  var idbVersion = 0
+  var idbPending = null
+  var idbFlush = null
   var idbTimer = null
   var flushIdb = function () {
     return Promise.resolve()
@@ -205,6 +208,7 @@
     var changedIdb = function () {
       if (restoring) return
       idbDirty = true
+      idbVersion++
       if (!idbTimer) idbTimer = setTimeout(function () { flushIdb() }, 2000)
     }
     // A cache refused like a browser without storage would: the open request fails.
@@ -270,10 +274,10 @@
     })
 
     var readDb = function (name) {
-      return new Promise(function (resolve) {
+      return new Promise(function (resolve, reject) {
         var req = realOpen(name)
         req.onerror = function () {
-          resolve(null)
+          reject(req.error)
         }
         req.onsuccess = function () {
           var db = req.result
@@ -314,7 +318,7 @@
           }
           t.onerror = t.onabort = function () {
             db.close()
-            resolve(out)
+            reject(t.error)
           }
         }
       })
@@ -322,9 +326,10 @@
     flushIdb = function () {
       if (idbTimer) clearTimeout(idbTimer)
       idbTimer = null
+      if (idbFlush) return idbFlush
       if (!idbDirty) return Promise.resolve()
-      idbDirty = false
-      return factory
+      var version = idbVersion
+      idbFlush = factory
         .databases()
         .then(function (list) {
           return Promise.all(
@@ -338,11 +343,15 @@
           )
         })
         .then(function (dbs) {
-          post('storage', { kind: 'idb', data: JSON.stringify({ databases: dbs.filter(Boolean) }) })
+          var data = JSON.stringify({ databases: dbs.filter(Boolean) })
+          idbPending = { data: data, version: version }
+          post('storage', { kind: 'idb', data: data })
         })
         .catch(function (e) {
           console.warn('[renplay] could not keep the game storage', e)
         })
+        .then(function () { idbFlush = null })
+      return idbFlush
     }
 
     define(window, 'indexedDB', function () {
@@ -361,6 +370,9 @@
       if (document.visibilityState === 'hidden') flushIdb()
     })
   }
+
+  // Retry both storage APIs until the trusted parent acknowledges durable storage, not upload.
+  setInterval(function () { sendStorage(); flushIdb() }, 5000)
 
   // ------------------------------------------------------------- mute
 
@@ -431,6 +443,18 @@
     switch (d.type) {
       case 'renplay:mute':
         setMuted(d.value)
+        break
+      case 'renplay:storage-kept':
+        if (d.userId !== cfg.userId) break
+        if (!d.kind && d.data === JSON.stringify(local)) dirty = false
+        if (d.kind === 'idb' && idbPending && d.data === idbPending.data && idbPending.version === idbVersion) idbDirty = false
+        break
+      case 'renplay:resume-sync':
+        if (d.userId !== cfg.userId) break
+        dirty = true
+        idbDirty = true
+        sendStorage()
+        flushIdb()
         break
       case 'renplay:flush':
       case 'renplay:save-and-exit':

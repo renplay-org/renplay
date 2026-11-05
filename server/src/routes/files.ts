@@ -15,7 +15,7 @@ const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|c
 type BaseIndex = Map<string, { size: number; where: 'zip' | 'pack' }>
 
 export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jobs: JobManager, content: ContentMode): Router {
-  const router = Router()
+  const router = Router({ caseSensitive: true, strict: true })
   const cache = new Map<string, { key: string; files: BaseIndex }>()
 
   const game = (req: Request): GameRow => {

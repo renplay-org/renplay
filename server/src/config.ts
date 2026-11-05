@@ -1,9 +1,16 @@
 import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { fallbackOf } from './envvars.js'
 
 function env(name: string, fallback: string): string {
   const v = process.env[name]
   return v && v.trim() ? v.trim() : fallback
+}
+
+function secret(name: string): string {
+  if (process.env[name] && process.env[`${name}_FILE`]) throw new Error(`Set only ${name} or ${name}_FILE`)
+  const file = process.env[`${name}_FILE`]
+  return file ? readFileSync(file, 'utf-8').replace(/\r?\n$/, '') : process.env[name] ?? ''
 }
 
 function envInt(name: string, fallback: number): number {
@@ -27,6 +34,14 @@ function adultGames(): '' | 'allow' | 'block' {
 }
 
 export interface Config {
+  auth: '' | 'on' | 'off'
+  authUser: number
+  authLocal: boolean
+  adminUsername: string
+  adminPassword: string
+  publicUrl: string
+  trustedHops: number
+  adultDefault: boolean
   port: number
   dataDir: string
   savesDir: string
@@ -64,7 +79,17 @@ export function loadConfig(): Config {
   const dataDir = env('DATA_DIR', fallbackOf('DATA_DIR'))
   const gamesDir = env('GAMES_DIR', fallbackOf('GAMES_DIR'))
   const internalDir = env('RENPLAY_DIR', join(gamesDir, '_renplay'))
+  const auth = env('RENPLAY_AUTH', '')
+  if (auth && auth !== 'on' && auth !== 'off') throw new Error('RENPLAY_AUTH must be on or off')
   return {
+    auth: auth as '' | 'on' | 'off',
+    authUser: envInt('RENPLAY_AUTH_USER', 1),
+    authLocal: envBool('RENPLAY_AUTH_LOCAL', true),
+    adminUsername: env('RENPLAY_ADMIN_USERNAME', ''),
+    adminPassword: secret('RENPLAY_ADMIN_PASSWORD'),
+    publicUrl: env('RENPLAY_PUBLIC_URL', ''),
+    trustedHops: Math.max(0, envInt('RENPLAY_TRUSTED_HOPS', 1)),
+    adultDefault: env('RENPLAY_ADULT_DEFAULT', 'block') === 'allow',
     port: envInt('PORT', fallbackOf('PORT')),
     dataDir,
     savesDir: env('SAVES_DIR', join(dataDir, 'saves')),

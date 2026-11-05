@@ -4,6 +4,19 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { Db } from '../db.js'
 
+it('forgets personal progress and safe overrides with a library entry, never carrying them onto a reused game id', () => {
+  const db = new Db(':memory:')
+  try {
+    db.insertGame({ id: 'story', title: 'Story' })
+    db.raw.prepare('INSERT INTO safe_games VALUES (?)').run('story')
+    db.raw.prepare('INSERT INTO user_games (user_id, game, favorite_at) VALUES (1, ?, ?)').run('story', '2026-01-01')
+    expect(db.deleteGame('story')).toBe(true)
+    db.insertGame({ id: 'story', title: 'Another story' })
+    expect(db.raw.prepare('SELECT * FROM user_games').all()).toEqual([])
+    expect(db.raw.prepare('SELECT * FROM safe_games').all()).toEqual([])
+  } finally { db.close() }
+})
+
 it('migrates version 4 progress without changing existing library metadata', () => {
   const root = mkdtempSync(join(tmpdir(), 'renplay-db-'))
   const path = join(root, 'library.db')
@@ -14,7 +27,7 @@ it('migrates version 4 progress without changing existing library metadata', () 
     db.close()
     db = new Db(path)
     expect(db.getGame('story')).toMatchObject({ save_dir: 'Story-123', favorite_at: '2026-01-01', last_played_at: '2026-01-02', finished_at: '', play_time: 0 })
-    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 6 })
+    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 7 })
     db.close()
     db = new Db(path)
     expect(db.getGame('story')?.play_time).toBe(0)

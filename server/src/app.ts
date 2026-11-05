@@ -5,6 +5,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
+import { Accounts, playerRoute } from './auth.js'
+import { viewer } from './accounts-context.js'
 import { Builds } from './builds.js'
 import { Catalog } from './catalog.js'
 import { ContentMode } from './content.js'
@@ -52,19 +54,22 @@ export interface App {
   builds: Builds
   engines: EngineStore
   saves: SaveStore
+  accounts: Accounts
   catalog: Catalog
   purger: Purger
   close(): void
 }
 
 export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
-  for (const d of [cfg.dataDir, cfg.savesDir, cfg.coversDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
+  const db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir })
+  for (const d of [cfg.dataDir, cfg.coversDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
   for (const d of [cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
 
   const version = packageVersion()
-  const db = Db.open(cfg.dataDir)
+  const accounts = new Accounts(db, cfg)
+  try { await accounts.init() } catch (error) { db.close(); throw error }
   const purger = new Purger(cfg.purgeDir)
-  const saves = new SaveStore(cfg.savesDir, cfg.saveHistoryDir, cfg.saveHistoryVersions)
+  const saves = accounts.store(1)
   const jobs = new JobManager(db, cfg)
   const builds = new Builds(cfg, db, purger)
   const engines = new EngineStore(cfg, db, purger)
@@ -73,7 +78,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const catalog = new Catalog(cfg, db, content)
   await catalog.init()
 
-  const deps = { cfg, db, builds, engines, overlays, catalog, saves, jobs, version }
+  const deps = { cfg, db, builds, engines, overlays, catalog, get saves() { return accounts.store() }, accounts, jobs, version }
   jobs.register('import', (ctx) => runImport(ctx, deps))
   jobs.register('apply-mods', (ctx) => applyMods(ctx, deps))
   jobs.register('hash-archive', async (ctx) => {
@@ -93,8 +98,51 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
 
   const app = express()
   app.disable('x-powered-by')
-  app.set('trust proxy', true)
+  app.set('case sensitive routing', true)
+  app.set('strict routing', true)
+  app.set('trust proxy', cfg.trustedHops)
+  app.use((req, _res, next) => {
+    // Reject ambiguous spellings before auth, mounts and decoded route parameters diverge.
+    const path = req.path
+    // Only the filename tail of a canonical packed-asset route may contain encoded #, ? or %.
+    // Route components retain the stricter rules; separators and double-encoded octets never pass.
+    const asset = path.match(/^\/g\/[a-z0-9][a-z0-9._-]*\/[a-z0-9]+(?:\.m[a-z0-9]+)?\/(?:s\/[a-zA-Z0-9_.-]+\/)?game\/(.+)$/)
+    const structure = asset ? path.slice(0, -asset[1]!.length) : path
+    if (/^\/(?:api|g)(?:\/|%|$)/i.test(path) && (
+      !/^\/(?:api|g)\//.test(path) || path.includes('//') || /%(?:2f|5c|00|25[0-9a-f]{2})/i.test(path) || /%(?:25|3f|23)/i.test(structure) || path.includes('\\') ||
+      (path.startsWith('/api/') && path.endsWith('/'))
+    )) return next(new HttpError(400, 'Use a canonical resource path'))
+    next()
+  })
+  app.use(accounts.middleware)
   app.use(express.json({ limit: '2mb' }))
+  app.use('/api', accounts.router())
+  const checkStatic = (path: string) => {
+    const game = path.match(/^\/g\/([^/]+)\//)?.[1]
+    if (game && (!db.getGame(game) || content.hides(db.getGame(game)))) throw new HttpError(404, 'Game not found')
+    const cover = path.match(/^\/api\/covers\/([^/]+)$/)?.[1]
+    if (cover && !catalog.canReadCover(cover)) throw new HttpError(404, 'Cover not found')
+    const walkthrough = path.match(/^\/api\/walkthroughs\/([^/]+)$/)?.[1]
+    if (walkthrough && !db.allGames().some((g) => g.walkthrough === walkthrough && !content.hides(g))) throw new HttpError(404, 'Walkthrough not found')
+    return !!(game || cover || walkthrough)
+  }
+  app.get('/api/auth/check', (req, res) => {
+    let path: string
+    try {
+      // nginx passes $uri: already percent-decoded and dot/slash-normalized. Never decode twice.
+      path = req.get('x-original-uri') ?? ''
+      if (!path.startsWith('/') || /[%?#]/.test(path) || path.includes('\\') || path.includes('//') || /(?:^|\/)\.{1,2}(?:\/|$)/.test(path)) throw new Error('Invalid path')
+    } catch { throw new HttpError(403, 'Invalid static path') }
+    if (!/^\/g\/[a-z0-9][a-z0-9._-]*\/[a-z0-9]+(?:\.m[a-z0-9]+)?\/.+$/.test(path) && !/^\/api\/(?:covers|walkthroughs)\/[^/]+$/.test(path)) throw new HttpError(403, 'Not a static game file')
+    if (viewer()?.user.role !== 'admin' && !playerRoute('GET', path)) throw new HttpError(403, 'Only an admin can do this')
+    // auth_request accepts only 2xx, 401 or 403; a hidden file must not become a 500.
+    try { if (!checkStatic(path)) throw new HttpError(403, 'Not a recognized static resource') } catch (error) {
+      if (error instanceof HttpError && error.status === 404) throw new HttpError(403, 'File not available')
+      throw error
+    }
+    res.sendStatus(204)
+  })
+  app.use((req, _res, next) => { try { checkStatic(req.path); next() } catch (e) { next(e) } })
 
   // The HTML games' runtime lives next to Ren'Py's (runtime/ in the repository and the image).
   const htmlRuntimePath = resolve(dirname(opts.runtimePath ?? fileURLToPath(new URL('../../runtime/renplay-runtime.js', import.meta.url))), 'renplay-html.js')
@@ -104,7 +152,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     (htmlRuntime ??= Promise.all([readFile(join(dirname(htmlRuntimePath), 'vendor', 'fake-indexeddb.js'), 'utf-8'), readFile(htmlRuntimePath, 'utf-8')])
       .then((parts) => parts.join('\n;\n').replace(/<\/script/gi, '<\\/script'))
       .catch((e) => ((htmlRuntime = null), Promise.reject(e))))
-  app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath), { runtime: readHtmlRuntime, saves }, content))
+  app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath), { runtime: readHtmlRuntime, get saves() { return accounts.store() } }, content, accounts))
   // Static fallbacks for development; nginx serves these paths in production.
   // resolve(): sendFile refuses paths with "..", like the $PWD/../runtime one in AGENTS.md.
   if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(resolve(opts.runtimePath!)))
@@ -117,19 +165,19 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
     const tryNext = (i: number): void => {
       if (i >= candidates.length) return next()
-      res.sendFile(candidates[i]!, { immutable: true, maxAge: '365d' }, (err) => (err ? tryNext(i + 1) : undefined))
+      res.sendFile(candidates[i]!, { cacheControl: false }, (err) => (err ? tryNext(i + 1) : undefined))
     }
     tryNext(0)
   })
   app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content))
   app.use('/api/content', createContentRouter(content, catalog))
-  app.get('/api/saves-export', createSavesExportAll(saves, db, content))
-  app.use('/api/saves', createSavesRouter(saves, db, content))
+  app.get('/api/saves-export', (req, res, next) => { void createSavesExportAll(accounts.store(), db, content)(req, res).catch(next) })
+  app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content)(req, res, next))
   app.use('/api/games', createFilesRouter(db, builds, overlays, jobs, content))
   app.use('/api/games', createGamesRouter(deps))
   app.use('/api', createLibraryRouter(deps))
-  app.use('/api/covers', express.static(cfg.coversDir, { maxAge: '365d', immutable: true, fallthrough: false }))
-  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { maxAge: '1d', fallthrough: false }))
+  app.use('/api/covers', express.static(cfg.coversDir, { cacheControl: false, fallthrough: false }))
+  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false }))
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found')))
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
@@ -158,7 +206,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   if (check.orphans.length) console.log(`folders in ${cfg.gamesDir} that belong to no game: ${check.orphans.join(', ')}`)
   if (opts.startJobs !== false) jobs.start()
 
-  return { app, db, jobs, builds, engines, saves, catalog, purger, close: () => (catalog.stop(), db.close()) }
+  return { app, db, jobs, builds, engines, saves, accounts, catalog, purger, close: () => (catalog.stop(), db.close()) }
 }
 
 /** Development server: serve *.gz engine files with their encoding, like nginx does. */

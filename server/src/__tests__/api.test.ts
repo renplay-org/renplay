@@ -115,7 +115,7 @@ describe('HTTP API', () => {
   it('stores finished state and measured play time without changing saves', async () => {
     app.db.insertGame({ id: 'progress-game', title: 'Progress', save_dir: 'Progress-123' })
     const path = '/api/games/progress-game'
-    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(6)
+    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(7)
     expect((await request(app.app).get(path)).body.game).toMatchObject({ playTime: 0, finishedAt: null, latestSave: null })
     for (const on of [undefined, 'true', 1]) await request(app.app).put(`${path}/finished`).send({ on }).expect(400)
     await request(app.app).put('/api/games/missing/finished').send({ on: true }).expect(404)
@@ -140,7 +140,7 @@ describe('HTTP API', () => {
     await app.saves.write('Latest-123', '_internal.save', await save('Internal', 999))
     const latest = async () => (await request(app.app).get('/api/games').expect(200)).body.games.find((game: { id: string }) => game.id === 'latest-game')
     expect(await latest()).toMatchObject({ playTime: 0, latestSave: { file: 'auto-1-LT1.save', name: 'Next scene', ctime: 200000, runtime: 42 } })
-    expect((await latest()).latestSave.screenshot).toContain('/api/saves/latest-game/screenshot?file=auto-1-LT1.save')
+    expect((await latest()).latestSave.screenshot).toContain('/api/saves/latest-game/screenshot?user=1&file=auto-1-LT1.save')
     await app.saves.write('Latest-123', '1-1-LT1.save', await save('A newer scene', 300))
     expect((await latest()).latestSave).toMatchObject({ file: '1-1-LT1.save', name: 'A newer scene', ctime: 300000 })
     await app.saves.remove('Latest-123', '1-1-LT1.save', 'user-delete')
@@ -198,7 +198,8 @@ describe('HTTP API', () => {
     await app.saves.write('story', 'localStorage.json', Buffer.from(JSON.stringify({ 'story.saves': '{"slots":[1]}' })))
 
     const g = (await request(app.app).get('/api/games/twine-story').expect(200)).body.game
-    expect(g).toMatchObject({ family: 'html', engineLabel: 'HTML (SugarCube 2.36.1)', playUrl: '/g/twine-story/h1/game/Story%20Page.html' })
+    expect(g).toMatchObject({ family: 'html', engineLabel: 'HTML (SugarCube 2.36.1)' })
+    expect(g.playUrl).toMatch(/^\/g\/twine-story\/h1\/s\/[^/]+\/game\/Story%20Page.html$/)
     expect((await request(app.app).get('/g/twine-story/h1/').expect(302)).headers.location).toBe('/g/twine-story/h1/game/Story%20Page.html')
 
     const res = await request(app.app).get('/g/twine-story/h1/game/Story%20Page.html').expect(200)
@@ -258,13 +259,13 @@ describe('HTTP API', () => {
     const r = await request(app.app).get('/g/fixture-game/b1/game/images/a%20b.png').responseType('blob').expect(200)
     expect(r.body.toString()).toBe('png')
     expect(r.headers['content-type']).toBe('image/png')
-    expect(r.headers['cache-control']).toContain('immutable')
+    expect(r.headers['cache-control']).toBe('private, no-store')
     const part = await request(app.app).get('/g/fixture-game/b1/game/movies/m.webm').set('Range', 'bytes=2-4').responseType('blob').expect(206)
     expect(part.body.toString()).toBe('234')
     expect(part.headers['content-range']).toBe('bytes 2-4/10')
     await request(app.app).get('/g/fixture-game/b1/game/movies/m.webm').set('Range', 'bytes=20-').expect(416)
     await request(app.app).get('/g/fixture-game/b1/game/missing.png').expect(404)
-    await request(app.app).get('/g/fixture-game/b1/game/..%2F..%2Fsecret').expect(404)
+    await request(app.app).get('/g/fixture-game/b1/game/..%2F..%2Fsecret').expect(400)
   })
 
   it('stores bytecode caches for the current build only', async () => {
@@ -312,7 +313,7 @@ describe('HTTP API', () => {
   it('refuses unsafe paths', async () => {
     await request(app.app).put('/api/saves/fixture-game/file?path=../../etc/passwd').send(Buffer.from('x')).expect(400)
     await request(app.app).get('/api/saves/..%2F..%2Fx/boot').expect(400)
-    await request(app.app).get('/g/fixture-game/b1/..%2F..%2F_renplay/engines/8.5.3/.ready').expect(404)
+    await request(app.app).get('/g/fixture-game/b1/..%2F..%2F_renplay/engines/8.5.3/.ready').expect(400)
   })
 
   it('creates uploads at /api/uploads without a trailing slash', async () => {

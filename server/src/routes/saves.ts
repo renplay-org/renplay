@@ -1,13 +1,13 @@
 import express, { Router, type Request } from 'express'
-import multer from 'multer'
+import { readFile } from 'node:fs/promises'
+import { saveImport } from '../saves/import-upload.js'
+import { viewer } from '../accounts-context.js'
 import type { ContentMode } from '../content.js'
 import type { Db, GameRow } from '../db.js'
 import { readSaveMeta, readSaveScreenshot, slotInfo } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
 import { sha1 } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/paths.js'
-
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 512 << 20, files: 200 } })
 
 /** Metadata cache shared with the library, keyed by store/dir/name/mtime/size. */
 const metaCache = new Map<string, Awaited<ReturnType<typeof readSaveMeta>>>()
@@ -24,12 +24,18 @@ export async function cachedSaveMeta(store: SaveStore, dir: string, file: { name
 }
 
 export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode): Router {
-  const router = Router()
+  const router = Router({ caseSensitive: true, strict: true })
 
   const game = (req: Request): GameRow => {
     const g = db.getGame(assertSlug(req.params.id))
     if (!g || content.hides(g)) throw new HttpError(404, 'Game not found')
     return g
+  }
+  const allowedDir = (dir: string): boolean => {
+    if (dir === 'tokens' || dir === 'persistent') return true
+    const games = db.allGames().filter((g) => g.save_dir === dir)
+    // Restricted users may not discover an unclassified folder through another game's runtime.
+    return games.length ? games.some((g) => !content.hides(g)) : !content.hides({ adult: 0, recipe_id: '' })
   }
   const requireSaveDir = (g: GameRow): string => {
     if (!g.save_dir) throw new HttpError(409, 'The save folder of this game is not known yet. Start the game once, or set it in the game settings.')
@@ -53,7 +59,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     }
     for (const t of await store.sharedFiles()) files.push({ path: t.name, data: t.data.toString('base64'), mtime: t.mtimeMs })
     for (const dir of await store.listDirs()) {
-      if (dir === g.save_dir) continue
+      if (dir === g.save_dir || !allowedDir(dir)) continue
       for (const f of await store.list(dir)) lazy.push({ path: `${dir}/${f.name}`, size: f.size, mtime: f.mtimeMs })
     }
     res.setHeader('Cache-Control', 'no-store')
@@ -72,6 +78,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     if (slash === -1) throw new HttpError(400, 'Path must be inside a save folder')
     const top = rel.slice(0, slash)
     const name = rel.slice(slash + 1)
+    if (!allowedDir(top)) throw new HttpError(404, 'Save folder not found')
     if (!isSaveDirName(top)) throw new HttpError(400, 'Invalid save folder')
     return { dir: top, name }
   }
@@ -82,6 +89,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const rel = cleanRelPath(req.query['path'])
     const slash = rel.indexOf('/')
     if (slash === -1) throw new HttpError(400, 'Invalid path')
+    if (!allowedDir(rel.slice(0, slash))) throw new HttpError(404, 'Save folder not found')
     const data = await store.read(rel.slice(0, slash), rel.slice(slash + 1))
     res.setHeader('Cache-Control', 'no-store')
     res.type('application/octet-stream').send(data)
@@ -108,7 +116,12 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
   router.post('/:id/save-dir', async (req, res) => {
     const g = game(req)
     const sd = req.body?.saveDir
-    if (!isSaveDirName(sd)) throw new HttpError(400, 'Invalid save folder')
+    if (!isSaveDirName(sd) || sd === 'tokens' || sd === 'persistent') throw new HttpError(400, 'Invalid save folder')
+    if (sd !== g.save_dir) {
+      // Reporting a folder must not relabel a hidden game's (or an orphaned) saves as safe.
+      const existing = db.allGames().filter((other) => other.id !== g.id && other.save_dir === sd)
+      if (existing.some((other) => content.hides(other)) || (!existing.length && !allowedDir(sd) && (await store.list(sd)).length)) throw new HttpError(404, 'Save folder not found')
+    }
     let changed = false
     if (g.save_dir !== sd) {
       db.updateGame(g.id, { save_dir: sd })
@@ -151,7 +164,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
         renpyVersion: meta?.renpyVersion,
         gameVersion: meta?.gameVersion,
         runtime: meta?.runtime,
-        screenshot: meta?.hasScreenshot ? `/api/saves/${g.id}/screenshot?file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
+        screenshot: meta?.hasScreenshot ? `/api/saves/${g.id}/screenshot?user=${viewer()?.user.id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
         valid: !!meta,
       })
     }
@@ -164,7 +177,8 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const name = cleanRelPath(req.query['file'])
     const png = await readSaveScreenshot(await store.read(requireSaveDir(g), name))
     if (!png) throw new HttpError(404, 'No screenshot')
-    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable')
+    if (req.query['user'] !== undefined && req.query['user'] !== String(viewer()?.user.id ?? 1)) throw new HttpError(404, 'Screenshot not found')
+    res.setHeader('Cache-Control', 'private, no-store')
     res.type('png').send(png)
   })
 
@@ -191,17 +205,19 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     await store.exportZip([dir], res, { includeTokens: req.query['tokens'] === '1' })
   })
 
-  router.post('/:id/import', upload.array('files'), async (req, res) => {
+  router.post('/:id/import', saveImport('files', async (req, res) => {
     const g = game(req)
     const dir = requireSaveDir(g)
     const files = (req.files as Express.Multer.File[] | undefined) ?? []
     if (!files.length) throw new HttpError(400, 'No files uploaded')
-    const report = await store.importFiles(
-      dir,
-      files.map((f) => ({ filename: Buffer.from(f.originalname, 'latin1').toString('utf-8'), data: f.buffer })),
-    )
+    // Process one bounded file at a time, never materialize the multipart request in memory.
+    const report = { imported: [] as string[], skipped: [] as Array<{ name: string; reason: string }>, trustedKeys: 0 }
+    for (const f of files) {
+      const part = await store.importFiles(dir, [{ filename: Buffer.from(f.originalname, 'latin1').toString('utf-8'), data: await readFile(f.path) }])
+      report.imported.push(...part.imported); report.skipped.push(...part.skipped); report.trustedKeys += part.trustedKeys
+    }
     res.json(report)
-  })
+  }))
 
   /** Copies a save to another game (e.g. carry the end of season 1 into season 2). */
   router.post('/:id/copy', async (req, res) => {
@@ -233,7 +249,8 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
 /** All save folders (including ones without a game) as one zip. */
 export function createSavesExportAll(store: SaveStore, db: Db, content: ContentMode) {
   return async (_req: Request, res: express.Response) => {
-    const dirs = new Set(await store.listDirs())
+    const restricted = content.hides({ adult: 0, recipe_id: '' })
+    const dirs = new Set(restricted ? [] : await store.listDirs())
     for (const g of db.allGames()) if (g.save_dir) dirs.add(g.save_dir)
     // The export is of what this Renplay shows; hidden games' saves stay where they are.
     for (const g of db.allGames()) if (g.save_dir && content.hides(g)) dirs.delete(g.save_dir)

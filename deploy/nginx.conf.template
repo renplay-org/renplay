@@ -53,6 +53,8 @@ http {
   }
   access_log /dev/stdout compact if=$loggable;
 
+  proxy_cache_path /tmp/nginx/auth levels=1:2 keys_zone=auth:10m max_size=20m inactive=2m;
+
   upstream renplay {
     server 127.0.0.1:3000;
     keepalive 32;
@@ -62,16 +64,36 @@ http {
     listen 8080;
     root /app/web;
     absolute_redirect off;
+    auth_request /_renplay_auth;
+
+    location = /_renplay_auth {
+      internal;
+      auth_request off;
+      proxy_pass http://renplay/api/auth/check;
+      proxy_pass_request_body off;
+      proxy_set_header Content-Length "";
+      # Authorize exactly the normalized path used for location/file resolution.
+      proxy_set_header X-Original-URI $resource_uri;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_cache auth;
+      proxy_cache_key "$cookie_renplay_session|$http_authorization|$resource_uri";
+      proxy_cache_valid 204 60s;
+      proxy_ignore_headers Set-Cookie Cache-Control;
+      proxy_hide_header Set-Cookie;
+    }
 
     add_header X-Content-Type-Options "nosniff" always;
 
     # Library UI (hashed assets are immutable).
     location /assets/ {
+      auth_request off;
       add_header Cache-Control "public, max-age=31536000, immutable" always;
       add_header X-Content-Type-Options "nosniff" always;
       try_files $uri =404;
     }
     location / {
+      auth_request off;
       add_header Cache-Control "no-cache" always;
       add_header X-Content-Type-Options "nosniff" always;
       try_files $uri /index.html;
@@ -79,6 +101,7 @@ http {
 
     # In-game runtime (versioned by query string).
     location = /renplay/runtime.js {
+      auth_request off;
       alias /app/runtime/renplay-runtime.js;
       add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
@@ -87,6 +110,7 @@ http {
     # gateway in front may strip Accept-Encoding (Envoy's compressor does) and
     # does not compress wasm itself; every browser that runs wasm takes gzip.
     location /engine/ {
+      auth_request off;
       alias ${RENPLAY_DIR}/engines/;
       gzip_static always;
       add_header Cache-Control "public, max-age=31536000, immutable" always;
@@ -95,48 +119,62 @@ http {
 
     # Game pages are rendered by the server (engine template + runtime).
     location ~ ^/g/[a-z0-9][a-z0-9._-]*/[a-z0-9]+(\.m[a-z0-9]+)?/(index\.html)?$ {
+      auth_request off;
       proxy_pass http://127.0.0.1:3000;
       proxy_http_version 1.1;
-      proxy_set_header Host $host;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # Streamed game files live in one pack per build (NFS handles one big file
     # far better than tens of thousands of small ones); the server serves them
     # with byte ranges.
-    location ~ ^/g/[a-z0-9][a-z0-9._-]*/[a-z0-9]+(\.m[a-z0-9]+)?/game/ {
+    location ~ ^/g/[a-z0-9][a-z0-9._-]*/[a-z0-9]+(\.m[a-z0-9]+)?/(s/[^/]+/)?game/ {
+      auth_request off;
       proxy_pass http://renplay;
       proxy_http_version 1.1;
       proxy_set_header Connection "";
-      proxy_set_header Host $host;
+      # Node also sends nosniff for direct development requests; keep one header here.
+      proxy_hide_header X-Content-Type-Options;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
       proxy_buffering off;
     }
 
-    # Everything else of a build. Build ids change with every install, so
-    # files are cached forever. A mod build (<build>.m<hash>) holds only its
-    # own game.zip and caches; the rest comes from the base build.
+    # Everything else of a build is protected too. A mod build (<build>.m<hash>)
+    # holds only its own game.zip and caches; the rest comes from the base build.
     location ~ ^/g/(?<game>[a-z0-9][a-z0-9._-]*)/(?<base>[a-z0-9]+)(?:\.m(?<mod>[a-z0-9]+))?/(?<asset>.+)$ {
+      # Capture before auth_request changes $uri to /_renplay_auth.
+      set $resource_uri $uri;
       root ${GAMES_DIR};
       try_files /$game/$base.m$mod/$asset /$game/$base/$asset =404;
-      add_header Cache-Control "public, max-age=31536000, immutable" always;
+      add_header Cache-Control "private, no-store" always;
       add_header X-Content-Type-Options "nosniff" always;
     }
 
     location /api/covers/ {
+      set $resource_uri $uri;
       alias ${DATA_DIR}/covers/;
-      add_header Cache-Control "public, max-age=31536000, immutable" always;
+      add_header Cache-Control "private, no-store" always;
     }
 
     location /api/walkthroughs/ {
+      set $resource_uri $uri;
       alias ${DATA_DIR}/walkthroughs/;
-      add_header Cache-Control "public, max-age=86400" always;
+      add_header Cache-Control "private, no-store" always;
     }
 
     # Chunked archive uploads stream straight through to the server. (No
     # trailing slash: "/api/uploads" itself must not get nginx's redirect.)
     location ^~ /api/uploads {
+      auth_request off;
       proxy_pass http://127.0.0.1:3000;
       proxy_http_version 1.1;
-      proxy_set_header Host $host;
+      proxy_set_header Host $http_host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
       proxy_request_buffering off;
       client_max_body_size 40m;
       proxy_read_timeout 300s;
@@ -144,9 +182,11 @@ http {
     }
 
     location /api/ {
+      # Includes the public /api/health and /api/auth/; node protects all other routes.
+      auth_request off;
       proxy_pass http://127.0.0.1:3000;
       proxy_http_version 1.1;
-      proxy_set_header Host $host;
+      proxy_set_header Host $http_host;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Proto $scheme;
       client_max_body_size 600m;

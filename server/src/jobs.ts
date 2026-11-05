@@ -1,3 +1,5 @@
+import { keepaliveToken } from './auth.js'
+import { viewers } from './accounts-context.js'
 import http from 'node:http'
 import https from 'node:https'
 import type { Config } from './config.js'
@@ -59,7 +61,8 @@ export class JobManager {
     const id = newId('j')
     this.db.insertJob({ id, type, game, params: JSON.stringify(params ?? {}) })
     this.notify()
-    void this.pump()
+    // Installs are shared work, not extensions of the enqueuing user's permissions.
+    viewers.exit(() => void this.pump())
     return id
   }
 
@@ -216,7 +219,7 @@ function startKeepalive(cfg: Config): { stop: () => void } {
     const mod = url.protocol === 'https:' ? https : http
     req = mod.request(
       url,
-      { method: 'GET', headers: cfg.keepaliveHost ? { host: cfg.keepaliveHost } : {}, timeout: 150_000 },
+      { method: 'GET', headers: { authorization: `Bearer ${keepaliveToken}`, ...(cfg.keepaliveHost ? { host: cfg.keepaliveHost } : {}) }, timeout: 150_000 },
       (res) => {
         res.resume()
         res.on('end', () => setTimeout(loop, 500))

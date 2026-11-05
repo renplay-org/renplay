@@ -16,6 +16,12 @@
   var cfg = window.__renplay || {}
   if (!cfg.id) return
 
+  var signedOut = false
+  function onSignedOut() {
+    if (signedOut) return
+    signedOut = true
+    post('signed-out', { userId: cfg.userId })
+  }
   var HOME = '/home/web_user/.renpy'
   var API = '/api/saves/' + encodeURIComponent(cfg.id)
   var inFrame = window.parent && window.parent !== window
@@ -287,16 +293,42 @@
     })
   }
 
-  // Mirror entries are keyed by path only: ~/.renpy is shared by all games.
+  // ~/.renpy is shared by games, never by accounts (including unsent changes).
+  function localKey(path) { return String(cfg.userId) + ':' + path }
   function idbPut(path, data, mtime, synced) {
     return idbTx('readwrite', function (s) {
-      s.put({ key: path, game: cfg.id, path: path, data: data, mtime: mtime, synced: synced ? 1 : 0 })
+      s.put({ key: localKey(path), userId: cfg.userId, game: cfg.id, path: path, data: data, mtime: mtime, synced: synced ? 1 : 0 })
     }).catch(function () {})
   }
 
   function idbAll() {
-    return idbTx('readonly', function (s) {
-      return s.getAll()
+    return idbTx('readwrite', function (s) {
+      var all = s.getAll()
+      all.onsuccess = function () {
+        all.result.forEach(function (entry) {
+          if (entry.userId != null) return
+          if (cfg.legacySaveOwner === cfg.userId) {
+            // Only the known pre-accounts owner may claim legacy entries, never overwrite a newer queue.
+            var existing = s.get(localKey(entry.path))
+            existing.onsuccess = function () {
+              if (existing.result) {
+                post('legacy-saves', { message: 'An older browser save was kept separately for recovery because this account already has a copy.' })
+                return
+              }
+              s.delete(entry.key)
+              entry.key = localKey(entry.path)
+              entry.userId = cfg.userId
+              s.put(entry)
+            }
+          } else {
+            console.warn('[renplay] Unowned browser saves were kept for recovery; their account is not known.')
+            post('legacy-saves', { message: 'Unowned browser saves were kept on this device. Their account is not known.' })
+          }
+        })
+      }
+      return all
+    }).then(function (entries) {
+      return entries.filter(function (entry) { return entry.userId === cfg.userId })
     }).catch(function () {
       return []
     })
@@ -304,11 +336,11 @@
 
   function idbMarkSynced(path, mtime) {
     return idbTx('readwrite', function (s) {
-      var r = s.get(path)
+      var r = s.get(localKey(path))
       r.onsuccess = function () {
         var v = r.result
         if (!v || v.mtime !== mtime) return
-        if (v.data === null) s.delete(path)
+        if (v.data === null) s.delete(localKey(path))
         else {
           v.synced = 1
           s.put(v)
@@ -347,7 +379,7 @@
       if (!r.ok) throw new Error('HTTP ' + r.status)
       return r.json()
     }).catch(function (e) {
-      if (tries <= 1) throw e
+      if (signedOut || tries <= 1) throw e
       return new Promise(function (res) {
         setTimeout(res, 600)
       }).then(function () {
@@ -384,8 +416,10 @@
   function syncFetch(path) {
     var xhr = new XMLHttpRequest()
     xhr.open('GET', API + '/raw?path=' + encodeURIComponent(path), false)
+    xhr.setRequestHeader('x-renplay-user', String(cfg.userId))
     xhr.overrideMimeType('text/plain; charset=x-user-defined')
     xhr.send(null)
+    if (xhr.status === 401) onSignedOut()
     if (xhr.status !== 200) throw new Error('lazy fetch failed ' + xhr.status)
     var s = xhr.responseText
     var out = new Uint8Array(s.length)
@@ -513,7 +547,7 @@
   }
 
   function pump() {
-    if (state.inflight || !state.queue.size) {
+    if (signedOut || state.inflight || !state.queue.size) {
       status()
       return
     }
@@ -543,6 +577,7 @@
       })
       .then(function () {
         state.inflight = false
+        if (signedOut) { status(); return }
         if (!state.online) {
           status()
           setTimeout(pump, Math.min(30000, 1000 * Math.pow(2, Math.min(5, state.failures))))
@@ -601,7 +636,6 @@
         // 2. Local changes the server has not seen (written while offline or
         //    interrupted). Offline: the whole local copy.
         local.forEach(function (e) {
-          var srv = serverFiles.get(e.path)
           if (!server) {
             if (e.data) writeLocal(e.path, e.data, e.mtime)
             if (e.synced) state.known.set(e.path, { mtime: e.mtime, size: e.data ? e.data.length : 0, hash: e.data ? hash(e.data) : null })
@@ -609,7 +643,7 @@
             return
           }
           if (e.synced) return
-          if (srv && srv.mtime > e.mtime) return
+          // Always deliver an unsent write. Server history preserves any newer server copy.
           if (e.data) {
             writeLocal(e.path, e.data, e.mtime)
             state.known.set(e.path, { mtime: e.mtime, size: e.data.length, hash: hash(e.data) })
@@ -736,7 +770,19 @@
 
   // ---------------------------------------------------------------- engine
 
-  var origFetch = window.fetch.bind(window)
+  var nativeFetch = window.fetch.bind(window)
+  var origFetch = function (input, init) {
+    var url = typeof input === 'string' ? input : input && input.url
+    if (url && new URL(url, location.href).pathname.indexOf('/api/') === 0) {
+      init = Object.assign({}, init)
+      init.headers = new Headers(init.headers || {})
+      init.headers.set('x-renplay-user', String(cfg.userId))
+    }
+    return nativeFetch(input, init).then(function (res) {
+      if (res.status === 401) onSignedOut()
+      return res
+    })
+  }
 
   /*
    * The shared engine (renpy.wasm + renpy.data, ~37 MB) is fetched as the
@@ -1178,6 +1224,9 @@
     if (e.origin !== location.origin || !e.data || typeof e.data.type !== 'string') return
     var d = e.data
     switch (d.type) {
+      case 'renplay:resume-sync':
+        if (d.userId === cfg.userId) { signedOut = false; pump() }
+        break
       case 'renplay:flush':
         flush(d.timeout).then(function (ok) {
           post('flushed', { ok: ok, id: d.id })
