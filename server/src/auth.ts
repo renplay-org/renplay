@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
 import { mkdir, rename, writeFile, symlink, lstat } from 'node:fs/promises'
+import { dirname as pathDirname, relative as pathRelative } from 'node:path'
 import { join } from 'node:path'
 import express, { Router, type Request, type Response } from 'express'
 import type { Config } from './config.js'
@@ -109,7 +110,7 @@ export class Accounts {
     for (const u of this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]) await this.tag(u)
     for (const [legacy, target] of [[this.cfg.savesDir, this.store(1).root], [this.cfg.saveHistoryDir, this.store(1).historyRoot]]) {
       await mkdir(target!, { recursive: true })
-      if (!await lstat(legacy!).catch(() => null)) { await mkdir(join(legacy!, '..'), { recursive: true }); await symlink(target!, legacy!, 'dir') }
+      if (!await lstat(legacy!).catch(() => null)) { await mkdir(join(legacy!, '..'), { recursive: true }); await symlink(pathRelative(pathDirname(legacy!), target!), legacy!, 'dir') }
     }
   }
   private invalidate(): void { this.sessionCache.clear() }

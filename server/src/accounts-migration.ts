@@ -1,6 +1,6 @@
 import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync, readlinkSync, statSync, utimesSync } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 
 /** Copy first, verify every file, then remove. A restart can resume at any folder boundary. */
@@ -55,7 +55,8 @@ export function migrateAccountFolders(raw: DatabaseSync, dataDir: string, saves:
     mkdirSync(dirname(target), { recursive: true })
     mkdirSync(dirname(src), { recursive: true })
     const probe = `${src}.renplay-symlink-check-${randomUUID()}`
-    try { symlinkSync(target, probe, 'dir') } finally { rmSync(probe, { force: true }) }
+    // Relative links keep working when the data folder is mounted or restored at another path.
+    try { symlinkSync(relative(dirname(probe), target), probe, 'dir') } finally { rmSync(probe, { force: true }) }
     if (existsSync(src) && !existsSync(target)) {
       try { renameSync(src, target) } catch (e: any) { if (e.code !== 'EXDEV') throw e }
     }
@@ -65,7 +66,7 @@ export function migrateAccountFolders(raw: DatabaseSync, dataDir: string, saves:
     }
     mkdirSync(target, { recursive: true })
     mkdirSync(dirname(src), { recursive: true })
-    symlinkSync(target, src, 'dir')
+    symlinkSync(relative(dirname(src), target), src, 'dir')
   }
   writeFileSync(join(owner, 'user.json'), JSON.stringify({ id: 1, name: 'Owner', created: new Date().toISOString() }) + '\n')
 }

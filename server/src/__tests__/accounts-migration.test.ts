@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, renameSync, lstatSync, utimesSync, statSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, renameSync, lstatSync, utimesSync, statSync, readlinkSync, cpSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { DatabaseSync } from 'node:sqlite'
@@ -29,6 +29,27 @@ function fixture() {
 }
 
 describe('account folder migration failure recovery', () => {
+  it('links the old save folders relatively, so a moved or restored data folder still opens in 2.11', () => {
+    const root = mkdtempSync(join(tmpdir(), 'renplay-migration-')); roots.push(root)
+    const data = join(root, 'data')
+    const db = Db.open(data)
+    db.raw.exec(`DROP TABLE users; DROP TABLE identities; DROP TABLE sessions; DROP TABLE tokens; DROP TABLE user_games; DROP TABLE safe_games;
+      ALTER TABLE games DROP COLUMN favorite_at; ALTER TABLE games DROP COLUMN finished_at; ALTER TABLE games DROP COLUMN play_time; ALTER TABLE games DROP COLUMN adult;
+      DELETE FROM settings; PRAGMA user_version = 3`)
+    db.close()
+    mkdirSync(join(data, 'saves', 'Fixture'), { recursive: true })
+    writeFileSync(join(data, 'saves', 'Fixture', '1-1-LT1.save'), 'save')
+    Db.open(data).close()
+    for (const name of ['saves', 'save-history']) {
+      expect(lstatSync(join(data, name)).isSymbolicLink()).toBe(true)
+      expect(readlinkSync(join(data, name))).toBe(join('users', '1', name))
+    }
+    const moved = join(root, 'restored-elsewhere')
+    cpSync(data, moved, { recursive: true, verbatimSymlinks: true })
+    rmSync(data, { recursive: true })
+    expect(readFileSync(join(moved, 'saves', 'Fixture', '1-1-LT1.save'), 'utf-8')).toBe('save')
+  })
+
   it('migrates a populated v3 library with custom paths across filesystems using verified copies and keeps mtimes', () => {
     const f = fixture()
     vi.mocked(renameSync).mockImplementation((from, to) => {
