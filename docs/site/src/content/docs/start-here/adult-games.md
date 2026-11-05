@@ -26,15 +26,22 @@ Any other value counts as `block`, because that is the safe reading of a typo.
   them back. A game with no catalog recipe is not hidden, because Renplay cannot tell what it is.
 - Downloads of known adult games are refused with a plain reason.
 
-One limit: the web server hands out files of installed games, such as `game.zip`, straight from
-disk. A hidden game’s files stay reachable by their exact address. Do not treat this mode as
-access control.
+Game files, covers and walkthroughs are checked too, including files nginx serves straight from
+disk. Static permission checks are cached for up to a minute; changing access or signing out may
+take that long for those files. Requests handled by the application check the account directly.
 
 ## Pictures in the browser
 
-Separately, each browser decides whether to show adult pictures. They start hidden in a new
-browser: covers become title cards and save pictures become scene cards, and the hidden art is not
-fetched. Change this under **Settings** → **This browser**.
+An admin separately grants adult access per [account](/accounts/). New accounts are blocked by
+default (`RENPLAY_ADULT_DEFAULT=block`); the first admin has access. For restricted accounts,
+games without recipes also count as adult until an admin marks them safe. This is enforced by
+the server, including saves and play routes.
+
+**Account → Adult pictures** chooses **Show**, **Hide pictures** (the default) or **Hide adult games**.
+With pictures hidden, covers become title cards and save pictures become scene cards; hidden art is
+not fetched. **On this device**, also in **Settings → This browser**, can hide more but never show
+more than the account allows. These controls only appear for accounts with adult access.
+A preference cannot grant access that the instance or account denies.
 
 ## In these docs
 

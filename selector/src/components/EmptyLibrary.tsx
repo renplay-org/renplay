@@ -1,3 +1,4 @@
+import { useAuth } from '../lib/auth'
 import { useState } from 'react'
 import DocsLink from './DocsLink'
 import { Link } from 'react-router-dom'
@@ -39,6 +40,8 @@ export default function EmptyLibrary({ recipes }: { recipes: Recipe[] }) {
   const links = starter?.links ?? {}
   const developer = links.itch ?? links.website ?? links.steam
   const source = links.itch ? 'itch.io' : 'the developer'
+  const admin = useAuth().data?.user.role === 'admin'
+  if (!admin) return <section className="p-6 text-zinc-300"><h1 className="text-2xl font-bold text-white">Your library is empty.</h1><p className="mt-3">Ask an admin to add a game.</p></section>
   if (content && !content.chosen) return <ContentChoice />
   return <section className="mx-auto max-w-3xl">
     <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">Your library is empty.</h1>

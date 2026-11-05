@@ -4,7 +4,7 @@ import type { ContentMode } from '../content.js'
 import { HttpError } from '../util/paths.js'
 
 export function createContentRouter(content: ContentMode, catalog: Catalog): Router {
-  const router = Router()
+  const router = Router({ caseSensitive: true, strict: true })
   const state = () => ({ adultGames: content.adultGames, locked: content.locked, chosen: content.chosen })
 
   router.get('/', (_req, res) => {

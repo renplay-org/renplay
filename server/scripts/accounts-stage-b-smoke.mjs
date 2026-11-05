@@ -1,0 +1,183 @@
+// Writes only to a disposable local /tmp/rp30b instance. Never use against a real library.
+import assert from 'node:assert/strict'
+import { mkdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { chromium, webkit, devices } from 'playwright'
+import yazl from 'yazl'
+
+const base = process.argv[2] || 'http://127.0.0.1:5192'
+const shots = process.argv[3]
+const off = process.argv.includes('--off')
+assert(shots, 'Pass a screenshot output folder')
+assert(['127.0.0.1', 'localhost'].includes(new URL(base).hostname), 'Local fixtures only')
+await mkdir(shots, { recursive: true })
+const headers = { 'Sec-Fetch-Site': 'same-origin' }, errors = [], browsers = []
+async function json(response, status = 200) { assert.equal(response.status(), status, await response.text()); return response.json() }
+async function signIn(page, username = 'owner', password = 'owner password') {
+  await page.goto(`${base}/signin`)
+  await page.getByLabel('Username', { exact: true }).fill(username)
+  await page.getByLabel('Password', { exact: true }).fill(password)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.waitForURL(`${base}/`)
+  await page.waitForLoadState('networkidle')
+}
+async function closeDialog(page) { await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click() }
+async function capture(page, name) {
+  await page.waitForTimeout(350)
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name}: no horizontal overflow`)
+  await page.screenshot({ path: join(shots, `${name}.png`), fullPage: true })
+}
+try {
+  const browser = await chromium.launch(); browsers.push(browser)
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await context.newPage(); page.on('pageerror', (e) => errors.push(e.message))
+  if (!off) {
+    const code = (await readFile('/tmp/rp30b/server.log', 'utf8')).match(/Setup code: (\S+)/)?.[1]
+    assert(code)
+    await page.goto(base)
+    await page.getByLabel('Setup code').fill(code)
+    await page.getByRole('button', { name: 'Continue', exact: true }).click()
+    await page.getByLabel('Name', { exact: true }).fill('Owner')
+    await page.getByLabel('Username', { exact: true }).fill('owner')
+    await page.getByLabel('Password', { exact: true }).fill('owner password')
+    await page.getByRole('button', { name: 'Create owner account' }).click()
+    await page.getByRole('button', { name: /Safe-for-work games only/ }).click()
+    await page.getByRole('heading', { name: 'Your library is empty.' }).waitFor()
+    await page.goto(`${base}/settings/users`)
+    await page.getByRole('button', { name: 'Add user', exact: true }).click()
+    await page.getByLabel('Username', { exact: true }).fill('player')
+    await page.getByLabel('Display name', { exact: true }).fill('Player')
+    await page.getByLabel('Password', { exact: true }).fill('player password')
+    await capture(page, 'desktop-add-user')
+    await page.getByRole('dialog').getByRole('button', { name: 'Add user', exact: true }).click()
+    await page.getByRole('dialog').waitFor({ state: 'hidden' })
+    const { users } = await json(await context.request.get(`${base}/api/users`))
+    const playerId = users.find((u) => u.username === 'player').id
+    const playerContext = await browser.newContext(), playerPage = await playerContext.newPage()
+    playerPage.on('pageerror', (e) => errors.push(e.message))
+    await signIn(playerPage, 'player', 'player password')
+    await playerPage.goto(`${base}/account`)
+    assert.equal(await playerPage.getByLabel('For your account').count(), 0, 'No adult controls without access')
+    await playerPage.goto(`${base}/settings/users`)
+    await playerPage.waitForURL(`${base}/`)
+    // Install a tiny SFW HTML fixture over HTTP; no direct SQLite writes.
+    const archive = await new Promise((resolve) => {
+      const zip = new yazl.ZipFile(), chunks = []
+      zip.addBuffer(Buffer.from('<!doctype html><title>Safe fixture</title><h1>Safe fixture</h1>'), 'index.html')
+      zip.outputStream.on('data', (chunk) => chunks.push(chunk)); zip.outputStream.on('end', () => resolve(Buffer.concat(chunks))); zip.end()
+    })
+    const upload = await json(await context.request.post(`${base}/api/uploads`, { headers, data: { name: 'safe-fixture.zip', size: archive.length } }))
+    await json(await context.request.put(`${base}/api/uploads/${upload.id}?offset=0`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: archive }))
+    const source = await json(await context.request.post(`${base}/api/uploads/${upload.id}/complete`, { headers }))
+    await json(await context.request.post(`${base}/api/imports`, { headers, data: { source: { kind: 'archive', path: source.path } } }))
+    let game
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const result = await json(await context.request.get(`${base}/api/games`))
+      game = result.games.find((g) => g.status === 'installed')
+      if (game) break
+      await page.waitForTimeout(100)
+    }
+    assert(game)
+    await json(await context.request.post(`${base}/api/games/${game.id}/safe`, { headers, data: { safe: true } }))
+    const file = `${game.saveDir}/localStorage.json`
+    const save = JSON.stringify({ fixture: 'owner progress' })
+    await json(await context.request.put(`${base}/api/saves/${game.id}/file?path=${file}`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: save }))
+    await page.reload()
+    await page.getByRole('button', { name: 'Actions for Owner' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Copy saves…', exact: true }).click()
+    await page.getByLabel('To', { exact: true }).selectOption(String(playerId))
+    await page.getByLabel('Game', { exact: true }).selectOption(game.id)
+    await capture(page, 'desktop-copy-saves')
+    await page.getByRole('dialog').getByRole('button', { name: 'Copy saves', exact: true }).click()
+    await page.getByRole('dialog').waitFor({ state: 'hidden' })
+    const copied = await playerContext.request.get(`${base}/api/saves/${game.id}/raw?path=${file}`)
+    assert.equal(copied.status(), 200); assert.equal(await copied.text(), save)
+    // Export/import use the visible controls and preserve a complete whole-folder zip.
+    await page.getByRole('button', { name: 'Actions for Player' }).click()
+    const exported = await context.request.get(`${base}${await page.getByRole('link', { name: 'Export save folder' }).getAttribute('href')}`)
+    assert.equal(exported.status(), 200)
+    const exportBytes = await exported.body()
+    await page.getByRole('dialog').getByRole('button', { name: 'Import a save folder', exact: true }).click()
+    await page.getByLabel('Save folder zip').setInputFiles({ name: 'saves.zip', mimeType: 'application/zip', buffer: exportBytes })
+    await page.getByRole('dialog').getByRole('button', { name: 'Import a save folder', exact: true }).click()
+    await page.getByRole('dialog').waitFor({ state: 'hidden' })
+    await capture(page, 'desktop-users')
+    await page.goto(`${base}/account`)
+    await page.getByLabel('Display name', { exact: true }).fill('Owner Account')
+    await page.getByRole('button', { name: 'Save name' }).click()
+    await page.getByText('Owner Account · Admin', { exact: false }).waitFor()
+    await page.getByLabel('For your account').selectOption('show')
+    await page.waitForTimeout(300)
+    await page.getByLabel('On this device').selectOption('hide-pictures')
+    await page.getByLabel('For your account').selectOption('hide-games')
+    await page.waitForTimeout(300)
+    assert.equal(await page.getByLabel('On this device').inputValue(), 'hide-games')
+    await page.waitForFunction(() => [...document.querySelectorAll('select')].some((select) => select.querySelector('option[value=""]') && select.querySelector('option[value="show"]')?.disabled))
+    await page.getByLabel('For your account').selectOption('hide-pictures')
+    await page.getByRole('button', { name: 'New token', exact: true }).click()
+    await page.getByLabel('Token name').fill('Smoke script')
+    await page.getByRole('button', { name: 'Create token', exact: true }).click()
+    const token = await page.getByLabel('Access token', { exact: true }).inputValue()
+    assert(token.length > 20)
+    await capture(page, 'desktop-token-once')
+    await closeDialog(page)
+    assert.equal((await context.request.get(`${base}/api/me`, { headers: { Authorization: `Bearer ${token}` } })).status(), 200)
+    await page.getByRole('button', { name: 'Revoke', exact: true }).click()
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await page.getByRole('dialog').waitFor({ state: 'hidden' })
+    assert.equal((await playerContext.request.get(`${base}/api/me`, { headers: { Authorization: `Bearer ${token}` } })).status(), 401)
+    const other = await browser.newContext(), otherPage = await other.newPage()
+    await signIn(otherPage)
+    await page.reload()
+    await page.getByText('This session', { exact: true }).waitFor()
+    await capture(page, 'desktop-account')
+    await page.getByRole('button', { name: 'Change password', exact: true }).click()
+    await page.getByLabel('Current password', { exact: true }).fill('owner password')
+    await page.getByLabel('New password', { exact: true }).fill('new owner password')
+    await page.getByRole('dialog').getByRole('button', { name: 'Change password', exact: true }).click()
+    await page.getByRole('dialog').waitFor({ state: 'hidden' })
+    assert.equal((await other.request.get(`${base}/api/me`)).status(), 401, 'Password change ends other sessions')
+    assert.equal((await context.request.get(`${base}/api/me`)).status(), 200)
+    await signIn(otherPage, 'owner', 'new owner password')
+    await page.reload()
+    await page.getByText('Chrome on Mac', { exact: true }).locator('../..').getByRole('button', { name: 'Sign out', exact: true }).click()
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await page.getByRole('dialog').waitFor({ state: 'hidden' })
+    assert.equal((await other.request.get(`${base}/api/me`)).status(), 401, 'Individual session sign-out')
+    await signIn(otherPage, 'owner', 'new owner password')
+    await page.reload()
+    await page.getByRole('button', { name: 'Sign out everywhere else', exact: true }).click()
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+    await page.getByRole('dialog').waitFor({ state: 'hidden' })
+    assert.equal((await other.request.get(`${base}/api/me`)).status(), 401, 'Sign out everywhere else')
+    await other.close()
+    await playerContext.close()
+  }
+  for (const [label, engine, viewport] of [['desktop', chromium, { width: 1440, height: 900 }], ['phone', webkit, { width: 390, height: 844 }]]) {
+    const b = await engine.launch(); browsers.push(b)
+    const ctx = await b.newContext({ ...(label === 'phone' ? devices['iPhone 13'] : {}), viewport })
+    const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push(`${label}: ${e.message}`))
+    if (!off) await signIn(p, 'owner', 'new owner password')
+    await p.goto(`${base}/account`)
+    await p.getByRole('heading', { name: 'Account', exact: true }).waitFor()
+    await capture(p, `${label}-account${off ? '-off' : ''}`)
+    await p.goto(`${base}/settings/users`)
+    await p.getByRole('heading', { name: 'Users', exact: true }).waitFor()
+    await capture(p, `${label}-users${off ? '-off' : ''}`)
+    if (!off && label === 'phone') {
+      await p.getByRole('button', { name: 'Actions for Player' }).click()
+      await p.waitForTimeout(300)
+      await p.screenshot({ path: join(shots, 'phone-user-actions.png') })
+      await p.getByRole('button', { name: 'Remove user…', exact: true }).click()
+      await p.waitForTimeout(300)
+      await p.screenshot({ path: join(shots, 'phone-remove-confirmation.png') })
+      await closeDialog(p)
+      await p.setViewportSize({ width: 844, height: 390 })
+      await capture(p, 'phone-land-users')
+    }
+    await p.waitForLoadState('networkidle')
+    await ctx.close()
+  }
+  assert.deepEqual(errors, [])
+  console.log(`Stage B smoke passed (${off ? 'sign-in off' : 'setup, player, save copy/import/export, tokens, sessions, password change'}). No page errors.`)
+} finally { for (const browser of browsers) await browser.close() }

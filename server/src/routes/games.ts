@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import YAML from 'yaml'
+import type { Accounts } from '../auth.js'
 import type { Builds } from '../builds.js'
 import { installedRelease, type Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
@@ -37,6 +38,7 @@ export const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json
 
 export interface GameDeps {
   cfg: Config
+  accounts?: Accounts
   db: Db
   jobs: JobManager
   builds: Builds
@@ -47,6 +49,7 @@ export interface GameDeps {
 }
 
 export async function toGame(row: GameRow, deps: GameDeps) {
+  if (deps.accounts) row = deps.accounts.progress(row)
   const source = parseJson<GameSource>(row.source, {})
   const job = deps.jobs.activeFor(row.id)
   let latestSave: { file: string; label: string; name: string; ctime: number; runtime: number | undefined; screenshot: string | null } | null = null
@@ -61,7 +64,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
         const ctime = meta.ctime ? meta.ctime * 1000 : f.mtimeMs
         if (!latestSave || ctime > latestSave.ctime) latestSave = {
           file: f.name, label: slotInfo(f.name).label, name: meta.name ?? '', ctime, runtime: meta.runtime,
-          screenshot: meta.hasScreenshot ? `/api/saves/${row.id}/screenshot?file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
+          screenshot: meta.hasScreenshot ? `/api/saves/${row.id}/screenshot?user=${deps.accounts?.current().id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
         }
       }
     } catch {}
@@ -89,7 +92,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     walkthrough: row.walkthrough || null,
     status: row.status,
     build: row.build || null,
-    playUrl: row.status === 'installed' && row.build ? playPath(row) : null,
+    playUrl: row.status === 'installed' && row.build ? (row.family !== 'renpy' && deps.accounts ? deps.accounts.assetUrl(row) : playPath(row)) : null,
     family: row.family || 'renpy',
     /** What made the game, for other engines ("HTML (SugarCube 2.36.1)"). */
     engineLabel: row.engine_label || null,
@@ -129,7 +132,7 @@ export async function toGame(row: GameRow, deps: GameDeps) {
 
 export function createGamesRouter(deps: GameDeps): Router {
   const { cfg, db, jobs, builds } = deps
-  const router = Router()
+  const router = Router({ caseSensitive: true, strict: true })
 
   const get = (req: Request): GameRow => {
     const g = db.getGame(assertSlug(req.params.id))
@@ -148,14 +151,18 @@ export function createGamesRouter(deps: GameDeps): Router {
   router.put('/:id/favorite', async (req, res) => {
     const g = get(req)
     if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
-    db.updateGame(g.id, { favorite_at: req.body.on ? g.favorite_at || new Date().toISOString() : '' })
+    const patch = { favorite_at: req.body.on ? (deps.accounts?.progress(g).favorite_at ?? g.favorite_at) || new Date().toISOString() : '' }
+    if (deps.accounts) deps.accounts.setProgress(g.id, patch)
+    else db.updateGame(g.id, patch)
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
   router.put('/:id/finished', async (req, res) => {
     const g = get(req)
     if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
-    db.updateGame(g.id, { finished_at: req.body.on ? g.finished_at || new Date().toISOString() : '' })
+    const patch = { finished_at: req.body.on ? (deps.accounts?.progress(g).finished_at ?? g.finished_at) || new Date().toISOString() : '' }
+    if (deps.accounts) deps.accounts.setProgress(g.id, patch)
+    else db.updateGame(g.id, patch)
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
@@ -164,12 +171,15 @@ export function createGamesRouter(deps: GameDeps): Router {
     const g = get(req)
     const seconds = req.body?.seconds
     if (!Number.isInteger(seconds) || seconds < 1 || seconds > 60) throw new HttpError(400, 'Seconds must be an integer from 1 to 60')
-    db.raw.prepare('UPDATE games SET play_time = play_time + ? WHERE id = ?').run(seconds, g.id)
+    if (deps.accounts) deps.accounts.setProgress(g.id, { play_time: deps.accounts.progress(g).play_time + seconds })
+    else db.raw.prepare('UPDATE games SET play_time = play_time + ? WHERE id = ?').run(seconds, g.id)
     res.json({ ok: true })
   })
 
   router.post('/:id/played', (req, res) => {
-    db.updateGame(get(req).id, { last_played_at: new Date().toISOString() })
+    const id = get(req).id, patch = { last_played_at: new Date().toISOString() }
+    if (deps.accounts) deps.accounts.setProgress(id, patch)
+    else db.updateGame(id, patch)
     res.json({ ok: true })
   })
 

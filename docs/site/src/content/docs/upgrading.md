@@ -26,15 +26,31 @@ same text. Read it before a minor or major upgrade.
 Installed games keep working across upgrades. A new version may build games differently, and that
 only affects games you install or reinstall afterwards.
 
-## Database migrations only go forward
+## Database migrations
 
-The library database (`/data/library.db`) is migrated when the new version starts. Migrations move
-forward only: **an older version cannot read a database a newer version has migrated.** So:
+The library database (`/data/library.db`) is migrated when the new version starts. Do not assume an
+older version understands a newer schema. In general:
 
 - Always back up `/data` before upgrading.
 - To roll back, stop Renplay, restore the backup of `/data` from before the upgrade, and start the
   older image. Without a backup you cannot roll back.
-- Migrations never change save files.
+- Migrations never rewrite save contents.
+
+### The 3.0 accounts migration
+
+Sign-in stays off on an upgraded data folder. The first admin claims the owner when you turn it on.
+All existing saves, history and library progress belong to owner 1. The migration backs up the
+checkpointed database and both save trees under `/data/backups/pre-3.0/` before moving either tree.
+It resumes after an interruption and verifies copies across volumes before removing the source.
+
+Saves and history move under `/data/users/1/`, with symlinks at their old paths (including custom
+`SAVES_DIR` and `SAVE_HISTORY_DIR`). The filesystem must support symlinks. Conflicts from a partial
+copy stay in `users/1/migration-conflicts/`; they are not discarded.
+
+For this migration, **2.10 can still use the owner layout** through those symlinks. Other accounts
+stay untouched but are not visible to 2.10. Stop the newer server before starting an older one;
+never run them against the same folders together. Keep your own complete backup as the safest
+rollback. See [Accounts](/accounts/) for switching sign-in off and on without moving saves.
 
 ## Backups
 

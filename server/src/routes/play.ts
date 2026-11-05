@@ -1,6 +1,8 @@
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
+import type { Accounts } from '../auth.js'
+import { viewer } from '../accounts-context.js'
 import { BUILD_RE, baseOf, type Builds } from '../builds.js'
 import type { ContentMode } from '../content.js'
 import type { Db, GameRow } from '../db.js'
@@ -33,8 +35,9 @@ export function createPlayRouter(
   runtimeVersion: string,
   html: { runtime: () => Promise<string>; saves: SaveStore },
   content: ContentMode,
+  accounts?: Accounts,
 ): Router {
-  const router = Router()
+  const router = Router({ caseSensitive: true, strict: true })
 
   router.get(['/g/:id/:build/', '/g/:id/:build/index.html'], async (req, res) => {
     const id = assertSlug(req.params.id)
@@ -57,8 +60,10 @@ export function createPlayRouter(
       caches: await builds.caches(id, game.build),
       presplash: presplash ?? `/engine/${game.engine}/web-presplash.jpg`,
       runtimeVersion,
+      userId: accounts ? accounts.current().id : viewer()?.user.id ?? 1,
+      legacySaveOwner: accounts?.legacySaveOwner ?? null,
     })
-    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Cache-Control', 'private, no-store')
     res.type('html').send(html)
   })
 
@@ -69,6 +74,8 @@ export function createPlayRouter(
   router.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m[a-z0-9]+)?\/game\/(.+)$/, async (req, res) => {
     const [id, base, raw] = [req.params[0], req.params[1], req.params[2]] as string[]
     const name = safeName(raw)
+    const installed = db.getGame(id)
+    if (accounts?.enabled && installed && isWebGame(installed) && !res.locals.verifiedAsset) throw new HttpError(403, 'Open this game from the library')
     if (!name || !isSlug(id) || content.hides(db.getGame(id))) throw new HttpError(404, 'Not found')
     const reader = new PackReader(join(builds.dir(id, base), 'assets.pack'), join(builds.dir(id, base), 'assets.json'))
     let entry: [number, number] | null
@@ -80,6 +87,13 @@ export function createPlayRouter(
     if (!entry) throw new HttpError(404, 'Not found')
     // Other engines' games run in sandboxed frames, whose requests come from an opaque origin.
     res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    if (installed && isWebGame(installed)) {
+      // Sandbox every pack response, independent of MIME, suffixes or browser sniffing.
+      // This follows direct navigations, secondary pages and popups too.
+      // Never allow-same-origin or popup escape: game scripts must not gain account cookies.
+      res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms')
+    }
     if (/\.html?$/i.test(name)) {
       const game = db.getGame(id)
       if (game && isWebGame(game) && game.entry === name && game.build && baseOf(game.build) === base) {
@@ -91,7 +105,7 @@ export function createPlayRouter(
     }
     const size = entry[1]
     res.setHeader('Content-Type', mimeOf(name))
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    res.setHeader('Cache-Control', 'private, no-store')
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('ETag', `"${base}-${entry[0].toString(36)}"`)
     let from = 0
@@ -135,7 +149,7 @@ export function createPlayRouter(
     }
     const storage = (await stored(HTML_STORAGE)) ?? {}
     const idb = await stored(HTML_IDB)
-    const cfg = JSON.stringify({ id: game.id, build: game.build, storage, idb }).replace(/</g, '\\u003c')
+    const cfg = JSON.stringify({ id: game.id, build: game.build, userId: viewer()?.user.id ?? 1, storage, idb }).replace(/</g, '\\u003c')
     const inject = `<script>window.__renplay=${cfg};</script><script>${await html.runtime()}</script>`
     const head = page.match(/<head\b[^>]*>/i)
     if (head) return page.slice(0, head.index! + head[0].length) + inject + page.slice(head.index! + head[0].length)
@@ -146,16 +160,11 @@ export function createPlayRouter(
   return router
 }
 
-/** Decodes and validates an asset path from a URL. */
+/** Express has already decoded the route parameter. Validate without decoding or normalizing it again. */
 function safeName(raw: string): string | null {
-  let name = raw
+  if (/[\\\x00-\x1f\x7f]/.test(raw) || raw.split('/').some((part) => !part || part === '.' || part === '..')) return null
   try {
-    if (/%[0-9a-f]{2}/i.test(raw)) name = decodeURIComponent(raw)
-  } catch {
-    return null
-  }
-  try {
-    return cleanRelPath(name)
+    return cleanRelPath(raw)
   } catch {
     return null
   }
@@ -187,6 +196,7 @@ const MIME: Record<string, string> = {
   // HTML games load their own pages, scripts and styles; nginx sends nosniff, so these must be right.
   html: 'text/html; charset=utf-8',
   htm: 'text/html; charset=utf-8',
+  xhtml: 'application/xhtml+xml',
   css: 'text/css; charset=utf-8',
   js: 'text/javascript; charset=utf-8',
   mjs: 'text/javascript; charset=utf-8',
@@ -225,6 +235,8 @@ export interface PageOptions {
   caches: Array<{ name: string; v: string }>
   presplash: string
   runtimeVersion: string
+  userId?: number
+  legacySaveOwner?: number | null
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -232,6 +244,8 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 export function renderPage(template: string, o: PageOptions): string {
   const config = {
     id: o.id,
+    userId: o.userId ?? 1,
+    legacySaveOwner: o.legacySaveOwner ?? null,
     build: o.build,
     saveDir: o.saveDir,
     screen: o.screen,

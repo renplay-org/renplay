@@ -1,25 +1,36 @@
 import { useSyncExternalStore } from 'react'
+import { useAuth } from './auth'
 
-/** Preferences of this browser (not synced: a phone used in public can differ from the TV). */
-const BLUR_ADULT = 'renplay:blur-adult-covers'
-const EVENT = 'renplay:prefs'
-
-function subscribe(cb: () => void) {
-  window.addEventListener('storage', cb)
-  window.addEventListener(EVENT, cb)
-  return () => {
-    window.removeEventListener('storage', cb)
-    window.removeEventListener(EVENT, cb)
-  }
+export type AdultPictures = 'show' | 'hide-pictures' | 'hide-games'
+export const adultPictureModes: AdultPictures[] = ['show', 'hide-pictures', 'hide-games']
+export function accountAdultPictures(prefs?: string): AdultPictures {
+  try {
+    const mode = JSON.parse(prefs || '{}').adultPictures
+    if (adultPictureModes.includes(mode)) return mode
+  } catch { /* Default hides pictures. */ }
+  return 'hide-pictures'
 }
-
-/** Blur the covers of adult games, for screens other people can see. */
-export function useBlurAdultCovers(): [boolean, (on: boolean) => void] {
-  const on = useSyncExternalStore(subscribe, () => localStorage.getItem(BLUR_ADULT) !== '0')
-  const set = (v: boolean) => {
-    if (v) localStorage.setItem(BLUR_ADULT, '1')
-    else localStorage.setItem(BLUR_ADULT, '0')
+const EVENT = 'renplay:prefs'
+function subscribe(cb: () => void) {
+  window.addEventListener('storage', cb); window.addEventListener(EVENT, cb)
+  return () => { window.removeEventListener('storage', cb); window.removeEventListener(EVENT, cb) }
+}
+export function useAdultPictures(): [AdultPictures, (mode: AdultPictures | '') => void, boolean] {
+  const { data } = useAuth()
+  const key = `renplay:adult-pictures:${data?.user.id ?? ''}`
+  const override = useSyncExternalStore(subscribe, () => localStorage.getItem(key))
+  const account = accountAdultPictures(data?.user.prefs)
+  const device = adultPictureModes.includes(override as AdultPictures) ? override as AdultPictures : account
+  const effective = adultPictureModes[Math.max(adultPictureModes.indexOf(account), adultPictureModes.indexOf(device))]!
+  const set = (mode: AdultPictures | '') => {
+    if (mode) localStorage.setItem(key, mode)
+    else localStorage.removeItem(key)
     window.dispatchEvent(new Event(EVENT))
   }
-  return [on, set]
+  return [effective, set, !!override]
+}
+/** Device choices can only narrow the account's visibility and picture preferences. */
+export function useBlurAdultCovers(): [boolean, (on: boolean) => void] {
+  const [mode, set] = useAdultPictures()
+  return [mode !== 'show', (on) => set(on ? 'hide-pictures' : 'show')]
 }

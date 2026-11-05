@@ -8,11 +8,11 @@ import { pagePath, render } from '../../../docs/site/scripts/gen-config.mjs'
 describe('environment variables', () => {
   it('lists every variable config.ts reads, once', () => {
     const source = readFileSync(new URL('../config.ts', import.meta.url), 'utf8')
-    const read = [...source.matchAll(/\benv(?:Int|Bool)?\('([A-Z_]+)'/g), ...source.matchAll(/process\.env\['([A-Z_]+)'\]/g)].map(
+    const read = [...source.matchAll(/\b(?:env(?:Int|Bool)?|secret)\('([A-Z_]+)'/g), ...source.matchAll(/process\.env\['([A-Z_]+)'\]/g)].map(
       (m) => m[1],
     )
     const listed = ENV_VARS.map((v) => v.name)
-    expect([...new Set(read)].sort()).toEqual([...listed].sort())
+    expect([...new Set([...read, ...[...source.matchAll(/secret\('([A-Z_]+)'/g)].map((m) => `${m[1]}_FILE`)])].sort()).toEqual([...listed].sort())
     expect(new Set(listed).size).toBe(listed.length)
   })
 

@@ -25,9 +25,11 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 | `/games/<id>/<build>.m<hash>/` | A mod build: its own `game.zip` and caches; everything else from the base build |
 | `/games/_renplay/engines/<version>/` | Engine packs, downloaded on demand |
 | `/games/_renplay/work/`, `purge/`, `uploads/` | Scratch space, deletions in progress, chunked uploads |
-| `/data/library.db` | SQLite: games, jobs, settings, the catalog cache |
+| `/data/library.db` | SQLite: games, jobs, settings, catalog cache, users, identities, hashed sessions and tokens, personal progress |
 | `/data/job-logs/` | Recent job messages, appended as they happen so interrupted jobs keep their logs |
-| `/data/saves/<save folder>/` | Saves, exactly as desktop Ren'Py lays them out, with `/data/save-history/` |
+| `/data/users/<id>/saves/<save folder>/` | Each person's saves, including shared signing keys and HTML storage; history in `../save-history/` |
+| `/data/saves/`, `/data/save-history/` | Compatibility symlinks to owner 1's folders |
+| `/data/users-removed/` | Archived removed accounts; never automatically purged |
 | `/data/overlays/<id>/` | Mods: the user's files layered over a game |
 | `/data/covers/` | Covers downloaded from the catalog (content-hashed names) |
 | `/data/walkthroughs/` | Walkthrough PDFs |
@@ -90,8 +92,8 @@ its log files; startup removes any orphan files left by an interrupted cleanup.
 
 On network storage every file creation is a round trip (100–250 ms on the reference NAS). A game
 with 34,000 images took hours to write as loose files; as one pack it is a sequential write at
-disk speed, and deleting a build is instant. The server serves pack entries with byte ranges and
-immutable caching; nginx proxies those requests without buffering.
+disk speed, and deleting a build is instant. The server serves pack entries with byte ranges; nginx proxies those requests without buffering. Protected files use private,
+no-store HTTP responses; the runtime separately caches shared build data in Cache Storage.
 
 ## Playing
 
@@ -116,10 +118,11 @@ iPhone), and offers saves, a walkthrough and display options.
 
 ## Saves
 
-`server/src/saves/store.ts` stores files under `/data/saves/<save folder>/`, exactly as desktop
-Ren'Py does, so exports work with desktop Ren'Py and imports from it need no conversion. Every
-overwrite and delete moves the previous version to `/data/save-history/`. Renplay never deletes
-saves on uninstall or reinstall.
+`server/src/saves/store.ts` has one instance per account, under `/data/users/<id>/saves/`, laid out
+like desktop Ren'Py. Every overwrite and delete snapshots the previous version in that account's
+`save-history/`. Locks are shared across store instances; metadata keys include the store root.
+Renplay never deletes saves on uninstall or reinstall. See [Accounts API](/developers/accounts-api/)
+for schema 7, migration, sessions, nginx protection and the request-local permission boundary.
 
 ## The catalog
 
@@ -145,7 +148,9 @@ library entry's `createdAt`, not the installation date. Library pages reveal 60 
 then 48 at a time; catalog pages reveal 30 at a time. Tag chips count games, include only play
 and story tags shared by at least two games, and use the catalog vocabulary for labels.
 
-Favourites live in `games.favorite_at` (added in database schema 4), independently of installed builds.
+Favourites first lived in `games.favorite_at` (schema 4). Schema 7 copies owner progress into
+`user_games` and all account-facing progress reads and writes use that table, independently of builds.
+The shared `games.last_played_at` remains the latest across accounts for downgrade compatibility.
 `PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
 Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
 its timestamp. Uninstall keeps it; forgetting the library entry removes it.
@@ -171,8 +176,9 @@ Optional catalog `free` and `cover.sfw` are additive to schema 3. The API keeps 
 URL field and exposes `coverSfw` alongside it, including on archive matches. Safe covers are
 allowed while adult save screenshots remain hidden. The empty library's starter is the first
 Ren'Py recipe with `free: true` that is not `nsfw` and has a working release; without one it shows
-no starter. Browser preference `renplay:blur-adult-covers` now defaults
-to hidden when absent; explicit `0` shows pictures and `1` hides them. Hidden art is not requested.
+no starter. Account preference `adultPictures` defaults to `hide-pictures`; `show` and `hide-games`
+are the other values. Device overrides use `renplay:adult-pictures:<user id>`. A device cannot grant
+adult access the account lacks, or widen the account's picture preference. Hidden art is not requested.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1–200) and `offset` (default 0). Invalid or unsafe integers use the defaults.
@@ -211,9 +217,13 @@ Blocking is done where the data enters and where it leaves:
   names one (game, saves, files, play pages and streamed assets, copy targets, jobs, the saves export)
   answer 404. Nothing is deleted; switching back to allow shows them again. A game without a recipe
   is not hidden.
-- **Not covered.** nginx serves `game.zip`, caches and presplash images straight from the games
-  folder, so those files of a hidden game stay reachable by their exact URL. Accounts (3.0) will
-  decide who may see what.
+- **Account access.** Schema 7 adds admin-set adult access (blocked by default for new users),
+  enforced in the catalog, games, save tree, exports and play routes. Unknown games count as adult
+  for restricted users unless an admin marks one safe. Account preference Hide adult games narrows
+  this further; Hide pictures is cosmetic, not access control.
+- **Static files.** nginx's server-level `auth_request` checks covers, walkthroughs and build files
+  too. Successful permission checks have a 60-second cache. Proxied routes check in Node; public
+  engines, the runtime, UI and health remain open.
 
 ## Security notes
 
@@ -221,4 +231,6 @@ Blocking is done where the data enters and where it leaves:
 - Every path from a request or an archive goes through `util/paths.ts` (`cleanRelPath`,
   `safeJoin`), which rejects traversal.
 - The container runs as a non-root user with a read-only root filesystem.
-- Renplay has no accounts; put it behind your own authentication if it is reachable from outside.
+- Local accounts separate saves and restrict management to admins. Use HTTPS outside a trusted
+  network. Proxy hop counts, CSRF, hashed credentials and sessions, and sandboxed HTML asset URLs
+  are documented in [Accounts API](/developers/accounts-api/).

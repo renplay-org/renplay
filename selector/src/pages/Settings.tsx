@@ -7,7 +7,8 @@ import DocsLink from '../components/DocsLink'
 import { Button, Confirm, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { post } from '../lib/api'
 import { ago, bytes } from '../lib/format'
-import { useBlurAdultCovers } from '../lib/prefs'
+import { useAuth } from '../lib/auth'
+import { DeviceAdultPreference } from '../components/AdultPreferences'
 import { useCatalog, useContent, useGames, useSetAdultGames, useSystem } from '../lib/queries'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
@@ -27,6 +28,15 @@ function DiskBar({ label, disk }: { label: string; disk: { total: number; free: 
 }
 
 export default function Settings() {
+  const { data } = useAuth()
+  return data?.user.role === 'admin' ? <AdminSettings /> : <BrowserSettings />
+}
+
+function BrowserSettings() {
+  return <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6"><h1 className="text-2xl font-bold text-white">This browser</h1><DeviceAdultPreference /><Button onClick={() => void navigator.storage?.persist?.()}>Keep game cache</Button></section>
+}
+
+function AdminSettings() {
   const { data: sys, isLoading } = useSystem()
   const { data: catalog } = useCatalog()
   const { data: games } = useGames()
@@ -38,7 +48,6 @@ export default function Settings() {
   const qc = useQueryClient()
   const toast = useToast()
   const [persisted, setPersisted] = useState<boolean | null>(null)
-  const [blurAdult, setBlurAdult] = useBlurAdultCovers()
   const { data: content } = useContent()
   const setAdultGames = useSetAdultGames()
   const [confirmAdult, setConfirmAdult] = useState(false)
@@ -56,7 +65,7 @@ export default function Settings() {
     <div className="animate-fade-in space-y-6">
       <h1 className="font-display text-3xl font-bold tracking-tight text-white">Settings</h1>
       <div className="flex flex-col gap-6 lg:flex-row">
-      <nav aria-label="Settings sections" className="flex shrink-0 gap-2 overflow-x-auto lg:w-44 lg:flex-col">{[['general', 'General'], ['browser', 'This browser'], ['about', 'About']].map(([value, label]) => <button key={value} onClick={() => setSection(value)} aria-current={section === value ? 'page' : undefined} className={`min-h-11 shrink-0 rounded-xl px-4 text-left text-sm ${section === value ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{label}</button>)}<Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/activity">Activity →</Link></nav>
+      <nav aria-label="Settings sections" className="flex shrink-0 gap-2 overflow-x-auto lg:w-44 lg:flex-col">{[['general', 'General'], ['browser', 'This browser'], ['about', 'About']].map(([value, label]) => <button key={value} onClick={() => setSection(value)} aria-current={section === value ? 'page' : undefined} className={`min-h-11 shrink-0 rounded-xl px-4 text-left text-sm ${section === value ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{label}</button>)}<Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/settings/users">Users →</Link><Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/activity">Activity →</Link></nav>
       <div className="min-w-0 flex-1 space-y-6">
       <div className={section === 'general' ? 'space-y-6' : 'hidden'}>
         {content && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
@@ -201,7 +210,7 @@ export default function Settings() {
           </Button>
           {persisted !== null && <p className="text-xs text-zinc-500">{persisted ? 'The browser will keep the cache.' : 'The browser declined; it may still keep it.'}</p>}
           <div className="border-t border-white/[0.06] pt-4">
-            <Switch checked={blurAdult} onChange={setBlurAdult} label="Hide pictures of adult games" hint="Covers and save pictures in the library, for screens other people can see. Only this browser is affected." />
+            <DeviceAdultPreference />
           </div>
         </section>
         {section === 'about' && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]"><h2 className="font-semibold text-white">About Renplay</h2><p className="text-sm text-zinc-400">Version {sys.version} · Made by the Renplay Team</p><p className="text-sm text-zinc-400">Renplay is open source, under the MIT license. Game art belongs to its developers.</p><div className="flex flex-wrap gap-4 text-sm text-accent-300"><DocsLink /><DocsLink path="troubleshooting/">Troubleshooting</DocsLink><a href="https://renplay.org/releases" target="_blank" rel="noreferrer">Release notes ↗</a><a href="https://renplay.org/github" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://renplay.org/support" target="_blank" rel="noreferrer">Support ↗</a><a href="https://github.com/renplay-org/renplay/blob/main/LICENSE" target="_blank" rel="noreferrer">License ↗</a></div></section>}

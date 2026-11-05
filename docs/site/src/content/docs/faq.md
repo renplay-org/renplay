@@ -31,8 +31,9 @@ and game, but a game that is not cached in the browser must be downloaded from y
 
 ## Does it have user accounts?
 
-Not yet. Put your own sign-in in front of it. See
-[Reverse proxy and HTTPS](/install/reverse-proxy/).
+Yes. Local accounts keep saves, favourites and progress separate. New installs require sign-in;
+upgrades keep it off until you enable it. See [Accounts](/accounts/). OIDC, LDAP and avatars follow
+later.
 
 ## Can I keep adult games out of sight?
 

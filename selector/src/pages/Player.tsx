@@ -24,7 +24,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Cover } from '../components/GameCard'
 import { Button, IconButton, Progress, Spinner, Switch, cx } from '../components/ui'
-import { post, slotName } from '../lib/api'
+import { useAuth } from '../lib/auth'
+import { api, slotName } from '../lib/api'
 import {
   NO_INSETS,
   frameRect,
@@ -40,6 +41,7 @@ import {
 } from '../lib/display'
 import { ago } from '../lib/format'
 import { useGame, useSaves } from '../lib/queries'
+import { queueHtmlSave, uploadHtmlSave, replayHtmlSaves } from '../lib/html-save-queue'
 
 type Panel = null | 'saves' | 'walkthrough' | 'display' | 'fullscreen'
 
@@ -60,6 +62,11 @@ const MUTE_KEY = 'renplay:muted'
 const HOME_TIP_KEY = 'renplay:home-screen-tip'
 
 export default function Player() {
+  const { data: account } = useAuth()
+  const userId = useRef(account!.user.id).current
+  const [signedOut, setSignedOut] = useState(false)
+  const [signInError, setSignInError] = useState('')
+  const [legacySaves, setLegacySaves] = useState(false)
   const { id: gameId = '' } = useParams()
   const [params] = useSearchParams()
   const resume = params.get('resume')
@@ -108,6 +115,19 @@ export default function Player() {
   // (opaque origin, no access to Renplay) and their storage comes through here.
   const sandboxed = !!game && game.family !== 'renpy'
   const storageWrite = useRef<Promise<unknown>>(Promise.resolve())
+  const storageUpload = useRef<Promise<unknown>>(Promise.resolve())
+  const [htmlQueueReady, setHtmlQueueReady] = useState(false)
+  useEffect(() => {
+    if (!sandboxed) return
+    let stopped = false
+    setHtmlQueueReady(false)
+    void replayHtmlSaves(userId, gameId).then(() => {
+      if (!stopped) setHtmlQueueReady(true)
+    }).catch(() => {
+      if (!stopped) setFailed('Your unsent saves are kept on this device. Connect and retry to sync them before playing.')
+    })
+    return () => { stopped = true }
+  }, [sandboxed, userId, gameId, attempt])
 
   const setPrefs = (p: DisplayPrefs) => {
     setPrefsState(p)
@@ -122,6 +142,12 @@ export default function Player() {
     [sandboxed],
   )
 
+  useEffect(() => {
+    const signedOut = () => setSignedOut(true)
+    window.addEventListener('renplay:signed-out', signedOut)
+    return () => window.removeEventListener('renplay:signed-out', signedOut)
+  }, [])
+
   // Messages from the in-game runtime.
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -129,13 +155,20 @@ export default function Player() {
       if (e.origin !== (sandboxed ? 'null' : location.origin)) return
       const d = e.data
       if (!d || typeof d.type !== 'string' || !d.type.startsWith('renplay:')) return
+      if (sandboxed && d.userId !== userId) return
       switch (d.type) {
+        case 'renplay:legacy-saves':
+          setLegacySaves(true)
+          break
+        case 'renplay:signed-out':
+          setSignedOut(true)
+          break
         case 'renplay:progress':
           setProgress({ done: d.done, total: d.total })
           break
         case 'renplay:ready':
           setReady(true)
-          void post(`/api/games/${gameId}/played`).then(() => qc.invalidateQueries({ queryKey: ['games'] }))
+          void api(`/api/games/${gameId}/played`, { method: 'POST', headers: { 'x-renplay-user': String(userId) } }).then(() => qc.invalidateQueries({ queryKey: ['games'] })).catch(() => {})
           if (resume && !resumed.current) {
             resumed.current = true
             send({ type: 'renplay:load', slot: resume })
@@ -161,7 +194,15 @@ export default function Player() {
             const path = `${game.saveDir}/${d.kind === 'idb' ? 'indexedDB.json' : 'localStorage.json'}`
             storageWrite.current = storageWrite.current
               .catch(() => {})
-              .then(() => fetch(`/api/saves/${gameId}/file?path=${encodeURIComponent(path)}`, { method: 'PUT', body: d.data, headers: { 'content-type': 'application/octet-stream', 'x-mtime': String(Date.now()) } }))
+              .then(async () => {
+                const entry = await queueHtmlSave(userId, gameId, path, d.data)
+                send({ type: 'renplay:storage-kept', kind: d.kind, data: d.data, userId })
+                // A stalled upload must never delay the next durable snapshot or its acknowledgement.
+                storageUpload.current = storageUpload.current.catch(() => {})
+                  .then(() => uploadHtmlSave(entry))
+                  .catch(() => setSignedOut(true))
+              })
+              .catch(() => setSignedOut(true))
           }
           break
         case 'renplay:exited':
@@ -191,7 +232,7 @@ export default function Player() {
       const whole = Math.min(60, Math.floor(seconds))
       if (whole < 1) return
       seconds -= whole
-      void fetch(`/api/games/${gameId}/play-time`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seconds: whole }), keepalive: true }).catch(() => {})
+      void fetch(`/api/games/${gameId}/play-time`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-renplay-user': String(userId) }, body: JSON.stringify({ seconds: whole }), keepalive: true }).then((response) => { if (response.status === 401) setSignedOut(true) }).catch(() => {})
     }
     const sample = () => {
       const now = performance.now()
@@ -399,16 +440,20 @@ export default function Player() {
 
   return (
     <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white outline-none">
+      {signedOut && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center"><section role="dialog" aria-modal="true" aria-label="You were signed out" className="safe-bottom w-full max-w-md space-y-4 rounded-3xl bg-ink-950 p-6 ring-1 ring-white/10"><h2 className="text-xl font-semibold">You were signed out.</h2><p className="text-sm text-zinc-400">Your saves are kept on this device until you sign in to the same account.</p><a className="inline-flex min-h-11 items-center rounded-xl bg-accent-500 px-5 text-sm font-semibold text-white" href="/signin" target="_blank" rel="noreferrer">Sign in</a><Button className="ml-3" onClick={async () => {
+        try { const me = await api<{ user: { id: number } }>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
+      }}>Continue</Button>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
+      {legacySaves && <div role="status" className="fixed inset-x-4 top-4 z-[90] mx-auto max-w-md rounded-2xl bg-ink-950 p-4 text-sm shadow-xl"><p>Unowned browser saves are kept on this device. Their account is not known. Ask an admin to help recover them before clearing browser storage.</p><Button onClick={() => setLegacySaves(false)} className="mt-2">Dismiss</Button></div>}
       {/* Game stage */}
       <div ref={stageRef} className={cx('absolute inset-0 transition-[right] duration-300', panel === 'walkthrough' && !fullscreen && 'md:right-[42%]')}>
         <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
           <iframe
             ref={frameRef}
             key={attempt}
-            src={game.playUrl}
+            src={sandboxed && !htmlQueueReady ? undefined : game.playUrl}
             title={game.title}
             allow="autoplay; fullscreen; gamepad; clipboard-read; clipboard-write"
-            sandbox={sandboxed ? 'allow-scripts allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-downloads allow-forms' : undefined}
+            sandbox={sandboxed ? 'allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms' : undefined}
             className="absolute border-0 bg-black outline-none"
             style={{ width: rect.width || '100%', height: rect.height || '100%', left: rect.left, top: rect.top }}
           />

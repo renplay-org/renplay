@@ -30,11 +30,13 @@ import { ago, bytes, capitalize, pct } from '../lib/format'
 import { recipeLinks } from '../lib/links'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
+import { useAuth } from '../lib/auth'
 import { stateLabel } from '../lib/tags'
 
 type Tab = 'saves' | 'files' | 'details'
 
 export default function GamePage() {
+  const admin = useAuth().data?.user.role === 'admin'
   const { id: gameId = '' } = useParams()
   const { data: game, isLoading, error } = useGame(gameId)
   const { data: catalog } = useCatalog()
@@ -96,9 +98,9 @@ export default function GamePage() {
                   <span className="tabular-nums text-zinc-400">{game.job.status === 'running' ? pct(game.job.progress) : ''}</span>
                 </div>
                 <Progress value={game.job.progress} indeterminate={game.job.status === 'queued'} />
-                <Link to="/activity" className="mt-2 inline-block text-xs text-zinc-400 hover:text-zinc-200">
+                {admin && <Link to="/activity" className="mt-2 inline-block text-xs text-zinc-400 hover:text-zinc-200">
                   Details in Activity →
-                </Link>
+                </Link>}
               </div>
             ) : (
               <div className="mt-6 hidden flex-wrap gap-3 sm:flex">
@@ -159,7 +161,7 @@ export default function GamePage() {
             ...(renpy
               ? [
                   { value: 'saves' as const, label: <><Save className="size-4" /> Saves</> },
-                  { value: 'files' as const, label: 'Mods' },
+                  ...(admin ? [{ value: 'files' as const, label: 'Mods' }] : []),
                 ]
               : []),
             { value: 'details' as const, label: <><Info className="size-4" /> Details</> },
@@ -167,7 +169,7 @@ export default function GamePage() {
         />
       </div>
       {renpy && tab === 'saves' && <>{!installed && <p className="mb-4 text-sm text-zinc-400">Install the game to load your saves.</p>}<SaveGallery game={game} /></>}
-      {renpy && tab === 'files' && <FileBrowser game={game} />}
+      {admin && renpy && tab === 'files' && <FileBrowser game={game} />}
       {(tab === 'details' || !renpy) && <Details game={game} />}
       {!game.job && <ActionBar>{installed ? <><Button variant="primary" onClick={primary}>{latest ? 'Resume' : 'Play'}</Button>{latest && <Button onClick={() => navigate(`/play/${gameId}`)}>Main menu</Button>}</> : <InstallButton game={game} />}</ActionBar>}
     </div>
@@ -178,6 +180,8 @@ function InstallButton({ game }: { game: Game }) {
   const toast = useToast()
   const qc = useQueryClient()
   const [busy, setBusy] = useState(false)
+  const admin = useAuth().data?.user.role === 'admin'
+  if (!admin) return <span className="text-sm text-zinc-400">Ask an admin to install this game.</span>
   if (!game.canReinstall)
     return (
       <Link to="/add">
@@ -232,6 +236,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 function Details({ game }: { game: Game }) {
+  const admin = useAuth().data?.user.role === 'admin'
   const { data: catalog } = useCatalog()
   const toast = useToast()
   const qc = useQueryClient()
@@ -305,7 +310,7 @@ function Details({ game }: { game: Game }) {
           )}
         </Card>
 
-        <Card title="Your walkthrough">
+        {admin && <Card title="Your walkthrough">
           <p className="mb-4 text-sm text-zinc-400">A PDF you keep with the game. It opens from the game page.</p>
           <input ref={pdfRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => void uploadPdf(e.target.files?.[0])} />
           <div className="flex flex-wrap gap-2">
@@ -318,7 +323,7 @@ function Details({ game }: { game: Game }) {
               </Button>
             )}
           </div>
-        </Card>
+        </Card>}
       </div>
 
       <Card title="Installation">
@@ -339,7 +344,7 @@ function Details({ game }: { game: Game }) {
           {game.installedAt && <Row label="Installed">{capitalize(ago(game.installedAt))}</Row>}
         </div>
       </Card>
-      <Card title="Danger zone">
+      {admin && <Card title="Danger zone">
         <p className="mb-4 text-sm text-zinc-400">Reinstall and uninstall keep your saves, mods and walkthrough. Removing a game from the library keeps its saves.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {game.canReinstall && (
@@ -356,7 +361,7 @@ function Details({ game }: { game: Game }) {
             Remove from library
           </Button>
         </div>
-      </Card>
+      </Card>}
 
       <Modal
         open={reinstall}
