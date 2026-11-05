@@ -7,14 +7,15 @@ release notes say what).
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-05
+
+Renplay 3.0 adds accounts. **Before you upgrade:** back up `/data`. On its first start 3.0 moves
+saves into `/data/users/1/` and makes its own backup in `/data/backups/pre-3.0/`; 2.11 still runs
+on the same data if you go back. Sign-in stays off until you set `RENPLAY_AUTH=on`; behind a
+reverse proxy with HTTPS, also set `RENPLAY_PUBLIC_URL`. Nothing else needs changing.
+
 ### Added
 
-- A stable installation contract for 3.x: image names, port, folders, configuration and upgrade
-  promises are documented in the new Stability page. Container health checks now check the app
-  through nginx.
-- Containers support arbitrary non-root user IDs, including TrueNAS's 568:568, with a read-only
-  root filesystem. Unraid-style `PUID` and `PGID` work when started as root; the app always drops
-  to a non-root user before starting.
 - Accounts. Turn on sign-in with `RENPLAY_AUTH=on` and everyone gets their own saves, save
   history, favourites, Finished stories and play time; the library is shared. A new install asks
   for a setup code from the server log before creating the owner account. Upgraded installs keep
@@ -33,6 +34,12 @@ release notes say what).
   can hide more than its account allows, never less.
 - A game asks you to sign back in when your session ends, and keeps saves it has not sent yet for
   the account that made them.
+- A stable installation contract for 3.x: image names, port, folders, configuration and upgrade
+  promises are documented in the new Stability page. Container health checks now check the app
+  through nginx.
+- Containers support arbitrary non-root user IDs, including TrueNAS's 568:568, with a read-only
+  root filesystem. Unraid-style `PUID` and `PGID` work when started as root; the app always drops
+  to a non-root user before starting.
 
 ### Changed
 
@@ -364,7 +371,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v2.11.1...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v3.0.0...dev
+[3.0.0]: https://github.com/renplay-org/renplay/compare/v2.11.1...v3.0.0
 [2.11.1]: https://github.com/renplay-org/renplay/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/renplay-org/renplay/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/renplay-org/renplay/compare/v2.9.1...v2.10.0
