@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs'
 import { Client } from 'ldapts'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 import type { Config } from './config.js'
+import { groupCeiling, type AdultLevel } from './content.js'
 import { HttpError } from './util/paths.js'
 
 export interface ExternalIdentity {
   provider: string; subject: string; username: string; name: string
-  admin: boolean; adult?: boolean; roleManaged: boolean; adultManaged: boolean
+  admin: boolean; ceiling?: AdultLevel; roleManaged: boolean; adultManaged: boolean
   picture?: string | Buffer
 }
 const text = (v: unknown) => typeof v === 'string' ? v : ''
@@ -73,7 +74,8 @@ export class SignInProviders {
     const groups: string[] = Array.isArray(p.groups) && p.groups.every(s => typeof s === 'string') ? p.groups : []
     const login = text(p.preferred_username) || p.sub
     const admin = this.cfg.oidcAdminGroup ? groups.includes(this.cfg.oidcAdminGroup) : this.isAdmin(login, text(p.email), p.email_verified === true)
-    return { provider: this.oidcProvider, subject: p.sub, username: login, name: text(p.name) || login, admin, adult: this.cfg.oidcAdultGroup ? groups.includes(this.cfg.oidcAdultGroup) : undefined, roleManaged: !!this.cfg.oidcAdminGroup, adultManaged: !!this.cfg.oidcAdultGroup, picture: text(p.picture) || undefined }
+    // The groups claim matches the configured groups exactly; the ceiling is recomputed at every sign-in.
+    return { provider: this.oidcProvider, subject: p.sub, username: login, name: text(p.name) || login, admin, ceiling: this.cfg.oidcAdultGroups ? groupCeiling(this.cfg.oidcAdultGroups, groups) : undefined, roleManaged: !!this.cfg.oidcAdminGroup, adultManaged: !!this.cfg.oidcAdultGroups, picture: text(p.picture) || undefined }
   }
   private isAdmin(username: string, email: string, verified: boolean) {
     return this.cfg.admins.some(a => a.includes('@') ? verified && a === email.toLowerCase() : a === username.toLowerCase())
@@ -92,7 +94,7 @@ export class SignInProviders {
     const c = this.cfg, client = await this.ldapClient()
     try {
       await client.bind(c.ldapBindDn, c.ldapBindPassword)
-      const { searchEntries } = await client.search(c.ldapBaseDn, { scope: 'sub', filter: c.ldapUserFilter.replaceAll('{username}', escapeLdapFilter(username)), sizeLimit: 2, attributes: [c.ldapUsernameAttribute, c.ldapNameAttribute, 'cn', c.ldapEmailAttribute, c.ldapPhotoAttribute, 'entryUUID'], explicitBufferAttributes: [c.ldapPhotoAttribute] })
+      const { searchEntries } = await client.search(c.ldapBaseDn, { scope: 'sub', filter: c.ldapUserFilter.replaceAll('{username}', escapeLdapFilter(username)), sizeLimit: 2, attributes: [c.ldapUsernameAttribute, c.ldapNameAttribute, 'cn', c.ldapEmailAttribute, c.ldapPhotoAttribute, 'entryUUID', 'memberOf'], explicitBufferAttributes: [c.ldapPhotoAttribute] })
       if (searchEntries.length !== 1) {
         // Local dummy verification avoids another bind that could lock a directory account.
         await new Promise<void>((resolve, reject) => scrypt(password, 'Renplay LDAP dummy verification', 64, { N: 32768, r: 8, p: 1, maxmem: 64 << 20 }, (error, key) => {
@@ -115,7 +117,9 @@ export class SignInProviders {
       }
       const attr = (key: string) => { const v = entry[key]; return Array.isArray(v) ? v[0] : v }
       const login = text(attr(c.ldapUsernameAttribute)) || username
-      return { provider: this.ldapProvider, subject: text(attr('entryUUID')) || entry.dn, username: login, name: text(attr(c.ldapNameAttribute)) || text(attr('cn')) || login, admin: c.ldapAdminFilter ? await matches(c.ldapAdminFilter) : this.isAdmin(login, '', false), adult: c.ldapAdultFilter ? await matches(c.ldapAdultFilter) : undefined, roleManaged: !!c.ldapAdminFilter, adultManaged: !!c.ldapAdultFilter, picture: Buffer.isBuffer(attr(c.ldapPhotoAttribute)) ? attr(c.ldapPhotoAttribute) as Buffer : undefined }
+      // Group ceilings match the cn of the memberOf groups, case-insensitive; the ceiling is recomputed at every sign-in.
+      const ceiling = c.ldapAdultGroups ? groupCeiling(Object.fromEntries(Object.entries(c.ldapAdultGroups).map(([g, l]) => [g.toLowerCase(), l])), groupCns(entry['memberOf']).map((cn) => cn.toLowerCase())) : c.ldapAdultFilter ? (await matches(c.ldapAdultFilter) ? 'shown' as const : 'off' as const) : undefined
+      return { provider: this.ldapProvider, subject: text(attr('entryUUID')) || entry.dn, username: login, name: text(attr(c.ldapNameAttribute)) || text(attr('cn')) || login, admin: c.ldapAdminFilter ? await matches(c.ldapAdminFilter) : this.isAdmin(login, '', false), ceiling, roleManaged: !!c.ldapAdminFilter, adultManaged: !!(c.ldapAdultGroups || c.ldapAdultFilter), picture: Buffer.isBuffer(attr(c.ldapPhotoAttribute)) ? attr(c.ldapPhotoAttribute) as Buffer : undefined }
     } catch {
       // Pad both failure paths beyond normal directory verification time.
       await delay(Math.max(0, 500 - (performance.now() - started)))
@@ -124,3 +128,15 @@ export class SignInProviders {
   }
 }
 export const signInRandom = () => randomBytes(32).toString('base64url')
+
+/** The cn of every group DN in a memberOf attribute (string or list), unescaped. */
+export function groupCns(memberOf: unknown): string[] {
+  const values = Array.isArray(memberOf) ? memberOf : typeof memberOf === 'string' ? [memberOf] : []
+  const out: string[] = []
+  for (const value of values) {
+    if (typeof value !== 'string') continue
+    const m = value.match(/^cn=((?:\\.|[^,])+)/i)
+    if (m) out.push(m[1]!.replace(/\\(.)/g, '$1'))
+  }
+  return out
+}

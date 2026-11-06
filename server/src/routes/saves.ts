@@ -164,7 +164,8 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
         renpyVersion: meta?.renpyVersion,
         gameVersion: meta?.gameVersion,
         runtime: meta?.runtime,
-        screenshot: meta?.hasScreenshot ? `/api/saves/${g.id}/screenshot?user=${viewer()?.user.id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
+        // Blurred: the save's picture is the adult game's art and never leaves the server.
+        screenshot: meta?.hasScreenshot && !content.blurs(g) ? `/api/saves/${g.id}/screenshot?user=${viewer()?.user.id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
         valid: !!meta,
       })
     }
@@ -174,6 +175,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
 
   router.get('/:id/screenshot', async (req, res) => {
     const g = game(req)
+    if (content.blurs(g)) throw new HttpError(404, 'No screenshot')
     const name = cleanRelPath(req.query['file'])
     const png = await readSaveScreenshot(await store.read(requireSaveDir(g), name))
     if (!png) throw new HttpError(404, 'No screenshot')

@@ -49,7 +49,8 @@ export function createPlayRouter(
       return
     }
     const template = await engines.template(game.engine)
-    const presplash = await findPresplash(builds.dir(id, baseOf(game.build)))
+    // Blurred: no byte of the game's art leaves the server, so the build's presplash stays out.
+    const presplash = content.blurs(game) ? null : await findPresplash(builds.dir(id, baseOf(game.build)))
     const html = renderPage(template, {
       id,
       build: game.build,

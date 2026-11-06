@@ -126,18 +126,26 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
     })
   })
 
+  /** The job, unless it belongs to a game that does not exist for this person. */
+  const visibleJob = (id: string) => {
+    const j = db.getJob(id)
+    if (!j || content.hides(j.game ? db.getGame(j.game) : null)) throw new HttpError(404, 'Job not found')
+    return j
+  }
+
   router.get('/jobs/:id/log', (req, res) => {
-    const j = db.getJob(req.params.id)
-    if (!j) throw new HttpError(404, 'Job not found')
+    const j = visibleJob(req.params.id)
     res.type('text/plain').send(jobs.getLog(j.id))
   })
 
   router.post('/jobs/:id/cancel', (req, res) => {
+    visibleJob(req.params.id)
     if (!jobs.cancel(req.params.id)) throw new HttpError(409, 'Job is not running or queued')
     res.json({ ok: true })
   })
 
   router.post('/jobs/:id/retry', (req, res) => {
+    visibleJob(req.params.id)
     const id = jobs.retry(req.params.id)
     if (!id) throw new HttpError(409, 'Job cannot be retried')
     res.json({ jobId: id })

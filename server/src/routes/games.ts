@@ -74,6 +74,9 @@ export async function toGame(row: GameRow, deps: GameDeps) {
   const release = recipe ? installedRelease(recipe, row.version, source.archive) : null
   const update = recipe ? deps.catalog.update(recipe, row.version, source.archive) : null
   const modded = row.build.includes('.m')
+  // Blurred: the game shows with its title and metadata, but no picture URL leaves the server.
+  const blurred = deps.catalog.content.blurs(row)
+  if (blurred && latestSave) latestSave.screenshot = null
   return {
     id: row.id,
     // Title, developer, tags and cover come from the catalog; a game without a
@@ -88,7 +91,8 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     nsfw: recipe?.nsfw ?? false,
     coverSfw: typeof recipe?.cover === 'object' && recipe.cover?.sfw === true,
     free: recipe?.free,
-    cover: recipe ? deps.catalog.cover(recipe.id) : null,
+    cover: recipe && !blurred ? deps.catalog.cover(recipe.id) : null,
+    art: blurred ? ('hidden' as const) : undefined,
     walkthrough: row.walkthrough || null,
     status: row.status,
     build: row.build || null,

@@ -121,11 +121,11 @@ Mods: your files, layered over a game.
 
 <div class="config-default">
 
-Default: `block`
+Default: `off`
 
 </div>
 
-`allow` gives newly created accounts access to adult games. `block` (and any other value) does not. The first admin always has access; admins can change access per account.
+Ceiling and starting choice of adult games for newly created accounts: off, blurred or shown (allow and block work as before). The first admin always starts at shown; admins can change the ceiling per account in Users.
 
 </div>
 
@@ -167,7 +167,7 @@ Default: not set
 
 </div>
 
-`allow` or `block` adult games for the whole install, and lock the choice. Not set: an existing library keeps showing adult games, a new install asks once in the empty library, and admins can change an unlocked choice in Settings. `block` reads the catalog’s safe-for-work index and hides adult games already in the library without deleting them. Any other value counts as `block`.
+The installation level of adult games: off (they do not exist), blurred (they show with hidden art) or shown, and the choice is fixed. The 3.x spellings work too: allow is shown, block is off. Not set: the stored choice applies (shown until an install answers its first-run question), and admins can change it in Settings. At off the server reads the catalog’s safe-for-work index; below shown it never downloads adult art. Any other value counts as off.
 
 </div>
 
@@ -456,7 +456,21 @@ Default: empty
 
 </div>
 
-Exact groups claim value granting adult access. When set, access follows membership at each OIDC sign-in and cannot be edited in Users.
+Deprecated alias of RENPLAY_OIDC_ADULT_GROUPS: the group gets shown, everyone else off. Still supported, with a warning once at startup. RENPLAY_OIDC_ADULT_GROUPS takes precedence when both are set.
+
+</div>
+
+<div class="config-entry" id="renplay-oidc-adult-groups">
+
+**`RENPLAY_OIDC_ADULT_GROUPS`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Adult games ceilings by sign-in group: group=off, =blurred or =shown, separated by commas. Matches the groups claim exactly. When set, a person’s ceiling is the highest level of their groups, or off when none match, recomputed at each OIDC sign-in, and Users cannot change it.
 
 </div>
 
@@ -638,7 +652,21 @@ Default: empty
 
 </div>
 
-Filter evaluated against the authenticated user entry. Controls adult access at each LDAP sign-in.
+Deprecated alias of RENPLAY_LDAP_ADULT_GROUPS: a matching entry gets shown, everyone else off. Filter evaluated against the authenticated user entry at each LDAP sign-in. RENPLAY_LDAP_ADULT_GROUPS takes precedence when both are set.
+
+</div>
+
+<div class="config-entry" id="renplay-ldap-adult-groups">
+
+**`RENPLAY_LDAP_ADULT_GROUPS`**
+
+<div class="config-default">
+
+Default: empty
+
+</div>
+
+Adult games ceilings by directory group: group=off, =blurred or =shown, separated by commas. Matches the cn of the user’s memberOf groups, case-insensitive. When set, the ceiling is the highest level of their groups, or off when none match, recomputed at each LDAP sign-in, and Users cannot change it.
 
 </div>
 

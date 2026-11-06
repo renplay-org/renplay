@@ -6,7 +6,6 @@ import { Router } from 'express'
 import { archiveIdentity, publishUpload } from '../archive-origin.js'
 import { installedRelease, type Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
-import { ADULT_REASON } from '../content.js'
 import { parseJson, type Db, type GameSource } from '../db.js'
 import type { JobManager } from '../jobs.js'
 import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
@@ -70,10 +69,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
         const info = parsed?.v === INSPECT_VERSION ? parsed : null
         const sha256 = fresh ? row.sha256 || null : null
         const match = catalog.match({ name: f.rel, size: f.size, sha256: sha256 ?? undefined })
-        // An adult game's archive stays in the folder but cannot be installed here.
-        if (match && catalog.content.hidesRecipe(match.recipe.nsfw)) {
-          return { path: f.rel, name: basename(f.rel), size: f.size, mtime: f.mtimeMs, sha256, info, installedAs: null, recipe: null, existingGame: null, blocked: ADULT_REASON }
-        }
+        // Off: an adult game does not exist, so its download does not appear in Add games.
+        if (match && catalog.content.hidesRecipe(match.recipe.nsfw)) return null
         return {
           path: f.rel,
           name: basename(f.rel),
@@ -82,7 +79,6 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
           sha256,
           info,
           installedAs: installedBy.get(f.rel) ?? null,
-          blocked: null,
           recipe: match
             ? {
                 id: match.recipe.id,
@@ -97,7 +93,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
             : null,
           existingGame: [match ? db.gameByRecipe(match.recipe.id) : null, info?.saveDir ? db.gameBySaveDir(info.saveDir) : null].find((g) => g && !catalog.content.hides(g))?.id ?? null,
         }
-      }),
+      }).filter((a) => a !== null),
     })
   })
 
@@ -106,6 +102,9 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     const full = safeJoin(cfg.archivesDir, rel)
     const st = await stat(full).catch(() => null)
     if (!st) throw new HttpError(404, 'Archive not found')
+    // Off: an adult game does not exist, so neither does its download.
+    const match = catalog.match({ name: rel, size: st.size, sha256: db.getArchive(rel)?.sha256 || undefined })
+    if (catalog.content.hidesRecipe(match?.recipe.nsfw)) throw new HttpError(404, 'Archive not found')
     const info = await inspectArchive(full)
     const prev = db.getArchive(rel)
     db.upsertArchive({
@@ -121,6 +120,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
 
   router.post('/archives/hash', (req, res) => {
     const rel = cleanRelPath(req.body?.path)
+    const row = db.getArchive(rel)
+    if (catalog.content.hidesRecipe(catalog.match({ name: rel, size: row?.size, sha256: row?.sha256 || undefined })?.recipe.nsfw)) throw new HttpError(404, 'Archive not found')
     res.json({ jobId: jobs.enqueue('hash-archive', '', { path: rel }) })
   })
 
@@ -147,11 +148,11 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     // to it after unpacking, which takes an hour for a big game.
     if (b.game && (!db.getGame(b.game) || catalog.content.hides(db.getGame(b.game)))) throw new HttpError(404, `Game ${b.game} is not in the library`)
     if (b.game && jobs.activeFor(b.game)) throw new HttpError(409, 'A job is already running for this game')
-    // Refuse adult games before any work, while the install is safe-for-work only.
+    // Off: an adult game does not exist, so its download cannot be installed either.
     {
       const st = await stat(safeJoin(cfg.archivesDir, rel)).catch(() => null)
       const match = st ? catalog.match({ name: rel, size: st.size, sha256: db.getArchive(rel)?.sha256 || undefined }) : null
-      if (catalog.content.hidesRecipe(match?.recipe.nsfw) || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId) && catalog.content.hidesRecipe(true))) throw new HttpError(403, ADULT_REASON)
+      if (catalog.content.hidesRecipe(match?.recipe.nsfw) || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId) && catalog.content.hidesRecipe(true))) throw new HttpError(404, 'Game not found')
     }
     const id = jobs.enqueue('import', b.game ?? '', {
       source,

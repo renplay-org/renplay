@@ -4,6 +4,7 @@ import { dirname as pathDirname, relative as pathRelative } from 'node:path'
 import { join } from 'node:path'
 import express, { Router, type Request, type Response } from 'express'
 import type { Config } from './config.js'
+import { legacyMirror, lowestLevel, parseAdultLevel, type AdultLevel, type ContentMode } from './content.js'
 import type { Db, GameRow } from './db.js'
 import { parseJson } from './db.js'
 import { viewer, viewers, type User, type Viewer } from './accounts-context.js'
@@ -71,7 +72,7 @@ export class Accounts {
   private readonly limits = new Map<string, { count: number; until: number }>()
   private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
   private dummyPassword = ''
-  constructor(readonly db: Db, readonly cfg: Config) {
+  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode) {
     this.enabled = (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
   }
@@ -122,6 +123,15 @@ export class Accounts {
       if (!await lstat(legacy!).catch(() => null)) { await mkdir(join(legacy!, '..'), { recursive: true }); await symlink(pathRelative(pathDirname(legacy!), target!), legacy!, 'dir') }
     }
   }
+  /** Writes a person's ceiling and choice, and the 3.x columns a downgrade to 3.2 still reads. */
+  private writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
+    const u = this.user(id)
+    const ceiling = patch.ceiling ?? parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
+    const choice = patch.choice ?? parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
+    const mirror = legacyMirror(ceiling, choice)
+    const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), adultPictures: mirror.adultPictures }
+    this.db.raw.prepare('UPDATE users SET adult_ceiling = ?, adult_choice = ?, adult_access = ?, prefs = ? WHERE id = ?').run(ceiling, choice, mirror.adultAccess, JSON.stringify(prefs), id)
+  }
   private invalidate(): void { this.sessionCache.clear() }
   private async claim(raw: unknown, display: unknown, password: unknown): Promise<void> {
     const login = username(raw), displayName = name(display), encoded = await passwordHash(password)
@@ -129,7 +139,8 @@ export class Accounts {
     if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != 1').get(login)) throw new HttpError(409, 'That username is taken')
     this.db.raw.exec('BEGIN IMMEDIATE')
     try {
-      this.db.raw.prepare("UPDATE users SET username = ?, name = ?, adult_access = 1 WHERE id = 1").run(login, displayName)
+      this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = 1').run(login, displayName)
+      this.writeLevels(1, { ceiling: 'shown', choice: 'shown' })
       this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, 1, ?)").run(login, encoded)
       this.db.raw.exec('COMMIT')
     } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
@@ -291,7 +302,7 @@ export class Accounts {
     const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)
     const oidc = identities.some(i => i.provider === this.providers.oidcProvider), ldap = identities.some(i => i.provider === this.providers.ldapProvider)
     const u = this.user(id)
-    return { roleManaged: !(u.role === 'admin' && u.admin_source === 'manual') && !!(oidc && this.cfg.oidcAdminGroup || ldap && this.cfg.ldapAdminFilter), adultManaged: !!(oidc && this.cfg.oidcAdultGroup || ldap && this.cfg.ldapAdultFilter) }
+    return { roleManaged: !(u.role === 'admin' && u.admin_source === 'manual') && !!(oidc && this.cfg.oidcAdminGroup || ldap && this.cfg.ldapAdminFilter), adultManaged: !!(oidc && this.cfg.oidcAdultGroups || ldap && (this.cfg.ldapAdultGroups || this.cfg.ldapAdultFilter)) }
   }
   private methodAvailable(id: number, provider: string, subject: string, removingLocal = ''): boolean {
     if (provider === 'local') return this.cfg.authLocal
@@ -315,12 +326,16 @@ export class Accounts {
       if (newOwner) {
         id = 1
         const ownerLogin = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != 1').get(identity.username) ? `sso-${signInRandom().slice(0, 12)}` : identity.username.slice(0, 64)
-        this.db.raw.prepare('UPDATE users SET username = ?, name = ?, adult_access = 1 WHERE id = 1').run(ownerLogin, identity.name.slice(0, 100))
+        this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = 1').run(ownerLogin, identity.name.slice(0, 100))
+        this.writeLevels(1, { ceiling: 'shown', choice: 'shown' })
       } else if (id === undefined) {
         // Display names and emails are never used to match or merge accounts.
         const login = identity.username.toLowerCase().replace(/[^a-z0-9._-]/g, '-').slice(0, 48) || 'player'
         const unique = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login) ? `${login}-${signInRandom().slice(0, 8)}` : login
-        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, adult_access, created_at) VALUES (?, ?, ?, ?, ?)').run(unique, identity.name.slice(0, 100), identity.admin ? 'admin' : 'player', Number(identity.adult ?? (identity.admin || this.cfg.adultDefault)), new Date().toISOString()).lastInsertRowid)
+        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, created_at) VALUES (?, ?, ?, ?)').run(unique, identity.name.slice(0, 100), identity.admin ? 'admin' : 'player', new Date().toISOString()).lastInsertRowid)
+        // The sign-in group's level, or the starting level for new people (the first admin starts at shown).
+        const ceiling = identity.ceiling ?? (identity.admin ? 'shown' : this.cfg.adultDefault)
+        this.writeLevels(id, { ceiling, choice: ceiling })
       }
       if (linking) this.requireLiveLink(linking.user, linking.session, linking.bearer)
       if (!existing) this.db.raw.prepare('INSERT INTO identities (provider, subject, user_id) VALUES (?, ?, ?)').run(identity.provider, identity.subject, id!)
@@ -335,7 +350,8 @@ export class Accounts {
         }
         this.db.raw.prepare('UPDATE users SET role = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = ?').run(identity.admin ? 'admin' : 'player', identity.roleManaged ? 'provider' : 'allowlist', identity.provider, identity.subject, id!)
       }
-      if (identity.adultManaged) this.db.raw.prepare('UPDATE users SET adult_access = ? WHERE id = ?').run(Number(identity.adult), id!)
+      // A configured sign-in group replaces the hand setting and is recomputed at each sign-in.
+      if (identity.adultManaged) this.writeLevels(id!, { ceiling: identity.ceiling! })
       if (u.disabled) throw new HttpError(403, 'This account is disabled')
       this.db.raw.exec('COMMIT')
     } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
@@ -400,9 +416,9 @@ export class Accounts {
       if (!remaining.length) throw new HttpError(409, 'Keep at least one enabled way to sign in')
       const u = this.user(id)
       const roleManaged = u.admin_source !== 'manual' && u.admin_provider === provider && u.admin_subject === subject
-      const adultManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdultGroup || provider === this.providers.ldapProvider && !!this.cfg.ldapAdultFilter
+      const adultManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdultGroups || provider === this.providers.ldapProvider && !!(this.cfg.ldapAdultGroups || this.cfg.ldapAdultFilter)
       if (roleManaged) { this.guardLastAdmin(u, { role: 'player' }); this.db.raw.prepare("UPDATE users SET role = 'player', admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(id) }
-      if (adultManaged) this.db.raw.prepare('UPDATE users SET adult_access = 0 WHERE id = ?').run(id)
+      if (adultManaged) this.writeLevels(id, { ceiling: 'off' })
       this.db.raw.prepare('DELETE FROM identities WHERE user_id = ? AND provider = ? AND subject = ?').run(id, provider, subject)
       this.db.raw.prepare('DELETE FROM identity_metadata WHERE provider = ? AND subject = ?').run(provider, subject)
       this.revoke(id, viewer()!.session); res.json({ ok: true })
@@ -479,12 +495,25 @@ export class Accounts {
       this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, u.id)
       this.revoke(u.id, viewer()!.session); res.json({ ok: true })
     })
-    r.get('/me/prefs', (_req, res) => res.json(parseJson(this.current().prefs, {})))
-    r.put('/me/prefs', (req, res) => {
-      const mode = req.body?.adultPictures
-      if (!['show', 'hide-pictures', 'hide-games'].includes(mode)) throw new HttpError(400, 'Choose Show, Hide pictures or Hide adult games')
-      this.db.raw.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify({ adultPictures: mode }), this.current().id)
-      res.json({ adultPictures: mode })
+    r.get('/me/adult', (_req, res) => {
+      const u = this.current()
+      const ceiling = parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
+      const choice = parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
+      res.json({
+        installation: { level: this.content.level, fixed: this.content.locked, chosen: this.content.chosen },
+        ceiling: { level: ceiling, managed: this.managed(u.id).adultManaged ? 'group' : null },
+        choice,
+        effective: lowestLevel(this.content.level, ceiling, choice),
+      })
+    })
+    r.put('/me/adult', (req, res) => {
+      const level = parseAdultLevel(req.body?.level)
+      if (!level) throw new HttpError(400, 'Choose Off, Blurred or Shown')
+      const u = this.current()
+      const ceiling = parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
+      if (lowestLevel(level, ceiling) !== level) throw new HttpError(409, `Your account allows at most ${ceiling}`)
+      this.writeLevels(u.id, { choice: level })
+      res.json({ ok: true, choice: level })
     })
     r.get('/me/sessions', (_req, res) => res.json({ sessions: this.db.raw.prepare('SELECT hash AS id, created_at, touched_at, expires_at, label FROM sessions WHERE user_id = ? AND expires_at > ?').all(this.current().id, Date.now()).map((s) => ({ ...s, current: s.id === viewer()?.session })) }))
     r.delete('/me/sessions', (_req, res) => { this.revoke(this.current().id, viewer()!.session); res.json({ ok: true }) })
@@ -509,10 +538,14 @@ export class Accounts {
       if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login)) throw new HttpError(409, 'That username is taken')
       const role = req.body?.role ?? 'player'
       if (!['admin', 'player'].includes(role)) throw new HttpError(400, 'Choose Admin or Player')
+      const ceiling = req.body?.adultCeiling === undefined ? this.cfg.adultDefault : parseAdultLevel(req.body?.adultCeiling)
+      if (!ceiling) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games ceiling')
       this.db.raw.exec('BEGIN IMMEDIATE')
       let id: number
       try {
-        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, adult_access, created_at) VALUES (?, ?, ?, ?, ?)').run(login, display, role, req.body?.adultAccess === true || (req.body?.adultAccess === undefined && this.cfg.adultDefault) ? 1 : 0, new Date().toISOString()).lastInsertRowid)
+        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, created_at) VALUES (?, ?, ?, ?)').run(login, display, role, new Date().toISOString()).lastInsertRowid)
+        // The ceiling an admin chooses here is also where the person's own choice starts.
+        this.writeLevels(id, { ceiling, choice: ceiling })
         this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, ?, ?)").run(login, id, encoded)
         this.db.raw.exec('COMMIT')
       } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
@@ -522,11 +555,16 @@ export class Accounts {
       const target = this.user(Number(req.params.id)), b = req.body ?? {}
       if (this.removing.has(target.id)) throw new HttpError(409, 'This account is being archived')
       if (b.role !== undefined && !['admin', 'player'].includes(b.role)) throw new HttpError(400, 'Choose Admin or Player')
-      for (const key of ['disabled', 'adultAccess']) if (b[key] !== undefined && typeof b[key] !== 'boolean') throw new HttpError(400, `${key} must be a boolean`)
+      if (b.disabled !== undefined && typeof b.disabled !== 'boolean') throw new HttpError(400, 'disabled must be a boolean')
+      const ceiling = b.adultCeiling === undefined ? undefined : parseAdultLevel(b.adultCeiling) ?? undefined
+      if (b.adultCeiling !== undefined && !ceiling) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games ceiling')
+      const choice = b.adultChoice === undefined ? undefined : parseAdultLevel(b.adultChoice) ?? undefined
+      if (b.adultChoice !== undefined && !choice) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games choice')
       const managed = this.managed(target.id)
-      if (b.role !== undefined && managed.roleManaged || b.adultAccess !== undefined && managed.adultManaged) throw new HttpError(409, 'This permission is set by the sign-in provider')
+      if (b.role !== undefined && managed.roleManaged || ceiling !== undefined && managed.adultManaged) throw new HttpError(409, 'This permission is set by the sign-in provider')
       this.guardLastAdmin(target, b)
-      this.db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ?, adult_access = ? WHERE id = ?').run(b.name === undefined ? target.name : name(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), b.adultAccess === undefined ? target.adult_access : Number(b.adultAccess), target.id)
+      this.db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ? WHERE id = ?').run(b.name === undefined ? target.name : name(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), target.id)
+      if (ceiling !== undefined || choice !== undefined) this.writeLevels(target.id, { ceiling, choice })
       if (b.role !== undefined) this.db.raw.prepare("UPDATE users SET admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(target.id)
       this.invalidate(); await this.tag(this.user(target.id)); res.json({ user: this.user(target.id) })
     })
@@ -614,7 +652,8 @@ export class Accounts {
           if (!now || now.disabled || now.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
           this.mergeProgress(u.id, 1)
           this.db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
-          this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', adult_access = ?, avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(now.username, now.name, now.adult_access, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject)
+          this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(now.username, now.name, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject)
+          this.writeLevels(1, { ceiling: parseAdultLevel(now.adult_ceiling) ?? this.cfg.adultDefault, choice: parseAdultLevel(now.adult_choice) ?? this.cfg.adultDefault })
           this.db.raw.prepare('UPDATE identities SET user_id = 1 WHERE user_id = ?').run(u.id)
           this.db.raw.prepare('UPDATE sessions SET user_id = 1 WHERE hash = ?').run(session)
           this.db.raw.prepare('UPDATE tokens SET user_id = 1 WHERE hash = ?').run(session)

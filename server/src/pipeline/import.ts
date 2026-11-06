@@ -17,7 +17,6 @@ import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, s
 import { defaultImagePolicy, imageConcurrency } from './optimize.js'
 import { PackWriter, writeIndex } from './pack.js'
 import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
-import { ADULT_REASON } from '../content.js'
 import { detectEngine, type EngineInfo } from './family.js'
 import { extractHtml, storyId, versionFromName } from './html.js'
 import { detectLayout, extractProject } from './project.js'
@@ -109,7 +108,8 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     } else {
       match = catalog.match({ name: source.archive, size: source.size, sha256: source.sha256 })
     }
-    if (catalog.content.blocked && (match?.recipe.nsfw || (p.recipeId && catalog.isAdultId(p.recipeId)))) throw new Error(ADULT_REASON)
+    // The route refuses adult games up front; this catches a switch to off while the job waited.
+    if (catalog.content.hidesRecipe(match?.recipe.nsfw) || (p.recipeId && catalog.isAdultId(p.recipeId) && catalog.content.hidesRecipe(true))) throw new Error('This is an adult game, and adult games are off on this Renplay.')
     if (match) ctx.log(`Recipe: ${match.recipe.id}${match.release ? ` (${match.release.version}, ${match.release.status})` : ' (unlisted version)'}`)
     const settings = match ? catalog.settings(match.recipe, match.release) : {}
 

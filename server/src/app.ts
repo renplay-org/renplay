@@ -66,7 +66,8 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   for (const d of [cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
 
   const version = packageVersion()
-  const accounts = new Accounts(db, cfg)
+  const content = new ContentMode(cfg, db)
+  const accounts = new Accounts(db, cfg, content)
   try { await accounts.init() } catch (error) { db.close(); throw error }
   const purger = new Purger(cfg.purgeDir)
   const saves = accounts.store(1)
@@ -74,7 +75,6 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const builds = new Builds(cfg, db, purger)
   const engines = new EngineStore(cfg, db, purger)
   const overlays = new Overlays(cfg)
-  const content = new ContentMode(cfg, db)
   const catalog = new Catalog(cfg, db, content)
   await catalog.init()
 
@@ -170,7 +170,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     tryNext(0)
   })
   app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content))
-  app.use('/api/content', createContentRouter(content, catalog))
+  app.use('/api/content', createContentRouter(cfg, content, catalog))
   app.get('/api/saves-export', (req, res, next) => { void createSavesExportAll(accounts.store(), db, content)(req, res).catch(next) })
   app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content)(req, res, next))
   app.use('/api/games', createFilesRouter(db, builds, overlays, jobs, content))

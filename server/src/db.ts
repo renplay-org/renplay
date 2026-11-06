@@ -206,6 +206,16 @@ export class Db {
       this.raw.exec(`CREATE TABLE IF NOT EXISTS identity_metadata (provider TEXT NOT NULL, subject TEXT NOT NULL, username TEXT NOT NULL, PRIMARY KEY(provider, subject));
         PRAGMA user_version = 10; COMMIT;`)
     }
+    // 4.0: three adult levels. The 3.x access becomes the ceiling and the choice; adult_access and
+    // prefs stay written (content.ts legacyMirror) so a downgrade to 3.2 reads the same levels.
+    if (v < 11) {
+      const columns = this.raw.prepare('PRAGMA table_info(users)').all().map(c => c.name)
+      this.raw.exec('BEGIN')
+      if (!columns.includes('adult_ceiling')) this.raw.exec("ALTER TABLE users ADD COLUMN adult_ceiling TEXT NOT NULL DEFAULT ''")
+      if (!columns.includes('adult_choice')) this.raw.exec("ALTER TABLE users ADD COLUMN adult_choice TEXT NOT NULL DEFAULT ''")
+      this.raw.exec("UPDATE users SET adult_ceiling = CASE adult_access WHEN 1 THEN 'shown' ELSE 'off' END, adult_choice = CASE adult_access WHEN 1 THEN 'shown' ELSE 'off' END WHERE adult_ceiling = ''")
+      this.raw.exec('PRAGMA user_version = 11; COMMIT')
+    }
     } catch (error) { this.raw.close(); throw error }
   }
 

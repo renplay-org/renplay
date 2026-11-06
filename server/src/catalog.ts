@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Config } from './config.js'
-import { ContentMode, sfwIndexUrl } from './content.js'
+import { ContentMode, parseAdultLevel, sfwIndexUrl } from './content.js'
 import { parseJson, type Db, type GameSource } from './db.js'
 import type { JobContext } from './jobs.js'
 import sharp from 'sharp'
@@ -228,8 +228,10 @@ export class Catalog {
     if (cached && Array.isArray(cached.games)) {
       this.load(cached.games)
       this.vocabulary = cached.vocabulary ?? {}
-      // A catalog cached without its adult games is stale once they are allowed.
-      this.fetchedAt = !this.content.blocked && cached.adultGames === 'block' ? 0 : cached.at
+      // A catalog cached without its adult games is stale once they are allowed. Caches written
+      // by 3.x say allow/block; 4.0 writes the installation level.
+      const cachedLevel = parseAdultLevel(cached.adultGames, true) ?? 'shown'
+      this.fetchedAt = cachedLevel === 'off' && this.content.level !== 'off' ? 0 : cached.at
     } else {
       try {
         const here = dirname(fileURLToPath(import.meta.url))
@@ -240,7 +242,7 @@ export class Catalog {
     }
     this.covers = new Map(Object.entries(this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})).map(([id, c]) => [id, c.file]))
     this.syncAdult()
-    if (this.content.blocked) await this.restrict()
+    if (this.content.level === 'off') await this.restrict()
     this.link()
     if (Date.now() - this.fetchedAt > REFRESH_EVERY) void this.refresh().catch(() => {})
     this.timer = setInterval(() => void this.refresh().catch(() => {}), REFRESH_EVERY)
@@ -258,12 +260,13 @@ export class Catalog {
   }
 
   /**
-   * Called after the admin changes the setting. Blocking drops the adult
-   * recipes and covers at once and fetches the safe-for-work index; allowing
-   * fetches the full one.
+   * Called after the admin changes the setting. Off moves adult recipes out of
+   * the catalog (keeping only a stub) and fetches the safe-for-work index;
+   * their covers stay on disk, unserved, until the level allows them again.
+   * Blurred and shown fetch the full index.
    */
   async modeChanged(): Promise<void> {
-    if (this.content.blocked) {
+    if (this.content.level === 'off') {
       this.syncAdult()
       await this.restrict()
     } else {
@@ -274,7 +277,7 @@ export class Catalog {
     void this.refresh().catch(() => {})
   }
 
-  /** Moves adult recipes out of the catalog (keeping only a stub) and deletes their covers. */
+  /** Moves adult recipes out of the catalog, keeping a stub and their already downloaded covers. */
   private async restrict(): Promise<void> {
     const gone = [...this.recipes.values()].filter((r) => r.nsfw === true)
     if (gone.length) {
@@ -282,12 +285,12 @@ export class Catalog {
       this.setAdult([...this.adult.values(), ...gone])
       this.load(kept.games)
       this.vocabulary = kept.vocabulary
-      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: kept.games, vocabulary: kept.vocabulary, adultGames: 'block' })
+      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: kept.games, vocabulary: kept.vocabulary, adultGames: 'off' })
     } else {
       const cache = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary } | null>(CACHE_KEY, null)
-      if (cache) this.db.setSetting(CACHE_KEY, { ...cache, adultGames: 'block' })
+      if (cache) this.db.setSetting(CACHE_KEY, { ...cache, adultGames: 'off' })
     }
-    await this.purgeCovers((id) => !this.recipes.has(id))
+    await this.purgeCovers((id) => !this.recipes.has(id) && !this.adult.has(id))
   }
 
   /** Forgets covers (and deletes their files) of recipes the catalog no longer has. */
@@ -325,11 +328,11 @@ export class Catalog {
     const all: Recipe[] = []
     const vocabulary: Vocabulary = Object.create(null)
     this.errors = []
-    const blocked = this.content.blocked
+    const off = this.content.level === 'off'
     const adult: Recipe[] = []
     for (const url of this.cfg.catalogUrls) {
-      // A blocked install reads the safe-for-work index; where that is missing, the full one with its adult games dropped.
-      const sfw = blocked ? sfwIndexUrl(url) : null
+      // At off the install reads the safe-for-work index; where that is missing, the full one with its adult games dropped.
+      const sfw = off ? sfwIndexUrl(url) : null
       let idx: Index | null = null
       let from = url
       if (sfw) {
@@ -340,14 +343,14 @@ export class Catalog {
           console.warn(`catalog: no safe-for-work index at ${sfw} (${(e as Error).message}); dropping adult games from ${url}`)
           this.errors.push(`${sfw}: ${(e as Error).message}`)
         }
-      } else if (blocked) {
+      } else if (off) {
         console.warn(`catalog: ${url} has no safe-for-work index; dropping its adult games`)
       }
       try {
         idx ??= await fetchIndex(url)
         let games: Recipe[] = (idx.games ?? []).filter(valid).map((g) => ({ ...normalizeRecipe(g), _base: from }))
         let vocab = idx.vocabulary ?? {}
-        if (blocked) {
+        if (off) {
           const kept = withoutAdult(games, vocab)
           games = kept.games
           vocab = kept.vocabulary
@@ -365,8 +368,8 @@ export class Catalog {
       this.load(all)
       this.vocabulary = vocabulary
       this.fetchedAt = Date.now()
-      this.setAdult(blocked ? [...this.adult.values(), ...adult] : [])
-      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: all, vocabulary, adultGames: this.content.adultGames })
+      this.setAdult(off ? [...this.adult.values(), ...adult] : [])
+      this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: all, vocabulary, adultGames: this.content.level })
       this.syncAdult()
       this.link()
       await this.syncCovers()
@@ -394,14 +397,21 @@ export class Catalog {
 
   /**
    * Downloads the recipes' covers into the covers folder (named by content, so
-   * they can be cached forever) and removes every other file there.
+   * they can be cached forever) and removes every other file there. Below
+   * shown the server never downloads adult art; covers it already has stay on
+   * disk until the level allows them again.
    */
   private async syncCovers(): Promise<void> {
     const dir = this.cfg.coversDir
     const known = this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})
     const next: Record<string, CoverFile> = {}
     await mkdir(dir, { recursive: true })
+    const artAllowed = this.content.level === 'shown'
     for (const r of this.recipes.values()) {
+      if (!artAllowed && r.nsfw === true) {
+        if (known[r.id]) next[r.id] = known[r.id]!
+        continue
+      }
       if (!r.cover || !isSlug(r.id)) continue
       const cover: RecipeCover = typeof r.cover === 'string' ? { url: r.cover } : r.cover
       const have = known[r.id]
@@ -434,6 +444,8 @@ export class Catalog {
         this.errors.push(`cover of ${r.id} (${url || cover.url}): ${(e as Error).message}`)
       }
     }
+    // Covers of adult recipes kept aside while off stay on disk, unserved.
+    if (!artAllowed) for (const [id, have] of Object.entries(known)) if (!(id in next) && this.adult.has(id)) next[id] = have
     this.db.setSetting(COVERS_KEY, next)
     this.covers = new Map(Object.entries(next).map(([id, c]) => [id, c.file]))
     const keep = new Set(this.covers.values())
@@ -442,8 +454,10 @@ export class Catalog {
     }
   }
 
-  /** URL of a recipe's cover, once downloaded. */
+  /** URL of a recipe's cover, once downloaded. Blurred adult art is never sent, so no URL goes out. */
   cover(id: string): string | null {
+    const recipe = this.recipes.get(id)
+    if (recipe && this.content.blursRecipe(recipe.nsfw)) return null
     const file = this.covers.get(id)
     return file ? `/api/covers/${file}` : null
   }
@@ -467,7 +481,12 @@ export class Catalog {
 
   /** Static cover permissions are checked by node and nginx's auth subrequest alike. */
   canReadCover(file: string): boolean {
-    return [...this.covers].some(([id, name]) => name === file && !!this.recipe(id))
+    return [...this.covers].some(([id, name]) => {
+      if (name !== file) return false
+      const recipe = this.recipes.get(id)
+      // A recipe the catalog no longer shows (removed, or an adult stub while off) has no cover.
+      return !!recipe && !this.content.hidesRecipe(recipe.nsfw) && !this.content.blursRecipe(recipe.nsfw)
+    })
   }
 
   status(): { fetchedAt: number; urls: string[]; errors: string[]; count: number } {

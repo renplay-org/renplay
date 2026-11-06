@@ -29,7 +29,7 @@ function config(): Config {
   const root = mkdtempSync(join(tmpdir(), 'renplay-auth-')); roots.push(root)
   const cfg = loadConfig()
   const dataDir = join(root, 'data'), gamesDir = join(root, 'games'), internalDir = join(gamesDir, '_renplay')
-  return { ...cfg, dataDir, gamesDir, internalDir, savesDir: join(dataDir, 'saves'), saveHistoryDir: join(dataDir, 'save-history'), coversDir: join(dataDir, 'covers'), walkthroughsDir: join(dataDir, 'walkthroughs'), overlaysDir: join(dataDir, 'overlays'), workDir: join(internalDir, 'work'), purgeDir: join(internalDir, 'purge'), archivesDir: join(gamesDir, '_archives'), uploadsDir: join(internalDir, 'uploads'), enginesDir: join(internalDir, 'engines'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', auth: 'on', authLocal: true, authUser: 1, adultGames: 'allow', adminUsername: '', adminPassword: '', adultDefault: false }
+  return { ...cfg, dataDir, gamesDir, internalDir, savesDir: join(dataDir, 'saves'), saveHistoryDir: join(dataDir, 'save-history'), coversDir: join(dataDir, 'covers'), walkthroughsDir: join(dataDir, 'walkthroughs'), overlaysDir: join(dataDir, 'overlays'), workDir: join(internalDir, 'work'), purgeDir: join(internalDir, 'purge'), archivesDir: join(gamesDir, '_archives'), uploadsDir: join(internalDir, 'uploads'), enginesDir: join(internalDir, 'engines'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', auth: 'on', authLocal: true, authUser: 1, adultGames: 'shown', adminUsername: '', adminPassword: '', adultDefault: 'off' }
 }
 async function start(cfg = config(), seeded = true) {
   if (seeded) { cfg.adminUsername = 'admin'; cfg.adminPassword = 'correct password' }
@@ -86,15 +86,15 @@ describe('accounts authentication and security', () => {
     await a.accounts.store(id).write('one-game', 'persistent', Buffer.from('persistent'))
     await a.accounts.store(id).write('tokens', 'security_keys.txt', Buffer.from('keys'))
     const response = await request(a.app).get('/api/users').set('Cookie', admin).expect(200)
-    expect(response.body.adultDefault).toBe(false)
+    expect(response.body.adultDefault).toBe('off')
     expect(response.body.users.find((u: { id: number }) => u.id === id)).toMatchObject({ games: 1, saves: 2, protected: false })
     expect(response.body.users.find((u: { id: number }) => u.id === 1)).toMatchObject({ games: 0, saves: 0, protected: true })
     const player = await login(a, 'player', 'player password')
     await request(a.app).get('/api/users').set('Cookie', player).expect(403)
-    const cfg = config(); cfg.auth = 'off'; cfg.adultDefault = true
+    const cfg = config(); cfg.auth = 'off'; cfg.adultDefault = 'shown'
     const off = await start(cfg, false)
     expect((await request(off.app).get('/api/me').expect(200)).body.hasPassword).toBe(false)
-    expect((await request(off.app).get('/api/users').expect(200)).body.adultDefault).toBe(true)
+    expect((await request(off.app).get('/api/users').expect(200)).body.adultDefault).toBe('shown')
   })
   it('rejects noncanonical routing before authentication, roles or CSRF can disagree', async () => {
     const a = await start(), admin = await login(a)
@@ -426,9 +426,12 @@ describe('adult access and signed game URLs', () => {
     await request(a.app).get('/api/auth/check').set('Cookie', player).set('X-Original-URI', '/g/safe/b1/%2e%2e/%2e%2e/adult/b1/game.zip').expect(403)
     await request(a.app).post('/api/games/unknown/safe').set(site).set('Cookie', admin).send({ safe: true }).expect(200)
     expect((await request(a.app).get('/api/games/unknown').set('Cookie', player)).body.game.id).toBe('unknown')
-    await request(a.app).put(`/api/users/${id}`).set(site).set('Cookie', admin).send({ adultAccess: true }).expect(200)
+    await request(a.app).put(`/api/users/${id}`).set(site).set('Cookie', admin).send({ adultCeiling: 'shown' }).expect(200)
+    // The ceiling is only the maximum: the person's own choice still starts where it was.
+    await request(a.app).get('/api/games/adult').set('Cookie', player).expect(404)
+    await request(a.app).put('/api/me/adult').set(site).set('Cookie', player).send({ level: 'shown' }).expect(200)
     await request(a.app).get('/api/games/adult').set('Cookie', player).expect(200)
-    await request(a.app).put('/api/me/prefs').set(site).set('Cookie', player).send({ adultPictures: 'hide-games' }).expect(200)
+    await request(a.app).put('/api/me/adult').set(site).set('Cookie', player).send({ level: 'off' }).expect(200)
     await request(a.app).get('/api/games/adult').set('Cookie', player).expect(404)
   })
   it('filters catalog recipes and their static covers and walkthroughs by adult access, including nginx checks', async () => {
