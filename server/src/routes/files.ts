@@ -14,6 +14,9 @@ const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|c
 
 type BaseIndex = Map<string, { size: number; where: 'zip' | 'pack' }>
 
+/** Pictures and videos of a game, which the file browser does not send below Shown. */
+const PICTURE_EXT = /\.(?:jpe?g|png|webp|gif|avif|bmp|tga|svg|mp4|webm|ogv|mkv|avi|mov|m4v)$/i
+
 export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jobs: JobManager, content: ContentMode): Router {
   const router = Router({ caseSensitive: true, strict: true })
   const cache = new Map<string, { key: string; files: BaseIndex }>()
@@ -75,6 +78,8 @@ export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jo
   router.get('/:id/files/raw', async (req, res) => {
     const g = game(req)
     const path = Overlays.editablePath(req.query['path'])
+    // Blurred: the game plays, but its pictures and videos are not sent on their own.
+    if (content.blurs(g) && PICTURE_EXT.test(path)) throw new HttpError(404, 'File not found')
     const data = (await overlays.read(g.id, path)) ?? (await readBaseFile(builds, g.id, g.build, path))
     if (!data) throw new HttpError(404, 'File not found')
     if (req.query['download'] === '1') res.attachment(path.split('/').pop()!)

@@ -156,7 +156,8 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
   })
 
   router.delete('/jobs', (_req, res) => {
-    jobs.clearFinished()
+    // An admin at Off clears what they can see. The jobs about hidden games stay.
+    jobs.clearFinished(content.viewerLevel() === 'off' ? (j) => catalog.jobHidden(j) : undefined)
     res.json({ ok: true })
   })
 

@@ -43,6 +43,12 @@ export function deviceLevel(): DeviceLevel | null {
   }
 }
 
+/** The header that carries this device's level, for requests made without `api()`. */
+export function deviceHeaders(): Record<string, string> {
+  const level = deviceLevel()
+  return level ? { 'x-renplay-adult': level } : {}
+}
+
 export function setDeviceLevel(level: DeviceLevel | null): void {
   try {
     if (level) localStorage.setItem(DEVICE_KEY, level)

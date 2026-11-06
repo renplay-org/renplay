@@ -511,11 +511,39 @@ describe('the levels on every route', () => {
     // The game itself still plays, with its walkthrough: those are the game, not its library art.
     await request(app.app).get('/g/adult/b1/game.zip').expect(200)
     await request(app.app).get('/api/walkthroughs/adult.pdf').expect(200)
+    // The file browser sends the game's files, but not its pictures and videos on their own.
+    writeFileSync(join(gamesDir, 'adult', 'b1', 'cover.png'), 'png')
+    await request(app.app).get('/api/games/adult/files/raw?path=game/script.rpyc').expect(200)
+    await request(app.app).get('/api/games/adult/files/raw?path=game/images/a.png').expect(404)
     await setLevel('shown')
+  })
+
+  it('clears only the finished jobs an Off admin can see, and a forgotten game takes its jobs along', async () => {
+    await setLevel('shown')
+    app.db.insertJob({ id: 'j-clear-adult', type: 'import', game: 'adult', params: '{}' })
+    app.db.insertJob({ id: 'j-clear-safe', type: 'import', game: 'safe', params: '{}' })
+    for (const id of ['j-clear-adult', 'j-clear-safe']) app.db.updateJob(id, { status: 'done' })
+    await setLevel('off')
+    await request(app.app).delete('/api/jobs').expect(200)
+    expect(app.db.getJob('j-clear-adult')).not.toBeNull()
+    expect(app.db.getJob('j-clear-safe')).toBeNull()
+    await setLevel('shown')
+    app.db.insertGame({ id: 'gone-soon', title: 'Gone soon', status: 'installed', adult: 1 })
+    app.db.insertJob({ id: 'j-gone', type: 'import', game: 'gone-soon', params: '{}' })
+    app.db.insertJob({ id: 'j-gone-first', type: 'import', game: '', params: '{}' })
+    app.db.updateJob('j-gone', { status: 'done' })
+    app.db.updateJob('j-gone-first', { status: 'done', result: JSON.stringify({ game: 'gone-soon' }) })
+    await request(app.app).delete('/api/games/gone-soon?forget=1').expect(200)
+    expect(app.db.getJob('j-gone')).toBeNull()
+    expect(app.db.getJob('j-gone-first')).toBeNull()
+    expect(app.db.getJob('j-clear-adult')).not.toBeNull()
   })
 
   it('hides jobs about adult games at Off even without a game, before paging and counting', async () => {
     await setLevel('shown')
+    // A job this person may see, so a page always has something in it.
+    app.db.insertJob({ id: 'j-visible', type: 'import', game: 'safe', params: '{}' })
+    app.db.updateJob('j-visible', { status: 'done' })
     app.db.insertJob({ id: 'j-first-install', type: 'import', game: '', params: JSON.stringify({ source: { kind: 'archive', path: 'adult.zip' } }) })
     app.db.insertJob({ id: 'j-hash', type: 'hash-archive', game: '', params: JSON.stringify({ path: 'adult2.zip' }) })
     app.db.insertJob({ id: 'j-by-recipe', type: 'import', game: '', params: JSON.stringify({ source: { kind: 'archive', path: 'other.zip' }, recipeId: 'adult' }) })

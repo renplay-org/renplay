@@ -1,4 +1,5 @@
 import Sheet from './Sheet'
+import { deviceHeaders } from '../lib/device'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   ChevronRight,
@@ -319,7 +320,7 @@ function EditorDialog({ game, path, isNew, onClose, onSaved }: { game: Game; pat
   const [saving, setSaving] = useState(false)
   const raw = `/api/games/${game.id}/files/raw?path=${encodeURIComponent(path)}`
   if (text === null) {
-    void fetch(raw)
+    void fetch(raw, { headers: deviceHeaders() })
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(setText)
       .catch((e) => {

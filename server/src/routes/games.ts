@@ -269,6 +269,9 @@ export function createGamesRouter(deps: GameDeps): Router {
     await builds.remove(g.id)
     if (req.query['forget'] === '1') {
       if (g.walkthrough) await unlink(join(cfg.walkthroughsDir, g.walkthrough)).catch(() => {})
+      // Its finished jobs go with it: without the game, nothing tells whether they were about an
+      // adult game. Saves stay, as always.
+      jobs.clearFinished((j) => j.game !== g.id && parseJson<{ game?: unknown }>(j.result, {}).game !== g.id)
       db.deleteGame(g.id)
       res.json({ ok: true, forgotten: true })
       return

@@ -334,8 +334,15 @@ export class Db {
     this.raw.prepare(`UPDATE jobs SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...entries.map(([, v]) => v as SQLInputValue), id)
   }
 
-  deleteFinishedJobs(): void {
-    this.raw.exec("DELETE FROM jobs WHERE status IN ('done','failed','cancelled','interrupted')")
+  /** Deletes finished jobs: all of them, or those `keep` does not keep. */
+  deleteFinishedJobs(keep?: (job: JobRow) => boolean): void {
+    if (!keep) {
+      this.raw.exec("DELETE FROM jobs WHERE status IN ('done','failed','cancelled','interrupted')")
+      return
+    }
+    const rows = this.raw.prepare("SELECT * FROM jobs WHERE status IN ('done','failed','cancelled','interrupted')").all() as unknown as JobRow[]
+    const remove = this.raw.prepare('DELETE FROM jobs WHERE id = ?')
+    for (const j of rows) if (!keep(j)) remove.run(j.id)
   }
 
   // ---- archives ----------------------------------------------------------
