@@ -199,7 +199,7 @@ export class ContentMode {
   }
 }
 
-/** `.../index.v3.json` -> `.../index.v3.sfw.json`; null when the URL has no such sibling. */
+/** `.../index.v4.json` -> `.../index.v4.sfw.json`; null when the URL has no such sibling. */
 export function sfwIndexUrl(url: string): string | null {
   try {
     const u = new URL(url)

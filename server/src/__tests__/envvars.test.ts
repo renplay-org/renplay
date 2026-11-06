@@ -31,7 +31,7 @@ describe('environment variables', () => {
       expect(cfg.keepDownloadsLocked).toBe(false)
       expect(cfg.imageQuality).toBe(88)
       expect(cfg.saveHistoryVersions).toBe(20)
-      expect(cfg.catalogUrls).toEqual(['https://catalog.renplay.org/index.v3.json'])
+      expect(cfg.catalogUrls).toEqual(['https://catalog.renplay.org/index.v4.json'])
     } finally {
       process.env = saved
     }

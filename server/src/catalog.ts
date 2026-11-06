@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, readdir, rm } from 'node:fs/promises'
+import { readFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { viewer } from './accounts-context.js'
+import { catalogPictures, type ArtSet, type ArtStore, type ArtSubject, type CatalogImage } from './art.js'
 import type { Config } from './config.js'
 import { ContentMode, parseAdultLevel, sfwIndexUrl } from './content.js'
-import { parseJson, type Db, type GameSource, type JobRow } from './db.js'
+import { parseJson, type Db, type GameRow, type GameSource, type JobRow } from './db.js'
 import type { JobContext } from './jobs.js'
-import sharp from 'sharp'
-import { exists, writeFileAtomic } from './util/fsx.js'
-import { cleanRelPath, isSlug } from './util/paths.js'
+import { cleanRelPath } from './util/paths.js'
 
 export interface RecipeArchive {
   name: string
@@ -60,12 +60,8 @@ export interface Recipe {
   summary?: string
   nsfw?: boolean
   free?: boolean
-  /**
-   * The game's official cover art: a file in the catalog (safe for work only)
-   * or a URL on the developer's own hosting. The published index gives an
-   * object with the image's sha256 and size.
-   */
-  cover?: string | RecipeCover
+  /** The game's pictures in SteamGridDB's formats (schema 4). A schema 3 cover becomes one grid. */
+  art?: CatalogImage[]
   links?: Record<string, string>
   saveDir?: string
   /** Games whose saves this one imports (an earlier season, a prequel). */
@@ -90,14 +86,6 @@ export interface Recipe {
   _base?: string
 }
 
-export interface RecipeCover {
-  sfw?: boolean
-  url: string
-  sha256?: string
-  width?: number
-  height?: number
-}
-
 export interface BuildSettings {
   engine?: string
   quality?: number
@@ -115,27 +103,12 @@ export interface RecipeMatch {
 }
 
 const CACHE_KEY = 'catalog_cache'
+/** Where Renplay 3.x kept its covers. 4.0 makes its pictures in the art cache and forgets these. */
 const COVERS_KEY = 'catalog_covers'
 /** What blocking needs to know about adult recipes: ids, archives and save folders, never titles, tags or covers. */
 const STUBS_KEY = 'catalog_adult_stubs'
-/** How often the catalog is fetched while Renplay runs (cheap: covers are fetched only when changed). */
+/** How often the catalog is fetched while Renplay runs (cheap: pictures are fetched only once). */
 const REFRESH_EVERY = 3600_000
-const MAX_COVER = 16 << 20
-/** Covers are shown as thumbnails; wider art is scaled down to this. */
-const COVER_WIDTH = 960
-
-interface CoverFile {
-  url: string
-  /** sha256 of the downloaded original, to notice when it changes. */
-  sha256: string
-  file: string
-  etag: string
-}
-
-function isImage(b: Buffer): boolean {
-  const head = b.subarray(0, 12).toString('latin1')
-  return (head.startsWith('RIFF') && head.slice(8) === 'WEBP') || head.startsWith('\x89PNG') || (b[0] === 0xff && b[1] === 0xd8) || head.startsWith('GIF8')
-}
 
 function globMatch(pattern: string, name: string): boolean {
   const re = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i')
@@ -147,15 +120,23 @@ function valid(g: any): g is Recipe {
 }
 
 /**
- * Recipes in catalog schema 3 names. Schema 2 (and caches written by Renplay
+ * Recipes in catalog schema 4 names. Schema 2 (and caches written by Renplay
  * 2.5 and older) called the runtime `engine` and a release's madeWith and
- * runtime `renpy` and `engine`; all of those were Ren'Py games.
+ * runtime `renpy` and `engine`; all of those were Ren'Py games. Schema 3 had
+ * one `cover` instead of the `art` list: it becomes a grid, placed by the
+ * making order like any picture of another shape.
  */
 export function normalizeRecipe(g: any): Recipe {
   const old = typeof g.engine !== 'string' || /^\d/.test(g.engine)
-  const { renpy: _r, engine: _e, ...rest } = g
+  const { renpy: _r, engine: _e, cover, coverSfw: _s, ...rest } = g
+  const fromCover = (): CatalogImage[] | undefined => {
+    const c = typeof cover === 'string' ? { url: cover } : cover && typeof cover === 'object' && typeof cover.url === 'string' ? cover : null
+    if (!c) return undefined
+    return [{ kind: 'grid', url: c.url, source: 'developer', sha256: c.sha256, width: c.width, height: c.height, default: true }]
+  }
   return {
     ...rest,
+    art: Array.isArray(g.art) ? g.art : fromCover(),
     engine: old ? 'renpy' : g.engine,
     runtime: g.runtime ?? (old ? g.engine : undefined),
     releases: g.releases.map(({ renpy, engine, ...r }: any) => ({ ...r, madeWith: r.madeWith ?? renpy, runtime: r.runtime ?? engine })),
@@ -211,7 +192,8 @@ export class Catalog {
   /** Adult recipes of a blocked install, reduced by stub(): enough to refuse their archives and hide their games. */
   private adult = new Map<string, Recipe>()
   vocabulary: Vocabulary = {}
-  private covers = new Map<string, string>()
+  /** The art cache, set by the app. Without it (in tests of the catalog alone) nothing is made. */
+  art: ArtStore | null = null
   private fetchedAt = 0
   /** Problems of the last refresh. An error about one recipe names it, so a person who may not see that game does not see the error either. */
   private errors: Array<{ text: string; recipe?: string }> = []
@@ -243,11 +225,16 @@ export class Catalog {
         this.vocabulary = idx.vocabulary ?? {}
       } catch {}
     }
-    this.covers = new Map(Object.entries(this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})).map(([id, c]) => [id, c.file]))
+    // 3.x covers: 4.0 never serves them, the art cache replaces them.
+    if (this.db.getSetting<unknown>(COVERS_KEY, null) !== null) {
+      this.db.raw.prepare('DELETE FROM settings WHERE key = ?').run(COVERS_KEY)
+      await rm(this.cfg.coversDir, { recursive: true, force: true }).catch(() => {})
+    }
     this.syncAdult()
     if (this.content.level === 'off') await this.restrict()
     this.link()
     if (Date.now() - this.fetchedAt > REFRESH_EVERY) void this.refresh().catch(() => {})
+    else void this.syncArt().catch(() => {})
     this.timer = setInterval(() => void this.refresh().catch(() => {}), REFRESH_EVERY)
     this.timer.unref()
   }
@@ -264,9 +251,9 @@ export class Catalog {
 
   /**
    * Called after the admin changes the setting. Off moves adult recipes out of
-   * the catalog (keeping only a stub) and fetches the safe-for-work index;
-   * their covers stay on disk, unserved, until the level allows them again.
-   * Blurred and shown fetch the full index.
+   * the catalog (keeping only a stub) and fetches the safe-for-work index, and
+   * the next art sync forgets their pictures. Blurred and shown fetch the full
+   * index.
    */
   async modeChanged(): Promise<void> {
     if (this.content.level === 'off') {
@@ -280,7 +267,7 @@ export class Catalog {
     void this.refresh().catch(() => {})
   }
 
-  /** Moves adult recipes out of the catalog, keeping a stub and their already downloaded covers. */
+  /** Moves adult recipes out of the catalog, keeping a stub. */
   private async restrict(): Promise<void> {
     const gone = [...this.recipes.values()].filter((r) => r.nsfw === true)
     if (gone.length) {
@@ -293,20 +280,8 @@ export class Catalog {
       const cache = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary } | null>(CACHE_KEY, null)
       if (cache) this.db.setSetting(CACHE_KEY, { ...cache, adultGames: 'off' })
     }
-    await this.purgeCovers((id) => !this.recipes.has(id) && !this.adult.has(id))
   }
 
-  /** Forgets covers (and deletes their files) of recipes the catalog no longer has. */
-  private async purgeCovers(drop: (id: string) => boolean): Promise<void> {
-    const known = this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})
-    const next = Object.fromEntries(Object.entries(known).filter(([id]) => !drop(id)))
-    this.db.setSetting(COVERS_KEY, next)
-    this.covers = new Map(Object.entries(next).map(([id, c]) => [id, c.file]))
-    const keep = new Set(this.covers.values())
-    for (const f of await readdir(this.cfg.coversDir).catch(() => [] as string[])) {
-      if (!keep.has(f)) await rm(join(this.cfg.coversDir, f), { recursive: true, force: true }).catch(() => {})
-    }
-  }
 
   /** Remembers which library games have adult recipes, for when the catalog can no longer say. */
   syncAdult(): void {
@@ -380,7 +355,7 @@ export class Catalog {
       this.db.setSetting(CACHE_KEY, { at: this.fetchedAt, games: all, vocabulary, adultGames: this.content.level })
       this.syncAdult()
       this.link()
-      await this.syncCovers()
+      await this.syncArt()
     }
   }
 
@@ -402,72 +377,53 @@ export class Catalog {
     }
   }
 
-  /**
-   * Downloads the recipes' covers into the covers folder (named by content, so
-   * they can be cached forever) and removes every other file there. Below
-   * shown the server never downloads adult art; covers it already has stay on
-   * disk until the level allows them again.
-   */
-  private async syncCovers(): Promise<void> {
-    const dir = this.cfg.coversDir
-    const known = this.db.getSetting<Record<string, CoverFile>>(COVERS_KEY, {})
-    const next: Record<string, CoverFile> = {}
-    await mkdir(dir, { recursive: true })
-    const artAllowed = this.content.level === 'shown'
-    for (const r of this.recipes.values()) {
-      if (!artAllowed && r.nsfw === true) {
-        if (known[r.id]) next[r.id] = known[r.id]!
-        continue
-      }
-      if (!r.cover || !isSlug(r.id)) continue
-      const cover: RecipeCover = typeof r.cover === 'string' ? { url: r.cover } : r.cover
-      const have = known[r.id]
-      let url = ''
-      try {
-        url = new URL(cover.url, r._base ?? this.cfg.catalogUrls[0]).toString()
-        if (!/^https?:/.test(url)) throw new Error('not an http(s) URL')
-        const cached = have?.url === url && (!cover.sha256 || have.sha256 === cover.sha256) && (await exists(join(dir, have.file)))
-        const res = await fetch(url, { signal: AbortSignal.timeout(30_000), headers: cached && have.etag ? { 'if-none-match': have.etag } : {} })
-        if (res.status === 304 && cached) {
-          next[r.id] = have
-          continue
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = Buffer.from(await res.arrayBuffer())
-        if (!isImage(data) || data.length > MAX_COVER) throw new Error('not a WebP, PNG, JPEG or GIF image under 16 MB')
-        const sha256 = createHash('sha256').update(data).digest('hex')
-        if (cover.sha256 && cover.sha256.toLowerCase() !== sha256) throw new Error('the image changed since the catalog checked it')
-        if (cached && have.sha256 === sha256) {
-          next[r.id] = { ...have, etag: res.headers.get('etag') ?? '' }
-          continue
-        }
-        // Thumbnails: WebP, at most COVER_WIDTH wide, first frame of animations.
-        const webp = await sharp(data, { failOn: 'none' }).resize({ width: COVER_WIDTH, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
-        const file = `${r.id}.${createHash('sha256').update(webp).digest('hex').slice(0, 12)}.webp`
-        if (!(await exists(join(dir, file)))) await writeFileAtomic(join(dir, file), webp)
-        next[r.id] = { url, sha256, file, etag: res.headers.get('etag') ?? '' }
-      } catch (e) {
-        if (have) next[r.id] = have
-        this.errors.push({ text: `cover of ${r.id} (${url || cover.url}): ${(e as Error).message}`, recipe: r.id })
-      }
-    }
-    // Covers of adult recipes kept aside while off stay on disk, unserved.
-    if (!artAllowed) for (const [id, have] of Object.entries(known)) if (!(id in next) && this.adult.has(id)) next[id] = have
-    this.db.setSetting(COVERS_KEY, next)
-    this.covers = new Map(Object.entries(next).map(([id, c]) => [id, c.file]))
-    const keep = new Set(this.covers.values())
-    for (const f of await readdir(dir).catch(() => [] as string[])) {
-      if (!keep.has(f)) await rm(join(dir, f), { recursive: true, force: true }).catch(() => {})
-    }
+  /** The catalog pictures of a recipe, as the art cache takes them. */
+  pictures(recipe: Recipe): ReturnType<typeof catalogPictures> {
+    const pictures = catalogPictures(recipe.art, recipe._base ?? this.cfg.catalogUrls[0])
+    return this.art ? this.art.complete(pictures) : pictures
   }
 
-  /** URL of a recipe's cover, once downloaded. Blurred adult art is never sent, so no URL goes out. */
-  cover(id: string): string | null {
-    const recipe = this.recipes.get(id)
-    if (recipe && this.content.blursRecipe(recipe.nsfw)) return null
-    const file = this.covers.get(id)
-    return file ? `/api/covers/${file}` : null
+  /**
+   * What the art cache makes: every recipe the installation shows (adult ones only measured by
+   * hash below Shown), and every library game with its uploads.
+   */
+  artSubjects(): ArtSubject[] {
+    const subjects: ArtSubject[] = [...this.recipes.values()].map((r) => ({ game: null, recipe: r.id, adult: r.nsfw === true, pictures: this.pictures(r) }))
+    for (const g of this.db.allGames()) {
+      const recipe = g.recipe_id ? this.recipes.get(g.recipe_id) : undefined
+      const adult = g.adult === 1 || recipe?.nsfw === true || this.adult.has(g.recipe_id)
+      // At Off an adult game's pictures are not made at all.
+      if (adult && this.content.level === 'off') continue
+      const uploads = this.art ? (this.db.raw.prepare('SELECT DISTINCT scope FROM art_uploads WHERE game = ?').all(g.id) as Array<{ scope: number }>).flatMap((r) => this.art!.uploads(g.id, r.scope)) : []
+      const unique = [...new Map(uploads.map((u) => [`${u.id}:${u.kind}`, u])).values()]
+      subjects.push({ game: g.id, recipe: g.recipe_id || null, adult, pictures: [...(recipe ? this.pictures(recipe) : []), ...unique] })
+    }
+    return subjects
   }
+
+  /** A library game's pictures for this person: the catalog's and the uploads they may choose. */
+  gameSubject(row: GameRow): ArtSubject {
+    const recipe = row.recipe_id ? this.recipes.get(row.recipe_id) : undefined
+    const uploads = this.art ? this.art.uploads(row.id, viewer()?.user.id ?? 0) : []
+    return { game: row.id, recipe: row.recipe_id || null, adult: row.adult === 1 || recipe?.nsfw === true, pictures: [...(recipe ? this.pictures(recipe) : []), ...uploads] }
+  }
+
+  /** A library game's formats as this person sees them. */
+  gameArt(row: GameRow): ArtSet {
+    return this.art ? this.art.forSubject(this.gameSubject(row)) : {}
+  }
+
+  /** A catalog recipe's formats (its defaults) as this person sees them. */
+  recipeArt(recipe: Recipe): ArtSet {
+    return this.art ? this.art.forSubject({ game: null, adult: recipe.nsfw === true, pictures: this.pictures(recipe) }, { scope: 0 }) : {}
+  }
+
+  /** Makes the pictures every page needs, and forgets the ones nothing uses. */
+  async syncArt(): Promise<void> {
+    if (!this.art) return
+    for (const text of await this.art.sync(this.artSubjects())) this.errors.push({ text, recipe: text.match(/^[a-z]+ of ([a-z0-9][a-z0-9._-]*) \(/)?.[1] })
+  }
+
 
   /** The newest working release after the installed version, if the catalog lists one. */
   update(recipe: Recipe, version: string, archive?: string): RecipeRelease | null {
@@ -486,15 +442,6 @@ export class Catalog {
     return recipe && !this.content.hidesRecipe(recipe.nsfw) ? recipe : null
   }
 
-  /** Static cover permissions are checked by node and nginx's auth subrequest alike. */
-  canReadCover(file: string): boolean {
-    return [...this.covers].some(([id, name]) => {
-      if (name !== file) return false
-      const recipe = this.recipes.get(id)
-      // A recipe the catalog no longer shows (removed, or an adult stub while off) has no cover.
-      return !!recipe && !this.content.hidesRecipe(recipe.nsfw) && !this.content.blursRecipe(recipe.nsfw)
-    })
-  }
 
   status(): { fetchedAt: number; urls: string[]; errors: string[]; count: number } {
     return { fetchedAt: this.fetchedAt, urls: this.cfg.catalogUrls, errors: this.visibleErrors(), count: this.visibleCount() }

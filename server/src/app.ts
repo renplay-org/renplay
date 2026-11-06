@@ -1,3 +1,4 @@
+import { ArtStore } from './art.js'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, stat } from 'node:fs/promises'
@@ -65,7 +66,7 @@ const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
 
 export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
   const db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir })
-  for (const d of [cfg.dataDir, cfg.coversDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
+  for (const d of [cfg.dataDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
   for (const d of [cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
 
   const version = packageVersion()
@@ -79,6 +80,8 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const engines = new EngineStore(cfg, db, purger)
   const overlays = new Overlays(cfg)
   const catalog = new Catalog(cfg, db, content)
+  const art = new ArtStore(cfg, db, content)
+  catalog.art = art
   // The 3.2 columns follow the levels, so a downgrade never shows more (the variable can change between starts).
   content.refreshLegacyMirrors()
   await catalog.init()
@@ -127,11 +130,11 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     if (game && (!db.getGame(game) || content.hides(db.getGame(game)))) throw new HttpError(404, 'Game not found')
     // The presplash is a picture of the game, not part of playing it: withheld below Shown.
     if (game && PRESPLASH.test(path) && content.blurs(db.getGame(game))) throw new HttpError(404, 'Not found')
-    const cover = path.match(/^\/api\/covers\/([^/]+)$/)?.[1]
-    if (cover && !catalog.canReadCover(cover)) throw new HttpError(404, 'Cover not found')
+    const picture = path.match(/^\/api\/art\/([^/]+)$/)?.[1]
+    if (picture && !art.canRead(picture)) throw new HttpError(404, 'Not found')
     const walkthrough = path.match(/^\/api\/walkthroughs\/([^/]+)$/)?.[1]
     if (walkthrough && !db.allGames().some((g) => g.walkthrough === walkthrough && !content.hides(g))) throw new HttpError(404, 'Walkthrough not found')
-    return !!(game || cover || walkthrough)
+    return !!(game || picture || walkthrough)
   }
   app.get('/api/auth/check', (req, res) => {
     let path: string
@@ -140,7 +143,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
       path = req.get('x-original-uri') ?? ''
       if (!path.startsWith('/') || /[%?#]/.test(path) || path.includes('\\') || path.includes('//') || /(?:^|\/)\.{1,2}(?:\/|$)/.test(path)) throw new Error('Invalid path')
     } catch { throw new HttpError(403, 'Invalid static path') }
-    if (!/^\/g\/[a-z0-9][a-z0-9._-]*\/[a-z0-9]+(?:\.m[a-z0-9]+)?\/.+$/.test(path) && !/^\/api\/(?:covers|walkthroughs)\/[^/]+$/.test(path)) throw new HttpError(403, 'Not a static game file')
+    if (!/^\/g\/[a-z0-9][a-z0-9._-]*\/[a-z0-9]+(?:\.m[a-z0-9]+)?\/.+$/.test(path) && !/^\/api\/(?:art|walkthroughs)\/[^/]+$/.test(path)) throw new HttpError(403, 'Not a static game file')
     if (viewer()?.user.role !== 'admin' && !playerRoute('GET', path)) throw new HttpError(403, 'Only an admin can do this')
     // auth_request accepts only 2xx, 401 or 403; a hidden file must not become a 500.
     try { if (!checkStatic(path)) throw new HttpError(403, 'Not a recognized static resource') } catch (error) {
@@ -184,7 +187,11 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use('/api/games', createFilesRouter(db, builds, overlays, jobs, content))
   app.use('/api/games', createGamesRouter(deps))
   app.use('/api', createLibraryRouter(deps))
-  app.use('/api/covers', express.static(cfg.coversDir, { cacheControl: false, fallthrough: false }))
+  // Made pictures are named by their content, so they never change: browsers keep them.
+  app.get('/api/art/:file', (req, res, next) => {
+    if (!art.canRead(req.params.file)) return next(new HttpError(404, 'Not found'))
+    res.sendFile(art.file(req.params.file), { headers: { 'Cache-Control': 'private, max-age=31536000, immutable', 'Content-Type': 'image/webp', 'X-Content-Type-Options': 'nosniff' } }, (err) => err && next(new HttpError(404, 'Not found')))
+  })
   app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false }))
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found')))
 

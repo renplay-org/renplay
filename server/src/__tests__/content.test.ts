@@ -6,6 +6,7 @@ import request from 'supertest'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
+import { ArtStore } from '../art.js'
 import { Catalog } from '../catalog.js'
 import { loadConfig } from '../config.js'
 import { ContentMode, legacyInstallMirror, legacyMirror, lowestLevel, parseAdultLevel, sfwIndexUrl } from '../content.js'
@@ -104,10 +105,12 @@ describe('adult games in the catalog', () => {
   let base = ''
   let requests: string[] = []
   let png: Buffer
+  let adultPng: Buffer
   let hasSfw = true
 
   beforeAll(async () => {
     png = await sharp({ create: { width: 40, height: 40, channels: 3, background: '#357' } }).png().toBuffer()
+    adultPng = await sharp({ create: { width: 40, height: 40, channels: 3, background: '#a35' } }).png().toBuffer()
     const vocabulary = { 'sci-fi': { label: 'Sci-fi', group: 'story' }, nudity: { label: 'Nudity', group: 'content' } }
     const safe = { id: 'safe', title: 'Safe', tags: ['Sci-fi'], tagIds: ['sci-fi'], cover: 'covers/safe.png', releases: [{ version: '1', status: 'verified', archives: [{ name: 'Safe-pc.zip' }] }] }
     const adult = {
@@ -121,7 +124,8 @@ describe('adult games in the catalog', () => {
       const json = (body: unknown) => void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
       if (req.url === '/c/index.v3.json' || req.url === '/c/catalog') return json(full)
       if (req.url === '/c/index.v3.sfw.json') return hasSfw ? json(sfw) : void res.writeHead(404).end()
-      if (req.url === '/c/covers/safe.png' || req.url === '/c/covers/adult.png') return void res.writeHead(200, { 'content-type': 'image/png' }).end(png)
+      if (req.url === '/c/covers/safe.png') return void res.writeHead(200, { 'content-type': 'image/png' }).end(png)
+      if (req.url === '/c/covers/adult.png') return void res.writeHead(200, { 'content-type': 'image/png' }).end(adultPng)
       res.writeHead(404).end()
     })
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
@@ -135,23 +139,27 @@ describe('adult games in the catalog', () => {
     const { cfg } = tempConfig({ RENPLAY_CATALOG_URLS: base, ...env })
     const db = Db.open(cfg.dataDir)
     const content = new ContentMode(cfg, db)
-    return { cfg, db, content, catalog: new Catalog(cfg, db, content) }
+    const catalog = new Catalog(cfg, db, content)
+    catalog.art = new ArtStore(cfg, db, content)
+    // The originals the art cache downloaded, one file per picture.
+    const originals = () => readdirSync(join(cfg.dataDir, 'art', 'src'), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name)
+    return { cfg, db, content, catalog, originals }
   }
 
-  it('at off reads the safe-for-work index and never fetches adult recipes or covers', async () => {
-    const { catalog, cfg, content } = setup()
+  it('at off reads the safe-for-work index and never fetches adult recipes or pictures', async () => {
+    const { catalog, content, originals } = setup()
     content.set('off')
     await catalog.refresh()
     expect(requests).toContain('/c/index.v3.sfw.json')
     expect(requests).not.toContain('/c/index.v3.json')
     expect(requests).not.toContain('/c/covers/adult.png')
     expect(catalog.list().map((r) => r.id)).toEqual(['safe'])
-    expect(readdirSync(cfg.coversDir)).toHaveLength(1)
+    expect(originals()).toHaveLength(1)
     catalog.stop()
   })
 
   it('at off drops adult games and content tags after fetching the full index when there is no safe-for-work one', async () => {
-    const { catalog, cfg, content } = setup()
+    const { catalog, content, originals } = setup()
     content.set('off')
     hasSfw = false
     const { errors } = await catalog.refresh()
@@ -160,7 +168,7 @@ describe('adult games in the catalog', () => {
     expect(catalog.recipe('tagged')).toMatchObject({ tagIds: ['sci-fi'], tags: ['Sci-fi'], content: [] })
     expect(catalog.vocabulary).not.toHaveProperty('nudity')
     expect(requests).not.toContain('/c/covers/adult.png')
-    expect(readdirSync(cfg.coversDir).every((f) => f.startsWith('safe.'))).toBe(true)
+    expect(originals()).toHaveLength(1)
     // A URL with no sibling index is handled the same way.
     const other = setup({ RENPLAY_CATALOG_URLS: base.replace('index.v3.json', 'catalog') })
     other.content.set('off')
@@ -171,31 +179,39 @@ describe('adult games in the catalog', () => {
     other.catalog.stop()
   })
 
-  it('at blurred reads the full index but never downloads adult art, keeping the covers it has', async () => {
-    const { catalog, cfg, content } = setup()
+  it('at blurred reads the full index but never downloads adult art, keeping the pictures it has', async () => {
+    const { catalog, content, originals } = setup()
     await catalog.refresh()
     expect(catalog.list().map((r) => r.id)).toContain('adult')
-    expect(readdirSync(cfg.coversDir).some((f) => f.startsWith('adult.'))).toBe(true)
+    expect(originals()).toHaveLength(2)
+    const shown = catalog.recipeArt(catalog.recipe('adult')!) as Record<string, { url1x?: string }>
+    expect(shown['grid']?.url1x).toMatch(/^\/api\/art\//)
 
     content.set('blurred')
     await catalog.modeChanged()
+    await catalog.refresh()
     expect(catalog.list().map((r) => r.id)).toContain('adult')
-    // The cover file stays on disk, unserved, and is never downloaded again.
-    expect(readdirSync(cfg.coversDir).some((f) => f.startsWith('adult.'))).toBe(true)
+    // The pictures stay in the cache, unserved, and are never downloaded again.
+    expect(originals()).toHaveLength(2)
     expect(requests.filter((u) => u === '/c/covers/adult.png')).toHaveLength(1)
-    expect(catalog.cover('adult')).toBeNull()
+    const blurred = catalog.recipeArt(catalog.recipe('adult')!) as Record<string, { url1x?: string }>
+    expect(blurred['grid']).toBeDefined()
+    expect(blurred['grid']!.url1x).toBeUndefined()
+    expect(catalog.art!.canRead(shown['grid']!.url1x!.split('/').pop()!)).toBe(false)
 
     content.set('shown')
     await catalog.modeChanged()
-    expect(readdirSync(cfg.coversDir).some((f) => f.startsWith('adult.'))).toBe(true)
+    await catalog.refresh()
+    expect((catalog.recipeArt(catalog.recipe('adult')!) as Record<string, { url1x?: string }>)['grid']?.url1x).toBe(shown['grid']!.url1x)
+    expect(requests.filter((u) => u === '/c/covers/adult.png')).toHaveLength(1)
     catalog.stop()
   })
 
-  it('moving to off keeps stubs and downloaded covers, and shown brings everything back', async () => {
-    const { catalog, cfg, content, db } = setup()
+  it('moving to off keeps stubs, forgets adult pictures, and shown brings everything back', async () => {
+    const { catalog, content, db, originals } = setup()
     await catalog.refresh()
     expect(catalog.list().map((r) => r.id)).toContain('adult')
-    expect(readdirSync(cfg.coversDir).some((f) => f.startsWith('adult.'))).toBe(true)
+    expect(originals()).toHaveLength(2)
     db.insertGame({ id: 'adult', title: 'Adult', status: 'installed', recipe_id: 'adult' })
     db.insertGame({ id: 'mine', title: 'Mine', status: 'installed' })
 
@@ -204,8 +220,10 @@ describe('adult games in the catalog', () => {
     expect(catalog.recipe('adult')).toBeNull()
     expect(catalog.list().map((r) => r.id)).not.toContain('adult')
     expect(JSON.stringify(db.getSetting('catalog_cache', {}))).not.toContain('Adult')
-    // Covers it already has stay on disk until the level allows them again.
-    expect(readdirSync(cfg.coversDir).some((f) => f.startsWith('adult.'))).toBe(true)
+    // At Off the art cache forgets adult pictures: they come back with the level.
+    await new Promise((r) => setTimeout(r, 20))
+    await catalog.refresh()
+    expect(originals()).toHaveLength(1)
     // The library keeps the game, flagged, and it is hidden; a game without a recipe is not.
     expect(db.getGame('adult')).toMatchObject({ adult: 1, recipe_id: 'adult' })
     expect(content.hides(db.getGame('adult'))).toBe(true)
@@ -316,8 +334,8 @@ describe('the levels in the API', () => {
     expect((await request(app.app).put('/api/content').send({ level: 'blurred' })).body.installation.level).toBe('blurred')
     expect(await ids()).toEqual(['adult', 'safe'])
     const game = (await request(app.app).get('/api/games/adult').expect(200)).body.game
-    expect(game).toMatchObject({ id: 'adult', title: 'adult', cover: null, art: 'hidden' })
-    expect(JSON.stringify(game)).not.toContain('/api/covers/')
+    expect(game).toMatchObject({ id: 'adult', title: 'adult' })
+    expect(JSON.stringify(game)).not.toContain('/api/art/')
     expect(JSON.stringify(game)).not.toContain('screenshot')
     // The play page and the saves work; picture routes refuse.
     expect((await request(app.app).get('/g/adult/b1/')).status).toBe(200)
@@ -336,7 +354,8 @@ describe('the levels in the API', () => {
     expect((await request(app.app).put('/api/content').send({ level: 'shown' })).body.installation).toMatchObject({ level: 'shown', chosen: true })
     expect(await ids()).toEqual(['adult', 'safe'])
     const game = (await request(app.app).get('/api/games/adult').expect(200)).body.game
-    expect(game.art).toBeUndefined()
+    // This recipe has no art: no format at all, at any level.
+    expect(game.art).toEqual({})
     expect((await request(app.app).get('/api/saves/adult')).status).toBe(200)
   })
 })

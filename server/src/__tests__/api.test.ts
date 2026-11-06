@@ -84,10 +84,10 @@ describe('HTTP API', () => {
     app.db.insertGame({ id: 'legacy-game', title: 'Legacy', recipe_id: 'legacy-game', version: '.510b' })
     const catalog = (await request(app.app).get('/api/catalog').expect(200)).body
     expect(catalog.vocabulary).toEqual(vocabulary)
-    expect(catalog.games.find((g: { id: string }) => g.id === recipe.id)).toMatchObject({ free: true, coverSfw: true, tagIds: ['sci-fi'], local: { version: '0.9.23', detectedVersion: 'Ch4Up7Public' } })
+    expect(catalog.games.find((g: { id: string }) => g.id === recipe.id)).toMatchObject({ free: true, tagIds: ['sci-fi'], local: { version: '0.9.23', detectedVersion: 'Ch4Up7Public' } })
     const game = (await request(app.app).get('/api/games/metadata-game').expect(200)).body.game
     expect(game.createdAt).toBe(app.db.getGame('metadata-game')!.created_at)
-    expect(game).toMatchObject({ free: true, coverSfw: true, tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: recipe.summary, version: '0.9.23', detectedVersion: 'Ch4Up7Public', recipe: { status: 'verified' }, update: { version: '0.9.24' } })
+    expect(game).toMatchObject({ free: true, tags: ['sci-fi'], tagIds: ['sci-fi'], content: ['violence'], state: 'completed', summary: recipe.summary, version: '0.9.23', detectedVersion: 'Ch4Up7Public', recipe: { status: 'verified' }, update: { version: '0.9.24' } })
     const legacy = (await request(app.app).get('/api/games/legacy-game').expect(200)).body.game
     expect(legacy).toMatchObject({ tags: ['romance'], tagIds: [], content: [], state: null, summary: null, version: '.510b', detectedVersion: '.510b', favoriteAt: null })
     app.db.deleteGame('metadata-game')
@@ -116,7 +116,7 @@ describe('HTTP API', () => {
   it('stores finished state and measured play time without changing saves', async () => {
     app.db.insertGame({ id: 'progress-game', title: 'Progress', save_dir: 'Progress-123' })
     const path = '/api/games/progress-game'
-    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(11)
+    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(12)
     expect((await request(app.app).get(path)).body.game).toMatchObject({ playTime: 0, finishedAt: null, latestSave: null })
     for (const on of [undefined, 'true', 1]) await request(app.app).put(`${path}/finished`).send({ on }).expect(400)
     await request(app.app).put('/api/games/missing/finished').send({ on: true }).expect(404)

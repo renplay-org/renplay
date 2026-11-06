@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
+import sharp from 'sharp'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import yazl from 'yazl'
 import { createApp, type App } from '../app.js'
@@ -163,7 +165,7 @@ describe('migration from 3.x, and back', () => {
     expect(user('nogames')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'off' })
     expect(user('broken')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
     expect(user('no')).toMatchObject({ adult_ceiling: 'off', adult_choice: 'off' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(11)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(12)
     // Downgrading to 3.2 reads the columns 4.0 keeps in step: access, the picture
     // preference and the allow/block install setting (covered by legacyMirror in content.test).
     const cols = db.raw.prepare('PRAGMA table_info(users)').all().map((c) => c.name)
@@ -185,6 +187,16 @@ describe('the levels on every route', () => {
   let app: App
   let zip = Buffer.alloc(0)
   let archivesDir = ''
+  /** The made grid of each game: the picture routes the levels guard. */
+  let adultPic = ''
+  let safePic = ''
+  let fullCatalog: unknown = null
+  /** After Off, adult recipes come back with the next full index. Offline, the test puts it back. */
+  const restoreCatalog = async () => {
+    app.db.setSetting('catalog_cache', fullCatalog)
+    await app.catalog.init()
+    app.catalog.stop()
+  }
   let gamesDir = ''
 
   beforeAll(async () => {
@@ -209,8 +221,15 @@ describe('the levels on every route', () => {
       mkdirSync(join(cfg.savesDir, `${id}-1`), { recursive: true })
       writeFileSync(join(cfg.savesDir, `${id}-1`, '1-1.save'), 'x')
     }
-    mkdirSync(cfg.coversDir, { recursive: true })
-    for (const id of ['adult', 'safe']) writeFileSync(join(cfg.coversDir, `${id}.webp`), 'cover')
+    // Each recipe's grid is in the art cache's originals already: made without any download.
+    const grids: Record<string, { sha256: string }> = {}
+    mkdirSync(join(cfg.dataDir, 'art', 'src'), { recursive: true })
+    for (const id of ['adult', 'safe']) {
+      const data = await sharp({ create: { width: 600, height: 900, channels: 3, background: id === 'adult' ? '#a33' : '#3a3' } }).png().toBuffer()
+      const sha256 = createHash('sha256').update(data).digest('hex')
+      writeFileSync(join(cfg.dataDir, 'art', 'src', sha256), data)
+      grids[id] = { sha256 }
+    }
     mkdirSync(cfg.walkthroughsDir, { recursive: true })
     for (const id of ['adult', 'safe']) writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), '%PDF-1.4 fixture')
     mkdirSync(cfg.archivesDir, { recursive: true })
@@ -218,9 +237,9 @@ describe('the levels on every route', () => {
     gamesDir = cfg.gamesDir
     for (const name of ['adult.zip', 'safe.zip', 'adult2.zip']) writeFileSync(join(cfg.archivesDir, name), '1234')
     const db = Db.open(cfg.dataDir)
-    const recipe = (id: string, nsfw: boolean) => ({ id, title: id, nsfw, engine: 'renpy', saveDir: `${id}-1`, cover: `covers/${id}.png`, releases: [{ version: '1', status: 'verified', archives: [{ name: `${id}.zip`, size: 4 }] }] })
-    db.setSetting('catalog_cache', { at: Date.now(), games: [recipe('adult', true), recipe('safe', false)], vocabulary: {}, adultGames: 'shown' })
-    db.setSetting('catalog_covers', { adult: { url: 'covers/adult.png', sha256: '', file: 'adult.webp', etag: '' }, safe: { url: 'covers/safe.png', sha256: '', file: 'safe.webp', etag: '' } })
+    const recipe = (id: string, nsfw: boolean) => ({ id, title: id, nsfw, engine: 'renpy', saveDir: `${id}-1`, art: [{ kind: 'grid', url: `https://art.example/${id}.png`, source: 'steam', sha256: grids[id]!.sha256, width: 600, height: 900, thumbhash: '1QcSHQRnh493V4dIh4eXh1h4kJUI', tint: '#aa3333' }], releases: [{ version: '1', status: 'verified', archives: [{ name: `${id}.zip`, size: 4 }] }] })
+    fullCatalog = { at: Date.now(), games: [recipe('adult', true), recipe('safe', false)], vocabulary: {}, adultGames: 'shown' }
+    db.setSetting('catalog_cache', fullCatalog)
     db.insertGame({ id: 'adult', title: 'Adult', recipe_id: 'adult', adult: 1, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'adult-1', walkthrough: 'adult.pdf' })
     db.insertGame({ id: 'safe', title: 'Safe', recipe_id: 'safe', status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'safe-1', walkthrough: 'safe.pdf' })
     db.insertGame({ id: 'adult-two', title: 'Adult Two', recipe_id: '', adult: 1, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'adult-two-1', source: JSON.stringify({ archive: 'adult2.zip' }) })
@@ -230,6 +249,11 @@ describe('the levels on every route', () => {
     db.updateJob('j-adult-failed', { status: 'failed' })
     db.close()
     app = await createApp(cfg, { startJobs: false })
+    await app.catalog.syncArt()
+    const grid = (id: string) => (app.catalog.gameArt(app.db.getGame(id)!) as Record<string, { url1x: string }>)['grid']!.url1x
+    adultPic = grid('adult')
+    safePic = grid('safe')
+    expect(adultPic).toMatch(/^\/api\/art\/[0-9a-f]{32}\.webp$/)
   })
   afterAll(async () => {
     while (app.jobs.isBusy()) await new Promise((resolve) => setTimeout(resolve, 50))
@@ -276,6 +300,7 @@ describe('the levels on every route', () => {
     ['GET /health', 'none'], ['GET /keepalive', 'none'], ['GET /system', 'list'], ['PUT /system/downloads', 'none'], ['POST /system/prune', 'none'],
     ['POST /system/engines/refresh', 'none'], ['GET /jobs', 'list'], ['GET /jobs/:id/log', 'tool'], ['POST /jobs/:id/cancel', 'tool'],
     ['POST /jobs/:id/retry', 'tool'], ['DELETE /jobs', 'tool'], ['GET /', 'none'], ['PUT /', 'none'], ['GET /api/saves-export', 'list'],
+    ['GET /api/art/:file', 'game'], ['GET /:id/art', 'game'], ['PUT /:id/art', 'game'], ['DELETE /:id/art', 'game'], ['POST /:id/art/upload', 'game'],
     ['GET /:id/files', 'game'], ['GET /:id/files/raw', 'game'], ['PUT /:id/files/raw', 'game'], ['DELETE /:id/files/raw', 'game'],
     ['POST /:id/files/revert', 'game'], ['POST /:id/files/upload', 'game'], ['POST /:id/files/apply', 'game'], ['POST /:id/files/reset', 'game'],
     ['GET /', 'list'], ['GET /:id', 'game'], ['PUT /:id/favorite', 'game'], ['PUT /:id/finished', 'game'], ['POST /:id/play-time', 'game'],
@@ -297,13 +322,19 @@ describe('the levels on every route', () => {
     const games = (await request(app.app).get('/api/games')).body.games
     expect(games.map((g: { id: string }) => g.id)).toEqual(['adult', 'adult-two', 'safe'])
     const adult = games.find((g: { id: string }) => g.id === 'adult')
-    expect(adult).toMatchObject({ title: 'adult', cover: null, art: 'hidden' })
+    expect(adult).toMatchObject({ title: 'adult' })
+    // Every format is its hash and tint only: no address, no size, no credit.
+    for (const format of Object.values(adult.art)) expect(Object.keys(format as object).sort()).toEqual(['thumbhash', 'tint'])
+    expect(adult.art.grid.thumbhash).toBeTruthy()
     // A recipe-less game marked adult in the library is an adult game to the interface too.
-    expect(games.find((g: { id: string }) => g.id === 'adult-two')).toMatchObject({ nsfw: true, cover: null, art: 'hidden' })
-    expect(JSON.stringify(games)).not.toContain('/api/covers/adult')
+    expect(games.find((g: { id: string }) => g.id === 'adult-two')).toMatchObject({ nsfw: true })
+    expect(JSON.stringify(games.filter((g: { nsfw: boolean }) => g.nsfw))).not.toContain('/api/art/')
+    expect(JSON.stringify(games.find((g: { id: string }) => g.id === 'safe').art)).toContain(safePic)
     const catalogGames = (await request(app.app).get('/api/catalog')).body.games
     expect(catalogGames.map((g: { id: string }) => g.id)).toContain('adult')
-    expect(catalogGames.find((g: { id: string }) => g.id === 'adult').cover).toBeNull()
+    expect(JSON.stringify(catalogGames.find((g: { id: string }) => g.id === 'adult').art)).not.toContain('/api/art/')
+    // The catalog's own picture addresses never go out: only the art the server made.
+    expect(JSON.stringify(catalogGames)).not.toContain('art.example')
     expect((await request(app.app).get('/api/archives')).body.archives.map((a: { name: string }) => a.name)).toContain('adult.zip')
     expect((await request(app.app).get('/api/jobs')).body.jobs.map((j: { id: string }) => j.id)).toContain('j-adult-failed')
     const sys = (await request(app.app).get('/api/system')).body
@@ -313,10 +344,15 @@ describe('the levels on every route', () => {
     expect(await exportedNames()).toContain('adult-two-1/1-1.save')
 
     // The art routes refuse, with the same 404 as an unknown file.
-    for (const path of ['/api/covers/adult.webp', '/api/saves/adult/screenshot?file=1-1.save']) {
+    for (const path of [adultPic, '/api/saves/adult/screenshot?file=1-1.save', '/api/games/adult/art', '/api/games/adult/art?kind=grid']) {
       await request(app.app).get(path).expect(404)
     }
-    await request(app.app).get('/api/auth/check').set('X-Original-URI', '/api/covers/adult.webp').expect(403)
+    await request(app.app).get('/api/auth/check').set('X-Original-URI', adultPic).expect(403)
+    await request(app.app).put('/api/games/adult/art').send({ kind: 'grid', candidate: 'any', scope: 'me' }).expect(404)
+    await request(app.app).post('/api/games/adult/art/upload?kind=grid').set('content-type', 'image/png').send(Buffer.from('x')).expect(404)
+    await request(app.app).delete('/api/games/adult/art?kind=grid').expect(404)
+    // Safe games keep their pictures at every level.
+    await request(app.app).get(safePic).expect(200)
     // Saves list without picture URLs.
     const saves = (await request(app.app).get('/api/saves/adult').expect(200)).body
     expect(JSON.stringify(saves)).not.toContain('screenshot?')
@@ -368,11 +404,12 @@ describe('the levels on every route', () => {
 
   it('at shown every picture route answers again', async () => {
     await setLevel('shown')
-    await request(app.app).get('/api/covers/adult.webp').expect(200)
-    await request(app.app).get('/api/auth/check').set('X-Original-URI', '/api/covers/adult.webp').expect(204)
+    const pic = await request(app.app).get(adultPic).expect(200)
+    expect(pic.headers['cache-control']).toBe('private, max-age=31536000, immutable')
+    await request(app.app).get('/api/auth/check').set('X-Original-URI', adultPic).expect(204)
     const adult = (await request(app.app).get('/api/games/adult')).body.game
-    expect(adult.cover).toBe('/api/covers/adult.webp')
-    expect(adult.art).toBeUndefined()
+    expect(adult.art.grid).toMatchObject({ url1x: adultPic, width: 600, height: 900, made: null, credit: { store: 'Steam' } })
+    expect((await request(app.app).get('/api/games/adult/art?kind=grid').expect(200)).body.candidates).toHaveLength(1)
   })
 
   it('at off hides adult games from lists and refuses every route addressed to one with 404', async () => {
@@ -412,7 +449,9 @@ describe('the levels on every route', () => {
       ['post', '/api/saves/adult/import'], ['post', '/api/saves/adult/copy', { target: 'safe', file: '1-1.save' }],
       ['get', '/api/saves/adult/history'], ['post', '/api/saves/adult/history/restore', { id: 'none' }],
       ['get', '/g/adult/b1/'], ['get', '/g/adult/b1/index.html'], ['get', '/g/adult/b1/game.zip'], ['get', '/g/adult/b1/game/images/a.png'],
-      ['get', '/api/covers/adult.webp'], ['get', '/api/walkthroughs/adult.pdf'],
+      ['get', adultPic], ['get', '/api/walkthroughs/adult.pdf'],
+      ['get', '/api/games/adult/art'], ['get', '/api/games/adult/art?kind=grid'], ['put', '/api/games/adult/art', { kind: 'grid', candidate: 'x' }],
+      ['delete', '/api/games/adult/art?kind=grid'], ['post', '/api/games/adult/art/upload?kind=grid'],
       ['get', '/api/jobs/j-adult-failed/log'], ['post', '/api/jobs/j-adult-failed/retry'], ['post', '/api/jobs/j-adult-queued/cancel'],
       ['post', '/api/imports', { source: { kind: 'archive', path: 'adult.zip' } }],
       ['post', '/api/imports', { source: { kind: 'archive', path: 'safe.zip' }, recipeId: 'adult' }],
@@ -427,12 +466,12 @@ describe('the levels on every route', () => {
       const response = await (request(app.app) as any)[method](path).send(body)
       expect(response.status, `${method} ${path}`).toBe(404)
     }
-    for (const uri of ['/g/adult/b1/game.zip', '/g/adult/b1/game/images/a.png', '/api/covers/adult.webp', '/api/walkthroughs/adult.pdf']) {
+    for (const uri of ['/g/adult/b1/game.zip', '/g/adult/b1/game/images/a.png', adultPic, '/api/walkthroughs/adult.pdf']) {
       await request(app.app).get('/api/auth/check').set('X-Original-URI', uri).expect(403)
     }
     // Safe games are never affected at any level.
     await request(app.app).get('/api/games/safe').expect(200)
-    await request(app.app).get('/api/covers/safe.webp').expect(200)
+    await request(app.app).get(safePic).expect(200)
     await request(app.app).get('/g/safe/b1/').expect(200)
     // Installed games stay installed, saves untouched.
     expect(app.db.getGame('adult')).toMatchObject({ status: 'installed', adult: 1 })
@@ -440,13 +479,16 @@ describe('the levels on every route', () => {
 
   it('applies this device\'s level from the header or the query, and never lets it raise anything', async () => {
     await setLevel('shown')
+    await restoreCatalog()
+    expect((await request(app.app).get('/api/games/adult')).body.game.art.grid.url1x).toBe(adultPic)
     const ids = async (device?: string) => (await request(app.app).get('/api/games').set(device ? { 'x-renplay-adult': device } : {})).body.games.map((g: { id: string }) => g.id)
     expect(await ids()).toContain('adult')
     expect(await ids('off')).not.toContain('adult')
     const blurred = (await request(app.app).get('/api/games/adult').set('x-renplay-adult', 'blurred')).body.game
-    expect(blurred).toMatchObject({ cover: null, art: 'hidden', playUrl: '/g/adult/b1/?adult=blurred' })
+    expect(blurred).toMatchObject({ playUrl: '/g/adult/b1/?adult=blurred' })
+    expect(blurred.art.grid.url1x).toBeUndefined()
     await request(app.app).get('/api/games/adult').set('x-renplay-adult', 'off').expect(404)
-    await request(app.app).get('/api/covers/adult.webp').set('x-renplay-adult', 'blurred').expect(404)
+    await request(app.app).get(adultPic).set('x-renplay-adult', 'blurred').expect(404)
     // The game page, an iframe without headers, takes it as a query, and keeps it across a redirect.
     writeFileSync(join(gamesDir, 'adult', 'b1', 'web-presplash.jpg'), 'presplash')
     expect((await request(app.app).get('/g/adult/b1/').expect(200)).text).toContain('src="web-presplash.jpg"')
@@ -454,7 +496,7 @@ describe('the levels on every route', () => {
     expect((await request(app.app).get('/g/adult/old/?adult=blurred').expect(302)).headers.location).toBe('/g/adult/b1/?adult=blurred')
     // A device cannot raise: an installation at Blurred stays Blurred whatever the header says.
     await setLevel('blurred')
-    expect((await request(app.app).get('/api/games/adult').set('x-renplay-adult', 'shown')).body.game).toMatchObject({ art: 'hidden' })
+    expect((await request(app.app).get('/api/games/adult').set('x-renplay-adult', 'shown')).body.game.art.grid.url1x).toBeUndefined()
     await setLevel('shown')
   })
 

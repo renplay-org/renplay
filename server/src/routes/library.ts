@@ -93,9 +93,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
                 version: match.release?.version ?? null,
                 status: match.release?.status ?? 'untested',
                 exact: match.exact,
-                cover: catalog.cover(match.recipe.id),
+                art: catalog.recipeArt(match.recipe),
                 nsfw: match.recipe.nsfw ?? false,
-                coverSfw: typeof match.recipe.cover === 'object' && match.recipe.cover.sfw === true,
               }
             : null,
           existingGame: [match ? db.gameByRecipe(match.recipe.id) : null, info?.saveDir ? db.gameBySaveDir(info.saveDir) : null].find((g) => g && !catalog.content.hides(g))?.id ?? null,
@@ -245,7 +244,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
       vocabulary: catalog.content.hidesRecipe(true) ? Object.fromEntries(Object.entries(catalog.vocabulary).filter(([, v]) => v.group !== 'content')) : catalog.vocabulary,
       games: catalog.list().map((r) => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
-        return { ...r, _base: undefined, cover: catalog.cover(r.id), coverSfw: typeof r.cover === 'object' && r.cover.sfw === true, local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
+        return { ...r, _base: undefined, art: catalog.recipeArt(r), local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
       }),
     })
   })

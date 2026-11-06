@@ -227,6 +227,18 @@ export class Db {
       if (v === 0) this.raw.exec("UPDATE users SET adult_choice = 'shown' WHERE id = 1 AND adult_ceiling = 'shown'")
       this.raw.exec('PRAGMA user_version = 11; COMMIT')
     }
+    // 4.0: the art cache (art.ts). Made pictures by the key of their source and method, the
+    // choices of each person (scope = user id) and of the admin for everyone (scope 0), uploads,
+    // and the sizes of catalog pictures the index gave none for. Choices and uploads outlive a
+    // removed game, like saves.
+    if (v < 12) this.raw.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS art_made (key TEXT PRIMARY KEY, file1x TEXT NOT NULL, file2x TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL, made TEXT NOT NULL DEFAULT '', adult INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS art_made_file1x ON art_made (file1x);
+      CREATE INDEX IF NOT EXISTS art_made_file2x ON art_made (file2x);
+      CREATE TABLE IF NOT EXISTS art_choices (game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, candidate TEXT NOT NULL, PRIMARY KEY (game, kind, scope));
+      CREATE TABLE IF NOT EXISTS art_uploads (id TEXT NOT NULL, game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, focal TEXT NOT NULL DEFAULT '', thumbhash TEXT NOT NULL, tint TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (id, game, kind, scope));
+      CREATE TABLE IF NOT EXISTS art_measured (id TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL);
+      PRAGMA user_version = 12; COMMIT;`)
     } catch (error) { this.raw.close(); throw error }
   }
 

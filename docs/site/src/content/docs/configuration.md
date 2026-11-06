@@ -177,11 +177,11 @@ The installation level of adult games: off (they do not exist), blurred (they sh
 
 <div class="config-default">
 
-Default: `https://catalog.renplay.org/index.v3.json`
+Default: `https://catalog.renplay.org/index.v4.json`
 
 </div>
 
-Catalog indexes, separated by commas. The first one that defines a tag wins.
+Catalog indexes, separated by commas. The first one that defines a tag wins. Schema 4 indexes give each game its pictures in five formats. A schema 3 index still works, its cover becoming the grid.
 
 </div>
 

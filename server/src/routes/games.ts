@@ -4,6 +4,7 @@ import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import YAML from 'yaml'
 import { viewer } from '../accounts-context.js'
+import { ART_KINDS, type ArtKind } from '../art.js'
 import type { Accounts } from '../auth.js'
 import type { Builds } from '../builds.js'
 import { installedRelease, type Catalog } from '../catalog.js'
@@ -91,10 +92,9 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     summary: recipe?.summary ?? null,
     // A game without a recipe can be marked adult in the library, and its tile says so too.
     nsfw: recipe?.nsfw ?? row.adult === 1,
-    coverSfw: typeof recipe?.cover === 'object' && recipe.cover?.sfw === true,
     free: recipe?.free,
-    cover: recipe && !blurred ? deps.catalog.cover(recipe.id) : null,
-    art: blurred ? ('hidden' as const) : undefined,
+    // The five formats. Below Shown an adult game's formats are hashes and tints, no address.
+    art: deps.catalog.gameArt(row),
     walkthrough: row.walkthrough || null,
     status: row.status,
     build: row.build || null,
@@ -153,6 +153,78 @@ export function createGamesRouter(deps: GameDeps): Router {
 
   router.get('/:id', async (req, res) => {
     res.json({ game: await toGame(get(req), deps) })
+  })
+
+  // ---- art: choices and uploads (DESIGN 0.7) ------------------------------------
+
+  /** The game, when this person may see its pictures: below Shown an adult game's art does not exist. */
+  const withArt = (req: Request): GameRow => {
+    const g = get(req)
+    if (deps.catalog.content.blurs(g) || !deps.catalog.art) throw new HttpError(404, 'Not found')
+    return g
+  }
+  const kindOf = (value: unknown): ArtKind => {
+    if (typeof value !== 'string' || !ART_KINDS.includes(value as ArtKind)) throw new HttpError(400, 'Choose grid, wide, hero, logo or icon')
+    return value as ArtKind
+  }
+  /** Me: this person's own view. Everyone: the admin's default for the instance. */
+  const scopeOf = (value: unknown): number => {
+    const v = viewer()
+    if (value === 'everyone') {
+      if (v && v.user.role !== 'admin') throw new HttpError(403, 'Only an admin can choose art for everyone')
+      return 0
+    }
+    if (value !== undefined && value !== 'me') throw new HttpError(400, 'Scope must be me or everyone')
+    return v?.user.id ?? 0
+  }
+
+  router.get('/:id/art', async (req, res) => {
+    const g = withArt(req)
+    const subject = deps.catalog.gameSubject(g)
+    const scope = scopeOf(undefined)
+    if (req.query['kind'] === undefined) {
+      res.json({ art: deps.catalog.art!.forSubject(subject), counts: Object.fromEntries(ART_KINDS.map((k) => [k, subject.pictures.filter((p) => p.kind === k).length])) })
+      return
+    }
+    const kind = kindOf(req.query['kind'])
+    res.json({ kind, candidates: await deps.catalog.art!.candidates(subject, kind, scope) })
+  })
+
+  router.put('/:id/art', async (req, res) => {
+    const g = withArt(req)
+    const kind = kindOf(req.body?.kind)
+    const scope = scopeOf(req.body?.scope)
+    const subject = deps.catalog.gameSubject(g)
+    if (!subject.pictures.some((p) => p.kind === kind && p.id === req.body?.candidate)) throw new HttpError(404, 'That picture is not a choice for this game')
+    deps.catalog.art!.choose(g.id, kind, req.body.candidate, scope)
+    await deps.catalog.art!.ready(subject, scope)
+    res.json({ art: deps.catalog.art!.forSubject(subject) })
+  })
+
+  router.delete('/:id/art', async (req, res) => {
+    const g = withArt(req)
+    const kind = kindOf(req.query['kind'])
+    const scope = scopeOf(req.query['scope'])
+    deps.catalog.art!.clearChoice(g.id, kind, scope)
+    const subject = deps.catalog.gameSubject(g)
+    await deps.catalog.art!.ready(subject, scope)
+    res.json({ art: deps.catalog.art!.forSubject(subject) })
+  })
+
+  router.post('/:id/art/upload', express.raw({ type: () => true, limit: '16mb' }), async (req, res) => {
+    const g = withArt(req)
+    const kind = kindOf(req.query['kind'])
+    const scope = scopeOf(req.query['scope'])
+    const focalText = typeof req.query['focal'] === 'string' ? req.query['focal'] : ''
+    const focal = /^(0(\.\d+)?|1(\.0+)?),(0(\.\d+)?|1(\.0+)?)$/.test(focalText) ? (focalText.split(',').map(Number) as [number, number]) : null
+    if (focalText && !focal) throw new HttpError(400, 'The focal point is two numbers from 0 to 1, like 0.5,0.3')
+    if (!Buffer.isBuffer(req.body) || !req.body.length) throw new HttpError(400, 'No picture uploaded')
+    const { id, warning } = await deps.catalog.art!.upload(g.id, kind, req.body, focal, scope)
+    // An upload is made to be used: it becomes the choice at the scope it was uploaded for.
+    deps.catalog.art!.choose(g.id, kind, id, scope)
+    const subject = deps.catalog.gameSubject(g)
+    await deps.catalog.art!.ready(subject, scope)
+    res.json({ id, warning, art: deps.catalog.art!.forSubject(subject) })
   })
 
   router.put('/:id/favorite', async (req, res) => {

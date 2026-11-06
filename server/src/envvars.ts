@@ -142,8 +142,8 @@ export const ENV_VARS: readonly EnvVar[] = [
     name: 'RENPLAY_CATALOG_URLS',
     group: 'Games and catalog',
     kind: 'text',
-    fallback: 'https://catalog.renplay.org/index.v3.json',
-    description: 'Catalog indexes, separated by commas. The first one that defines a tag wins.',
+    fallback: 'https://catalog.renplay.org/index.v4.json',
+    description: 'Catalog indexes, separated by commas. The first one that defines a tag wins. Schema 4 indexes give each game its pictures in five formats. A schema 3 index still works, its cover becoming the grid.',
   },
   {
     name: 'RENPLAY_ENGINES_URL',

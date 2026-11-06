@@ -2,9 +2,10 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, lstatSync,
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { scryptSync } from 'node:crypto'
+import { createHash, scryptSync } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import request from 'supertest'
+import sharp from 'sharp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
@@ -434,19 +435,31 @@ describe('adult access and signed game URLs', () => {
     await request(a.app).put('/api/me/adult').set(site).set('Cookie', player).send({ level: 'off' }).expect(200)
     await request(a.app).get('/api/games/adult').set('Cookie', player).expect(404)
   })
-  it('filters catalog recipes and their static covers and walkthroughs by adult access, including nginx checks', async () => {
+  it('filters catalog recipes and their pictures and walkthroughs by adult access, including nginx checks', async () => {
     const cfg = config(), db = Db.open(cfg.dataDir)
-    db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'safe', title: 'Safe', releases: [] }, { id: 'adult', title: 'Adult', nsfw: true, releases: [] }] })
-    db.setSetting('catalog_covers', { safe: { file: 'safe.webp' }, adult: { file: 'adult.webp' } }); db.close()
+    // Each recipe's grid is in the art cache's originals already, so it is made without a download.
+    const art = async (id: string) => {
+      const data = await sharp({ create: { width: 600, height: 900, channels: 3, background: id === 'adult' ? '#a33' : '#3a3' } }).png().toBuffer()
+      const sha256 = createHash('sha256').update(data).digest('hex')
+      mkdirSync(join(cfg.dataDir, 'art', 'src'), { recursive: true })
+      writeFileSync(join(cfg.dataDir, 'art', 'src', sha256), data)
+      return [{ kind: 'grid', url: `https://art.example/${id}.png`, source: 'steam', sha256, width: 600, height: 900 }]
+    }
+    db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'safe', title: 'Safe', art: await art('safe'), releases: [] }, { id: 'adult', title: 'Adult', nsfw: true, art: await art('adult'), releases: [] }] })
+    db.close()
     const a = await start(cfg), admin = await login(a); await add(a, admin); const player = await login(a, 'player', 'player password')
-    for (const id of ['safe', 'adult']) { game(a, id, { recipe_id: id, adult: id === 'adult' ? 1 : 0, walkthrough: `${id}.pdf` }); writeFileSync(join(cfg.coversDir, `${id}.webp`), 'cover'); writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), 'pdf') }
+    for (const id of ['safe', 'adult']) { game(a, id, { recipe_id: id, adult: id === 'adult' ? 1 : 0, walkthrough: `${id}.pdf` }); writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), 'pdf') }
+    await a.catalog.syncArt()
+    const picture = (id: string) => (a.catalog.recipeArt(a.catalog.recipe(id)!) as Record<string, { url1x: string }>)['grid']!.url1x
+    const adultPic = picture('adult'), safePic = picture('safe')
     expect((await request(a.app).get('/api/catalog').set('Cookie', player)).body.games.map((g: any) => g.id)).toEqual(['safe'])
-    for (const file of ['/api/covers/adult.webp', '/api/walkthroughs/adult.pdf']) {
+    for (const file of [adultPic, '/api/walkthroughs/adult.pdf']) {
       await request(a.app).get(file).set('Cookie', player).expect(404)
       await request(a.app).get('/api/auth/check').set('Cookie', player).set('X-Original-URI', file).expect(403)
       await request(a.app).get(file).set('Cookie', admin).expect(200)
     }
-    await request(a.app).get('/api/covers/safe.webp').set('Cookie', player).expect(200)
+    await request(a.app).get(safePic).set('Cookie', player).expect(200)
+    await request(a.app).get('/api/auth/check').set('Cookie', player).set('X-Original-URI', safePic).expect(204)
   })
   it('sandboxes every HTML pack response regardless of filename or MIME and permits encoded filenames', async () => {
     const a = await start(), cookie = await login(a)
