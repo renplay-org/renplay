@@ -102,6 +102,8 @@ jobs:
         run: python3 deploy/test-contract.py renplay:contract smoke
       - name: Upgrade and downgrade from 2.11.1
         run: python3 deploy/test-contract.py renplay:contract upgrade
+      - name: Separate downloads mount
+        run: python3 deploy/test-contract.py renplay:contract all --downloads
 
   docs:
     runs-on: ubuntu-latest
@@ -118,8 +120,51 @@ jobs:
       - run: npm run build
         working-directory: docs/site
 
+  helm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: azure/setup-helm@v4.3.0
+        with:
+          version: v3.17.3
+      # chart-testing's YAML validator (yamale) still uses ast.Num, which Python 3.14 removed.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: helm/chart-testing-action@v2.7.0
+      - name: Lint and render the install contract
+        run: |
+          helm lint charts/renplay --strict
+          python3 deploy/test-chart.py
+          python3 deploy/test-package-chart.py
+          ct lint --config .github/ct.yaml --charts charts/renplay --lint-conf .github/chart-lint.yaml
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Chart values reference stays current
+        run: |
+          go install github.com/norwoodj/helm-docs/cmd/helm-docs@v1.14.2
+          helm-docs --chart-search-root charts/renplay
+          git diff --exit-code -- charts/renplay/README.md
+      - uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: chart-testing
+      # Test the chart with the image built from this commit: a release bumps appVersion before
+      # its image exists, and the chart should be tested with the code it ships with.
+      - name: Build the image for the chart test
+        run: |
+          docker build -t ghcr.io/renplay-org/renplay:chart-test .
+          kind load docker-image ghcr.io/renplay-org/renplay:chart-test --name chart-testing
+      - name: Install and test on kind
+        run: ct install --config .github/ct.yaml --charts charts/renplay --helm-extra-set-args "--set=image.tag=chart-test --set=image.pullPolicy=Never"
+
   build:
-    needs: [check, install-contract, docs]
+    needs: [check, install-contract, docs, helm]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

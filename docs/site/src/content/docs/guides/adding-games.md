@@ -36,8 +36,9 @@ Press **Install**. A background job runs, and **Settings** → **Activity** show
 5. Files the game streams (images, audio, video) go into one `assets.pack`; what the engine needs
    at the start goes into `game.zip`.
 6. The finished build appears at once. Installed builds never change; an update makes a new one.
-7. Downloads uploaded through Renplay are deleted, unless `RENPLAY_DELETE_ARCHIVES=false`.
-   Files you copied into the archives folder are never automatically deleted. A failed install
+7. Downloads are kept by default. Turning off **Keep downloads** in Settings, or setting
+   `RENPLAY_KEEP_DOWNLOADS=false`, deletes only uploads through Renplay after a successful install.
+   Files you copied into the drop folder are never automatically deleted. A failed install
    keeps its download either way.
 
 A big game takes minutes, mostly for image conversion. You can leave the page.

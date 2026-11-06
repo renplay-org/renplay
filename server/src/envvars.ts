@@ -77,8 +77,8 @@ export const ENV_VARS: readonly EnvVar[] = [
     group: 'Folders',
     kind: 'text',
     fallback: '',
-    shown: '`$GAMES_DIR/_archives`',
-    description: 'The drop folder for game downloads (zip, 7z, rar), and the source for reinstalls.',
+    shown: '`/downloads` if it exists and is writable, otherwise `$GAMES_DIR/_archives`',
+    description: 'Downloads and the drop folder (zip, 7z, rar), kept for reinstalls. An explicit path overrides automatic detection. Existing files are never moved.',
   },
   {
     name: 'RENPLAY_DIR',
@@ -113,12 +113,19 @@ export const ENV_VARS: readonly EnvVar[] = [
     description: 'Mods: your files, layered over a game.',
   },
   {
-    name: 'RENPLAY_DELETE_ARCHIVES',
+    name: 'RENPLAY_KEEP_DOWNLOADS',
     group: 'Games and catalog',
     kind: 'yes/no',
     fallback: true,
-    description:
-      'Delete downloads uploaded through Renplay after a successful install. Files copied into the archives folder are never deleted automatically, including downloads from before 3.0 whose origin is unknown. `false` keeps everything for reinstalls.',
+    description: 'Keep downloads after install so games can be reinstalled. `false` deletes only unchanged uploads through Renplay after a successful install. Files copied in are never deleted automatically. Setting this variable locks the Settings switch. When unset, admins can choose in Settings.',
+  },
+  {
+    name: 'RENPLAY_DELETE_ARCHIVES',
+    group: 'Games and catalog',
+    kind: 'yes/no',
+    fallback: false,
+    shown: 'not set',
+    description: 'Deprecated alias for the opposite of `RENPLAY_KEEP_DOWNLOADS`. `true` deletes uploaded downloads and `false` keeps them. Still supported in 3.x, with a warning once at startup. `RENPLAY_KEEP_DOWNLOADS` takes precedence when both are set.',
   },
   {
     name: 'RENPLAY_ADULT_GAMES',

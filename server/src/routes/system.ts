@@ -1,4 +1,5 @@
 import { keepaliveToken } from '../auth.js'
+import { keepDownloads } from '../downloads.js'
 import { statfs } from 'node:fs/promises'
 import { Router } from 'express'
 import type { Builds } from '../builds.js'
@@ -70,9 +71,18 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
       orphans,
       purging: purger.pending(),
       paths: { games: cfg.gamesDir, archives: cfg.archivesDir, data: cfg.dataDir },
-      deleteArchives: cfg.deleteArchives,
+      deleteArchives: !keepDownloads(cfg, db),
+      keepDownloads: keepDownloads(cfg, db),
+      keepDownloadsLocked: cfg.keepDownloadsLocked,
       busy: jobs.isBusy(),
     })
+  })
+
+  router.put('/system/downloads', (req, res) => {
+    if (cfg.keepDownloadsLocked) throw new HttpError(409, 'Download retention is set by the server configuration')
+    if (typeof req.body?.keepDownloads !== 'boolean') throw new HttpError(400, 'Keep downloads must be a boolean')
+    db.setSetting('keep_downloads', req.body.keepDownloads)
+    res.json({ ok: true })
   })
 
   /** Removes engines no installed game uses. */

@@ -48,21 +48,36 @@ docker run -d --name renplay --restart unless-stopped -p 8080:8080 \
   ghcr.io/renplay-org/renplay:__RENPLAY_VERSION__
 ```
 
-## The two folders
+## Storage folders
 
 | Folder | What is in it |
 |---|---|
 | `/data` | Saves and their history, the library, mods, covers, walkthroughs. **Back this up.** |
-| `/games` | Installed games, and `_archives/`, where game downloads are dropped. Renplay can rebuild installed games from the archives, while they are kept. |
+| `/games` | Installed games, engines and scratch space. Scratch stays on this filesystem for atomic installs. Without a separate downloads mount, this also holds `_archives/`. |
+| `/downloads` | Optional downloads and drop folder. Mount your downloads share here to keep it separate from installed games. |
 
 **Keep `/data` on local disk.** Its SQLite database must not be on a network share. `/games`
 and the optional archives folder can be shares; see
 [Troubleshooting](/troubleshooting/#network-storage-is-slow). Allow about twice a game's download
-size free while it installs. By default only uploads through Renplay are deleted after install;
-files copied into the archives folder stay there. `RENPLAY_DELETE_ARCHIVES=false` keeps uploads too.
+size free while it installs. Downloads are kept by default so games can be reinstalled.
+In Settings, turn off **Keep downloads** to delete only uploads through Renplay after successful
+installs. Files copied in are never deleted automatically. `RENPLAY_KEEP_DOWNLOADS=true` or
+`false` sets and locks this choice. `RENPLAY_DELETE_ARCHIVES` is still supported as a deprecated
+alias with the opposite value.
 
-The container can also run with a read-only root filesystem: it writes only to `/games`, `/data`
-and `/tmp`. Add `read_only: true` and `tmpfs: [/tmp]` to the Compose service if you want that.
+To keep downloads on another disk, add `- /path/to/downloads:/downloads` under Compose
+`volumes`, or `-v /path/to/downloads:/downloads` to `docker run`. Make it writable by the
+container user. Renplay uses `/downloads` when it exists and is writable, or an explicit
+`ARCHIVES_DIR` when set. Otherwise it keeps using `/games/_archives`. Existing files are never
+moved. Settings shows the folder in use.
+
+Deleting `/data` loses saves and the library. Deleting `/games` loses installed games and also
+its downloads unless you mounted them separately. Games can be rebuilt only while you keep the
+downloads. Deleting a download saves space, but reinstalling then needs that download again.
+Admins can use **Delete download** on a game's Details tab without touching installed files or saves.
+
+The container can also run with a read-only root filesystem: it writes only to `/games`, `/data`,
+`/tmp` and the optional downloads mount. Add `read_only: true` and `tmpfs: [/tmp]` to the Compose service if you want that.
 
 ## Other user IDs
 

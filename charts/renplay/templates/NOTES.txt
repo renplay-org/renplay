@@ -1,0 +1,13 @@
+Renplay is installed with one SQLite writer and a Recreate rollout strategy.
+
+{{- if .Values.service.enabled }}
+Open a local connection:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "renplay.fullname" . }} 8080:{{ .Values.service.port }}
+Then open http://localhost:8080 and create the owner account.
+{{- end }}
+
+Back up /data. Downloads {{ if .Values.persistence.downloads.enabled }}live on /downloads{{ else }}stay inside /games/_archives{{ end }}.
+PVCs created by this chart are retained on uninstall by default. Do not delete the
+/data claim unless you intend to lose the library and saves.
+
+Documentation: https://docs.renplay.org/install/kubernetes/
