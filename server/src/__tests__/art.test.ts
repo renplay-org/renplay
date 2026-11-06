@@ -181,6 +181,14 @@ describe('the art cache', () => {
     expect(grid(6)).toBe('https://art.example/b.png')
     art.clearChoice('g', 'grid', 5)
     expect(grid(5)).toBe('https://art.example/b.png')
+    // The candidates say which one an admin chose for everyone, and which this person chose.
+    art.choose('g', 'grid', pictures[2]!.id, 5)
+    const flags = (await art.candidates(subject, 'grid', 5)).map((c) => [c.everyone, c.mine, c.current])
+    expect(flags).toEqual([[false, false, false], [true, false, false], [false, true, true]])
+    art.clearChoice('g', 'grid', 0)
+    expect((await art.candidates(subject, 'grid', 5)).some((c) => c.everyone)).toBe(false)
+    art.clearChoice('g', 'grid', 5)
+    art.choose('g', 'grid', pictures[1]!.id, 0)
     // A choice of a picture the catalog no longer has falls back to the default.
     art.choose('g', 'grid', 'gone', 0)
     expect(grid(5)).toBe('https://art.example/a.png')

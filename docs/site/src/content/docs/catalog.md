@@ -34,6 +34,13 @@ never contain text.
 The game page says where its art came from. SteamGridDB art names its author, linked to the
 picture's page.
 
+**Change art** on a game's page (or **Details → Art**) opens the art picker, one format at a time.
+Every choice is shown as it will look in place. Your choice changes only what you see. An admin
+can choose for everyone, which beats the catalog's default, and each person's own choice still wins
+for them. **Use the default** goes back. You can upload your own picture: the sizes above work
+best, and another size is accepted with a warning and cropped around the point you tap. Uploads stay
+on your server. Pictures of adult games below Shown cannot be changed.
+
 ## How matching works
 
 When you add a game, Renplay compares it with the recipes by, in order of how sure it is:

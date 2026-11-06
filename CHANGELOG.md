@@ -16,7 +16,7 @@ release notes say what).
 - Upgrading keeps what each person saw: access becomes their account's level, and their 3.x picture preference becomes their own level, so hidden pictures stay hidden.
 - Games have art in five formats, the shapes SteamGridDB uses: a 600 × 900 poster, a wide banner, a hero for the top of the game page, a logo and an icon. Pictures come from the catalog (Steam, itch.io, SteamGridDB credited to their author, the developer). Renplay keeps them in its data folder and makes any missing format from the others, without adding text. The game page says where its art came from.
 - Pictures show their colours the moment a page opens and sharpen as they load.
-- You can choose another picture for yourself, or upload your own, and an admin can choose for everyone (the picker comes in a later step of 4.0).
+- **Change art** on a game's page, or **Details → Art**, opens the art picker: every picture is shown as it will look in place, hovering previews it, a tap chooses it. Your choice changes only what you see, an admin can choose for everyone, and **Use the default** goes back. Upload your own picture too: another size is accepted with a warning, cropped around the point you tap.
 - The catalog is read from `index.v4.json`. A catalog in the older format still works, its cover becoming the poster.
 - A new look, Lantern: a dark room lit by the game you are looking at. Games are posters in the library, the game page opens on the game's own art with its logo, and the picture travels from the tile to the page.
 - The Catalog has its own page, at the top left, and Activity is always one tap away in the header.

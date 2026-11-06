@@ -62,6 +62,12 @@ export default function Sheet({
       if (e.key !== 'Tab') return
       const f = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.offsetParent !== null || x === document.activeElement)
       if (!f.length) return
+      // Focus that slipped out of the sheet (a control that went away) comes back in.
+      if (!el.contains(document.activeElement)) {
+        e.preventDefault()
+        ;(e.shiftKey ? f[f.length - 1]! : f[0]!).focus()
+        return
+      }
       const i = f.indexOf(document.activeElement as HTMLElement)
       if (e.shiftKey && i <= 0) {
         e.preventDefault()
@@ -71,9 +77,10 @@ export default function Sheet({
         f[0]!.focus()
       }
     }
-    el.addEventListener('keydown', onKey)
+    // On the document, so Escape and Tab still work when focus has slipped out of the sheet.
+    document.addEventListener('keydown', onKey)
     return () => {
-      el.removeEventListener('keydown', onKey)
+      document.removeEventListener('keydown', onKey)
       const idx = stack.indexOf(rec)
       if (idx >= 0) stack.splice(idx, 1)
       if (!stack.length && root) root.inert = false

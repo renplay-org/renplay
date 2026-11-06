@@ -481,7 +481,8 @@ export class ArtStore {
    */
   async candidates(subject: ArtSubject, kind: ArtKind, scope: number): Promise<Array<{ id: string; current: boolean; everyone: boolean; mine: boolean; inShape: boolean; width: number; height: number; source: string; credit: Credit; upload: boolean; preview: ArtOut | null }>> {
     const chosen = this.chosen(subject, scope)
-    const everyone = this.chosen(subject, EVERYONE)[kind]?.id
+    // For everyone: only what an admin chose for everyone, not the catalog default.
+    const everyone = subject.game ? (this.db.raw.prepare('SELECT candidate FROM art_choices WHERE game = ? AND kind = ? AND scope = 0').get(subject.game, kind) as { candidate: string } | undefined)?.candidate : undefined
     const choice = subject.game ? (this.db.raw.prepare('SELECT candidate FROM art_choices WHERE game = ? AND kind = ? AND scope = ?').get(subject.game, kind, scope) as { candidate: string } | undefined)?.candidate : undefined
     const out = []
     for (const p of subject.pictures.filter((x) => x.kind === kind)) {

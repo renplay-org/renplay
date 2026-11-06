@@ -16,7 +16,8 @@ import FavoriteButton from '../components/FavoriteButton'
 import GameTags from '../components/GameTags'
 import SaveGallery from '../components/SaveGallery'
 import { BetaBadge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
-import { api, del, post, slotName, type Game } from '../lib/api'
+import { api, del, post, slotName, type ArtKind, type Game } from '../lib/api'
+import ArtPicker from '../components/ArtPicker'
 import { ago, bytes, capitalize, duration, pct } from '../lib/format'
 import { recipeLinks } from '../lib/links'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
@@ -32,6 +33,7 @@ export default function GamePage() {
   const { data: game, isLoading, error } = useGame(gameId)
   const { data: catalog } = useCatalog()
   const [tab, setTab] = useState<Tab>('play')
+  const [picker, setPicker] = useState<ArtKind | null>(null)
   const navigate = useNavigate()
   const qc = useQueryClient()
   const toast = useToast()
@@ -97,7 +99,7 @@ export default function GamePage() {
       <GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} />
       {game.summary && <p className="sum">{game.summary}</p>}
       {game.recipe?.continuesFrom.length ? <p className="small muted" style={{ marginTop: 10 }}>Continues from {game.recipe.continuesFrom.join(', ')}. The game finds those saves itself.</p> : null}
-      {credits.length > 0 && (
+      {(credits.length > 0 || !hidden) && (
         <p className="xs muted" style={{ marginTop: 10, lineHeight: 1.6 }}>
           {credits.map((c) => (
             <span key={c.kind} style={{ display: 'block' }}>
@@ -106,6 +108,11 @@ export default function GamePage() {
               {c.made ? ', fitted by Renplay' : ''}
             </span>
           ))}
+          {!hidden && (
+            <button className="link" onClick={() => setPicker('grid')}>
+              Change art
+            </button>
+          )}
         </p>
       )}
     </>
@@ -180,7 +187,8 @@ export default function GamePage() {
       )}
       {admin && renpy && tab === 'files' && <FileBrowser game={game} />}
       {tab === 'walkthroughs' && <Details game={game} section="walkthroughs" />}
-      {tab === 'details' && <Details game={game} section="details" />}
+      {tab === 'details' && <Details game={game} section="details" onChangeArt={hidden ? undefined : setPicker} />}
+      {!hidden && <ArtPicker game={game} open={!!picker} initialKind={picker ?? 'grid'} onClose={() => setPicker(null)} />}
       {admin && tab === 'manage' && <Details game={game} section="manage" />}
       {!game.job && (
         <ActionBar watch={actsRef}>
@@ -254,6 +262,8 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
     </section>
   )
 }
+
+const ART_ROWS: Array<[ArtKind, string]> = [['grid', 'Grid'], ['wide', 'Wide'], ['hero', 'Hero'], ['logo', 'Logo'], ['icon', 'Icon']]
 
 const STATUS_OPTIONS = [
   { value: 'playing', label: 'Playing' },
@@ -352,7 +362,7 @@ function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
 }
 
 /** The Details, Walkthroughs and Manage panes: one component, so the shared actions and dialogs stay in one place. */
-function Details({ game, section }: { game: Game; section: 'details' | 'walkthroughs' | 'manage' }) {
+function Details({ game, section, onChangeArt }: { game: Game; section: 'details' | 'walkthroughs' | 'manage'; onChangeArt?: (kind: ArtKind) => void }) {
   const admin = useAuth().data?.user.role === 'admin'
   const { data: catalog } = useCatalog()
   const toast = useToast()
@@ -475,6 +485,26 @@ function Details({ game, section }: { game: Game; section: 'details' | 'walkthro
         )}
 
       {section === 'details' && <div className="stack">
+        <Card title="Art">
+          {onChangeArt ? (
+            <div className="list tight">
+              {ART_ROWS.map(([kind, label]) => {
+                const f = game.art[kind]
+                return (
+                  <div key={kind} className="row between" style={{ gap: 12, minHeight: 'var(--hit)' }}>
+                    <span className="grow">
+                      <span style={{ display: 'block', fontWeight: 600 }}>{label}</span>
+                      <span className="xs muted">{f ? <>{creditText(f.credit)}{f.made ? ', fitted by Renplay' : ''}</> : kind === 'logo' ? 'The title in text' : 'Not available yet'}</span>
+                    </span>
+                    <Pill variant="s" size="sm" onClick={() => onChangeArt(kind)}>Change</Pill>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="small muted">Pictures of this game are blurred at your adult games level, so its art cannot be chosen here.</p>
+          )}
+        </Card>
         <Card title="Installation">
           <div className="list tight">
             <Row label="Status">{STATUS[game.status]}</Row>
