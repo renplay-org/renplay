@@ -78,6 +78,8 @@ describe('status, rating, Not now and play history', () => {
     expect(history.games[0]).toMatchObject({ title: 'A Story', sessions: 2 })
     const sessions = history.days.flatMap((d: { sessions: Array<{ game: string; seconds: number }> }) => d.sessions)
     expect(sessions.map((s: { game: string; seconds: number }) => s.seconds).sort((a: number, b: number) => a - b)).toEqual([10, 20, 90])
+    // One game's history, for its game page.
+    expect((await request(app.app).get('/api/history?game=story').expect(200)).body.totals).toMatchObject({ seconds: 100, sessions: 2, games: 1 })
     // Off: the adult game's sessions are not in the history, and come back with the level.
     await request(app.app).put('/api/content').send({ level: 'off' }).expect(200)
     const off = (await request(app.app).get('/api/history').expect(200)).body

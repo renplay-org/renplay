@@ -7,6 +7,8 @@ const options = [
   { value: 'played', label: 'Last played' },
   { value: 'title', label: 'Title' },
   { value: 'added', label: 'Recently added' },
+  { value: 'rating', label: 'Rating' },
+  { value: 'time', label: 'Time played' },
 ]
 
 export default function SortMenu({ value, onChange }: { value: string; onChange: (value: string) => void }) {

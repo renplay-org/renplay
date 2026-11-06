@@ -870,6 +870,8 @@ main.mid {
 }
 .seg > button {
   min-width: 44px;
+  /* A segment never shrinks below its label: a long group scrolls (.seg.scroll) instead. */
+  flex: none;
 }
 .seg button {
   padding: 0 15px;
@@ -2616,4 +2618,37 @@ input[type="range"] {
   display: inline-flex;
   align-items: center;
   min-height: var(--hit);
+}
+
+/* Stars: five 44 px buttons. Filled pink when rated, an outline otherwise. */
+.stars {
+  display: flex;
+  gap: 0;
+}
+.stars button {
+  width: var(--hit);
+  height: var(--hit);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-4);
+  border-radius: 999px;
+}
+.stars button svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linejoin: round;
+}
+.stars button.on {
+  color: var(--pink);
+}
+.stars button.on svg {
+  fill: currentColor;
+}
+.stars button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 0;
 }

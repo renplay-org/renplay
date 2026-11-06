@@ -8,14 +8,27 @@ description: Play on phones and computers, install the home-screen app, and move
 Open **Search** in the header (also available on phones), or press **⌘K** on Apple devices and
 **Ctrl+K** elsewhere. Search titles, developers and tags across your library and the catalog,
 open a page, or resume your Up next game. Use arrow keys and Enter or tap a result. Catalog
-results show where to get the game; only admins see Add games, Activity and Users.
+results show where to get the game. Only admins see Add games, Activity and Users.
 Search follows your adult games level, as the library does.
 
 ## On a computer
 
 Open the game and press **Play**. The game paces itself to your display. A toolbar offers saves,
 fullscreen, mute and display options. **Up next** on the library home opens your latest save
-straight away; mark a story **Finished** on its page to leave it out.
+straight away.
+
+## Up next, status and ratings
+
+**Up next** holds the games you are playing, newest first. **Not now** takes a game out of it until
+you play it again. On a game's page, under **Play**, set its **Status**: Playing, Stalled, Dropped
+or Finished. Stalled, Dropped and Finished leave Up next, and your saves are kept. Rate a game with
+up to five stars. The library can sort by **Rating** and **Time played**.
+
+## History
+
+**Account → Play history** shows how long you played, day by day, and the time per game with your
+ratings and statuses. A game's page shows its last sessions. Renplay counts the time a game is open
+and in front of you. Each person has their own history.
 
 ## On a phone
 
@@ -38,7 +51,7 @@ The player explains this itself where a fullscreen button would not work.
 
 Use the fullscreen button in the player.
 
-Serve Renplay over HTTPS so the browser can cache the game and the home-screen app works; see
+Serve Renplay over HTTPS so the browser can cache the game and the home-screen app works. See
 [Reverse proxy and HTTPS](/install/reverse-proxy/).
 
 ## Saves and history

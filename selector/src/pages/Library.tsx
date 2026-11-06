@@ -12,7 +12,7 @@ import TagFilters from '../components/TagFilters'
 import Shelf from '../components/Shelf'
 import SortMenu from '../components/SortMenu'
 import { Button, Empty, errorText, useToast } from '../components/ui'
-import { post, slotName, type Game } from '../lib/api'
+import { del, post, slotName, type Game } from '../lib/api'
 import { ago, capitalize, pct, playedTime } from '../lib/format'
 import { useCatalog, useGames, useJobs } from '../lib/queries'
 import { gameTags, matchesSearch, tagChips } from '../lib/tags'
@@ -67,6 +67,12 @@ function stageMeta(g: Game) {
       <span>{save ? `${save.label} · ${ago(save.ctime)}` : 'Not played yet'}</span>
       <span className="sep">·</span>
       <span>{playedTime(g.playTime)}</span>
+      {g.rating && (
+        <>
+          <span className="sep">·</span>
+          <span aria-label={`Rated ${g.rating} of 5`}>{'★'.repeat(g.rating)}</span>
+        </>
+      )}
       {g.saves.count > 0 && (
         <>
           <span className="sep">·</span>
@@ -79,20 +85,37 @@ function stageMeta(g: Game) {
   )
 }
 
+/** Resume, the game page, and Not now, which takes the game out of Up next until it is played again. */
 function StageActions({ g }: { g: Game }) {
   const hidden = useHidden(g)
+  const qc = useQueryClient()
+  const toast = useToast()
+  const notNow = async () => {
+    try {
+      await post(`/api/games/${g.id}/not-now`)
+      await qc.invalidateQueries({ queryKey: ['games'] })
+      toast(
+        <>
+          {g.title} left Up next until you play it again.{' '}
+          <button className="link" onClick={() => void del(`/api/games/${g.id}/not-now`).then(() => qc.invalidateQueries({ queryKey: ['games'] }))}>
+            Undo
+          </button>
+        </>,
+      )
+    } catch (e) {
+      toast(errorText(e), 'error')
+    }
+  }
   return (
     <>
       <Pill variant="p" size="lg" icon={<Play />} to={resumeUrl(g)} onClick={() => travelToDoor(g, hidden)}>
         {g.latestSave ? 'Resume' : 'Play'}
       </Pill>
-      {g.latestSave && (
-        <Pill variant="s" size="lg" to={`/play/${g.id}`} onClick={() => travelToDoor(g, hidden)}>
-          Main menu
-        </Pill>
-      )}
-      <Pill variant="q" size="lg" to={`/game/${g.id}`}>
+      <Pill variant="s" size="lg" to={`/game/${g.id}`}>
         Game page
+      </Pill>
+      <Pill variant="q" size="lg" onClick={() => void notNow()}>
+        Not now
       </Pill>
     </>
   )
@@ -155,10 +178,15 @@ export default function Library() {
     .sort((a, b) => {
       if (sort === 'title') return a.title.localeCompare(b.title)
       if (sort === 'added') return Date.parse(b.createdAt) - Date.parse(a.createdAt) || a.title.localeCompare(b.title)
+      if (sort === 'rating') return (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title)
+      if (sort === 'time') return b.playTime - a.playTime || a.title.localeCompare(b.title)
       const time = (g: typeof a) => (sort === 'recent' ? Math.max(Date.parse(g.lastPlayedAt ?? '') || 0, Date.parse(g.createdAt)) : Date.parse(g.lastPlayedAt ?? '') || 0)
       return time(b) - time(a) || a.title.localeCompare(b.title)
     })
-  const upNext = all.filter((g) => g.status === 'installed' && !g.job && g.lastPlayedAt && !g.finishedAt).sort((a, b) => b.lastPlayedAt!.localeCompare(a.lastPlayedAt!))
+  // Up next: games in play. Stalled, Dropped and Finished retire a game, Not now hides it until it is played again.
+  const upNext = all
+    .filter((g) => g.status === 'installed' && !g.job && g.lastPlayedAt && !g.finishedAt && !['stalled', 'dropped', 'finished'].includes(g.playStatus ?? '') && !(g.notNowAt && g.notNowAt > g.lastPlayedAt))
+    .sort((a, b) => b.lastPlayedAt!.localeCompare(a.lastPlayedAt!))
   const favorites = all.filter((g) => g.favoriteAt).sort((a, b) => b.favoriteAt!.localeCompare(a.favoriteAt!))
   const added = all.filter((g) => !g.lastPlayedAt && g.status === 'installed' && !g.job && Date.now() - Date.parse(g.createdAt) < 7 * 86400000).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const updates = all.filter((g) => g.update)

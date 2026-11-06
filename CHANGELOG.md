@@ -22,6 +22,11 @@ release notes say what).
 - The Catalog has its own page, at the top left, and Activity is always one tap away in the header.
 - Every button and link has a 44 px touch area, and the layout fits phones from 390 px wide in portrait and landscape.
 - The reminder that sign-in is off is one sentence in Settings instead of a banner on every page.
+- Each game has a status for you, Playing, Stalled, Dropped or Finished, and a rating from one to five stars. Stalled, Dropped and Finished leave Up next. The Finished switch of 3.x is the same thing.
+- **Not now** on the library home takes a game out of Up next until you play it again, with Undo.
+- **Play history** shows your time day by day and per game, and a game's page shows its last sessions.
+- The library sorts by Rating and Time played.
+- A game's page has its sections in one row: Play, Saves, Walkthroughs, Mods and options, Details and Manage.
 
 ## [3.2.0] - 2026-11-06
 

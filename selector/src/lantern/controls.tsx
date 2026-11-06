@@ -105,6 +105,21 @@ export function Seg<T extends string>({
   )
 }
 
+/** Five stars, each a 44 px radio button. Tapping the rating it already has clears it. */
+export function Stars({ value, onChange, label = 'Your rating' }: { value: number; onChange: (value: number) => void; label?: string }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="stars">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" role="radio" aria-checked={value === n} aria-label={`${n} of 5`} className={n <= value ? 'on' : ''} onClick={() => onChange(value === n ? 0 : n)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3.2l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.2l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
+          </svg>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /** A switch: a 48 by 30 button with role="switch", its state exposed. */
 export function LanternSwitch({ checked, onChange, label }: { checked: boolean; onChange?: (v: boolean) => void; label: string }) {
   return <button type="button" role="switch" aria-checked={checked} aria-label={label} className={`sw ${checked ? 'on' : ''}`} onClick={() => onChange?.(!checked)} />

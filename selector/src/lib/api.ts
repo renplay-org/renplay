@@ -64,6 +64,14 @@ export interface Game {
   favoriteAt: string | null
   finishedAt: string | null
   playTime: number
+  /** The person's status. Stalled, Dropped and Finished leave Up next. */
+  playStatus: 'playing' | 'stalled' | 'dropped' | 'finished' | null
+  /** The person's rating, 1 to 5. */
+  rating: number | null
+  /** Not now: out of Up next until it is played again. */
+  notNowAt: string | null
+  /** How it plays on a phone, curated in the recipe. */
+  phone: 'great' | 'playable' | 'desktop' | null
   latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot'> | null
   free?: boolean
   renpyVersion: string | null

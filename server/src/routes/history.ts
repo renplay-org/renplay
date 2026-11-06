@@ -37,7 +37,9 @@ export function createHistoryRouter(db: Db, catalog: Catalog, accounts: Accounts
       visible.set(id, withProgress)
       return withProgress
     }
-    const all = (db.raw.prepare('SELECT game, started_at, ended_at, seconds FROM play_sessions WHERE user_id = ? ORDER BY ended_at DESC').all(user) as unknown as SessionRow[]).filter((s) => seen(s.game))
+    // ?game= narrows the history to one game, for its game page.
+    const only = typeof req.query['game'] === 'string' ? req.query['game'] : null
+    const all = (db.raw.prepare('SELECT game, started_at, ended_at, seconds FROM play_sessions WHERE user_id = ? ORDER BY ended_at DESC').all(user) as unknown as SessionRow[]).filter((s) => (!only || s.game === only) && seen(s.game))
     const title = (row: GameRow) => (row.recipe_id ? catalog.recipe(row.recipe_id)?.title : undefined) ?? row.title
     const icon = (row: GameRow) => catalog.gameArt(row).icon ?? null
 

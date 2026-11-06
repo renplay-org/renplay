@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Clock, Settings, Users } from 'lucide-react'
+import { Clock, History, Settings, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Avatar from '../components/Avatar'
 import AvatarUpload from '../components/AvatarUpload'
@@ -57,13 +57,16 @@ export default function Account() {
           </p>
         </div>
       </header>
-      {admin && (
-        <nav className="acct-nav hide-desk" aria-label="Account pages">
-          <Link to="/settings"><Settings /> Settings</Link>
-          <Link to="/settings/users"><Users /> Users</Link>
-          <Link to="/activity" className="full"><Clock /> Activity</Link>
-        </nav>
-      )}
+      <nav className="acct-nav" aria-label="Account pages">
+        <Link to="/history" className={admin ? '' : 'full'}><History /> Play history</Link>
+        {admin && (
+          <>
+            <Link to="/settings"><Settings /> Settings</Link>
+            <Link to="/settings/users"><Users /> Users</Link>
+            <Link to="/activity"><Clock /> Activity</Link>
+          </>
+        )}
+      </nav>
       {!me.auth && (
         <section className="panel" style={{ marginTop: 18 }}>
           <h2 className="h3">Sign-in is off</h2>
