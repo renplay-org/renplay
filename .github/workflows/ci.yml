@@ -152,8 +152,16 @@ jobs:
           helm-docs --chart-search-root charts/renplay
           git diff --exit-code -- charts/renplay/README.md
       - uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: chart-testing
+      # Test the chart with the image built from this commit: a release bumps appVersion before
+      # its image exists, and the chart should be tested with the code it ships with.
+      - name: Build the image for the chart test
+        run: |
+          docker build -t ghcr.io/renplay-org/renplay:chart-test .
+          kind load docker-image ghcr.io/renplay-org/renplay:chart-test --name chart-testing
       - name: Install and test on kind
-        run: ct install --config .github/ct.yaml --charts charts/renplay
+        run: ct install --config .github/ct.yaml --charts charts/renplay --helm-extra-set-args "--set=image.tag=chart-test --set=image.pullPolicy=Never"
 
   build:
     needs: [check, install-contract, docs, helm]
