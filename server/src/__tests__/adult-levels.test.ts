@@ -174,6 +174,7 @@ describe('the levels on every route', () => {
   let root = ''
   let app: App
   let zip = Buffer.alloc(0)
+  let archivesDir = ''
 
   beforeAll(async () => {
     zip = await zipBuffer({ 'game/script.rpyc': 'x', 'game/renpyweb_remote_files.txt': 'images/a.png\nimage 16,16\n' })
@@ -202,6 +203,7 @@ describe('the levels on every route', () => {
     mkdirSync(cfg.walkthroughsDir, { recursive: true })
     for (const id of ['adult', 'safe']) writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), '%PDF-1.4 fixture')
     mkdirSync(cfg.archivesDir, { recursive: true })
+    archivesDir = cfg.archivesDir
     for (const name of ['adult.zip', 'safe.zip', 'adult2.zip']) writeFileSync(join(cfg.archivesDir, name), '1234')
     const db = Db.open(cfg.dataDir)
     const recipe = (id: string, nsfw: boolean) => ({ id, title: id, nsfw, engine: 'renpy', saveDir: `${id}-1`, cover: `covers/${id}.png`, releases: [{ version: '1', status: 'verified', archives: [{ name: `${id}.zip`, size: 4 }] }] })
@@ -307,7 +309,9 @@ describe('the levels on every route', () => {
       const response = await (raw ? call.set('content-type', 'application/octet-stream').send(Buffer.from('mod content!!')) : call.send(body))
       expect(response.status, `${method} ${path}`).not.toBe(404)
     }
-    // Destructive verbs on the second adult game.
+    // Destructive verbs on the second adult game, once the retried install has finished
+    // (a download cannot be deleted while a job runs, whatever the level).
+    await expect.poll(() => app.jobs.isBusy()).toBe(false)
     await request(app.app).delete('/api/games/adult-two/download').expect(200)
     await request(app.app).delete('/api/games/adult-two').expect(200)
     expect(app.db.getGame('adult-two')).toMatchObject({ status: 'not_installed' })
@@ -325,6 +329,9 @@ describe('the levels on every route', () => {
 
   it('at off hides adult games from lists and refuses every route addressed to one with 404', async () => {
     await setLevel('off')
+    // The blurred test deleted the download of the recipe-less adult game. Put it back: at Off it
+    // must stay hidden because a hidden game was installed from it, though no recipe names it.
+    writeFileSync(join(archivesDir, 'adult2.zip'), '1234')
     // Lists leave adult games out.
     expect((await request(app.app).get('/api/games')).body.games.map((g: { id: string }) => g.id)).toEqual(['safe'])
     expect((await request(app.app).get('/api/catalog')).body.games.map((g: { id: string }) => g.id)).toEqual(['safe'])
@@ -362,6 +369,9 @@ describe('the levels on every route', () => {
       ['post', '/api/imports', { source: { kind: 'archive', path: 'adult.zip' } }],
       ['post', '/api/imports', { source: { kind: 'archive', path: 'safe.zip' }, recipeId: 'adult' }],
       ['post', '/api/archives/inspect', { path: 'adult.zip' }], ['post', '/api/archives/hash', { path: 'adult.zip' }],
+      ['post', '/api/archives/inspect', { path: 'adult2.zip' }], ['post', '/api/archives/hash', { path: 'adult2.zip' }],
+      ['post', '/api/imports', { source: { kind: 'archive', path: 'adult2.zip' } }],
+      ['delete', '/api/archives?path=adult.zip'], ['delete', '/api/archives?path=adult2.zip'],
       // The recipe-less adult game and the nginx subrequest too.
       ['get', '/api/games/adult-two'], ['get', '/g/adult-two/b1/game.zip'],
     ]

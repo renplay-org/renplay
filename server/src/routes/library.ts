@@ -51,12 +51,31 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
 
   // ---- archives -------------------------------------------------------------
 
+  // Off: an adult game does not exist, so neither does its download: one a recipe for an
+  // adult game names, or one a hidden game was installed from (also a game without a recipe).
+  const archiveHidden = (rel: string, size?: number): boolean => {
+    const row = db.getArchive(rel)
+    const match = catalog.match({ name: rel, size: size ?? row?.size, sha256: row?.sha256 || undefined })
+    if (catalog.content.hidesRecipe(match?.recipe.nsfw)) return true
+    let hidden = false
+    for (const g of db.allGames()) {
+      if (parseJson<GameSource>(g.source, {}).archive !== rel) continue
+      if (!catalog.content.hides(g)) return false
+      hidden = true
+    }
+    return hidden
+  }
+
   router.get('/archives', async (_req, res) => {
     const files = await listArchiveFiles(cfg.archivesDir)
     const installedBy = new Map<string, string>()
-    for (const g of db.allGames().filter((g) => !catalog.content.hides(g))) {
+    // Off: the download of a hidden game is hidden too, also when no recipe names it.
+    const hiddenSources = new Set<string>()
+    for (const g of db.allGames()) {
       const s = parseJson<GameSource>(g.source, {})
-      if (s.archive) installedBy.set(s.archive, g.id)
+      if (!s.archive) continue
+      if (catalog.content.hides(g)) hiddenSources.add(s.archive)
+      else installedBy.set(s.archive, g.id)
     }
     const known = new Map(db.allArchives().map((a) => [a.path, a]))
     for (const k of known.keys()) if (!files.some((f) => f.rel === k)) db.deleteArchive(k)
@@ -71,6 +90,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
         const match = catalog.match({ name: f.rel, size: f.size, sha256: sha256 ?? undefined })
         // Off: an adult game does not exist, so its download does not appear in Add games.
         if (match && catalog.content.hidesRecipe(match.recipe.nsfw)) return null
+        if (hiddenSources.has(f.rel) && !installedBy.has(f.rel)) return null
         return {
           path: f.rel,
           name: basename(f.rel),
@@ -102,9 +122,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     const full = safeJoin(cfg.archivesDir, rel)
     const st = await stat(full).catch(() => null)
     if (!st) throw new HttpError(404, 'Archive not found')
-    // Off: an adult game does not exist, so neither does its download.
-    const match = catalog.match({ name: rel, size: st.size, sha256: db.getArchive(rel)?.sha256 || undefined })
-    if (catalog.content.hidesRecipe(match?.recipe.nsfw)) throw new HttpError(404, 'Archive not found')
+    if (archiveHidden(rel, st.size)) throw new HttpError(404, 'Archive not found')
     const info = await inspectArchive(full)
     const prev = db.getArchive(rel)
     db.upsertArchive({
@@ -120,15 +138,14 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
 
   router.post('/archives/hash', (req, res) => {
     const rel = cleanRelPath(req.body?.path)
-    const row = db.getArchive(rel)
-    if (catalog.content.hidesRecipe(catalog.match({ name: rel, size: row?.size, sha256: row?.sha256 || undefined })?.recipe.nsfw)) throw new HttpError(404, 'Archive not found')
+    if (archiveHidden(rel)) throw new HttpError(404, 'Archive not found')
     res.json({ jobId: jobs.enqueue('hash-archive', '', { path: rel }) })
   })
 
   router.delete('/archives', async (req, res) => {
     const rel = cleanRelPath(req.query['path'])
     const full = safeJoin(cfg.archivesDir, rel)
-    if (!(await exists(full))) throw new HttpError(404, 'Archive not found')
+    if (!(await exists(full)) || archiveHidden(rel)) throw new HttpError(404, 'Archive not found')
     await unlink(full)
     db.deleteArchive(rel)
     res.json({ ok: true })
@@ -151,8 +168,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     // Off: an adult game does not exist, so its download cannot be installed either.
     {
       const st = await stat(safeJoin(cfg.archivesDir, rel)).catch(() => null)
-      const match = st ? catalog.match({ name: rel, size: st.size, sha256: db.getArchive(rel)?.sha256 || undefined }) : null
-      if (catalog.content.hidesRecipe(match?.recipe.nsfw) || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId) && catalog.content.hidesRecipe(true))) throw new HttpError(404, 'Game not found')
+      if ((st && archiveHidden(rel, st.size)) || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId) && catalog.content.hidesRecipe(true))) throw new HttpError(404, 'Game not found')
     }
     const id = jobs.enqueue('import', b.game ?? '', {
       source,
