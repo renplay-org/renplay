@@ -22,7 +22,7 @@ import { playedTime } from '../components/UpNext'
 import { useAdultView } from '../lib/adult'
 import FavoriteButton from '../components/FavoriteButton'
 import GameTags from '../components/GameTags'
-import { Cover } from '../components/GameCard'
+import { Cover, creditText, hashUrl } from '../components/GameCard'
 import SaveGallery from '../components/SaveGallery'
 import { BetaBadge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { api, del, post, slotName, type Game } from '../lib/api'
@@ -62,7 +62,11 @@ export default function GamePage() {
 
   const installed = game.status === 'installed'
   const renpy = game.family === 'renpy'
-  const backdrop = game.art === 'hidden' || (game.nsfw && view !== 'shown') ? null : game.cover
+  // The hero behind the page. Below Shown an adult game's hero is its hash: colour, no picture.
+  const hero = game.art.hero ?? game.art.grid
+  const hidden = game.nsfw && view !== 'shown'
+  const backdrop = (!hidden && hero?.url1x) || hashUrl(hero?.thumbhash)
+  const credits = hidden ? [] : (['grid', 'hero'] as const).map((kind) => ({ kind, credit: game.art[kind]?.credit, made: game.art[kind]?.made })).filter((c, i, all) => c.credit && all.findIndex((o) => JSON.stringify(o.credit) === JSON.stringify(c.credit)) === i)
   const primary = () => navigate(`/play/${gameId}${latest ? `?resume=${encodeURIComponent(slotName(latest.file))}` : ''}`)
 
   return (
@@ -77,7 +81,14 @@ export default function GamePage() {
             <ArrowLeft className="size-4" /> Library
           </Link>
           <div className="grid grid-cols-[132px_minmax(0,1fr)] gap-4 sm:grid-cols-[340px_minmax(0,1fr)] sm:gap-8 lg:items-start">
-          <Cover game={game} className="aspect-[63/50] w-full shrink-0 shadow-2xl ring-1 ring-white/10" />
+          <div className="min-w-0">
+            <Cover game={game} className="aspect-[63/50] w-full shrink-0 shadow-2xl ring-1 ring-white/10" />
+            {credits.length > 0 && (
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                {credits.map((c, i) => <span key={c.kind} className="block">{credits.length > 1 ? `${c.kind === 'grid' ? 'Poster' : 'Background'} ` : 'Art '}{creditText(c.credit)}{c.made ? ', fitted by Renplay' : ''}</span>)}
+              </p>
+            )}
+          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-3">
               <h1 className="min-w-0 flex-1 font-display text-2xl font-bold tracking-tight text-white sm:text-4xl">{game.title}</h1>

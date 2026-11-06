@@ -30,7 +30,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
     ...pages.map(p => ({ id: p.url, title: p.title, subtitle: p.url === '/add' ? 'Page · Add a game' : 'Page', action: () => go(p.url) })),
   ].filter(r => `${r.title} ${r.subtitle}`.toLowerCase().includes(query.toLowerCase()))
   results.push(...(games ?? []).filter(g => matchesSearch(g, query, vocabulary)).slice(0, 30).map(g => ({ id: `game:${g.id}`, title: g.title, subtitle: `Library${g.developer ? ` · ${g.developer}` : ''}`, cover: g, action: () => go(`/game/${g.id}`) })))
-  results.push(...(catalog?.games ?? []).filter(r => !r.local && matchesSearch(r, query, vocabulary)).slice(0, 30).map(r => ({ id: `recipe:${r.id}`, title: r.title, subtitle: `Catalog${r.developer ? ` · ${r.developer}` : ''}`, cover: { title: r.title, cover: r.cover ?? null, nsfw: r.nsfw }, action: () => setRecipe(r) })))
+  results.push(...(catalog?.games ?? []).filter(r => !r.local && matchesSearch(r, query, vocabulary)).slice(0, 30).map(r => ({ id: `recipe:${r.id}`, title: r.title, subtitle: `Catalog${r.developer ? ` · ${r.developer}` : ''}`, cover: r, action: () => setRecipe(r) })))
   const index = Math.min(active, Math.max(0, results.length - 1))
   useEffect(() => { input.current?.focus() }, [])
   useEffect(() => { list.current?.querySelector(`[data-index="${index}"]`)?.scrollIntoView({ block: 'nearest' }) }, [index])

@@ -38,7 +38,7 @@ Other engines are added only when their normal download plays as easily; the
   desktop version, export them back, or copy them between games.
 - **One-click installs.** Drop in the PC zip (or 7z, rar). Renplay unpacks it, shrinks the images
   and prepares it for the web. No Ren’Py SDK, and the game’s code never runs on your server.
-- **A curated catalog.** Known games get their proper title, cover, links and tested settings from
+- **A curated catalog.** Known games get their proper title, art, links and tested settings from
   the [catalog](https://renplay.org/catalog), and Renplay tells you when a newer tested
   version exists.
 - **Resume in one tap.** Up next opens your latest save straight away, with play time and your
@@ -89,7 +89,7 @@ More in the docs: [Docker Compose](https://docs.renplay.org/install/docker/),
 [troubleshooting](https://docs.renplay.org/troubleshooting/).
 
 **Back up `/data` and keep it on local disk:** it holds your saves and their history, accounts,
-the SQLite library, mods and covers. SQLite must not be on a network share. `/games` and the
+the SQLite library, mods and the art cache. SQLite must not be on a network share. `/games` and the
 archives folder can be shares. Allow about twice the game's download size free during install.
 Downloads are kept by default. Turn off **Keep downloads** in Settings to delete only uploads
 through Renplay after a successful install. Files copied in are never deleted automatically.
@@ -159,7 +159,7 @@ More in the [FAQ](https://docs.renplay.org/faq/).
 - [CONTRIBUTING.md](CONTRIBUTING.md): the short version
 - [AGENTS.md](AGENTS.md): product rules and lessons learned, for people and AI agents alike
 - [CHANGELOG.md](CHANGELOG.md): what changed in each version
-- Related: [catalog](https://renplay.org/github/catalog) (recipes and covers),
+- Related: [catalog](https://renplay.org/github/catalog) (recipes and art),
   [engines](https://renplay.org/github/engines) (Ren’Py web engines),
   [website](https://renplay.org)
 

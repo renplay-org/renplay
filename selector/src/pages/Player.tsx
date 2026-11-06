@@ -465,7 +465,7 @@ export default function Player() {
 
       {/* Loader */}
       <div className={cx('absolute inset-0 z-10 flex flex-col items-center justify-center bg-black transition-opacity duration-700', ready || (portrait && !portraitOk) ? 'pointer-events-none opacity-0' : 'opacity-100')}>
-        <Cover game={game} rounded={false} className="absolute inset-0 scale-110 opacity-40 blur-2xl" />
+        <Cover game={game} kind="hero" rounded={false} className="absolute inset-0 scale-110 opacity-40 blur-2xl" />
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative flex w-full max-w-md flex-col items-center px-8 text-center">
           <Cover game={game} className="mb-8 aspect-[63/50] w-56 shadow-2xl ring-1 ring-white/15 sm:w-64" />

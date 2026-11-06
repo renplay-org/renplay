@@ -1,7 +1,8 @@
 import { ArrowUpCircle, Heart, Play } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import type { Game } from '../lib/api'
+import { thumbHashToDataURL } from 'thumbhash'
+import type { ArtCredit, ArtKind, ArtSet, Game } from '../lib/api'
 import { ago, capitalize, pct } from '../lib/format'
 import { useAdultView } from '../lib/adult'
 import { Badge, BetaBadge, cx, Progress } from './ui'
@@ -28,41 +29,60 @@ export function TitleTile({ title }: { title: string }) {
   )
 }
 
+/** A ThumbHash as an image address: the picture's colours and shapes in a few bytes. */
+export function hashUrl(hash: string | null | undefined): string | null {
+  if (!hash) return null
+  try {
+    return thumbHashToDataURL(Uint8Array.from(atob(hash), (c) => c.charCodeAt(0)))
+  } catch {
+    return null
+  }
+}
+
 /**
- * A game's cover in a frame of any shape. Art that does not match the frame's
- * shape is shown whole, over a blurred copy of itself, so logos are never cut
- * off. Below Shown, an adult game's cover is a title card with an 18+ tag and
- * its art is never requested.
+ * One of a game's formats in a frame of any shape. The ThumbHash shows at once and the picture
+ * fades in over it. A picture that does not match the frame's shape is shown whole, over a blurred
+ * copy of itself. Below Shown an adult game is its hash with an 18+ tag, and the server sends no
+ * address, so nothing is requested. A game with no picture at all is a title card.
  */
-export function Cover({ game, className, rounded = true }: { game: Pick<Game, 'title' | 'cover'> & { nsfw?: boolean; art?: 'hidden' }; className?: string; rounded?: boolean }) {
-  const [failed, setFailed] = useState(false)
-  const [fit, setFit] = useState<'cover' | 'contain' | null>(null)
+export function Cover({ game, kind = 'grid', className, rounded = true }: { game: Pick<Game, 'title'> & { art?: ArtSet; nsfw?: boolean }; kind?: ArtKind; className?: string; rounded?: boolean }) {
+  const [failed, setFailed] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState<string | null>(null)
+  const [fit, setFit] = useState<'cover' | 'contain'>('cover')
   const view = useAdultView()
   const frame = useRef<HTMLDivElement>(null)
-  const src = game.cover
-  const hidden = game.art === 'hidden' || (!!game.nsfw && view !== 'shown')
+  const format = game.art?.[kind] ?? (kind !== 'grid' ? game.art?.grid : undefined)
+  const hidden = !!game.nsfw && view !== 'shown'
+  const src = !hidden && format?.url1x && format.url1x !== failed ? format.url1x : null
+  const hash = hashUrl(format?.thumbhash)
   return (
-    <div ref={frame} className={cx('@container relative overflow-hidden bg-ink-800', rounded && 'rounded-2xl', className)}>
-      {!hidden && !fit && !failed && src && <div className="skeleton absolute inset-0" />}
-      {src && !failed && !hidden ? (
-        <div className={cx('absolute inset-0 transition-opacity duration-500', fit ? 'opacity-100' : 'opacity-0', hidden && 'scale-110 blur-2xl')}>
-          {fit === 'contain' && <img src={src} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover opacity-60 blur-xl" />}
-          <img
-            src={src}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onLoad={(e) => {
-              const img = e.currentTarget
-              const box = frame.current
-              const art = img.naturalWidth / img.naturalHeight
-              const shape = box && box.clientHeight ? box.clientWidth / box.clientHeight : art
-              setFit(Math.abs(art - shape) / shape > 0.12 ? 'contain' : 'cover')
-            }}
-            onError={() => setFailed(true)}
-            className={cx('absolute inset-0 size-full', fit === 'contain' ? 'object-contain drop-shadow-2xl' : 'object-cover')}
-          />
-        </div>
+    <div ref={frame} className={cx('@container relative overflow-hidden bg-ink-800', rounded && 'rounded-2xl', className)} style={format?.tint ? { backgroundColor: format.tint } : undefined}>
+      {format ? (
+        <>
+          {hash && <img src={hash} alt="" aria-hidden="true" className={cx('absolute inset-0 size-full object-cover', hidden && 'scale-110 blur-md')} />}
+          {src && (
+            <div className={cx('absolute inset-0 transition-opacity duration-300', loaded === src ? 'opacity-100' : 'opacity-0')}>
+              {fit === 'contain' && <img src={src} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover opacity-60 blur-xl" />}
+              <img
+                src={src}
+                srcSet={format.url2x && format.url2x !== src ? `${src} 1x, ${format.url2x} 2x` : undefined}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onLoad={(e) => {
+                  const img = e.currentTarget
+                  const box = frame.current
+                  const art = img.naturalWidth / img.naturalHeight
+                  const shape = box && box.clientHeight ? box.clientWidth / box.clientHeight : art
+                  setFit(Math.abs(art - shape) / shape > 0.12 ? 'contain' : 'cover')
+                  setLoaded(src)
+                }}
+                onError={() => setFailed(src)}
+                className={cx('absolute inset-0 size-full', fit === 'contain' ? 'object-contain drop-shadow-2xl' : 'object-cover')}
+              />
+            </div>
+          )}
+        </>
       ) : (
         <TitleTile title={game.title} />
       )}
@@ -73,6 +93,16 @@ export function Cover({ game, className, rounded = true }: { game: Pick<Game, 't
       )}
     </div>
   )
+}
+
+/** Where a picture came from, as one short phrase. */
+export function creditText(credit: ArtCredit | undefined): ReactNode {
+  if (!credit) return null
+  if ('by' in credit) return <>by {credit.asset ? <a href={credit.asset} target="_blank" rel="noreferrer" className="underline decoration-white/30 hover:decoration-white">{credit.by}</a> : credit.by} on SteamGridDB</>
+  if ('store' in credit) return <>from {credit.store}</>
+  if ('renplay' in credit) return <>Default art by Renplay</>
+  if ('upload' in credit) return <>uploaded</>
+  return <>from the developer</>
 }
 
 export default function GameCard({ game, index = 0 }: { game: Game; index?: number }) {

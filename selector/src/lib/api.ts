@@ -15,6 +15,29 @@ export interface JobsResponse {
   total: number
 }
 
+export type ArtKind = 'grid' | 'wide' | 'hero' | 'logo' | 'icon'
+/** Where a picture came from: a SteamGridDB author, a store, Renplay, the developer or an upload. */
+export type ArtCredit = { by: string; byUrl?: string; asset?: string } | { store: 'Steam' | 'itch.io' } | { renplay: true } | { developer: true } | { upload: true }
+/**
+ * One format, made by the server. Below Shown an adult game's formats carry only `thumbhash` and
+ * `tint`: no address. A format not made yet has its source's hash and no address for a moment.
+ */
+export interface ArtFormat {
+  url1x?: string | null
+  url2x?: string | null
+  width?: number
+  height?: number
+  thumbhash: string | null
+  tint: string | null
+  /** How it was made: null for real art in the shape. */
+  made?: null | 'crop' | 'composed' | 'glow' | 'whole'
+  source?: string
+  credit?: ArtCredit
+  /** A dark logo, inverted on ink. */
+  dark?: boolean
+}
+export type ArtSet = Partial<Record<ArtKind, ArtFormat>>
+
 export interface Game {
   id: string
   title: string
@@ -24,8 +47,8 @@ export interface Game {
   content: string[]
   state: GameState | null
   summary: string | null
-  /** Curated cover from the catalog (URL), or null. */
-  cover: string | null
+  /** The five formats, made by the server from the catalog's pictures and people's choices. */
+  art: ArtSet
   /** An adult game, per its recipe. */
   nsfw: boolean
   walkthrough: string | null
@@ -42,8 +65,6 @@ export interface Game {
   finishedAt: string | null
   playTime: number
   latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot'> | null
-  /** Blurred: the server sends no picture of this adult game, only what a placeholder needs. */
-  art?: 'hidden'
   free?: boolean
   renpyVersion: string | null
   engine: string | null
@@ -135,7 +156,7 @@ export interface Archive {
   sha256: string | null
   info: ArchiveInfo | null
   installedAs: string | null
-  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean } | null
+  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; art: ArtSet; nsfw: boolean } | null
   existingGame: string | null
   /** Why this download cannot be installed here (an adult game on a safe-for-work install). */
   blocked: string | null
@@ -172,7 +193,7 @@ export interface Recipe {
   summary?: string
   nsfw?: boolean
   free?: boolean
-  cover?: string | null
+  art?: ArtSet
   links?: Record<string, string>
   saveDir?: string
   continuesFrom?: string[]

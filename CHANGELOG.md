@@ -14,6 +14,10 @@ release notes say what).
 - `RENPLAY_ADULT_GAMES` and `RENPLAY_ADULT_DEFAULT` take `off`, `blurred` or `shown`. The 3.x values still work, `allow` as Shown and `block` as Off.
 - Sign-in groups set levels with `RENPLAY_OIDC_ADULT_GROUPS` and `RENPLAY_LDAP_ADULT_GROUPS`, for example `renplay-adults=shown,renplay-family=blurred`. A configured group replaces the setting in Users. The 3.x single group variables still work.
 - Upgrading keeps what each person saw: access becomes their account's level, and their 3.x picture preference becomes their own level, so hidden pictures stay hidden.
+- Games have art in five formats, the shapes SteamGridDB uses: a 600 × 900 poster, a wide banner, a hero for the top of the game page, a logo and an icon. Pictures come from the catalog (Steam, itch.io, SteamGridDB credited to their author, the developer). Renplay keeps them in its data folder and makes any missing format from the others, without adding text. The game page says where its art came from.
+- Pictures show their colours the moment a page opens and sharpen as they load.
+- You can choose another picture for yourself, or upload your own, and an admin can choose for everyone (the picker comes in a later step of 4.0).
+- The catalog is read from `index.v4.json`. A catalog in the older format still works, its cover becoming the poster.
 
 ## [3.2.0] - 2026-11-06
 

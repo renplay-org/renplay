@@ -162,8 +162,8 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   )
   return (
     <div className="flex gap-3 rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.07] sm:items-center sm:gap-4">
-      {a.recipe?.cover ? (
-        <Cover game={{ title, cover: a.recipe.cover, nsfw: a.recipe.nsfw }} className="aspect-[63/50] w-20 shrink-0 self-start rounded-xl sm:w-24 sm:self-center" rounded={false} />
+      {a.recipe?.art.grid ? (
+        <Cover game={{ title, art: a.recipe.art, nsfw: a.recipe.nsfw }} className="aspect-[63/50] w-20 shrink-0 self-start rounded-xl sm:w-24 sm:self-center" rounded={false} />
       ) : (
         <div className="flex aspect-[63/50] w-20 shrink-0 items-center justify-center self-start rounded-xl bg-white/[0.05] text-zinc-500 sm:w-24 sm:self-center">
           <FileArchive className="size-6" />
