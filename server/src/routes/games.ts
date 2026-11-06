@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import YAML from 'yaml'
+import { viewer } from '../accounts-context.js'
 import type { Accounts } from '../auth.js'
 import type { Builds } from '../builds.js'
 import { installedRelease, type Catalog } from '../catalog.js'
@@ -97,7 +98,8 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     walkthrough: row.walkthrough || null,
     status: row.status,
     build: row.build || null,
-    playUrl: row.status === 'installed' && row.build ? (row.family !== 'renpy' && deps.accounts ? deps.accounts.assetUrl(row) : playPath(row)) : null,
+    // The game page is an iframe, which sends no header: this device's level rides along as a query.
+    playUrl: row.status === 'installed' && row.build ? (row.family !== 'renpy' && deps.accounts ? deps.accounts.assetUrl(row) : playPath(row) + (viewer()?.device ? `?adult=${viewer()!.device}` : '')) : null,
     family: row.family || 'renpy',
     /** What made the game, for other engines ("HTML (SugarCube 2.36.1)"). */
     engineLabel: row.engine_label || null,

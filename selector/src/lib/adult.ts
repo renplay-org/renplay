@@ -1,13 +1,13 @@
 import { useSyncExternalStore } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, put } from './api'
-import { useAuth } from './auth'
+import { DEVICE_EVENT, deviceLevel, setDeviceLevel } from './device'
 
 /**
  * The three adult levels, ordered so each one shows more than the previous.
  * Off: adult games do not exist. Blurred: they show without their pictures.
- * Shown: everything. The server enforces the person's level; this device can
- * only go lower, in this browser.
+ * Shown: everything. The server enforces the person's level and this device's,
+ * which can only go lower.
  */
 export type AdultLevel = 'off' | 'blurred' | 'shown'
 export const adultLevels: AdultLevel[] = ['off', 'blurred', 'shown']
@@ -41,51 +41,24 @@ export function useSetAdultChoice() {
   }
 }
 
-const EVENT = 'renplay:adult-device'
+/** This device's level, or null when it follows the person's choice. Changing it reloads everything, since the server applies it. */
+export function useDeviceLevel(): [AdultLevel | null, (level: AdultLevel | null) => void] {
+  const qc = useQueryClient()
+  const stored = useSyncExternalStore(subscribe, deviceLevel)
+  const set = (level: AdultLevel | null) => {
+    setDeviceLevel(level === 'off' || level === 'blurred' ? level : null)
+    void qc.invalidateQueries()
+  }
+  return [stored, set]
+}
+
 function subscribe(cb: () => void) {
   window.addEventListener('storage', cb)
-  window.addEventListener(EVENT, cb)
+  window.addEventListener(DEVICE_EVENT, cb)
   return () => {
     window.removeEventListener('storage', cb)
-    window.removeEventListener(EVENT, cb)
+    window.removeEventListener(DEVICE_EVENT, cb)
   }
-}
-const deviceKey = (user: number | undefined) => `renplay:adult-device:${user ?? ''}`
-
-/**
- * 3.x kept two device settings: a blur switch for every account and a picture
- * mode per account. Each becomes this device's level once, then goes away.
- */
-function migrateDevice(user: number) {
-  const key = deviceKey(user)
-  const picturesKey = `renplay:adult-pictures:${user}`
-  const pictures = localStorage.getItem(picturesKey)
-  const blur = localStorage.getItem('renplay:blur-adult-covers')
-  if (localStorage.getItem(key) === null) {
-    const level = pictures === 'hide-games' ? 'off' : pictures === 'hide-pictures' || blur === '1' ? 'blurred' : null
-    if (level) localStorage.setItem(key, level)
-  }
-  if (pictures !== null) localStorage.removeItem(picturesKey)
-  if (blur !== null) localStorage.removeItem('renplay:blur-adult-covers')
-}
-
-const migrated = new Set<number>()
-
-/** This device's level for the signed-in person, or null when it follows their choice. */
-export function useDeviceLevel(): [AdultLevel | null, (level: AdultLevel | null) => void] {
-  const user = useAuth().data?.user.id
-  // Before the first read, so an old blur setting never lets a picture through.
-  if (user !== undefined && !migrated.has(user)) {
-    migrated.add(user)
-    migrateDevice(user)
-  }
-  const stored = useSyncExternalStore(subscribe, () => localStorage.getItem(deviceKey(user)))
-  const set = (level: AdultLevel | null) => {
-    if (level) localStorage.setItem(deviceKey(user), level)
-    else localStorage.removeItem(deviceKey(user))
-    window.dispatchEvent(new Event(EVENT))
-  }
-  return [isLevel(stored) ? stored : null, set]
 }
 
 /**

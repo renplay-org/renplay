@@ -1,4 +1,5 @@
 import { keepaliveToken } from '../auth.js'
+import type { Catalog } from '../catalog.js'
 import { keepDownloads } from '../downloads.js'
 import { statfs } from 'node:fs/promises'
 import { Router } from 'express'
@@ -20,7 +21,7 @@ async function disk(path: string) {
   }
 }
 
-export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode): Router {
+export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode, catalog: Catalog): Router {
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/health', (_req, res) => {
@@ -105,8 +106,11 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
     }
     const limit = Math.max(1, Math.min(200, pageNumber(req.query['limit'], 30)))
     const offset = pageNumber(req.query['offset'], 0)
+    // Off: hidden jobs are left out before paging, so pages, the total and busy only count what this person may see.
+    const visible = content.viewerLevel() === 'off' ? db.listJobs(Number.MAX_SAFE_INTEGER, 0).filter((j) => !catalog.jobHidden(j)) : null
+    const page = visible ? visible.slice(offset, offset + limit) : db.listJobs(limit, offset)
     res.json({
-      jobs: db.listJobs(limit, offset).filter((j) => !content.hides(j.game ? db.getGame(j.game) : null)).map((j) => ({
+      jobs: page.map((j) => ({
         id: j.id,
         type: j.type,
         game: j.game,
@@ -121,15 +125,15 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
         startedAt: j.started_at || null,
         finishedAt: j.finished_at || null,
       })),
-      busy: jobs.isBusy(),
-      total: db.countJobs(),
+      busy: visible ? visible.some((j) => j.status === 'running') : jobs.isBusy(),
+      total: visible ? visible.length : db.countJobs(),
     })
   })
 
   /** The job, unless it belongs to a game that does not exist for this person. */
   const visibleJob = (id: string) => {
     const j = db.getJob(id)
-    if (!j || content.hides(j.game ? db.getGame(j.game) : null)) throw new HttpError(404, 'Job not found')
+    if (!j || catalog.jobHidden(j)) throw new HttpError(404, 'Job not found')
     return j
   }
 

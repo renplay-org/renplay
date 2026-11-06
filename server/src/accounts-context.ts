@@ -20,7 +20,13 @@ export interface User {
   avatar: string
   avatar_uploaded: number
 }
-export interface Viewer { user: User; session: string; bearer: boolean }
+export interface Viewer {
+  user: User
+  session: string
+  bearer: boolean
+  /** This device's level, sent by the browser. It can only narrow what the person may see. */
+  device?: 'off' | 'blurred'
+}
 /** Request-local permissions; background installs deliberately have no viewer. */
 export const viewers = new AsyncLocalStorage<Viewer>()
 export const viewer = () => viewers.getStore()

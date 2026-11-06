@@ -251,11 +251,8 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
 /** All save folders (including ones without a game) as one zip. */
 export function createSavesExportAll(store: SaveStore, db: Db, content: ContentMode) {
   return async (_req: Request, res: express.Response) => {
-    const restricted = content.hides({ adult: 0, recipe_id: '' })
-    const dirs = new Set(restricted ? [] : await store.listDirs())
-    for (const g of db.allGames()) if (g.save_dir) dirs.add(g.save_dir)
-    // The export is of what this Renplay shows; hidden games' saves stay where they are.
-    for (const g of db.allGames()) if (g.save_dir && content.hides(g)) dirs.delete(g.save_dir)
+    // The export is of what this person may see. Hidden games' saves stay where they are.
+    const dirs = new Set(content.visibleSaveDirs([...await store.listDirs(), ...db.allGames().map((g) => g.save_dir).filter(Boolean)]))
     res.attachment(`renplay-saves-${new Date().toISOString().slice(0, 10)}.zip`)
     res.type('application/zip')
     await store.exportZip([...dirs], res, { includeTokens: true })

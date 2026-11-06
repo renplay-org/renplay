@@ -6,7 +6,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import yazl from 'yazl'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
-import { groupCeiling, parseAdultGroups, parseAdultLevel } from '../content.js'
+import { groupCeiling, legacyMirror, parseAdultGroups, parseAdultLevel } from '../content.js'
+import { adultFlag } from '../pipeline/import.js'
 import { Db } from '../db.js'
 import { readZipEntries } from '../saves/savefile.js'
 import { groupCns } from '../sign-in-providers.js'
@@ -184,6 +185,7 @@ describe('the levels on every route', () => {
   let app: App
   let zip = Buffer.alloc(0)
   let archivesDir = ''
+  let gamesDir = ''
 
   beforeAll(async () => {
     zip = await zipBuffer({ 'game/script.rpyc': 'x', 'game/renpyweb_remote_files.txt': 'images/a.png\nimage 16,16\n' })
@@ -213,6 +215,7 @@ describe('the levels on every route', () => {
     for (const id of ['adult', 'safe']) writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), '%PDF-1.4 fixture')
     mkdirSync(cfg.archivesDir, { recursive: true })
     archivesDir = cfg.archivesDir
+    gamesDir = cfg.gamesDir
     for (const name of ['adult.zip', 'safe.zip', 'adult2.zip']) writeFileSync(join(cfg.archivesDir, name), '1234')
     const db = Db.open(cfg.dataDir)
     const recipe = (id: string, nsfw: boolean) => ({ id, title: id, nsfw, engine: 'renpy', saveDir: `${id}-1`, cover: `covers/${id}.png`, releases: [{ version: '1', status: 'verified', archives: [{ name: `${id}.zip`, size: 4 }] }] })
@@ -248,10 +251,44 @@ describe('the levels on every route', () => {
     expect((await request(app.app).put('/api/content').send({ level })).body.installation.level).toBe(level)
   }
 
-  it('registers exactly the routes this matrix classifies', () => {
-    const visit = (stack: any[]): number => (stack ?? []).reduce((n: number, layer: any) => n + (layer.route ? 1 : layer.handle?.stack ? visit(layer.handle.stack) : 0), 0)
-    // Update this number and the matrix below together when a route is added or removed.
-    expect(visit((app.app as any).router.stack)).toBe(86)
+  /**
+   * Every registered route, with what the levels do on it. A route added later changes this list,
+   * and the test fails until it is classified here (and, for a new kind, tested below).
+   * person: the person's own account and actions, nothing about any game.
+   * game: addressed to one game, 404 at Off, no art at Blurred (the matrix below calls each).
+   * list: lists and counts, adult games left out at Off and without art at Blurred.
+   * tool: admin tools that name games or downloads, filtered by the admin's own level.
+   * none: says nothing about any game.
+   */
+  const ROUTES: Array<[route: string, kind: 'person' | 'game' | 'list' | 'tool' | 'none']> = [
+    ['GET /auth/providers', 'none'], ['GET /auth/oidc/start', 'person'], ['GET /auth/oidc/callback', 'person'],
+    ['POST /me/identities/oidc', 'person'], ['POST /me/identities/ldap', 'person'], ['GET /me/identities', 'person'], ['DELETE /me/identities', 'person'],
+    ['POST /me/avatar', 'person'], ['GET /avatars/:file', 'person'], ['POST /auth/setup/verify', 'none'], ['POST /auth/setup', 'person'],
+    ['POST /auth/login', 'person'], ['POST /auth/logout', 'person'], ['GET /me', 'person'], ['PUT /me', 'person'], ['POST /me/password', 'person'],
+    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/sessions', 'person'], ['DELETE /me/sessions', 'person'], ['DELETE /me/sessions/:id', 'person'],
+    ['GET /me/tokens', 'person'], ['POST /me/tokens', 'person'], ['DELETE /me/tokens/:id', 'person'],
+    ['GET /users', 'tool'], ['POST /users', 'person'], ['PUT /users/:id', 'person'], ['POST /users/:id/password', 'person'],
+    ['POST /users/:id/saves/copy', 'tool'], ['GET /users/:id/saves/export', 'tool'], ['POST /users/:id/saves/import', 'person'],
+    ['POST /me/claim-owner', 'person'], ['POST /users/:id/merge', 'person'], ['DELETE /users/:id', 'person'], ['POST /games/:id/safe', 'game'],
+    ['GET /api/auth/check', 'game'], ['GET /g/:id/:build/,/g/:id/:build/index.html', 'game'],
+    ['GET /^\\/g\\/([a-z0-9][a-z0-9._-]*)\\/([a-z0-9]+)(?:\\.m[a-z0-9]+)?\\/game\\/(.+)$/', 'game'],
+    ['GET /^\\/g\\/([a-z0-9][a-z0-9._-]*)\\/([a-z0-9]+)(?:\\.m([a-z0-9]+))?\\/(.+)$/', 'game'],
+    ['GET /health', 'none'], ['GET /keepalive', 'none'], ['GET /system', 'list'], ['PUT /system/downloads', 'none'], ['POST /system/prune', 'none'],
+    ['POST /system/engines/refresh', 'none'], ['GET /jobs', 'list'], ['GET /jobs/:id/log', 'tool'], ['POST /jobs/:id/cancel', 'tool'],
+    ['POST /jobs/:id/retry', 'tool'], ['DELETE /jobs', 'tool'], ['GET /', 'none'], ['PUT /', 'none'], ['GET /api/saves-export', 'list'],
+    ['GET /:id/files', 'game'], ['GET /:id/files/raw', 'game'], ['PUT /:id/files/raw', 'game'], ['DELETE /:id/files/raw', 'game'],
+    ['POST /:id/files/revert', 'game'], ['POST /:id/files/upload', 'game'], ['POST /:id/files/apply', 'game'], ['POST /:id/files/reset', 'game'],
+    ['GET /', 'list'], ['GET /:id', 'game'], ['PUT /:id/favorite', 'game'], ['PUT /:id/finished', 'game'], ['POST /:id/play-time', 'game'],
+    ['POST /:id/played', 'game'], ['DELETE /:id', 'game'], ['DELETE /:id/download', 'game'], ['POST /:id/reinstall', 'game'],
+    ['PUT /:id/cache', 'game'], ['GET /:id/recipe', 'game'], ['POST /:id/walkthrough', 'game'], ['DELETE /:id/walkthrough', 'game'],
+    ['GET /archives', 'list'], ['POST /archives/inspect', 'tool'], ['POST /archives/hash', 'tool'], ['DELETE /archives', 'tool'],
+    ['POST /imports', 'tool'], ['POST /uploads', 'person'], ['GET /uploads/:id', 'person'], ['PUT /uploads/:id', 'person'],
+    ['POST /uploads/:id/complete', 'person'], ['DELETE /uploads/:id', 'person'], ['GET /catalog', 'list'], ['POST /catalog/refresh', 'list'],
+  ]
+
+  it('registers exactly the routes this file classifies', () => {
+    const list = (stack: any[]): string[] => (stack ?? []).flatMap((layer: any) => layer.route ? Object.keys(layer.route.methods).map((m) => `${m.toUpperCase()} ${String(layer.route.path)}`) : layer.handle?.stack ? list(layer.handle.stack) : [])
+    expect(list((app.app as any).router.stack).sort()).toEqual(ROUTES.map(([route]) => route).sort())
   })
 
   it('at blurred adult games are there with titles, but no picture route returns a byte of their art', async () => {
@@ -399,5 +436,140 @@ describe('the levels on every route', () => {
     await request(app.app).get('/g/safe/b1/').expect(200)
     // Installed games stay installed, saves untouched.
     expect(app.db.getGame('adult')).toMatchObject({ status: 'installed', adult: 1 })
+  })
+
+  it('applies this device\'s level from the header or the query, and never lets it raise anything', async () => {
+    await setLevel('shown')
+    const ids = async (device?: string) => (await request(app.app).get('/api/games').set(device ? { 'x-renplay-adult': device } : {})).body.games.map((g: { id: string }) => g.id)
+    expect(await ids()).toContain('adult')
+    expect(await ids('off')).not.toContain('adult')
+    const blurred = (await request(app.app).get('/api/games/adult').set('x-renplay-adult', 'blurred')).body.game
+    expect(blurred).toMatchObject({ cover: null, art: 'hidden', playUrl: '/g/adult/b1/?adult=blurred' })
+    await request(app.app).get('/api/games/adult').set('x-renplay-adult', 'off').expect(404)
+    await request(app.app).get('/api/covers/adult.webp').set('x-renplay-adult', 'blurred').expect(404)
+    // The game page, an iframe without headers, takes it as a query, and keeps it across a redirect.
+    writeFileSync(join(gamesDir, 'adult', 'b1', 'web-presplash.jpg'), 'presplash')
+    expect((await request(app.app).get('/g/adult/b1/').expect(200)).text).toContain('src="web-presplash.jpg"')
+    expect((await request(app.app).get('/g/adult/b1/?adult=blurred').expect(200)).text).toContain('/engine/8.5.3/web-presplash.jpg')
+    expect((await request(app.app).get('/g/adult/old/?adult=blurred').expect(302)).headers.location).toBe('/g/adult/b1/?adult=blurred')
+    // A device cannot raise: an installation at Blurred stays Blurred whatever the header says.
+    await setLevel('blurred')
+    expect((await request(app.app).get('/api/games/adult').set('x-renplay-adult', 'shown')).body.game).toMatchObject({ art: 'hidden' })
+    await setLevel('shown')
+  })
+
+  it('withholds the presplash below Shown, directly and for nginx', async () => {
+    await setLevel('shown')
+    writeFileSync(join(gamesDir, 'adult', 'b1', 'web-presplash.jpg'), 'presplash')
+    await request(app.app).get('/g/adult/b1/web-presplash.jpg').expect(200)
+    await request(app.app).get('/api/auth/check').set('X-Original-URI', '/g/adult/b1/web-presplash.jpg').expect(204)
+    await setLevel('blurred')
+    await request(app.app).get('/g/adult/b1/web-presplash.jpg').expect(404)
+    await request(app.app).get('/api/auth/check').set('X-Original-URI', '/g/adult/b1/web-presplash.jpg').expect(403)
+    // The game itself still plays, with its walkthrough: those are the game, not its library art.
+    await request(app.app).get('/g/adult/b1/game.zip').expect(200)
+    await request(app.app).get('/api/walkthroughs/adult.pdf').expect(200)
+    await setLevel('shown')
+  })
+
+  it('hides jobs about adult games at Off even without a game, before paging and counting', async () => {
+    await setLevel('shown')
+    app.db.insertJob({ id: 'j-first-install', type: 'import', game: '', params: JSON.stringify({ source: { kind: 'archive', path: 'adult.zip' } }) })
+    app.db.insertJob({ id: 'j-hash', type: 'hash-archive', game: '', params: JSON.stringify({ path: 'adult2.zip' }) })
+    app.db.insertJob({ id: 'j-by-recipe', type: 'import', game: '', params: JSON.stringify({ source: { kind: 'archive', path: 'other.zip' }, recipeId: 'adult' }) })
+    app.db.insertJob({ id: 'j-forgotten', type: 'import', game: 'gone', params: '{}' })
+    app.db.updateJob('j-forgotten', { result: JSON.stringify({ recipe: 'adult' }) })
+    for (const id of ['j-first-install', 'j-hash', 'j-by-recipe', 'j-forgotten']) app.db.updateJob(id, { status: 'failed', error: `about ${id}` })
+    const all = (await request(app.app).get('/api/jobs?limit=200')).body
+    await setLevel('off')
+    writeFileSync(join(archivesDir, 'adult2.zip'), '1234')
+    const visible = (await request(app.app).get('/api/jobs?limit=200')).body
+    const ids = visible.jobs.map((j: { id: string }) => j.id)
+    for (const id of ['j-first-install', 'j-hash', 'j-by-recipe', 'j-forgotten']) {
+      expect(ids).not.toContain(id)
+      await request(app.app).get(`/api/jobs/${id}/log`).expect(404)
+    }
+    expect(visible.total).toBe(ids.length)
+    expect(visible.total).toBeLessThan(all.total)
+    // Pages are cut from the visible jobs, so a page is never short of what exists.
+    const first = (await request(app.app).get('/api/jobs?limit=1')).body
+    expect(first.jobs).toHaveLength(1)
+    expect(first.total).toBe(visible.total)
+    await setLevel('shown')
+  })
+
+  it('keeps the Users tools to what an Off admin may see, and never drops a save', async () => {
+    await setLevel('shown')
+    const count = async () => (await request(app.app).get('/api/users')).body.users.find((u: { id: number }) => u.id === 1).saves
+    const shownSaves = await count()
+    await setLevel('off')
+    expect(await count()).toBeLessThan(shownSaves)
+    const zip = (await request(app.app).get('/api/users/1/saves/export').buffer(true).parse((res, cb) => {
+      const chunks: Buffer[] = []
+      res.on('data', (c: Buffer) => chunks.push(c))
+      res.on('end', () => cb(null, Buffer.concat(chunks)))
+    }).expect(200)).body
+    const names = [...(await readZipEntries(zip, () => true, 128 << 20)).keys()]
+    expect(names.some((n) => n.startsWith('adult'))).toBe(false)
+    const other = (await request(app.app).post('/api/users').send({ username: 'reader', name: 'Reader', password: 'reader-password-1' })).body.user
+    await request(app.app).post('/api/users/1/saves/copy').send({ target: other.id, game: 'adult' }).expect(404)
+    await request(app.app).post('/api/games/adult-two/safe').send({ safe: true }).expect(404)
+    await setLevel('shown')
+  })
+
+  it('keeps catalog problems about adult games from people below Shown', async () => {
+    // A level change refreshes the catalog, which resets its problems, so they are set after each change.
+    const problems = () => { (app.catalog as unknown as { errors: Array<{ text: string; recipe?: string }> }).errors = [{ text: 'cover of adult (https://example.org/a.png): HTTP 404', recipe: 'adult' }, { text: 'https://catalog.example: timeout' }] }
+    await setLevel('shown')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    problems()
+    expect((await request(app.app).get('/api/catalog')).body.status.errors).toHaveLength(2)
+    expect((await request(app.app).get('/api/catalog').set('x-renplay-adult', 'blurred')).body.status.errors).toEqual(['https://catalog.example: timeout'])
+    const off = (await request(app.app).get('/api/catalog').set('x-renplay-adult', 'off')).body.status
+    expect(off.errors).toEqual(['https://catalog.example: timeout'])
+    expect(off.count).toBe((await request(app.app).get('/api/catalog').set('x-renplay-adult', 'off')).body.games.length)
+  })
+
+  it('writes the 3.2 columns with the installation level, so a downgrade never shows more', async () => {
+    await setLevel('blurred')
+    const owner = app.db.raw.prepare('SELECT adult_access, prefs FROM users WHERE id = 1').get() as { adult_access: number; prefs: string }
+    expect(JSON.parse(owner.prefs).adultPictures).toBe('hide-pictures')
+    expect(app.db.getSetting('adult_games', '')).toBe('allow')
+    await setLevel('shown')
+    expect(JSON.parse((app.db.raw.prepare('SELECT prefs FROM users WHERE id = 1').get() as { prefs: string }).prefs).adultPictures).toBe('show')
+  })
+})
+
+describe('review fixes outside the routes', () => {
+  it('marks an install adult from its recipe at once, and keeps a recipe-less game\'s mark', () => {
+    const catalog = { isAdultId: (id: string) => id === 'adult' }
+    expect(adultFlag(catalog, 'adult', null)).toBe(1)
+    expect(adultFlag(catalog, 'safe', { adult: 1 } as never)).toBe(0)
+    expect(adultFlag(catalog, '', { adult: 1 } as never)).toBe(1)
+    expect(adultFlag(catalog, '', null)).toBe(0)
+  })
+
+  it('reads a group mapping without one valid entry as everyone at Off, never as no mapping', () => {
+    process.env['RENPLAY_OIDC_ADULT_GROUPS'] = 'adults=shwon'
+    process.env['RENPLAY_LDAP_ADULT_GROUPS'] = 'nonsense'
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const cfg = loadConfig()
+      expect(cfg.oidcAdultGroups).toEqual({})
+      expect(cfg.ldapAdultGroups).toEqual({})
+      expect(groupCeiling(cfg.oidcAdultGroups!, ['adults'])).toBe('off')
+    } finally {
+      delete process.env['RENPLAY_OIDC_ADULT_GROUPS']
+      delete process.env['RENPLAY_LDAP_ADULT_GROUPS']
+      error.mockRestore()
+      warn.mockRestore()
+    }
+  })
+
+  it('projects the installation level into the 3.2 picture preference', () => {
+    expect(legacyMirror('shown', 'shown', 'blurred')).toEqual({ adultAccess: 1, adultPictures: 'hide-pictures' })
+    expect(legacyMirror('shown', 'shown', 'off')).toEqual({ adultAccess: 1, adultPictures: 'hide-games' })
+    expect(legacyMirror('shown', 'shown')).toEqual({ adultAccess: 1, adultPictures: 'show' })
   })
 })

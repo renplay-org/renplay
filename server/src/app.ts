@@ -60,6 +60,9 @@ export interface App {
   close(): void
 }
 
+/** A build's presplash, at its top level: /g/<game>/<build>/web-presplash.jpg. */
+const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
+
 export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
   const db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir })
   for (const d of [cfg.dataDir, cfg.coversDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
@@ -76,6 +79,8 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const engines = new EngineStore(cfg, db, purger)
   const overlays = new Overlays(cfg)
   const catalog = new Catalog(cfg, db, content)
+  // The 3.2 columns follow the levels, so a downgrade never shows more (the variable can change between starts).
+  content.refreshLegacyMirrors()
   await catalog.init()
 
   const deps = { cfg, db, builds, engines, overlays, catalog, get saves() { return accounts.store() }, accounts, jobs, version }
@@ -120,6 +125,8 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const checkStatic = (path: string) => {
     const game = path.match(/^\/g\/([^/]+)\//)?.[1]
     if (game && (!db.getGame(game) || content.hides(db.getGame(game)))) throw new HttpError(404, 'Game not found')
+    // The presplash is a picture of the game, not part of playing it: withheld below Shown.
+    if (game && PRESPLASH.test(path) && content.blurs(db.getGame(game))) throw new HttpError(404, 'Not found')
     const cover = path.match(/^\/api\/covers\/([^/]+)$/)?.[1]
     if (cover && !catalog.canReadCover(cover)) throw new HttpError(404, 'Cover not found')
     const walkthrough = path.match(/^\/api\/walkthroughs\/([^/]+)$/)?.[1]
@@ -162,6 +169,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     const [game, base, mod, asset] = [req.params[0], req.params[1], req.params[2], req.params[3]] as string[]
     if (asset.includes('..')) return next()
     if (content.hides(db.getGame(game))) return next(new HttpError(404, 'Game not found'))
+    if (PRESPLASH.test(`/${asset}`) && content.blurs(db.getGame(game))) return next(new HttpError(404, 'Not found'))
     const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
     const tryNext = (i: number): void => {
       if (i >= candidates.length) return next()
@@ -169,7 +177,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     }
     tryNext(0)
   })
-  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content))
+  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content, catalog))
   app.use('/api/content', createContentRouter(cfg, content, catalog))
   app.get('/api/saves-export', (req, res, next) => { void createSavesExportAll(accounts.store(), db, content)(req, res).catch(next) })
   app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content)(req, res, next))

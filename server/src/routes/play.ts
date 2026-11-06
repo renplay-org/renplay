@@ -45,7 +45,8 @@ export function createPlayRouter(
     if (!game || game.status !== 'installed' || !game.build || content.hides(game)) throw new HttpError(404, 'Game not installed')
     if (req.params.build !== game.build || !BUILD_RE.test(req.params.build) || isWebGame(game)) {
       // Old build ids redirect to the current one, so bookmarks keep working.
-      res.redirect(302, playPath(game))
+      const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+      res.redirect(302, playPath(game) + query)
       return
     }
     const template = await engines.template(game.engine)

@@ -47,8 +47,11 @@ function adultDefault(): AdultLevel {
 /** group=level lists from the sign-in providers. The 3.x single group stays as an alias. */
 function adultGroups(raw: string, variable: string, alias: string, aliasVariable: string): { map: Record<string, AdultLevel>; variable: string } | null {
   if (raw) {
-    const map = parseAdultGroups(raw, variable)
-    return map ? { map, variable } : null
+    // A mapping with no valid entry still means the groups decide: nobody matches, so everyone is
+    // at Off until it is fixed. Reading a typo as no mapping would leave hand settings in force.
+    const map = parseAdultGroups(raw, variable) ?? {}
+    if (!Object.keys(map).length) console.error(`${variable} has no valid group=off, =blurred or =shown entry; everyone who signs in through it gets adult games off`)
+    return { map, variable }
   }
   if (alias) {
     console.warn(`${aliasVariable} is a 3.x alias of ${variable}; it means ${alias}=shown and everyone else off`)

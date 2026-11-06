@@ -1,15 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useAuth } from './auth'
-import { useAdultView, type AdultLevel } from './adult'
+import type { AdultLevel } from './adult'
 import { api, put, type CatalogResponse, type ContentState, type Archive, type FilesResponse, type Game, type Job, type SavesResponse, type SystemInfo } from './api'
 
 export function useGames() {
-  // The server leaves out what the person's level hides. This device can hide more.
-  const off = useAdultView() === 'off'
+  // The server leaves out what the person's level and this device's hide.
   return useQuery({
     queryKey: ['games'],
-    select: (games) => off ? games.filter((g) => !g.nsfw) : games,
     queryFn: () => api<{ games: Game[] }>('/api/games').then((r) => r.games),
     refetchInterval: (q) => (q.state.data?.some((g) => g.job) ? 2000 : false),
   })
@@ -60,19 +58,15 @@ export function useJobs() {
 }
 
 export function useArchives() {
-  const off = useAdultView() === 'off'
   return useQuery({
     queryKey: ['archives'],
-    select: (r) => off ? { ...r, archives: r.archives.filter((a) => !a.recipe?.nsfw) } : r,
     queryFn: () => api<{ dir: string; archives: Archive[] }>('/api/archives'),
   })
 }
 
 export function useCatalog() {
-  const off = useAdultView() === 'off'
   return useQuery({
     queryKey: ['catalog'],
-    select: (catalog) => off ? { ...catalog, games: catalog.games.filter((g) => !g.nsfw) } : catalog,
     queryFn: () => api<CatalogResponse>('/api/catalog'),
   })
 }

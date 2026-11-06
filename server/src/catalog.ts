@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Config } from './config.js'
 import { ContentMode, parseAdultLevel, sfwIndexUrl } from './content.js'
-import { parseJson, type Db, type GameSource } from './db.js'
+import { parseJson, type Db, type GameSource, type JobRow } from './db.js'
 import type { JobContext } from './jobs.js'
 import sharp from 'sharp'
 import { exists, writeFileAtomic } from './util/fsx.js'
@@ -213,14 +213,17 @@ export class Catalog {
   vocabulary: Vocabulary = {}
   private covers = new Map<string, string>()
   private fetchedAt = 0
-  private errors: string[] = []
+  /** Problems of the last refresh. An error about one recipe names it, so a person who may not see that game does not see the error either. */
+  private errors: Array<{ text: string; recipe?: string }> = []
   private timer: NodeJS.Timeout | null = null
 
   constructor(
     private readonly cfg: Config,
     private readonly db: Db,
     readonly content: ContentMode = new ContentMode(cfg, db),
-  ) {}
+  ) {
+    content.adultSaveDirs = () => [...this.adult.values(), ...[...this.recipes.values()].filter((r) => r.nsfw === true)].map((r) => r.saveDir ?? '').filter(Boolean)
+  }
 
   async init(): Promise<void> {
     const cached = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary; adultGames?: string } | null>(CACHE_KEY, null)
@@ -270,9 +273,9 @@ export class Catalog {
       this.syncAdult()
       await this.restrict()
     } else {
+      // The stubs stay until the full index arrives (refresh clears them), so a failed fetch never
+      // leaves adult downloads unrecognized for a later switch back to off.
       this.syncAdult()
-      this.adult = new Map()
-      this.db.setSetting(STUBS_KEY, {})
     }
     void this.refresh().catch(() => {})
   }
@@ -325,6 +328,11 @@ export class Catalog {
   }
 
   async refresh(): Promise<{ games: number; errors: string[] }> {
+    await this.refreshAll()
+    return { games: this.visibleCount(), errors: this.visibleErrors() }
+  }
+
+  private async refreshAll(): Promise<void> {
     const all: Recipe[] = []
     const vocabulary: Vocabulary = Object.create(null)
     this.errors = []
@@ -341,7 +349,7 @@ export class Catalog {
           from = sfw
         } catch (e) {
           console.warn(`catalog: no safe-for-work index at ${sfw} (${(e as Error).message}); dropping adult games from ${url}`)
-          this.errors.push(`${sfw}: ${(e as Error).message}`)
+          this.errors.push({ text: `${sfw}: ${(e as Error).message}` })
         }
       } else if (off) {
         console.warn(`catalog: ${url} has no safe-for-work index; dropping its adult games`)
@@ -361,7 +369,7 @@ export class Catalog {
         }
         all.push(...games)
       } catch (e) {
-        this.errors.push(`${url}: ${(e as Error).message}`)
+        this.errors.push({ text: `${url}: ${(e as Error).message}` })
       }
     }
     if (all.length || !this.errors.length) {
@@ -374,7 +382,6 @@ export class Catalog {
       this.link()
       await this.syncCovers()
     }
-    return { games: this.recipes.size, errors: this.errors }
   }
 
   /**
@@ -441,7 +448,7 @@ export class Catalog {
         next[r.id] = { url, sha256, file, etag: res.headers.get('etag') ?? '' }
       } catch (e) {
         if (have) next[r.id] = have
-        this.errors.push(`cover of ${r.id} (${url || cover.url}): ${(e as Error).message}`)
+        this.errors.push({ text: `cover of ${r.id} (${url || cover.url}): ${(e as Error).message}`, recipe: r.id })
       }
     }
     // Covers of adult recipes kept aside while off stay on disk, unserved.
@@ -490,10 +497,58 @@ export class Catalog {
   }
 
   status(): { fetchedAt: number; urls: string[]; errors: string[]; count: number } {
-    return { fetchedAt: this.fetchedAt, urls: this.cfg.catalogUrls, errors: this.errors, count: this.recipes.size }
+    return { fetchedAt: this.fetchedAt, urls: this.cfg.catalogUrls, errors: this.visibleErrors(), count: this.visibleCount() }
+  }
+
+  /** Errors about an adult recipe name it and its art, so only a person at Shown sees them. */
+  private visibleErrors(): string[] {
+    const shown = this.content.viewerLevel() === 'shown'
+    return this.errors.filter((e) => shown || !e.recipe || !this.isAdultId(e.recipe)).map((e) => e.text)
+  }
+
+  private visibleCount(): number {
+    return [...this.recipes.values()].filter((r) => !this.content.hidesRecipe(r.nsfw)).length
   }
 
   /** Finds the recipe (and release) an archive belongs to. */
+  /**
+   * Off: an adult game does not exist, so neither does its download: one a recipe for an adult
+   * game names, or one a hidden game was installed from (also a game without a recipe).
+   */
+  archiveHidden(rel: string, size?: number): boolean {
+    if (this.content.viewerLevel() !== 'off') return false
+    const row = this.db.getArchive(rel)
+    if (this.content.hidesRecipe(this.match({ name: rel, size: size ?? row?.size, sha256: row?.sha256 || undefined })?.recipe.nsfw)) return true
+    let hidden = false
+    for (const g of this.db.allGames()) {
+      if (parseJson<GameSource>(g.source, {}).archive !== rel) continue
+      if (!this.content.hides(g)) return false
+      hidden = true
+    }
+    return hidden
+  }
+
+  /**
+   * Off: a job about an adult game does not exist either. A job names its game when it has one;
+   * a first install or a hash has only its download and recipe, and a forgotten game only its id.
+   */
+  jobHidden(j: Pick<JobRow, 'game' | 'params' | 'result'>): boolean {
+    if (this.content.viewerLevel() !== 'off') return false
+    const game = j.game ? this.db.getGame(j.game) : null
+    if (game) return this.content.hides(game)
+    const params = parseJson<{ recipeId?: unknown; path?: unknown; source?: { path?: unknown } }>(j.params, {})
+    const result = parseJson<{ recipe?: unknown; game?: unknown } | null>(j.result, null)
+    const ids = [j.game, params.recipeId, result?.recipe, result?.game].filter((x): x is string => typeof x === 'string' && x !== '')
+    if (ids.some((id) => this.isAdultId(id))) return true
+    const archive = [params.source?.path, params.path].find((x): x is string => typeof x === 'string' && x !== '')
+    if (!archive) return false
+    try {
+      return this.archiveHidden(cleanRelPath(archive))
+    } catch {
+      return false
+    }
+  }
+
   match(archive: { name: string; size?: number; sha256?: string }): RecipeMatch | null {
     const base = archive.name.split('/').pop() ?? archive.name
     let byName: RecipeMatch | null = null

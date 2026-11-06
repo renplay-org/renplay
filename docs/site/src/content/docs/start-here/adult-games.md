@@ -11,7 +11,7 @@ them they see.
 | Level | What it means |
 |---|---|
 | **Off** | Adult games do not exist. They are left out of the library, the catalog, search, Add games, Activity and every count. Nothing is blurred or tagged, there is simply nothing there. |
-| **Blurred** | Adult games show with their titles and details, and they play. Their pictures do not: covers become title cards with an 18+ tag, and save pictures are hidden. The server never sends one of their pictures to that person. |
+| **Blurred** | Adult games show with their titles and details, and they play, with their walkthroughs and your save files. Their pictures do not: covers become title cards with an 18+ tag, and save pictures and loading pictures are hidden. The server never sends one of those pictures to that person. |
 | **Shown** | Adult games show with their pictures. |
 
 Safe-for-work games are never affected at any level.
@@ -30,7 +30,8 @@ Each layer can choose any level, but never more than the layer above it allows.
 3. **You.** Each person picks their own level on their **Account** page, at or below their
    account's. It applies on every device.
 4. **This device.** A browser can go lower still, for example a phone you use in public. It is
-   kept in that browser only.
+   kept in that browser, for everyone who uses it, and the server applies it to everything it
+   sends there.
 
 **Account → Adult games** shows all four rows, says where each one comes from, and ends with one
 sentence saying what you see and why. **Settings → This browser** has the device row too.

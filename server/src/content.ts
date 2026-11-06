@@ -29,7 +29,8 @@ export function lowestLevel(...levels: AdultLevel[]): AdultLevel {
 /**
  * A sign-in group mapping, as in RENPLAY_OIDC_ADULT_GROUPS and
  * RENPLAY_LDAP_ADULT_GROUPS: "group=level,group=level". Bad entries are
- * skipped with a warning; the safe reading of a mistake is no mapping.
+ * skipped with a warning, so their groups match nothing. Null when no entry
+ * is valid (config.ts still treats the variable as set, everyone at off).
  */
 export function parseAdultGroups(value: string, variable: string): Record<string, AdultLevel> | null {
   const out: Record<string, AdultLevel> = {}
@@ -56,9 +57,12 @@ const KEY = 'adult_level'
 /** The 3.x key, kept readable and in step so a downgrade to 3.2 keeps working. */
 const LEGACY_KEY = 'adult_games'
 
-/** What a 3.2 server reads: access plus the old account picture preference. */
-export function legacyMirror(ceiling: AdultLevel, choice: AdultLevel): { adultAccess: 0 | 1; adultPictures: 'show' | 'hide-pictures' | 'hide-games' } {
-  const effective = lowestLevel(ceiling, choice)
+/**
+ * What a 3.2 server reads: access plus the old account picture preference. The installation's
+ * level counts too, since 3.2 has no Blurred installation: a downgrade must not show more.
+ */
+export function legacyMirror(ceiling: AdultLevel, choice: AdultLevel, installation: AdultLevel = 'shown'): { adultAccess: 0 | 1; adultPictures: 'show' | 'hide-pictures' | 'hide-games' } {
+  const effective = lowestLevel(ceiling, choice, installation)
   return {
     adultAccess: ceiling === 'off' ? 0 : 1,
     adultPictures: effective === 'shown' ? 'show' : effective === 'blurred' ? 'hide-pictures' : 'hide-games',
@@ -103,6 +107,19 @@ export class ContentMode {
     if (this.locked) throw new HttpError(409, 'The server’s configuration sets this')
     this.db.setSetting(KEY, level)
     this.db.setSetting(LEGACY_KEY, legacyInstallMirror(level))
+    this.refreshLegacyMirrors()
+  }
+
+  /** Rewrites every person's 3.2 columns from their levels and the installation's (on a change and at start). */
+  refreshLegacyMirrors(): void {
+    const rows = this.db.raw.prepare('SELECT id, adult_ceiling, adult_choice, adult_access, prefs FROM users').all() as unknown as Array<{ id: number; adult_ceiling: string; adult_choice: string; adult_access: number; prefs: string }>
+    const update = this.db.raw.prepare('UPDATE users SET adult_access = ?, prefs = ? WHERE id = ?')
+    for (const u of rows) {
+      const mirror = legacyMirror(this.ceilingOf(u), this.choiceOf(u), this.level)
+      const prefs = parseJson<Record<string, unknown>>(u.prefs, {})
+      if (u.adult_access === mirror.adultAccess && prefs['adultPictures'] === mirror.adultPictures) continue
+      update.run(mirror.adultAccess, JSON.stringify({ ...prefs, adultPictures: mirror.adultPictures }), u.id)
+    }
   }
 
   /** The person's ceiling: set by an admin, or recomputed from sign-in groups at each sign-in. */
@@ -114,11 +131,11 @@ export class ContentMode {
     return parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
   }
 
-  /** The effective level for this request: the lowest layer. Background work sees the installation level. */
+  /** The effective level for this request: the lowest layer, this device's included. Background work sees the installation level. */
   viewerLevel(): AdultLevel {
-    const u = viewer()?.user
-    if (!u) return this.level
-    return lowestLevel(this.level, this.ceilingOf(u), this.choiceOf(u))
+    const v = viewer()
+    if (!v) return this.level
+    return lowestLevel(this.level, this.ceilingOf(v.user), this.choiceOf(v.user), v.device ?? 'shown')
   }
 
   /** A game counts as adult from its recipe's flag. Games without a recipe count as adult for a
@@ -127,12 +144,31 @@ export class ContentMode {
   private adult(game: Pick<GameRow, 'adult'> & Partial<Pick<GameRow, 'id' | 'recipe_id'>>): boolean {
     if (game.adult === 1) return true
     if (game.recipe_id !== '') return false
-    const u = viewer()?.user
-    if (!u) return false
-    if (lowestLevel(this.ceilingOf(u), this.choiceOf(u)) === 'off') {
+    const v = viewer()
+    if (!v) return false
+    if (lowestLevel(this.ceilingOf(v.user), this.choiceOf(v.user), v.device ?? 'shown') === 'off') {
       return !(game.id && this.db.raw.prepare('SELECT 1 FROM safe_games WHERE game = ?').get(game.id))
     }
     return false
+  }
+
+  /** The save folders adult recipes name, known to the catalog (it sets this). */
+  adultSaveDirs: () => Iterable<string> = () => []
+
+  /**
+   * The save folders this person may see, out of `dirs`. Off leaves out every folder of an adult
+   * game: an installed one's, one an adult recipe names, and, when games without a recipe count as
+   * adult for this person, any folder no game in the library claims. Nothing is moved or deleted.
+   */
+  visibleSaveDirs(dirs: Iterable<string>): string[] {
+    if (this.viewerLevel() !== 'off') return [...dirs]
+    const games = this.db.allGames()
+    const hidden = new Set(this.adultSaveDirs())
+    for (const g of games) if (g.save_dir && this.hides(g)) hidden.add(g.save_dir)
+    for (const g of games) if (g.save_dir && !this.hides(g)) hidden.delete(g.save_dir)
+    const restricted = this.hides({ adult: 0, recipe_id: '' })
+    const claimed = new Set(games.map((g) => g.save_dir).filter(Boolean))
+    return [...dirs].filter((d) => !hidden.has(d) && (!restricted || claimed.has(d)))
   }
 
   /** Off: the game does not exist for this person. */

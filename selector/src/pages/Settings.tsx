@@ -236,7 +236,7 @@ function AdminSettings() {
           >
             Keep game cache
           </Button>
-          {persisted !== null && <p className="text-xs text-zinc-500">{persisted ? 'The browser will keep the cache.' : 'The browser declined; it may still keep it.'}</p>}
+          {persisted !== null && <p className="text-xs text-zinc-500">{persisted ? 'The browser will keep the cache.' : 'The browser declined. It may still keep it.'}</p>}
           <div className="border-t border-white/[0.06] pt-4">
             <DeviceAdultRow />
           </div>

@@ -1,4 +1,5 @@
 import type { AdultLevel } from './adult'
+import { deviceLevel } from './device'
 export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
 export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
 
@@ -226,9 +227,11 @@ export class ApiError extends Error {
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init
+  // This device's adult games level: the server applies it to everything it answers. It can only narrow.
+  const device = deviceLevel()
   const res = await fetch(path, {
     ...rest,
-    headers: json !== undefined ? { 'content-type': 'application/json', ...(rest.headers ?? {}) } : rest.headers,
+    headers: { ...(device ? { 'x-renplay-adult': device } : {}), ...(json !== undefined ? { 'content-type': 'application/json' } : {}), ...(rest.headers as Record<string, string> | undefined ?? {}) },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   })
   if (!res.ok) {

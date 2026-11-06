@@ -128,7 +128,7 @@ export class Accounts {
     const u = this.user(id)
     const ceiling = patch.ceiling ?? parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
     const choice = patch.choice ?? parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
-    const mirror = legacyMirror(ceiling, choice)
+    const mirror = legacyMirror(ceiling, choice, this.content.level)
     const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), adultPictures: mirror.adultPictures }
     this.db.raw.prepare('UPDATE users SET adult_ceiling = ?, adult_choice = ?, adult_access = ?, prefs = ? WHERE id = ?').run(ceiling, choice, mirror.adultAccess, JSON.stringify(prefs), id)
   }
@@ -230,6 +230,9 @@ export class Accounts {
       return v ? viewers.run(v, proceed) : proceed()
     }
     if (!v) return next(new HttpError(401, 'Sign in to Renplay'))
+    // This device's level: a header on API calls, a query on the game page. It can only narrow.
+    const device = parseAdultLevel(req.get('x-renplay-adult')) ?? parseAdultLevel(typeof req.query['adult'] === 'string' ? req.query['adult'] : undefined)
+    if (device === 'off' || device === 'blurred') v = { ...v, device }
     viewers.run(v, () => {
       try {
         this.csrf(req)
@@ -275,16 +278,23 @@ export class Accounts {
     this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash != ?').run(id, except)
     this.invalidate()
   }
-  private async copy(from: number, to: number, game?: string): Promise<number> {
+  /**
+   * Copies saves between accounts. `visibleOnly` is for the admin's copy action, which copies what
+   * the admin may see. Merging and claiming the owner account move every save, always.
+   */
+  private async copy(from: number, to: number, game?: string, visibleOnly = false): Promise<number> {
     if (from === to) throw new HttpError(400, 'Choose two different users')
     this.user(from); this.user(to)
     const source = this.store(from), target = this.store(to)
     let dirs: string[]
     if (game) {
       const g = this.db.getGame(game)
-      if (!g?.save_dir) throw new HttpError(404, 'Game save folder not found')
+      if (!g?.save_dir || (visibleOnly && this.content.hides(g))) throw new HttpError(404, 'Game save folder not found')
       dirs = [g.save_dir, 'tokens']
-    } else dirs = [...await source.listDirs(), ...SHARED_DIRS]
+    } else {
+      const all = await source.listDirs()
+      dirs = [...(visibleOnly ? this.content.visibleSaveDirs(all) : all), ...SHARED_DIRS]
+    }
     let copied = 0
     for (const dir of dirs) for (const file of await source.list(dir)) {
       const data = await source.read(dir, file.name)
@@ -527,7 +537,8 @@ export class Accounts {
     r.delete('/me/tokens/:id', (req, res) => { this.db.raw.prepare('DELETE FROM tokens WHERE user_id = ? AND id = ?').run(this.current().id, req.params.id); res.json({ ok: true }) })
     r.get('/users', async (_req, res) => {
       const users = await Promise.all((this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]).map(async (u) => {
-        const store = this.store(u.id), dirs = await store.listDirs()
+        // Counts follow the admin's own level: an Off admin's counts leave hidden games' saves out.
+        const store = this.store(u.id), dirs = this.content.visibleSaveDirs(await store.listDirs())
         const files = await Promise.all(dirs.map((dir) => store.list(dir)))
         return { ...u, games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser, ...this.managed(u.id) }
       }))
@@ -573,11 +584,11 @@ export class Accounts {
       this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, target.id)
       this.revoke(target.id); res.json({ ok: true })
     })
-    r.post('/users/:id/saves/copy', async (req, res) => res.json({ copied: await this.copy(Number(req.params.id), Number(req.body?.target), req.body?.game) }))
+    r.post('/users/:id/saves/copy', async (req, res) => res.json({ copied: await this.copy(Number(req.params.id), Number(req.body?.target), req.body?.game, true) }))
     r.get('/users/:id/saves/export', async (req, res) => {
       const id = this.user(Number(req.params.id)).id, store = this.store(id)
       res.attachment(`renplay-user-${id}-saves.zip`).type('application/zip')
-      await store.exportZip(await store.listDirs(), res, { includeTokens: true })
+      await store.exportZip(this.content.visibleSaveDirs(await store.listDirs()), res, { includeTokens: true })
     })
     r.post('/users/:id/saves/import', saveImport('file', async (req, res) => {
       const target = this.store(this.user(Number(req.params.id)).id)
@@ -677,7 +688,8 @@ export class Accounts {
     r.delete('/users/:id', async (req, res) => { await remove(Number(req.params.id)); res.json({ ok: true }) })
     r.post('/games/:id/safe', (req, res) => {
       const g = this.db.getGame(req.params.id)
-      if (!g || g.recipe_id) throw new HttpError(409, 'Only games without a recipe can be marked safe')
+      if (!g || this.content.hides(g)) throw new HttpError(404, 'Game not found')
+      if (g.recipe_id) throw new HttpError(409, 'Only games without a recipe can be marked safe')
       if (typeof req.body?.safe !== 'boolean') throw new HttpError(400, 'Safe must be a boolean')
       if (req.body.safe) this.db.raw.prepare('INSERT OR IGNORE INTO safe_games VALUES (?)').run(g.id)
       else this.db.raw.prepare('DELETE FROM safe_games WHERE game = ?').run(g.id)

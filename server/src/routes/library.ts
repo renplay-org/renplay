@@ -51,20 +51,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
 
   // ---- archives -------------------------------------------------------------
 
-  // Off: an adult game does not exist, so neither does its download: one a recipe for an
-  // adult game names, or one a hidden game was installed from (also a game without a recipe).
-  const archiveHidden = (rel: string, size?: number): boolean => {
-    const row = db.getArchive(rel)
-    const match = catalog.match({ name: rel, size: size ?? row?.size, sha256: row?.sha256 || undefined })
-    if (catalog.content.hidesRecipe(match?.recipe.nsfw)) return true
-    let hidden = false
-    for (const g of db.allGames()) {
-      if (parseJson<GameSource>(g.source, {}).archive !== rel) continue
-      if (!catalog.content.hides(g)) return false
-      hidden = true
-    }
-    return hidden
-  }
+  const archiveHidden = (rel: string, size?: number) => catalog.archiveHidden(rel, size)
 
   router.get('/archives', async (_req, res) => {
     const files = await listArchiveFiles(cfg.archivesDir)

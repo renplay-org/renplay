@@ -175,13 +175,22 @@ save-gallery metadata share a bounded cache keyed by store root, folder, filenam
 a changed or deleted save is reflected on the next list. Up next uses the newest played installed,
 non-finished game and invalidates on player exit.
 
-Optional catalog `free` and `cover.sfw` are additive to schema 3. The API keeps its existing cover
-URL field and exposes `coverSfw` alongside it, including on archive matches. Safe covers are
-allowed while adult save screenshots remain hidden. The empty library's starter is the first
-Ren'Py recipe with `free: true` that is not `nsfw` and has a working release; without one it shows
-no starter. Account preference `adultPictures` defaults to `hide-pictures`; `show` and `hide-games`
-are the other values. Device overrides use `renplay:adult-pictures:<user id>`. A device cannot grant
-adult access the account lacks, or widen the account's picture preference. Hidden art is not requested.
+The empty library's starter is the first Ren'Py recipe with `free: true` that is not `nsfw` and
+has a working release. Without one it shows no starter.
+
+**Adult levels** (`content.ts`). A request's level is the lowest of the installation's, the
+person's ceiling, the person's choice and this device's. The browser keeps the device level in
+`localStorage` (`renplay:adult-device`, for everyone using that browser) and sends it as the
+`X-Renplay-Adult` header on API calls. The game page, an iframe, gets it as `?adult=` in `playUrl`.
+A device value can only narrow, so the server trusts it. At Off an adult game is left out of every
+answer and every route addressed to it answers 404: games, files, saves, jobs (also jobs with only
+a download or a recipe), downloads, the Users tools, counts and catalog problems. At Blurred the game
+is listed and plays, with its walkthrough and the person's own save files, but no picture of it is
+sent: no art URL in JSON, 404 for covers, save screenshots and the build's presplash, directly and
+through nginx's `/api/auth/check`. `adult-levels.test.ts` lists every registered route with what
+the levels do on it, so a new route fails until it is classified. The 3.x columns (`adult_access`,
+the `adultPictures` preference, the `adult_games` setting) are kept in step, the installation level
+included, so a downgrade to 3.2 never shows more.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1–200) and `offset` (default 0). Invalid or unsafe integers use the defaults.
