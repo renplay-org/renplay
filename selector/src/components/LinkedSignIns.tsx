@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, post } from '../lib/api'
-import { accountInput } from './AdultPreferences'
-import { Button, Modal, errorText } from './ui'
+import { Button, Modal, errorText, accountInput } from './ui'
 
 export default function LinkedSignIns() {
   const qc = useQueryClient(), [open, setOpen] = useState(false), [error, setError] = useState(''), [busy, setBusy] = useState(false)

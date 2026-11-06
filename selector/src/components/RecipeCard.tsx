@@ -10,7 +10,7 @@ export default function RecipeCard({ recipe: r }: { recipe: Recipe }) {
   const latest = r.releases[0]
   return (
     <div className="flex min-w-0 gap-3 rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.07] sm:gap-4">
-      <Cover game={{ title: r.title, cover: typeof r.cover === 'string' ? r.cover : null, nsfw: r.nsfw, coverSfw: r.coverSfw }} rounded={false} className="aspect-[63/50] w-24 shrink-0 self-start rounded-xl sm:w-36" />
+      <Cover game={{ title: r.title, cover: typeof r.cover === 'string' ? r.cover : null, nsfw: r.nsfw }} rounded={false} className="aspect-[63/50] w-24 shrink-0 self-start rounded-xl sm:w-36" />
       <div className="min-w-0 flex-1">
         <div className="truncate font-semibold text-white">{r.title}</div>
         {r.developer && <div className="truncate text-xs text-zinc-400">{r.developer}</div>}

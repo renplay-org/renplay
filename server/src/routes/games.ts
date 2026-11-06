@@ -88,7 +88,8 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     content: recipe?.content ?? [],
     state: recipe?.state ?? null,
     summary: recipe?.summary ?? null,
-    nsfw: recipe?.nsfw ?? false,
+    // A game without a recipe can be marked adult in the library, and its tile says so too.
+    nsfw: recipe?.nsfw ?? row.adult === 1,
     coverSfw: typeof recipe?.cover === 'object' && recipe.cover?.sfw === true,
     free: recipe?.free,
     cover: recipe && !blurred ? deps.catalog.cover(recipe.id) : null,

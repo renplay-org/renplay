@@ -3,8 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Avatar from '../components/Avatar'
 import AvatarUpload from '../components/AvatarUpload'
 import LinkedSignIns from '../components/LinkedSignIns'
-import AdultPreferences, { accountInput } from '../components/AdultPreferences'
-import { Button, Confirm, Modal, Spinner, errorText, useToast } from '../components/ui'
+import AdultLadder from '../components/AdultLadder'
+import { Button, Confirm, Modal, Spinner, accountInput, errorText, useToast } from '../components/ui'
 import { api, del, post, put } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { ago } from '../lib/format'
@@ -49,7 +49,7 @@ export default function Account() {
         <AvatarUpload />
         {me.hasPassword && <Button className="min-h-11" onClick={() => { setError(''); setDialog('password') }}>Change password</Button>}
       </AccountSection>
-      {me.user.adult_access === 1 && <AccountSection title="Adult pictures"><AdultPreferences /></AccountSection>}
+      <AccountSection title="Adult games"><AdultLadder /></AccountSection>
       <AccountSection title="Linked sign-ins"><LinkedSignIns /></AccountSection>
       <AccountSection title="Where you are signed in">
         {sessions.isPending ? <Spinner /> : sessions.isError ? <p role="alert" className="text-sm text-rose-300">{errorText(sessions.error)}</p> : <div className="divide-y divide-white/10">{sessions.data.sessions.map((session) => <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">

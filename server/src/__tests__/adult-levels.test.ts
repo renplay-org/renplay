@@ -252,6 +252,8 @@ describe('the levels on every route', () => {
     expect(games.map((g: { id: string }) => g.id)).toEqual(['adult', 'adult-two', 'safe'])
     const adult = games.find((g: { id: string }) => g.id === 'adult')
     expect(adult).toMatchObject({ title: 'adult', cover: null, art: 'hidden' })
+    // A recipe-less game marked adult in the library is an adult game to the interface too.
+    expect(games.find((g: { id: string }) => g.id === 'adult-two')).toMatchObject({ nsfw: true, cover: null, art: 'hidden' })
     expect(JSON.stringify(games)).not.toContain('/api/covers/adult')
     const catalogGames = (await request(app.app).get('/api/catalog')).body.games
     expect(catalogGames.map((g: { id: string }) => g.id)).toContain('adult')

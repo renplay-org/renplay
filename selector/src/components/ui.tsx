@@ -11,6 +11,8 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 
+export const accountInput = 'mt-2 min-h-11 w-full min-w-0 rounded-xl bg-zinc-900 px-3 text-sm text-zinc-100 ring-1 ring-white/10'
+
 export function cx(...c: Array<string | false | null | undefined>): string {
   return c.filter(Boolean).join(' ')
 }

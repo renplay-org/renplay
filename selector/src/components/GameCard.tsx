@@ -3,7 +3,7 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Game } from '../lib/api'
 import { ago, capitalize, pct } from '../lib/format'
-import { useBlurAdultCovers } from '../lib/prefs'
+import { useAdultView } from '../lib/adult'
 import { Badge, BetaBadge, cx, Progress } from './ui'
 
 /** Shape of cover frames: itch.io's cover format (630×500), which most official art uses. */
@@ -31,15 +31,16 @@ export function TitleTile({ title }: { title: string }) {
 /**
  * A game's cover in a frame of any shape. Art that does not match the frame's
  * shape is shown whole, over a blurred copy of itself, so logos are never cut
- * off. Hidden adult covers are title cards and never request the original art.
+ * off. Below Shown, an adult game's cover is a title card with an 18+ tag and
+ * its art is never requested.
  */
-export function Cover({ game, className, rounded = true }: { game: Pick<Game, 'title' | 'cover'> & { nsfw?: boolean; coverSfw?: boolean }; className?: string; rounded?: boolean }) {
+export function Cover({ game, className, rounded = true }: { game: Pick<Game, 'title' | 'cover'> & { nsfw?: boolean; art?: 'hidden' }; className?: string; rounded?: boolean }) {
   const [failed, setFailed] = useState(false)
   const [fit, setFit] = useState<'cover' | 'contain' | null>(null)
-  const [blurAdult] = useBlurAdultCovers()
+  const view = useAdultView()
   const frame = useRef<HTMLDivElement>(null)
   const src = game.cover
-  const hidden = blurAdult && !!game.nsfw && !game.coverSfw
+  const hidden = game.art === 'hidden' || (!!game.nsfw && view !== 'shown')
   return (
     <div ref={frame} className={cx('@container relative overflow-hidden bg-ink-800', rounded && 'rounded-2xl', className)}>
       {!hidden && !fit && !failed && src && <div className="skeleton absolute inset-0" />}

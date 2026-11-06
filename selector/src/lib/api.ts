@@ -1,3 +1,4 @@
+import type { AdultLevel } from './adult'
 export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
 export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
 
@@ -40,7 +41,8 @@ export interface Game {
   finishedAt: string | null
   playTime: number
   latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot'> | null
-  coverSfw?: boolean
+  /** Blurred: the server sends no picture of this adult game, only what a placeholder needs. */
+  art?: 'hidden'
   free?: boolean
   renpyVersion: string | null
   engine: string | null
@@ -132,17 +134,20 @@ export interface Archive {
   sha256: string | null
   info: ArchiveInfo | null
   installedAs: string | null
-  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean; coverSfw?: boolean } | null
+  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean } | null
   existingGame: string | null
   /** Why this download cannot be installed here (an adult game on a safe-for-work install). */
   blocked: string | null
 }
 
-/** Whether this Renplay shows adult games; locked when the server's configuration decides. */
+/** The installation's adult level, fixed when the server's variable sets it. Admins also get the starting level and the sign-in groups. */
 export interface ContentState {
-  adultGames: 'allow' | 'block'
-  locked: boolean
-  chosen: boolean
+  installation: { level: AdultLevel; fixed: boolean; chosen: boolean; variable: string }
+  starting?: { level: AdultLevel; variable: string }
+  groups?: {
+    oidc: { variable: string; map: Record<string, AdultLevel> } | null
+    ldap: { variable: string; map: Record<string, AdultLevel> | null } | null
+  }
 }
 
 export interface RecipeRelease {
@@ -166,7 +171,6 @@ export interface Recipe {
   summary?: string
   nsfw?: boolean
   free?: boolean
-  coverSfw?: boolean
   cover?: string | null
   links?: Record<string, string>
   saveDir?: string

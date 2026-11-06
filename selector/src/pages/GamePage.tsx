@@ -19,7 +19,7 @@ import SceneCard from '../components/SceneCard'
 import UpdateCard from '../components/UpdateCard'
 import SegmentedControl from '../components/SegmentedControl'
 import { playedTime } from '../components/UpNext'
-import { useBlurAdultCovers } from '../lib/prefs'
+import { useAdultView } from '../lib/adult'
 import FavoriteButton from '../components/FavoriteButton'
 import GameTags from '../components/GameTags'
 import { Cover } from '../components/GameCard'
@@ -44,7 +44,7 @@ export default function GamePage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const toast = useToast()
-  const [hide] = useBlurAdultCovers()
+  const view = useAdultView()
   const [expanded, setExpanded] = useState(false)
   const { data: saves } = useSaves(gameId, !!game?.saveDir)
   const latest = saves?.slots.find((s) => s.kind !== 'internal' && s.valid)
@@ -62,7 +62,7 @@ export default function GamePage() {
 
   const installed = game.status === 'installed'
   const renpy = game.family === 'renpy'
-  const backdrop = hide && game.nsfw && !game.coverSfw ? null : game.cover
+  const backdrop = game.art === 'hidden' || (game.nsfw && view !== 'shown') ? null : game.cover
   const primary = () => navigate(`/play/${gameId}${latest ? `?resume=${encodeURIComponent(slotName(latest.file))}` : ''}`)
 
   return (

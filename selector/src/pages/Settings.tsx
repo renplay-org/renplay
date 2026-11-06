@@ -8,8 +8,9 @@ import { Button, Confirm, Progress, Spinner, Switch, errorText, useToast } from 
 import { post, put } from '../lib/api'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
-import { DeviceAdultPreference } from '../components/AdultPreferences'
-import { useCatalog, useContent, useGames, useSetAdultGames, useSystem } from '../lib/queries'
+import { DeviceAdultRow, LevelPills } from '../components/AdultLadder'
+import { adultLabels, adultLevels, type AdultLevel } from '../lib/adult'
+import { useCatalog, useContent, useGames, useSetInstallationLevel, useSystem } from '../lib/queries'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
   if (!disk) return null
@@ -27,13 +28,19 @@ function DiskBar({ label, disk }: { label: string; disk: { total: number; free: 
   )
 }
 
+const installationHint: Record<AdultLevel, string> = {
+  off: 'Adult games are hidden for everyone and cannot be installed. Games already in the library stay, hidden.',
+  blurred: 'Adult games show for everyone whose account allows it, without their pictures. Renplay never downloads their art.',
+  shown: 'Adult games and their pictures show for everyone whose account allows it.',
+}
+
 export default function Settings() {
   const { data } = useAuth()
   return data?.user.role === 'admin' ? <AdminSettings /> : <BrowserSettings />
 }
 
 function BrowserSettings() {
-  return <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6"><h1 className="text-2xl font-bold text-white">This browser</h1><DeviceAdultPreference /><Button onClick={() => void navigator.storage?.persist?.()}>Keep game cache</Button></section>
+  return <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6"><h1 className="text-2xl font-bold text-white">This browser</h1><DeviceAdultRow /><Button onClick={() => void navigator.storage?.persist?.()}>Keep game cache</Button></section>
 }
 
 function AdminSettings() {
@@ -49,8 +56,8 @@ function AdminSettings() {
   const toast = useToast()
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const { data: content } = useContent()
-  const setAdultGames = useSetAdultGames()
-  const [confirmAdult, setConfirmAdult] = useState(false)
+  const setInstallationLevel = useSetInstallationLevel()
+  const [raiseTo, setRaiseTo] = useState<AdultLevel | null>(null)
   if (isLoading || !sys) return <Spinner />
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
@@ -68,18 +75,37 @@ function AdminSettings() {
       <nav aria-label="Settings sections" className="flex shrink-0 gap-2 overflow-x-auto lg:w-44 lg:flex-col">{[['general', 'General'], ['browser', 'This browser'], ['about', 'About']].map(([value, label]) => <button key={value} onClick={() => setSection(value)} aria-current={section === value ? 'page' : undefined} className={`min-h-11 shrink-0 rounded-xl px-4 text-left text-sm ${section === value ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>{label}</button>)}<Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/settings/users">Users →</Link><Link className="inline-flex min-h-11 shrink-0 items-center px-4 text-sm text-zinc-400" to="/activity">Activity →</Link></nav>
       <div className="min-w-0 flex-1 space-y-6">
       <div className={section === 'general' ? 'space-y-6' : 'hidden'}>
-        {content && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
+        {content && <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
           <h2 className="font-semibold text-white">Adult games</h2>
-          {content.locked ? <>
-            <p className="text-sm text-zinc-400">{content.adultGames === 'allow' ? 'This Renplay shows every game, including adult games.' : 'This Renplay shows safe-for-work games only.'}</p>
-            <p className="text-xs text-zinc-500">The server’s configuration sets this (<code className="text-zinc-400">RENPLAY_ADULT_GAMES={content.adultGames}</code>). It cannot be changed here.</p>
-          </> : <>
-            <Switch checked={content.adultGames === 'allow'} label="Show adult games" hint={content.adultGames === 'allow' ? 'This Renplay shows every game, including adult games.' : 'This Renplay shows safe-for-work games only. Adult games already in the library are hidden, not deleted.'} onChange={(on) => on ? setConfirmAdult(true) : void run(() => setAdultGames('block'), 'Adult games are hidden')} />
-            {!content.chosen && <p className="text-xs text-zinc-500">Nothing is chosen yet, so adult games stay hidden.</p>}
-          </>}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+              <h3 className="text-sm font-medium text-white">This installation</h3>
+              <p className="text-xs text-zinc-400">{content.installation.fixed ? `Fixed by the server with the variable ${content.installation.variable}` : content.installation.chosen ? 'Changed here' : 'Default'}</p>
+            </div>
+            <LevelPills
+              label="This installation"
+              value={content.installation.level}
+              onChange={content.installation.fixed ? undefined : (level) => {
+                if (level === content.installation.level) return
+                if (adultLevels.indexOf(level) > adultLevels.indexOf(content.installation.level)) setRaiseTo(level)
+                else void run(() => setInstallationLevel(level), 'Adult games level saved')
+              }}
+            />
+            <p className="text-sm text-zinc-400">{installationHint[content.installation.level]}</p>
+          </div>
+          {content.starting && <p className="text-sm text-zinc-400">New people start at {adultLabels[content.starting.level]}, set with <code className="text-zinc-300">{content.starting.variable}</code>. Change one person in <Link to="/settings/users" className="text-accent-300 underline">Users</Link>.</p>}
+          {content.groups && (content.groups.oidc || content.groups.ldap) && <div className="space-y-2 text-sm text-zinc-400">
+            <p>Sign-in groups set the highest level of their members, at each sign-in. They replace the setting in Users.</p>
+            <ul className="space-y-1">
+              {content.groups.oidc && Object.entries(content.groups.oidc.map).map(([group, level]) => <li key={`oidc-${group}`}>Single sign-on group <span className="text-zinc-200">{group}</span>: {adultLabels[level]}</li>)}
+              {content.groups.ldap?.map && Object.entries(content.groups.ldap.map).map(([group, level]) => <li key={`ldap-${group}`}>LDAP group <span className="text-zinc-200">{group}</span>: {adultLabels[level]}</li>)}
+              {content.groups.ldap && !content.groups.ldap.map && <li>LDAP entries that match <code className="text-zinc-300">{content.groups.ldap.variable}</code>: Shown, others Off</li>}
+            </ul>
+            <p className="text-xs">Set with {[content.groups.oidc?.variable, content.groups.ldap?.variable].filter(Boolean).join(' and ')}.</p>
+          </div>}
         </section>}
         <DocsLink path="start-here/adult-games/">Adult games</DocsLink>
-        <Confirm open={confirmAdult} onClose={() => setConfirmAdult(false)} title="Show adult games?" confirmLabel="Show adult games" onConfirm={() => void run(() => setAdultGames('allow'), 'Adult games are shown').then(() => setConfirmAdult(false))}>This shows games for adults.</Confirm>
+        <Confirm open={!!raiseTo} onClose={() => setRaiseTo(null)} title={raiseTo === 'shown' ? 'Show adult games and their pictures?' : 'Show adult games without pictures?'} confirmLabel={raiseTo ? `Set to ${adultLabels[raiseTo]}` : 'Confirm'} onConfirm={() => void run(() => setInstallationLevel(raiseTo!), 'Adult games level saved').then(() => setRaiseTo(null))}>{raiseTo ? installationHint[raiseTo] : null}</Confirm>
         <section className="space-y-5 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]">
           <h2 className="flex items-center gap-2 font-semibold text-white">
             <HardDrive className="size-4" /> Storage
@@ -212,7 +238,7 @@ function AdminSettings() {
           </Button>
           {persisted !== null && <p className="text-xs text-zinc-500">{persisted ? 'The browser will keep the cache.' : 'The browser declined; it may still keep it.'}</p>}
           <div className="border-t border-white/[0.06] pt-4">
-            <DeviceAdultPreference />
+            <DeviceAdultRow />
           </div>
         </section>
         {section === 'about' && <section className="space-y-4 rounded-3xl bg-white/[0.03] p-6 ring-1 ring-white/[0.07]"><h2 className="font-semibold text-white">About Renplay</h2><p className="text-sm text-zinc-400">Version {sys.version} · Made by the Renplay Team</p><p className="text-sm text-zinc-400">Renplay is open source, under the MIT license. Game art belongs to its developers.</p><div className="flex flex-wrap gap-4 text-sm text-accent-300"><DocsLink /><DocsLink path="troubleshooting/">Troubleshooting</DocsLink><a href="https://renplay.org/releases" target="_blank" rel="noreferrer">Release notes ↗</a><a href="https://renplay.org/github" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://renplay.org/support" target="_blank" rel="noreferrer">Support ↗</a><a href="https://github.com/renplay-org/renplay/blob/main/LICENSE" target="_blank" rel="noreferrer">License ↗</a></div></section>}
