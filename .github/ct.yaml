@@ -1,0 +1,7 @@
+---
+chart-dirs:
+  - charts
+check-version-increment: false
+validate-maintainers: false
+# The chart follows the application version. Release CI checks both explicitly.
+helm-extra-args: --timeout 5m

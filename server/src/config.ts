@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { readFileSync } from 'node:fs'
+import { accessSync, constants, readFileSync, statSync } from 'node:fs'
 import { fallbackOf } from './envvars.js'
 
 function env(name: string, fallback: string): string {
@@ -32,6 +32,19 @@ function adultGames(): '' | 'allow' | 'block' {
   console.warn(`RENPLAY_ADULT_GAMES=${v} is not "allow" or "block"; blocking adult games`)
   return 'block'
 }
+
+/** Only select an existing writable downloads mount. Never create it or move files. */
+export function downloadsDirectory(gamesDir: string, downloads = '/downloads'): string {
+  try {
+    if (statSync(downloads).isDirectory()) {
+      accessSync(downloads, constants.W_OK)
+      return downloads
+    }
+  } catch { /* No usable optional mount. Keep the legacy folder. */ }
+  return join(gamesDir, '_archives')
+}
+
+let warnedDeleteArchives = false
 
 export interface Config {
   auth: '' | 'on' | 'off'
@@ -76,8 +89,9 @@ export interface Config {
   internalDir: string
   /** Original game archives (zip/7z/rar): drop folder and reinstall source. */
   archivesDir: string
-  /** Delete completed uploads after install, never files copied into the archives folder. */
-  deleteArchives: boolean
+  /** Keep downloads unless an admin opts into upload cleanup. */
+  keepDownloads: boolean
+  keepDownloadsLocked: boolean
   enginesDir: string
   workDir: string
   purgeDir: string
@@ -100,6 +114,15 @@ export function loadConfig(): Config {
   const dataDir = env('DATA_DIR', fallbackOf('DATA_DIR'))
   const gamesDir = env('GAMES_DIR', fallbackOf('GAMES_DIR'))
   const internalDir = env('RENPLAY_DIR', join(gamesDir, '_renplay'))
+  const legacyDownloads = !!process.env['RENPLAY_DELETE_ARCHIVES']?.trim()
+  const keepDownloadsLocked = !!process.env['RENPLAY_KEEP_DOWNLOADS']?.trim() || legacyDownloads
+  if (legacyDownloads && !warnedDeleteArchives) {
+    console.warn('RENPLAY_DELETE_ARCHIVES is deprecated. Use RENPLAY_KEEP_DOWNLOADS with the opposite value. RENPLAY_KEEP_DOWNLOADS takes precedence.')
+    warnedDeleteArchives = true
+  }
+  const keepDownloads = process.env['RENPLAY_KEEP_DOWNLOADS']?.trim()
+    ? envBool('RENPLAY_KEEP_DOWNLOADS', true)
+    : legacyDownloads ? !envBool('RENPLAY_DELETE_ARCHIVES', false) : true
   const auth = env('RENPLAY_AUTH', '')
   if (auth && auth !== 'on' && auth !== 'off') throw new Error('RENPLAY_AUTH must be on or off')
   return {
@@ -141,8 +164,9 @@ export function loadConfig(): Config {
     overlaysDir: env('OVERLAYS_DIR', join(dataDir, 'overlays')),
     gamesDir,
     internalDir,
-    archivesDir: env('ARCHIVES_DIR', join(gamesDir, '_archives')),
-    deleteArchives: envBool('RENPLAY_DELETE_ARCHIVES', fallbackOf('RENPLAY_DELETE_ARCHIVES')),
+    archivesDir: env('ARCHIVES_DIR', downloadsDirectory(gamesDir)),
+    keepDownloads,
+    keepDownloadsLocked,
     enginesDir: join(internalDir, 'engines'),
     workDir: join(internalDir, 'work'),
     purgeDir: join(internalDir, 'purge'),

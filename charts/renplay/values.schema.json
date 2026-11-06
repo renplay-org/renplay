@@ -1,0 +1,472 @@
+{
+  "type": "object",
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "strategy": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "Recreate"
+          ]
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "extraEnv": {
+          "type": "array"
+        },
+        "envFrom": {
+          "type": "array"
+        }
+      }
+    },
+    "secret": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "oidcClientSecret": {
+          "type": "object",
+          "properties": {
+            "existingSecret": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          }
+        },
+        "ldapBindPassword": {
+          "type": "object",
+          "properties": {
+            "existingSecret": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "automount": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "type": "object",
+          "properties": {}
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "deploymentAnnotations": {
+      "type": "object",
+      "properties": {}
+    },
+    "podAnnotations": {
+      "type": "object",
+      "properties": {}
+    },
+    "podLabels": {
+      "type": "object",
+      "properties": {}
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "properties": {
+        "runAsNonRoot": {
+          "type": "boolean",
+          "const": true
+        },
+        "runAsUser": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "runAsGroup": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fsGroup": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fsGroupChangePolicy": {
+          "type": "string"
+        },
+        "seccompProfile": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securityContext": {
+      "type": "object",
+      "properties": {
+        "allowPrivilegeEscalation": {
+          "type": "boolean",
+          "const": false
+        },
+        "readOnlyRootFilesystem": {
+          "type": "boolean",
+          "const": true
+        },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "drop": {
+              "type": "array"
+            }
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "annotations": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "className": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object",
+          "properties": {}
+        },
+        "hosts": {
+          "type": "array"
+        },
+        "tls": {
+          "type": "array"
+        }
+      }
+    },
+    "httpRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "type": "object",
+          "properties": {}
+        },
+        "labels": {
+          "type": "object",
+          "properties": {}
+        },
+        "parentRefs": {
+          "type": "array"
+        },
+        "hostnames": {
+          "type": "array"
+        },
+        "filters": {
+          "type": "array"
+        },
+        "matches": {
+          "type": "array"
+        }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingClaim": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            },
+            "accessModes": {
+              "type": "array"
+            },
+            "size": {
+              "type": "string"
+            },
+            "annotations": {
+              "type": "object",
+              "properties": {
+                "helm.sh/resource-policy": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "games": {
+          "type": "object",
+          "properties": {
+            "existingClaim": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            },
+            "accessModes": {
+              "type": "array"
+            },
+            "size": {
+              "type": "string"
+            },
+            "annotations": {
+              "type": "object",
+              "properties": {
+                "helm.sh/resource-policy": {
+                  "type": "string"
+                }
+              }
+            },
+            "nfs": {
+              "type": "object",
+              "properties": {
+                "server": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "downloads": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "existingClaim": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            },
+            "accessModes": {
+              "type": "array"
+            },
+            "size": {
+              "type": "string"
+            },
+            "annotations": {
+              "type": "object",
+              "properties": {
+                "helm.sh/resource-policy": {
+                  "type": "string"
+                }
+              }
+            },
+            "nfs": {
+              "type": "object",
+              "properties": {
+                "server": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": "string"
+            },
+            "memory": {
+              "type": "string"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "memory": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "livenessProbe": {
+      "type": "object",
+      "properties": {
+        "httpGet": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "port": {
+              "type": "string"
+            }
+          }
+        },
+        "periodSeconds": {
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        }
+      }
+    },
+    "readinessProbe": {
+      "type": "object",
+      "properties": {
+        "httpGet": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "port": {
+              "type": "string"
+            }
+          }
+        },
+        "periodSeconds": {
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        }
+      }
+    },
+    "startupProbe": {
+      "type": "object",
+      "properties": {
+        "httpGet": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "port": {
+              "type": "string"
+            }
+          }
+        },
+        "periodSeconds": {
+          "type": "integer"
+        },
+        "failureThreshold": {
+          "type": "integer"
+        }
+      }
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer"
+    },
+    "nodeSelector": {
+      "type": "object",
+      "properties": {}
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object",
+      "properties": {}
+    },
+    "tests": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            },
+            "pullPolicy": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

@@ -23,16 +23,25 @@ existing names and meanings stay supported throughout 3.x.
 |---|---|
 | `/data` | Saves, save history, accounts, SQLite library database, mods and cached metadata. **Use local disk and back it up. SQLite must not be on a network share.** |
 | `/games` | Installed builds and `_renplay/` (engines and scratch space). This can be a network share. Installed builds can be recreated from the original downloads. |
-| `/games/_archives` | Original game downloads, also called the archives folder. Optionally mount a separate downloads folder here, or set `ARCHIVES_DIR`. |
+| `/downloads` | Optional downloads and drop folder, added in 3.x. Used when it exists and is writable, or when selected with `ARCHIVES_DIR`. Existing files are never moved. |
+| `/games/_archives` | Original game downloads when no usable `/downloads` exists. Existing mounts here and `ARCHIVES_DIR` overrides stay supported. |
 | `/tmp` | Disposable writable temporary space, including nginx state, HOME and caches. Provide a writable tmpfs when the root filesystem is read-only. |
 
 An install needs about **twice the game's download size free** while building, sometimes more
 for highly compressed archives. `/data` is usually small compared with `/games`, but save history,
 mods and the first upgrade backup need space too.
 
-By default, only completed uploads through Renplay are deleted after a successful install.
-Downloads you copied into the archives folder are **never automatically deleted**, nor are old
-archives with an unknown origin. Set `RENPLAY_DELETE_ARCHIVES=false` to keep uploads too.
+Downloads are now kept by default. `RENPLAY_KEEP_DOWNLOADS`, added in 3.x, sets and locks
+this choice. When unset, admins can change **Keep downloads** in Settings. `false` deletes only
+unchanged uploads through Renplay after a successful install. Files copied into the drop folder
+are **never automatically deleted**, nor are old archives with an unknown origin.
+`RENPLAY_DELETE_ARCHIVES` remains supported as a deprecated inverse alias, with a startup warning.
+If both are set, `RENPLAY_KEEP_DOWNLOADS` wins. Nothing was removed from the 3.0 contract.
+
+Deleting `/games` also deletes downloads stored in its `_archives` folder. Mount `/downloads`
+separately if you want to discard installed games without losing the downloads. Rebuilding games
+requires the original downloads. Deleting `/data` loses saves and the library. An admin can
+explicitly delete a game's download to free space. Reinstalling then needs that download again.
 Uninstalling or reinstalling a game never deletes its saves.
 
 ## Users and permissions
@@ -61,7 +70,7 @@ New variables may be added. The names frozen for 3.0 are:
 - Accounts: `RENPLAY_AUTH`, `RENPLAY_AUTH_USER`, `RENPLAY_AUTH_LOCAL`,
   `RENPLAY_ADMIN_USERNAME`, `RENPLAY_ADMIN_PASSWORD`, `RENPLAY_ADMIN_PASSWORD_FILE`,
   `RENPLAY_ADULT_DEFAULT`.
-- Games: `RENPLAY_DELETE_ARCHIVES`, `RENPLAY_ADULT_GAMES`, `RENPLAY_CATALOG_URLS`,
+- Games: `RENPLAY_KEEP_DOWNLOADS` (added in 3.x), `RENPLAY_DELETE_ARCHIVES` (deprecated alias), `RENPLAY_ADULT_GAMES`, `RENPLAY_CATALOG_URLS`,
   `RENPLAY_ENGINES_URL`, `RENPLAY_ENGINE`.
 - Images and saves: `RENPLAY_IMAGE_QUALITY`, `RENPLAY_IMAGE_CONCURRENCY`, `RENPLAY_SAVE_HISTORY`.
 - Proxy: `RENPLAY_PUBLIC_URL`, `RENPLAY_TRUSTED_HOPS`, `RENPLAY_KEEPALIVE_URL`,

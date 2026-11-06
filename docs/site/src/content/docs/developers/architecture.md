@@ -20,7 +20,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 
 | Path | Contents |
 |---|---|
-| `/games/_archives/` | Original game archives: the drop folder. Deleted after a successful install unless `RENPLAY_DELETE_ARCHIVES=false`, which keeps them as the source for reinstalls |
+| `/downloads/` or `/games/_archives/` | Original downloads and drop folder. A writable `/downloads` wins unless `ARCHIVES_DIR` is set. Downloads are kept by default. Nothing is moved automatically. |
 | `/games/<id>/<build>/` | One web build: `game.zip`, `assets.pack`, `assets.json`, `build.json`, `cache/` |
 | `/games/<id>/<build>.m<hash>/` | A mod build: its own `game.zip` and caches; everything else from the base build |
 | `/games/_renplay/engines/<version>/` | Engine packs, downloaded on demand |
@@ -72,7 +72,8 @@ archives, while they are kept).
    (`webcompat.ts`), stand-ins for what desktop games expect and a browser lacks (`ssl`, threads,
    Unix sockets, old import hooks, Python 2 print statements and octal numbers).
 8. **Delete an uploaded archive** once the archive is closed (on NFS, deleting an open file
-   leaves a hidden copy), unless `RENPLAY_DELETE_ARCHIVES=false`. The upload completion records
+   leaves a hidden copy), only when **Keep downloads** is off. `RENPLAY_KEEP_DOWNLOADS` locks this
+   choice when set. The deprecated `RENPLAY_DELETE_ARCHIVES` alias has the opposite value. The upload completion records
    the file identity separately from scan metadata; copied, replaced, edited and unknown archives
    are never automatically deleted. Failed installs keep their archive.
 

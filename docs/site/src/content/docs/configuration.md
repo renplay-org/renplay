@@ -48,11 +48,11 @@ Saves and their history, the library database, mods, covers and walkthroughs. Us
 
 <div class="config-default">
 
-Default: `$GAMES_DIR/_archives`
+Default: `/downloads` if it exists and is writable, otherwise `$GAMES_DIR/_archives`
 
 </div>
 
-The drop folder for game downloads (zip, 7z, rar), and the source for reinstalls.
+Downloads and the drop folder (zip, 7z, rar), kept for reinstalls. An explicit path overrides automatic detection. Existing files are never moved.
 
 </div>
 
@@ -129,9 +129,9 @@ Default: `block`
 
 </div>
 
-<div class="config-entry" id="renplay-delete-archives">
+<div class="config-entry" id="renplay-keep-downloads">
 
-**`RENPLAY_DELETE_ARCHIVES`**
+**`RENPLAY_KEEP_DOWNLOADS`**
 
 <div class="config-default">
 
@@ -139,7 +139,21 @@ Default: `true`
 
 </div>
 
-Delete downloads uploaded through Renplay after a successful install. Files copied into the archives folder are never deleted automatically, including downloads from before 3.0 whose origin is unknown. `false` keeps everything for reinstalls.
+Keep downloads after install so games can be reinstalled. `false` deletes only unchanged uploads through Renplay after a successful install. Files copied in are never deleted automatically. Setting this variable locks the Settings switch. When unset, admins can choose in Settings.
+
+</div>
+
+<div class="config-entry" id="renplay-delete-archives">
+
+**`RENPLAY_DELETE_ARCHIVES`**
+
+<div class="config-default">
+
+Default: not set
+
+</div>
+
+Deprecated alias for the opposite of `RENPLAY_KEEP_DOWNLOADS`. `true` deletes uploaded downloads and `false` keeps them. Still supported in 3.x, with a warning once at startup. `RENPLAY_KEEP_DOWNLOADS` takes precedence when both are set.
 
 </div>
 
@@ -760,5 +774,10 @@ Port of the Renplay server inside the container. nginx listens on 8080 and forwa
 | Folder | What is in it |
 |---|---|
 | `/data` | Saves and their history, accounts, the SQLite library, mods, covers, walkthroughs. **Local disk only. Back this up.** |
-| `/games/_archives` | Game downloads. Only completed Renplay uploads are deleted after install, unless `RENPLAY_DELETE_ARCHIVES=false`. Files you copied here stay here. |
-| `/games` (the rest) | Installed games. Renplay can rebuild them from the archives, while they are kept. |
+| `/downloads` | Optional downloads and drop folder. Used when it exists and is writable, or when selected with `ARCHIVES_DIR`. Downloads are kept by default. `RENPLAY_KEEP_DOWNLOADS=false` deletes only unchanged completed uploads after a successful install. Files copied in are never deleted automatically. |
+| `/games/_archives` | Downloads when no usable `/downloads` exists. Existing files are never moved. |
+| `/games` (the rest) | Installed games, engines and scratch space. Scratch stays on this filesystem for atomic installs. Rebuilding requires the original downloads. |
+
+Deleting `/data` loses saves and the library. Deleting `/games` also loses downloads stored
+inside it. Deleting a download means reinstalling needs that download again. Settings shows
+the downloads folder in use.

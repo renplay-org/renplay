@@ -188,8 +188,8 @@ export interface SystemInfo {
   orphans: string[]
   purging: number
   paths: { games: string; archives: string; data: string }
-  /** Archives are deleted once they installed (RENPLAY_DELETE_ARCHIVES). */
-  deleteArchives: boolean
+  keepDownloads: boolean
+  keepDownloadsLocked: boolean
   busy: boolean
 }
 

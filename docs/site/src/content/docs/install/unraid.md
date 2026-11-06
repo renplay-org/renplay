@@ -27,7 +27,12 @@ settings are the same as in [Docker and Docker Compose](/install/docker/), which
 options.
 
 Keep `/data` on local disk and in your NAS backups; its SQLite database must not be on a
-network share. `/games` and the archives folder can be shares. Put a sign-in in front of Renplay before you open it to the
+network share. `/games` holds installed games, engines and scratch space. Optionally mount a
+separate downloads share at `/downloads`. Without it, downloads stay in `/games/_archives`.
+Deleting `/data` loses saves. Deleting `/games` also loses downloads stored inside it. Games can
+be rebuilt only while their downloads are kept. Downloads are kept by default, and Settings
+controls cleanup of uploads through Renplay. Files copied in are never deleted automatically.
+See [storage folders](/install/docker/#storage-folders) for the full layout. Put a sign-in in front of Renplay before you open it to the
 internet: [Reverse proxy and HTTPS](/install/reverse-proxy/).
 
 The image names, ports, paths and upgrade promise are covered by the

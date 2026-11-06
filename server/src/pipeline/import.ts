@@ -1,6 +1,7 @@
 import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import { archiveIdentity } from '../archive-origin.js'
+import { keepDownloads } from '../downloads.js'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../builds.js'
 import type { BuildSettings, Catalog, RecipeMatch } from '../catalog.js'
 import type { Config } from '../config.js'
@@ -65,7 +66,7 @@ export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps)
 
 /** Removes only a completed, unchanged upload. Failure only costs space. */
 export async function deleteSource(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<void> {
-  if (!deps.cfg.deleteArchives) return
+  if (keepDownloads(deps.cfg, deps.db)) return
   const rel = cleanRelPath(ctx.params.source.path)
   const path = safeJoin(deps.cfg.archivesDir, rel)
   try {

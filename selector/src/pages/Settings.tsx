@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import RecipeDialog from '../components/RecipeDialog'
 import DocsLink from '../components/DocsLink'
 import { Button, Confirm, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
-import { post } from '../lib/api'
+import { post, put } from '../lib/api'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
 import { DeviceAdultPreference } from '../components/AdultPreferences'
@@ -89,17 +89,19 @@ function AdminSettings() {
           <p className="text-sm text-zinc-400">
             {sys.library.installed} of {sys.library.games} games installed, {bytes(sys.library.bytes)} in total.
           </p>
-          <div className="space-y-1 text-xs text-zinc-500">
+          <div className="space-y-1 break-all text-xs text-zinc-500">
             <div>
               Games <code className="text-zinc-400">{sys.paths.games}</code>
             </div>
             <div>
-              Archives <code className="text-zinc-400">{sys.paths.archives}</code>
+              Downloads <code className="text-zinc-400">{sys.paths.archives}</code>
             </div>
             <div>
               Data <code className="text-zinc-400">{sys.paths.data}</code>
             </div>
           </div>
+          {!sys.keepDownloadsLocked && <Switch checked={sys.keepDownloads} label="Keep downloads" hint="Keep downloads so games can be reinstalled. Off deletes only uploads through Renplay after a successful install. Files copied in are never deleted automatically." onChange={(on) => void run(() => put('/api/system/downloads', { keepDownloads: on }), 'Download preference saved')} />}
+          {sys.keepDownloadsLocked && <p className="text-xs text-zinc-500">The server configuration {sys.keepDownloads ? 'keeps downloads' : 'deletes completed uploads'}. It cannot be changed here.</p>}
           {sys.purging > 0 && <p className="text-xs text-zinc-500">Deleting {sys.purging} removed item{sys.purging === 1 ? '' : 's'} in the background.</p>}
           {sys.orphans.length > 0 && (
             <p className="text-xs text-amber-300/90">

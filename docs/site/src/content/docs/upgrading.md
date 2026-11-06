@@ -57,9 +57,11 @@ rollback. See [Accounts](/accounts/) for switching sign-in off and on without mo
 `/data` is what to back up: saves and their history, the library database, mods, covers and
 walkthroughs. Stop Renplay, or take a snapshot of the volume, so the database is copied whole.
 
-`/games` does not need a backup of its own: installed games can be rebuilt from `/games/_archives`,
-as long as the archives are kept (`RENPLAY_DELETE_ARCHIVES=false`). Games whose archives were
-deleted must be added again, but their saves are safe in `/data`.
+Installed games can be rebuilt while their downloads are kept. Downloads live in the optional
+`/downloads` mount, an explicit `ARCHIVES_DIR`, or `/games/_archives`. Downloads are kept by
+default. `RENPLAY_KEEP_DOWNLOADS=true` locks that choice. Back up downloads you cannot get again.
+Deleting `/games` also deletes downloads stored inside it. Games whose downloads were deleted
+must be added again, but their saves are safe in `/data`.
 
 ## An important change in this release line
 

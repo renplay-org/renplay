@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Container contract tests, shared by CI and local Docker (Python standard library only).
 
-Usage: python3 deploy/test-contract.py renplay:contract [users|smoke|upgrade|all]
+Usage: python3 deploy/test-contract.py renplay:contract [users|smoke|upgrade|all] [--downloads]
 The fixture engine is deliberately data-only: this tests native install/HTTP paths,
 not Ren'Py execution in a browser. No game or engine downloads are needed.
 """
@@ -23,6 +23,7 @@ if SUITE not in ('users', 'smoke', 'upgrade', 'all'):
     raise SystemExit('Suite must be users, smoke, upgrade or all')
 OLD = 'ghcr.io/renplay-org/renplay:2.11.1'
 PREFIX = 'renplay-contract-' + uuid.uuid4().hex[:10]
+DOWNLOADS = '--downloads' in sys.argv
 
 
 def docker(*args, data=None):
@@ -45,12 +46,15 @@ class Library:
     def __init__(self, suffix, uid=1000, gid=1000):
         self.name = PREFIX + '-' + suffix
         self.volumes = [self.name + '-data', self.name + '-games']
+        if DOWNLOADS:
+            self.volumes.append(self.name + '-downloads')
         self.container = None
         for volume in self.volumes:
             docker('volume', 'create', volume)
         docker('run', '--rm', '--user', '0:0', '-v', self.volumes[0] + ':/data',
-               '-v', self.volumes[1] + ':/games', '--entrypoint', 'sh', IMAGE,
-               '-c', f'chown {uid}:{gid} /data /games')
+               '-v', self.volumes[1] + ':/games',
+               *(['-v', self.volumes[2] + ':/downloads'] if DOWNLOADS else []),
+               '--entrypoint', 'sh', IMAGE, '-c', f'chown {uid}:{gid} /data /games' + (' /downloads' if DOWNLOADS else ''))
 
     def start(self, image=IMAGE, options=()):
         self.container = self.name
@@ -59,6 +63,7 @@ class Library:
                '-v', self.volumes[1] + ':/games', '-e', 'RENPLAY_AUTH=off',
                '-e', 'RENPLAY_CATALOG_URLS=http://127.0.0.1:9/catalog',
                '-e', 'RENPLAY_ENGINES_URL=http://127.0.0.1:9/engines',
+               *(['-v', self.volumes[2] + ':/downloads'] if DOWNLOADS else []),
                *options, image)
         port = docker('port', self.name, '8080/tcp').rsplit(':', 1)[1]
         self.url = 'http://127.0.0.1:' + port
@@ -144,6 +149,9 @@ def smoke():
     lib = Library('smoke')
     try:
         lib.start()
+        system = lib.request('/api/system')
+        assert system['paths']['archives'] == ('/downloads' if DOWNLOADS else '/games/_archives'), system
+        assert system['keepDownloads'] is True
         engine_zip = base64.b64encode(zip_bytes({'renpy/__init__.py': '', 'main.py': ''})).decode()
         js(lib.name, """
             import { mkdirSync, writeFileSync } from 'node:fs';
@@ -184,7 +192,12 @@ def smoke():
         packed = lib.request(game['playUrl'] + 'game.zip')
         with zipfile.ZipFile(io.BytesIO(packed)) as archive:
             assert 'game/script.rpy' in archive.namelist()
-        # The completed upload is removed, not kept as an unknown drop-folder download.
+        # Default retention preserves the completed upload, also across filesystems.
+        assert game['canReinstall'] is True
+        assert len(lib.request('/api/archives')['archives']) == 1
+        lib.request('/api/games/' + game['id'] + '/download', method='DELETE')
+        assert lib.request('/api/games/' + game['id'])['game']['canReinstall'] is False
+        assert lib.request('/api/games/' + game['id'])['game']['status'] == 'installed'
         assert lib.request('/api/archives')['archives'] == []
         print('PASS native install, page and game.zip:', docker('image', 'inspect', '--format', '{{.Architecture}}', IMAGE))
     finally:
