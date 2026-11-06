@@ -13,6 +13,7 @@ import './index.css'
 const GamePage = lazy(() => import('./pages/GamePage'))
 const Player = lazy(() => import('./pages/Player'))
 const AddGames = lazy(() => import('./pages/AddGames'))
+const Catalog = lazy(() => import('./pages/Catalog'))
 const Activity = lazy(() => import('./pages/Activity'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Account = lazy(() => import('./pages/Account'))
@@ -49,6 +50,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/play/:id" element={<Player />} />
               <Route element={<AppShell />}>
                 <Route path="/" element={<Library />} />
+                <Route path="/catalog" element={<Catalog />} />
                 <Route path="/game/:id" element={<GamePage />} />
                 <Route element={<AuthGuard admin />}>
                   <Route path="/add" element={<AddGames />} />

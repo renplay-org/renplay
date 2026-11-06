@@ -22,10 +22,12 @@ import SceneCard from '../components/SceneCard'
 import DocsLink from '../components/DocsLink'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Cover } from '../components/GameCard'
+import { formatFor, hashUrl, TitleArt, useHidden } from '../lantern/art'
+import { Bar } from '../lantern/controls'
+import { flyGhost, takeTravel } from '../lantern/travel'
 import { Button, IconButton, Progress, Spinner, Switch, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { api, slotName } from '../lib/api'
+import { api, slotName, type Game } from '../lib/api'
 import {
   NO_INSETS,
   frameRect,
@@ -440,7 +442,7 @@ export default function Player() {
 
   return (
     <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white outline-none">
-      {signedOut && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center"><section role="dialog" aria-modal="true" aria-label="You were signed out" className="safe-bottom w-full max-w-md space-y-4 rounded-3xl bg-ink-950 p-6 ring-1 ring-white/10"><h2 className="text-xl font-semibold">You were signed out.</h2><p className="text-sm text-zinc-400">Your saves are kept on this device until you sign in to the same account.</p><a className="inline-flex min-h-11 items-center rounded-xl bg-accent-500 px-5 text-sm font-semibold text-white" href="/signin" target="_blank" rel="noreferrer">Sign in</a><Button className="ml-3" onClick={async () => {
+      {signedOut && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center"><section role="dialog" aria-modal="true" aria-label="You were signed out" className="safe-bottom w-full max-w-md space-y-4 rounded-3xl bg-ink-950 p-6 ring-1 ring-white/10"><h2 className="text-xl font-semibold">You were signed out.</h2><p className="text-sm text-zinc-400">Your saves are kept on this device until you sign in to the same account.</p><a className="btn p" style={{ display: 'inline-flex' }} href="/signin" target="_blank" rel="noreferrer">Sign in</a><Button className="ml-3" onClick={async () => {
         try { const me = await api<{ user: { id: number } }>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
       }}>Continue</Button>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
       {legacySaves && <div role="status" className="fixed inset-x-4 top-4 z-[90] mx-auto max-w-md rounded-2xl bg-ink-950 p-4 text-sm shadow-xl"><p>Unowned browser saves are kept on this device. Their account is not known. Ask an admin to help recover them before clearing browser storage.</p><Button onClick={() => setLegacySaves(false)} className="mt-2">Dismiss</Button></div>}
@@ -463,54 +465,8 @@ export default function Player() {
       {/* Hot zone that reveals the toolbar, also while the game has focus. */}
       <div className="absolute inset-x-0 top-0 z-20 h-3" onMouseEnter={showToolbar} onClick={showToolbar} onTouchStart={showToolbar} />
 
-      {/* Loader */}
-      <div className={cx('absolute inset-0 z-10 flex flex-col items-center justify-center bg-black transition-opacity duration-700', ready || (portrait && !portraitOk) ? 'pointer-events-none opacity-0' : 'opacity-100')}>
-        <Cover game={game} kind="hero" rounded={false} className="absolute inset-0 scale-110 opacity-40 blur-2xl" />
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="relative flex w-full max-w-md flex-col items-center px-8 text-center">
-          <Cover game={game} className="mb-8 aspect-[63/50] w-56 shadow-2xl ring-1 ring-white/15 sm:w-64" />
-          <h1 className="font-display text-2xl font-semibold tracking-tight">{game.title}</h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            {sandboxed ? 'Loading game…' : resume ? 'Loading your save…' : !progress ? 'Starting engine…' : loadPct >= 1 ? 'Starting game…' : 'Loading game…'}
-          </p>
-          {failed ? (
-            <div className="mt-6 flex flex-col items-center gap-3">
-              <p className="text-sm text-rose-300">{failed}</p>
-              <button
-                onClick={() => {
-                  setFailed(null)
-                  setProgress(null)
-                  setAttempt((n) => n + 1)
-                }}
-                className="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-zinc-100 ring-1 ring-white/15 hover:bg-white/15"
-              >
-                Try again
-              </button>
-            </div>
-          ) : (
-            <Progress value={loadPct} indeterminate={!progress || !progress.total} className="mt-6 w-full" />
-          )}
-          {homeTip && (
-            <div className="mt-8 flex items-center gap-3 rounded-2xl bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-300 ring-1 ring-white/10">
-              <SquarePlus className="size-5 shrink-0 text-accent-300" />
-              <span>
-                For full screen, add Renplay to your home screen.{' '}
-                <button className="font-medium text-accent-300" onClick={() => setPanel('fullscreen')}>
-                  How
-                </button>
-              </span>
-              <IconButton label="Dismiss" onClick={dismissHomeTip}>
-                <X className="size-4" />
-              </IconButton>
-            </div>
-          )}
-          {slow && !failed && (
-            <button onClick={() => setReady(true)} className="mt-6 text-xs text-zinc-400 underline-offset-4 hover:text-zinc-200 hover:underline">
-              Taking long? Show the game’s own loading screen
-            </button>
-          )}
-        </div>
-      </div>
+      {/* The door: the stage's art grown to the viewport while the game loads. */}
+      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} homeTip={homeTip} onHomeTip={() => setPanel('fullscreen')} onDismissHomeTip={dismissHomeTip} />
 
       {/* Saving overlay */}
       {exiting && (
@@ -649,6 +605,91 @@ export default function Player() {
           <iframe src={`/api/walkthroughs/${encodeURIComponent(game.walkthrough)}`} title="Walkthrough" className="min-h-0 flex-1 border-0 bg-white" />
         </div>
       )}
+    </div>
+  )
+}
+
+/** The door: the hero across the whole screen, the logo or title and the loading bar at its bottom left. It ends when the game is ready, never after a minimum time. */
+function Door({
+  game,
+  ready,
+  resume,
+  progress,
+  loadPct,
+  failed,
+  slow,
+  sandboxed,
+  onRetry,
+  onShowGame,
+  homeTip,
+  onHomeTip,
+  onDismissHomeTip,
+}: {
+  game: Game
+  ready: boolean
+  resume: string | null
+  progress: { done: number; total: number } | null
+  loadPct: number
+  failed: string | null
+  slow: boolean
+  sandboxed: boolean
+  onRetry: () => void
+  onShowGame: () => void
+  homeTip: boolean
+  onHomeTip: () => void
+  onDismissHomeTip: () => void
+}) {
+  const hidden = useHidden(game)
+  const hero = formatFor(game.art, 'hero')
+  const art = (!hidden && hero?.url1x) || hashUrl(hero?.thumbhash)
+  const [settling, setSettling] = useState(false)
+  useEffect(() => {
+    const t = takeTravel(game.id)
+    if (!t) return
+    setSettling(true)
+    flyGhost(t, { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }, () => setSettling(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.id])
+  const status = failed ? 'Something went wrong' : sandboxed ? 'Loading game' : resume ? 'Loading your save' : !progress ? 'Starting engine' : loadPct >= 1 ? 'Starting game' : 'Loading game'
+  return (
+    <div className={cx('door', ready ? 'pointer-events-none opacity-0' : 'opacity-100')} style={{ transition: 'opacity .7s', zIndex: 10, position: 'absolute' }}>
+      <div className={cx('art', hero?.made === 'glow' && 'blur')} style={settling ? { opacity: 0 } : undefined}>
+        {art && <img src={art} alt="" />}
+      </div>
+      <div className="tb">
+        <TitleArt game={game} hidden={hidden} />
+        <div className="muted-2" style={{ marginTop: 8, fontSize: 14 }}>
+          {resume ? `Resuming ${resume}` : 'Starting from the main menu'} · {status}
+          {!failed && progress && progress.total > 0 ? <> <span className="tnum">{Math.round(loadPct * 100)}%</span></> : null}
+        </div>
+        {failed ? (
+          <div className="stack" style={{ marginTop: 14, alignItems: 'flex-start', gap: 10 }}>
+            <p className="red small">{failed}</p>
+            <Button onClick={onRetry}>Try again</Button>
+          </div>
+        ) : (
+          <div style={{ marginTop: 14, maxWidth: 360 }}>{progress && progress.total > 0 ? <Bar value={loadPct} /> : <Progress value={0} indeterminate />}</div>
+        )}
+        {homeTip && (
+          <div className="notice" style={{ marginTop: 16, maxWidth: 420 }}>
+            <SquarePlus />
+            <span className="grow small">
+              For full screen, add Renplay to your home screen.{' '}
+              <button className="link" onClick={onHomeTip}>
+                How
+              </button>
+            </span>
+            <IconButton label="Dismiss" onClick={onDismissHomeTip}>
+              <X className="size-4" />
+            </IconButton>
+          </div>
+        )}
+        {slow && !failed && (
+          <button onClick={onShowGame} className="link-q xs" style={{ marginTop: 14, display: 'inline-block' }}>
+            Taking long? Show the game’s own loading screen
+          </button>
+        )}
+      </div>
     </div>
   )
 }

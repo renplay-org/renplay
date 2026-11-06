@@ -1,6 +1,6 @@
-import { ArrowDownWideNarrow, Check } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import Sheet from './Sheet'
-import { Button, MenuItem } from './ui'
+import { MenuItem } from './ui'
 
 const options = [
   { value: 'recent', label: 'Recent' },
@@ -12,12 +12,20 @@ const options = [
 export default function SortMenu({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const label = options.find((option) => option.value === value)?.label ?? 'Recent'
   return (
-    <Sheet trigger={(open) => <Button icon={<ArrowDownWideNarrow className="size-4" />} onClick={open} aria-label={`Sort games: ${label}`}>{label}</Button>}>
-      {(close) => options.map((option) => (
-        <MenuItem key={option.value} icon={value === option.value ? <Check /> : undefined} onClick={() => { onChange(option.value); close() }}>
-          {option.label}
-        </MenuItem>
-      ))}
+    <Sheet
+      trigger={(open) => (
+        <button className="sort" onClick={open} aria-label={`Sort games: ${label}`}>
+          {label} <ChevronDown />
+        </button>
+      )}
+    >
+      {(close) =>
+        options.map((option) => (
+          <MenuItem key={option.value} icon={value === option.value ? <Check /> : undefined} onClick={() => { onChange(option.value); close() }}>
+            {option.label}
+          </MenuItem>
+        ))
+      }
     </Sheet>
   )
 }

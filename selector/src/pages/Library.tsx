@@ -1,18 +1,124 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { Heart, Play, Sparkles } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import GameCard from '../components/GameCard'
+import Card from '../lantern/Tile'
+import Stage, { travelToDoor } from '../lantern/Stage'
+import { Pill, TagPill, Seg, Bar } from '../lantern/controls'
+import { useRoom } from '../lantern/Room'
+import { useHidden } from '../lantern/art'
 import EmptyLibrary from '../components/EmptyLibrary'
-import ChipRow from '../components/ChipRow'
-import UpNext from '../components/UpNext'
+import TagFilters from '../components/TagFilters'
 import Shelf from '../components/Shelf'
-import UpdateCard from '../components/UpdateCard'
-import SegmentedControl from '../components/SegmentedControl'
 import SortMenu from '../components/SortMenu'
 import { Button, Empty, errorText, useToast } from '../components/ui'
-import { post } from '../lib/api'
+import { post, slotName, type Game } from '../lib/api'
+import { ago, capitalize, pct, playedTime } from '../lib/format'
 import { useCatalog, useGames, useJobs } from '../lib/queries'
 import { gameTags, matchesSearch, tagChips } from '../lib/tags'
+
+/** The one meta line under a tile: heart, Beta, when it was played. */
+function tileMeta(g: Game) {
+  if (g.job) return <span>Installing</span>
+  if (g.status !== 'installed') return <span>Not installed</span>
+  return (
+    <>
+      {g.favoriteAt && <Heart fill="currentColor" className="pink" />}
+      {g.family !== 'renpy' && <span className="vio">Beta</span>}
+      <span className="truncate">{g.lastPlayedAt ? capitalize(ago(g.lastPlayedAt)) : 'Not played yet'}</span>
+    </>
+  )
+}
+
+/** Corner pills and the install bar inside a tile's frame. */
+function tileExtra(g: Game) {
+  const parts: ReactNode[] = []
+  if (g.update && !g.job) parts.push(
+    <span key="up" className="corner">
+      <TagPill tone="dark">Update</TagPill>
+    </span>,
+  )
+  if (g.job)
+    parts.push(
+      <div key="job" className="prog">
+        <div className="row between">
+          <span className="truncate">{g.job.status === 'queued' ? 'Queued' : g.job.stage || 'Working'}</span>
+          <span className="tnum">{g.job.status === 'running' ? pct(g.job.progress) : ''}</span>
+        </div>
+        <Bar thin value={g.job.progress} />
+      </div>,
+    )
+  return parts.length ? <>{parts}</> : undefined
+}
+
+export function GameTile({ game, kind = 'grid', on, onFocus, onMouseEnter }: { game: Game; kind?: 'grid' | 'wide'; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
+  const installed = game.status === 'installed'
+  return <Card game={game} kind={kind} href={`/game/${game.id}`} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} onFocus={onFocus} onMouseEnter={onMouseEnter} />
+}
+
+function resumeUrl(g: Game): string {
+  return `/play/${g.id}${g.latestSave ? `?resume=${encodeURIComponent(slotName(g.latestSave.file))}` : ''}`
+}
+
+function stageMeta(g: Game) {
+  const save = g.latestSave
+  return (
+    <>
+      <span>{save ? `${save.label} · ${ago(save.ctime)}` : 'Not played yet'}</span>
+      <span className="sep">·</span>
+      <span>{playedTime(g.playTime)}</span>
+      {g.saves.count > 0 && (
+        <>
+          <span className="sep">·</span>
+          <span>
+            {g.saves.count} {g.saves.count === 1 ? 'save' : 'saves'} · Synced
+          </span>
+        </>
+      )}
+    </>
+  )
+}
+
+function StageActions({ g }: { g: Game }) {
+  const hidden = useHidden(g)
+  return (
+    <>
+      <Pill variant="p" size="lg" icon={<Play />} to={resumeUrl(g)} onClick={() => travelToDoor(g, hidden)}>
+        {g.latestSave ? 'Resume' : 'Play'}
+      </Pill>
+      {g.latestSave && (
+        <Pill variant="s" size="lg" to={`/play/${g.id}`} onClick={() => travelToDoor(g, hidden)}>
+          Main menu
+        </Pill>
+      )}
+      <Pill variant="q" size="lg" to={`/game/${g.id}`}>
+        Game page
+      </Pill>
+    </>
+  )
+}
+
+/** The phone stage carousel: one stage per game up next, the next one peeking. The room follows the snapped slide. */
+function StageCarousel({ games, onSlide }: { games: Game[]; onSlide: (id: string) => void }) {
+  return (
+    <div
+      className="carousel"
+      onScroll={(e) => {
+        const el = e.currentTarget
+        const slideW = el.scrollWidth / games.length
+        const i = Math.round(el.scrollLeft / slideW)
+        const g = games[Math.max(0, Math.min(games.length - 1, i))]
+        if (g) onSlide(g.id)
+      }}
+    >
+      {games.map((g) => (
+        <div key={g.id} className="slide">
+          <Stage game={g} eyebrow="Up next" meta={stageMeta(g)} actions={<StageActions g={g} />} />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function Library() {
   const qc = useQueryClient()
@@ -35,43 +141,163 @@ export default function Library() {
   const [limit, setLimit] = useState(60)
   useEffect(() => setLimit(60), [q, filter, tag, sort])
   const all = games ?? []
-  const failed = (jobs?.jobs ?? []).filter((job) => job.type === 'import' && ['failed', 'interrupted'].includes(job.status) && jobs?.jobs.find((other) => other.type === 'import' && other.game === job.game)?.id === job.id && !all.find((game) => game.id === job.game)?.job).filter((job, index, rows) => rows.findIndex((other) => other.game === job.game) === index)
-  const shown = all.filter((g) =>
-    matchesSearch(g, q, vocabulary) &&
-    (filter === 'all' || (filter === 'favorites' ? !!g.favoriteAt : filter === 'added' ? !g.lastPlayedAt && g.status === 'installed' && !g.job && Date.now() - Date.parse(g.createdAt) < 7 * 86400000 : filter === 'failed' ? failed.some((job) => job.game === g.id) : filter === 'installed' ? g.status === 'installed' || g.job : g.status !== 'installed' && !g.job)) &&
-    (!tag || gameTags(g, vocabulary).some((t) => t.id === tag)),
-  ).sort((a, b) => {
-    if (sort === 'title') return a.title.localeCompare(b.title)
-    if (sort === 'added') return Date.parse(b.createdAt) - Date.parse(a.createdAt) || a.title.localeCompare(b.title)
-    const time = (g: typeof a) => sort === 'recent' ? Math.max(Date.parse(g.lastPlayedAt ?? '') || 0, Date.parse(g.createdAt)) : Date.parse(g.lastPlayedAt ?? '') || 0
-    return time(b) - time(a) || a.title.localeCompare(b.title)
-  })
-  const recent = all.filter((g) => g.status === 'installed' && !g.job && g.lastPlayedAt && !g.finishedAt).sort((a, b) => b.lastPlayedAt!.localeCompare(a.lastPlayedAt!))[0]
+  const failed = (jobs?.jobs ?? [])
+    .filter((job) => job.type === 'import' && ['failed', 'interrupted'].includes(job.status) && jobs?.jobs.find((other) => other.type === 'import' && other.game === job.game)?.id === job.id && !all.find((game) => game.id === job.game)?.job)
+    .filter((job, index, rows) => rows.findIndex((other) => other.game === job.game) === index)
+  const shown = all
+    .filter(
+      (g) =>
+        matchesSearch(g, q, vocabulary) &&
+        (filter === 'all' ||
+          (filter === 'favorites' ? !!g.favoriteAt : filter === 'added' ? !g.lastPlayedAt && g.status === 'installed' && !g.job && Date.now() - Date.parse(g.createdAt) < 7 * 86400000 : filter === 'failed' ? failed.some((job) => job.game === g.id) : filter === 'installed' ? g.status === 'installed' || g.job : g.status !== 'installed' && !g.job)) &&
+        (!tag || gameTags(g, vocabulary).some((t) => t.id === tag)),
+    )
+    .sort((a, b) => {
+      if (sort === 'title') return a.title.localeCompare(b.title)
+      if (sort === 'added') return Date.parse(b.createdAt) - Date.parse(a.createdAt) || a.title.localeCompare(b.title)
+      const time = (g: typeof a) => (sort === 'recent' ? Math.max(Date.parse(g.lastPlayedAt ?? '') || 0, Date.parse(g.createdAt)) : Date.parse(g.lastPlayedAt ?? '') || 0)
+      return time(b) - time(a) || a.title.localeCompare(b.title)
+    })
+  const upNext = all.filter((g) => g.status === 'installed' && !g.job && g.lastPlayedAt && !g.finishedAt).sort((a, b) => b.lastPlayedAt!.localeCompare(a.lastPlayedAt!))
   const favorites = all.filter((g) => g.favoriteAt).sort((a, b) => b.favoriteAt!.localeCompare(a.favoriteAt!))
   const added = all.filter((g) => !g.lastPlayedAt && g.status === 'installed' && !g.job && Date.now() - Date.parse(g.createdAt) < 7 * 86400000).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const updates = all.filter((g) => g.update)
   const home = !q && !tag && filter === 'all'
-  if (error) return <Empty title="Could not load the library" action={<Button onClick={() => void refetch()}>Retry</Button>}>{String(error)}</Empty>
-  if (isLoading) return <div className="space-y-8"><div className="skeleton h-72 rounded-3xl" /><div className="grid grid-cols-2 gap-4 sm:grid-cols-3">{Array.from({ length: 6 }, (_, index) => <div key={index} className="skeleton aspect-[63/50] rounded-2xl" />)}</div></div>
-  if (!all.length) return <EmptyLibrary recipes={catalog?.games ?? []} />
-  return <div>
-    {home && <>
-      {recent && <UpNext game={recent} />}
-      {!!updates.length && <section className="mb-8 space-y-2">{updates.slice(0, 2).map((game) => <UpdateCard key={game.id} game={game} compact />)}{updates.length > 2 && <Link className="inline-flex min-h-11 items-center text-sm text-zinc-400" to="/add">And {updates.length - 2} more →</Link>}</section>}
-      <Shelf title="Favourites" count={favorites.length} href="/?filter=favorites">{favorites.slice(0, 12).map((g) => <GameCard key={g.id} game={g} />)}</Shelf>
-      <Shelf title={added.every((g) => new Date(g.createdAt).toDateString() === new Date().toDateString()) ? 'Added today' : 'Added this week'} count={added.length} href="/?filter=added&sort=added">{added.slice(0, 12).map((g) => <GameCard key={g.id} game={g} />)}</Shelf>
-      <Shelf title="Not finished installing" count={failed.length} href="/?filter=failed">{failed.slice(0, 12).map((job) => <div key={job.id} className="rounded-2xl bg-white/5 p-4"><p className="font-semibold text-white">{all.find((g) => g.id === job.game)?.title || job.game || 'Install interrupted'}</p><p className="my-3 line-clamp-3 text-sm text-zinc-400">{job.error || 'The install was interrupted. Your saves are kept.'}</p><Button onClick={async () => { try { await post(`/api/jobs/${job.id}/retry`); void qc.invalidateQueries({ queryKey: ['jobs'] }); void qc.invalidateQueries({ queryKey: ['games'] }) } catch (error) { toast(errorText(error), 'error') } }}>Retry</Button></div>)}</Shelf>
-    </>}
-    <h2 className="mb-4 font-display text-2xl font-semibold text-white">All games <span className="text-base font-normal text-zinc-500">{all.length}</span></h2>
-    <div className="sticky top-14 sm:top-16 z-20 -mx-1 mb-5 bg-ink-950/95 px-1 py-2 backdrop-blur-xl">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <SegmentedControl value={filter} onChange={(value) => update('filter', value)} options={[{ value: 'all', label: 'All' }, { value: 'installed', label: 'Installed' }, { value: 'not_installed', label: 'Not installed' }]} />
-        <SortMenu value={sort} onChange={(value) => update('sort', value)} />
-        <input aria-label="Search your games" placeholder="Search your games" value={q} onChange={(e) => update('q', e.target.value)} className="h-11 min-w-0 flex-1 rounded-xl bg-white/5 px-4 text-sm text-white" />
+
+  // The stage game: the one the person is looking at in the Up next shelf, else the first.
+  const [stageId, setStageId] = useState<string | null>(null)
+  const stageGame = home ? (upNext.find((g) => g.id === stageId) ?? upNext[0]) : undefined
+  useRoom({ game: stageGame ?? null, quiet: !stageGame })
+
+  if (error)
+    return (
+      <Empty title="Could not load the library" action={<Button variant="primary" onClick={() => void refetch()}>Retry</Button>}>
+        {String(error)}
+      </Empty>
+    )
+  if (isLoading)
+    return (
+      <div className="stack" style={{ gap: 32 }}>
+        <div className="skel" style={{ height: 300, borderRadius: 18 }} />
+        <div className="grid">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="skel" style={{ aspectRatio: '2/3' }} />
+          ))}
+        </div>
       </div>
-      <ChipRow tags={tagChips(all, vocabulary)} selected={tag} onSelect={(id) => update('tag', id)} />
+    )
+  if (!all.length) return <EmptyLibrary recipes={catalog?.games ?? []} />
+
+  return (
+    <div>
+      {home && (
+        <>
+          {!!upNext.length && (
+            <>
+              <div className="hide-phone">
+                <Stage game={stageGame!} eyebrow="Up next" meta={stageMeta(stageGame!)} actions={<StageActions g={stageGame!} />} />
+              </div>
+              <div className="hide-desk">
+                <StageCarousel games={upNext} onSlide={setStageId} />
+              </div>
+            </>
+          )}
+          {!!upNext.length && (
+            <Shelf title="Up next" count={upNext.length} wide>
+              {upNext.map((g) => (
+                <GameTile key={g.id} game={g} kind="wide" on={stageGame?.id === g.id} onFocus={() => setStageId(g.id)} onMouseEnter={() => setStageId(g.id)} />
+              ))}
+            </Shelf>
+          )}
+          {!!updates.length && (
+            <div className="stack" style={{ marginTop: 22, gap: 10 }}>
+              {updates.slice(0, 2).map((game) => (
+                <div key={game.id} className="notice">
+                  <Sparkles />
+                  <div className="grow">
+                    <b>
+                      {game.title} {game.update!.version}
+                    </b>{' '}
+                    is out. Get it from the developer and add the download. Your saves carry over.
+                  </div>
+                  <Link className="link small" to={`/game/${game.id}#update`} style={{ flex: 'none', alignSelf: 'center' }}>
+                    Details
+                  </Link>
+                </div>
+              ))}
+              {updates.length > 2 && (
+                <Link className="link small" to="/add">
+                  And {updates.length - 2} more
+                </Link>
+              )}
+            </div>
+          )}
+          <Shelf title="Favourites" count={favorites.length} href="/?filter=favorites">
+            {favorites.slice(0, 12).map((g) => (
+              <GameTile key={g.id} game={g} />
+            ))}
+          </Shelf>
+          <Shelf title={added.every((g) => new Date(g.createdAt).toDateString() === new Date().toDateString()) ? 'Added today' : 'Added this week'} count={added.length} href="/?filter=added&sort=added">
+            {added.slice(0, 12).map((g) => (
+              <GameTile key={g.id} game={g} />
+            ))}
+          </Shelf>
+          <Shelf title="Not finished installing" count={failed.length} href="/?filter=failed">
+            {failed.slice(0, 12).map((job) => (
+              <div key={job.id} className="panel" style={{ width: 'calc(var(--tile-w) * 2 + var(--gap))', flex: 'none' }}>
+                <p className="t" style={{ fontWeight: 650 }}>{all.find((g) => g.id === job.game)?.title || job.game || 'Install interrupted'}</p>
+                <p className="small muted" style={{ margin: '8px 0 12px' }}>{job.error || 'The install was interrupted. Your saves are kept.'}</p>
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await post(`/api/jobs/${job.id}/retry`)
+                      void qc.invalidateQueries({ queryKey: ['jobs'] })
+                      void qc.invalidateQueries({ queryKey: ['games'] })
+                    } catch (error) {
+                      toast(errorText(error), 'error')
+                    }
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            ))}
+          </Shelf>
+        </>
+      )}
+      <section className="sec">
+        <div className="sec-h">
+          <h2 className="h2">
+            All games<span className="n">{all.length}</span>
+          </h2>
+          <Link to="/catalog">Find more in the catalog</Link>
+        </div>
+        <div className="toolbar">
+          <Seg scroll value={filter} onChange={(value) => update('filter', value === 'all' ? null : value)} options={[{ value: 'all', label: 'All' }, { value: 'installed', label: 'Installed' }, { value: 'not_installed', label: 'Not installed' }]} />
+          <SortMenu value={sort} onChange={(value) => update('sort', value === 'recent' ? null : value)} />
+          <input aria-label="Search your games" placeholder="Search your games" value={q} onChange={(e) => update('q', e.target.value || null)} className="input" />
+        </div>
+        <TagFilters tags={tagChips(all, vocabulary)} selected={tag} onSelect={(id) => update('tag', id)} />
+        {!shown.length ? (
+          <Empty title="No games match" action={<Button onClick={() => setParams({})}>Clear filters</Button>}>
+            Nothing in your library has every included tag without an excluded one.
+          </Empty>
+        ) : (
+          <div className="grid" data-row>
+            {shown.slice(0, limit).map((g) => (
+              <GameTile key={g.id} game={g} />
+            ))}
+          </div>
+        )}
+        {shown.length > limit && (
+          <div className="center" style={{ marginTop: 20 }}>
+            <Button onClick={() => setLimit(limit + 48)}>
+              Show more
+            </Button>
+          </div>
+        )}
+      </section>
     </div>
-    {!shown.length ? <Empty title="No games match" action={<Button onClick={() => setParams({})}>Clear filters</Button>}>Try a different search or filter.</Empty> : <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">{shown.slice(0, limit).map((g, i) => <GameCard key={g.id} game={g} index={i} />)}</div>}
-    {shown.length > limit && <div className="mt-6 text-center"><Button onClick={() => setLimit(limit + 48)}>Show more</Button></div>}
-  </div>
+  )
 }

@@ -1,50 +1,38 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adultLabels, adultLevels, lowestLevel, useAdultState, useDeviceLevel, useSetAdultChoice, type AdultLevel } from '../lib/adult'
-import { cx, errorText, Spinner, useToast } from './ui'
+import { Seg, SourceLabel, TagPill } from '../lantern/controls'
+import { errorText, Spinner, useToast } from './ui'
 
 /**
  * Three pills, Off, Blurred and Shown. A pill above `max` (the row above) is
  * struck through and cannot be chosen. Without `onChange` the row is fixed.
  */
-export function LevelPills({ label, value, max = 'shown', onChange, busy }: { label: string; value: AdultLevel; max?: AdultLevel; onChange?: (level: AdultLevel) => void; busy?: boolean }) {
+export function LevelSeg({ label, value, max = 'shown', onChange, busy }: { label: string; value: AdultLevel; max?: AdultLevel; onChange?: (level: AdultLevel) => void; busy?: boolean }) {
   return (
-    <div role="radiogroup" aria-label={label} className="grid grid-cols-3 gap-1.5">
-      {adultLevels.map((level) => {
-        const above = adultLevels.indexOf(level) > adultLevels.indexOf(max)
-        const selected = level === value
-        return (
-          <button
-            key={level}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            disabled={!onChange || above || busy}
-            onClick={() => onChange?.(level)}
-            className={cx(
-              'min-h-11 rounded-full px-3 text-sm font-medium ring-1 transition-colors',
-              selected ? 'bg-white text-ink-950 ring-white' : 'bg-white/[0.04] text-zinc-200 ring-white/10',
-              selected && above && 'bg-white/25 text-zinc-200 ring-white/20',
-              above && 'line-through decoration-2',
-              above && !selected && 'text-zinc-500 ring-white/5',
-              onChange && !above && !selected && 'hover:bg-white/10',
-              (!onChange || above) && 'cursor-default',
-            )}
-          >
-            {adultLabels[level]}
-          </button>
-        )
-      })}
-    </div>
+    <Seg
+      small
+      label={label}
+      value={value}
+      onChange={onChange}
+      disabled={busy}
+      options={adultLevels.map((level) => ({
+        value: level,
+        label: adultLabels[level],
+        na: adultLevels.indexOf(level) > adultLevels.indexOf(max),
+        disabled: !onChange || adultLevels.indexOf(level) > adultLevels.indexOf(max),
+      }))}
+    />
   )
 }
 
-function Row({ title, source, children }: { title: string; source: string; children: React.ReactNode }) {
+function LadderRow({ title, sub, source, fixed, children }: { title: string; sub?: string; source?: React.ReactNode; fixed?: boolean; children: React.ReactNode }) {
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <h3 className="text-sm font-medium text-white">{title}</h3>
-        <p className="text-xs text-zinc-400">{source}</p>
+    <div className={`lrow ${fixed ? 'fixed' : ''}`.trim()}>
+      <div className="l">
+        <div className="t">{title}</div>
+        {sub && <div className="d">{sub}</div>}
+        {source}
       </div>
       {children}
     </div>
@@ -66,8 +54,8 @@ function summary(levels: AdultLevel[], group: boolean): string {
   return effective === 'blurred' ? `You see adult games with their pictures blurred, because ${reason}.` : `Adult games are hidden, because ${reason}.`
 }
 
-const installationSource = (s: { fixed: boolean; chosen: boolean }) =>
-  s.fixed ? 'Fixed by the server with the variable RENPLAY_ADULT_GAMES' : s.chosen ? 'Set by the admin' : 'Default'
+const installationSource = (s: { fixed: boolean; chosen: boolean }, variable = 'RENPLAY_ADULT'): React.ReactNode =>
+  s.fixed ? <SourceLabel kind="server" label={variable} /> : s.chosen ? <SourceLabel kind="admin" /> : <SourceLabel kind="def" />
 
 /** The account page's ladder: installation, account, you and this device. Each row can only narrow the one above. */
 export default function AdultLadder() {
@@ -76,12 +64,13 @@ export default function AdultLadder() {
   const setChoice = useSetAdultChoice()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
-  if (error) return <p className="text-sm text-rose-300">{errorText(error)}</p>
+  if (error) return <p className="red small">{errorText(error)}</p>
   if (!state) return <Spinner />
   const installation = state.installation.level
   const ceiling = state.ceiling.level
   const yours = lowestLevel(installation, ceiling)
   const here = lowestLevel(yours, state.choice)
+  const effective = lowestLevel(here, device ?? 'shown')
   const choose = async (level: AdultLevel) => {
     setBusy(true)
     try {
@@ -93,20 +82,28 @@ export default function AdultLadder() {
     }
   }
   return (
-    <div className="space-y-5">
-      <Row title="This installation" source={installationSource(state.installation)}>
-        <LevelPills label="This installation" value={installation} />
-      </Row>
-      <Row title="Your account" source={state.ceiling.managed === 'group' ? 'Set by your sign-in group' : 'Set by the admin'}>
-        <LevelPills label="Your account" value={ceiling} max={installation} />
-      </Row>
-      <Row title="You" source="Your choice, on every device">
-        <LevelPills label="You" value={state.choice} max={yours} onChange={(level) => void choose(level)} busy={busy} />
-      </Row>
-      <Row title="This device" source={device ? 'This browser only' : 'Follows your choice'}>
-        <LevelPills label="This device" value={device ? lowestLevel(here, device) : here} max={here} onChange={(level) => setDevice(level === here ? null : level)} />
-      </Row>
-      <p className="text-sm text-zinc-300">{summary([installation, ceiling, state.choice, device ?? 'shown'], state.ceiling.managed === 'group')}</p>
+    <div className="ladder">
+      <LadderRow title="This installation" sub="The server allows up to this." source={installationSource(state.installation)} fixed>
+        <LevelSeg label="This installation" value={installation} />
+      </LadderRow>
+      <LadderRow
+        title="Your account"
+        sub={state.ceiling.managed === 'group' ? 'A sign-in group sets your ceiling.' : 'Set by an admin for you. A configured sign-in group would replace it.'}
+        source={state.ceiling.managed === 'group' ? <SourceLabel kind="group" /> : <SourceLabel kind="admin-you" />}
+        fixed
+      >
+        <LevelSeg label="Your account" value={ceiling} max={installation} />
+      </LadderRow>
+      <LadderRow title="You" sub="Your choice, on every device." source={<SourceLabel kind="you" />}>
+        <LevelSeg label="You" value={state.choice} max={yours} onChange={(level) => void choose(level)} busy={busy} />
+      </LadderRow>
+      <LadderRow title="This device" sub="Lower it here on a shared screen. Stays in this browser." source={<SourceLabel kind="def" />}>
+        <LevelSeg label="This device" value={device ? lowestLevel(here, device) : here} max={here} onChange={(level) => setDevice(level === here ? null : level)} />
+      </LadderRow>
+      <div className="leff">
+        <TagPill tone={effective === 'shown' ? 'pink' : effective === 'blurred' ? 'vio' : undefined}>{adultLabels[effective]}</TagPill>
+        <span className="small muted-2">{summary([installation, ceiling, state.choice, device ?? 'shown'], state.ceiling.managed === 'group')}</span>
+      </div>
     </div>
   )
 }
@@ -118,12 +115,12 @@ export function DeviceAdultRow() {
   if (!state) return null
   const here = state.effective
   return (
-    <div className="space-y-3">
-      <Row title="Adult games on this device" source={device ? 'This browser only' : 'Follows your choice'}>
-        <LevelPills label="Adult games on this device" value={device ? lowestLevel(here, device) : here} max={here} onChange={(level) => setDevice(level === here ? null : level)} />
-      </Row>
-      <p className="text-xs text-zinc-400">
-        This browser can show less than your account, never more. All levels are on your <Link to="/account" className="text-accent-300 underline">account page</Link>.
+    <div className="ladder">
+      <LadderRow title="Adult games on this device" sub="Lower it here on a shared screen, never higher. The same control is on your account page, under Adult games." source={<SourceLabel kind="def" />}>
+        <LevelSeg label="Adult games on this device" value={device ? lowestLevel(here, device) : here} max={here} onChange={(level) => setDevice(level === here ? null : level)} />
+      </LadderRow>
+      <p className="hint">
+        This browser can show less than your account, never more. All levels are on your <Link to="/account" className="link">account page</Link>.
       </p>
     </div>
   )
