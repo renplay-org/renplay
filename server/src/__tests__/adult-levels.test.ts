@@ -165,7 +165,7 @@ describe('migration from 3.x, and back', () => {
     expect(user('nogames')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'off' })
     expect(user('broken')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
     expect(user('no')).toMatchObject({ adult_ceiling: 'off', adult_choice: 'off' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
     // Downgrading to 3.2 reads the columns 4.0 keeps in step: access, the picture
     // preference and the allow/block install setting (covered by legacyMirror in content.test).
     const cols = db.raw.prepare('PRAGMA table_info(users)').all().map((c) => c.name)
@@ -300,6 +300,7 @@ describe('the levels on every route', () => {
     ['GET /health', 'none'], ['GET /keepalive', 'none'], ['GET /system', 'list'], ['PUT /system/downloads', 'none'], ['POST /system/prune', 'none'],
     ['POST /system/engines/refresh', 'none'], ['GET /jobs', 'list'], ['GET /jobs/:id/log', 'tool'], ['POST /jobs/:id/cancel', 'tool'],
     ['POST /jobs/:id/retry', 'tool'], ['DELETE /jobs', 'tool'], ['GET /', 'none'], ['PUT /', 'none'], ['GET /api/saves-export', 'list'],
+    ['PUT /:id/status', 'game'], ['PUT /:id/rating', 'game'], ['POST /:id/not-now', 'game'], ['DELETE /:id/not-now', 'game'], ['GET /', 'list'],
     ['GET /api/art/:file', 'game'], ['GET /:id/art', 'game'], ['PUT /:id/art', 'game'], ['DELETE /:id/art', 'game'], ['POST /:id/art/upload', 'game'],
     ['GET /:id/files', 'game'], ['GET /:id/files/raw', 'game'], ['PUT /:id/files/raw', 'game'], ['DELETE /:id/files/raw', 'game'],
     ['POST /:id/files/revert', 'game'], ['POST /:id/files/upload', 'game'], ['POST /:id/files/apply', 'game'], ['POST /:id/files/reset', 'game'],
@@ -451,6 +452,8 @@ describe('the levels on every route', () => {
       ['get', '/g/adult/b1/'], ['get', '/g/adult/b1/index.html'], ['get', '/g/adult/b1/game.zip'], ['get', '/g/adult/b1/game/images/a.png'],
       ['get', adultPic], ['get', '/api/walkthroughs/adult.pdf'],
       ['get', '/api/games/adult/art'], ['get', '/api/games/adult/art?kind=grid'], ['put', '/api/games/adult/art', { kind: 'grid', candidate: 'x' }],
+      ['put', '/api/games/adult/status', { status: 'playing' }], ['put', '/api/games/adult/rating', { rating: 4 }],
+      ['post', '/api/games/adult/not-now'], ['delete', '/api/games/adult/not-now'],
       ['delete', '/api/games/adult/art?kind=grid'], ['post', '/api/games/adult/art/upload?kind=grid'],
       ['get', '/api/jobs/j-adult-failed/log'], ['post', '/api/jobs/j-adult-failed/retry'], ['post', '/api/jobs/j-adult-queued/cancel'],
       ['post', '/api/imports', { source: { kind: 'archive', path: 'adult.zip' } }],

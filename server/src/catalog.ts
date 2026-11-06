@@ -62,6 +62,8 @@ export interface Recipe {
   free?: boolean
   /** The game's pictures in SteamGridDB's formats (schema 4). A schema 3 cover becomes one grid. */
   art?: CatalogImage[]
+  /** How the game plays on a phone, curated: great, playable, or desktop (needs a bigger screen). */
+  phone?: 'great' | 'playable' | 'desktop'
   links?: Record<string, string>
   saveDir?: string
   /** Games whose saves this one imports (an earlier season, a prequel). */

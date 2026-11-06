@@ -49,6 +49,12 @@ export interface GameRow {
   favorite_at: string
   finished_at: string
   play_time: number
+  /** The person's status (user_games): playing, stalled, dropped, finished, or '' when not set. */
+  play_status?: string
+  /** The person's rating, 1 to 5, or 0 for none (user_games). */
+  rating?: number
+  /** When the person said Not now: the game leaves Up next until it is played again (user_games). */
+  not_now_at?: string
   /** 1 when the game's recipe is adult: the last thing the catalog said, kept for when it can no longer say (content.ts). */
   adult: number
   updated_at: string
@@ -180,7 +186,7 @@ export class Db {
         CREATE TABLE IF NOT EXISTS user_games (user_id INTEGER NOT NULL REFERENCES users(id), game TEXT NOT NULL, favorite_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', last_played_at TEXT NOT NULL DEFAULT '', play_time INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, game));
         CREATE TABLE IF NOT EXISTS safe_games (game TEXT PRIMARY KEY);
         INSERT OR IGNORE INTO users (id, username, name, role, adult_access, created_at) VALUES (1, 'owner', 'Owner', 'admin', 1, '${now()}');
-        INSERT OR IGNORE INTO user_games SELECT 1, id, favorite_at, finished_at, last_played_at, play_time FROM games;
+        INSERT OR IGNORE INTO user_games (user_id, game, favorite_at, finished_at, last_played_at, play_time) SELECT 1, id, favorite_at, finished_at, last_played_at, play_time FROM games;
         INSERT OR IGNORE INTO settings (key, value) VALUES ('auth_default', '${JSON.stringify(upgraded ? 'off' : 'on')}');
         PRAGMA user_version = 7; COMMIT;
       `)
@@ -246,6 +252,20 @@ export class Db {
       this.raw.exec('BEGIN')
       if (!columns.includes('dark')) this.raw.exec('ALTER TABLE art_made ADD COLUMN dark INTEGER NOT NULL DEFAULT 0')
       this.raw.exec('PRAGMA user_version = 13; COMMIT')
+    }
+    // 4.0: each person's status, rating and Not now for a game, and their play sessions for
+    // History. A finished game becomes the status Finished, and finished_at stays in step so a
+    // downgrade to 3.2 still shows it finished.
+    if (v < 14) {
+      const columns = this.raw.prepare('PRAGMA table_info(user_games)').all().map(c => c.name)
+      this.raw.exec('BEGIN')
+      if (!columns.includes('play_status')) this.raw.exec("ALTER TABLE user_games ADD COLUMN play_status TEXT NOT NULL DEFAULT ''")
+      if (!columns.includes('rating')) this.raw.exec('ALTER TABLE user_games ADD COLUMN rating INTEGER NOT NULL DEFAULT 0')
+      if (!columns.includes('not_now_at')) this.raw.exec("ALTER TABLE user_games ADD COLUMN not_now_at TEXT NOT NULL DEFAULT ''")
+      this.raw.exec(`UPDATE user_games SET play_status = 'finished' WHERE finished_at != '' AND play_status = '';
+        CREATE TABLE IF NOT EXISTS play_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, game TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, seconds INTEGER NOT NULL);
+        CREATE INDEX IF NOT EXISTS play_sessions_user ON play_sessions (user_id, ended_at);
+        PRAGMA user_version = 14; COMMIT;`)
     }
     } catch (error) { this.raw.close(); throw error }
   }

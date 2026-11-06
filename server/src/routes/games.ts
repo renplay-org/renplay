@@ -127,6 +127,12 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     favoriteAt: row.favorite_at || null,
     finishedAt: row.finished_at || null,
     playTime: row.play_time,
+    /** The person's status: playing, stalled, dropped, finished, or null when not set. */
+    playStatus: row.play_status || null,
+    rating: row.rating || null,
+    notNowAt: row.not_now_at || null,
+    /** How the game plays on a phone, curated in the recipe: great, playable or desktop. */
+    phone: recipe?.phone ?? null,
     latestSave,
     createdAt: row.created_at,
     installedAt: row.installed_at || null,
@@ -236,12 +242,49 @@ export function createGamesRouter(deps: GameDeps): Router {
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
+  /** Finished keeps finished_at in step with the status, which 3.x reads. */
+  const setStatus = (g: GameRow, status: string) => {
+    const previous = deps.accounts ? deps.accounts.progress(g).finished_at : g.finished_at
+    const patch = { play_status: status, finished_at: status === 'finished' ? previous || new Date().toISOString() : '' }
+    if (deps.accounts) deps.accounts.setProgress(g.id, patch)
+    else db.updateGame(g.id, { finished_at: patch.finished_at })
+  }
+
   router.put('/:id/finished', async (req, res) => {
     const g = get(req)
     if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
-    const patch = { finished_at: req.body.on ? (deps.accounts?.progress(g).finished_at ?? g.finished_at) || new Date().toISOString() : '' }
-    if (deps.accounts) deps.accounts.setProgress(g.id, patch)
-    else db.updateGame(g.id, patch)
+    setStatus(g, req.body.on ? 'finished' : '')
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
+  })
+
+  router.put('/:id/status', async (req, res) => {
+    const g = get(req)
+    const status = req.body?.status ?? ''
+    if (!['', 'playing', 'stalled', 'dropped', 'finished'].includes(status)) throw new HttpError(400, 'Status must be playing, stalled, dropped, finished or empty')
+    setStatus(g, status)
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
+  })
+
+  router.put('/:id/rating', async (req, res) => {
+    const g = get(req)
+    const rating = req.body?.rating ?? 0
+    if (!Number.isInteger(rating) || rating < 0 || rating > 5) throw new HttpError(400, 'Rating must be a whole number from 0 to 5')
+    if (!deps.accounts) throw new HttpError(503, 'Ratings need accounts')
+    deps.accounts.setProgress(g.id, { rating })
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
+  })
+
+  // Not now: the game leaves Up next until it is played again. DELETE undoes it.
+  router.post('/:id/not-now', async (req, res) => {
+    const g = get(req)
+    if (!deps.accounts) throw new HttpError(503, 'Not now needs accounts')
+    deps.accounts.setProgress(g.id, { not_now_at: new Date().toISOString() })
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
+  })
+  router.delete('/:id/not-now', async (req, res) => {
+    const g = get(req)
+    if (!deps.accounts) throw new HttpError(503, 'Not now needs accounts')
+    deps.accounts.setProgress(g.id, { not_now_at: '' })
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
@@ -250,8 +293,10 @@ export function createGamesRouter(deps: GameDeps): Router {
     const g = get(req)
     const seconds = req.body?.seconds
     if (!Number.isInteger(seconds) || seconds < 1 || seconds > 60) throw new HttpError(400, 'Seconds must be an integer from 1 to 60')
-    if (deps.accounts) deps.accounts.setProgress(g.id, { play_time: deps.accounts.progress(g).play_time + seconds })
-    else db.raw.prepare('UPDATE games SET play_time = play_time + ? WHERE id = ?').run(seconds, g.id)
+    if (deps.accounts) {
+      deps.accounts.setProgress(g.id, { play_time: deps.accounts.progress(g).play_time + seconds })
+      deps.accounts.addPlayTime(g.id, seconds)
+    } else db.raw.prepare('UPDATE games SET play_time = play_time + ? WHERE id = ?').run(seconds, g.id)
     res.json({ ok: true })
   })
 

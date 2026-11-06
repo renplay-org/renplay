@@ -57,7 +57,8 @@ export function playerRoute(method: string, path: string): boolean {
   if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export') return true
   if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art)?$/.test(path))) return true
   // A player chooses and uploads art for their own view (the route refuses everyone).
-  return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload)|DELETE \/api\/games\/[^/]+\/art)$/.test(`${method} ${path}`)
+  if ((method === 'GET' || method === 'HEAD') && path === '/api/history') return true
+  return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now))$/.test(`${method} ${path}`)
 }
 
 export class Accounts {
@@ -261,10 +262,10 @@ export class Accounts {
     return this.session(session)
   }
   progress(row: GameRow): GameRow {
-    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time FROM user_games WHERE user_id = ? AND game = ?').get(this.current().id, row.id)
-    return { ...row, favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, ...u }
+    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ? AND game = ?').get(this.current().id, row.id)
+    return { ...row, favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, play_status: '', rating: 0, not_now_at: '', ...u }
   }
-  setProgress(game: string, patch: Partial<Pick<GameRow, 'favorite_at' | 'finished_at' | 'last_played_at' | 'play_time'>>): void {
+  setProgress(game: string, patch: Partial<Pick<GameRow, 'favorite_at' | 'finished_at' | 'last_played_at' | 'play_time' | 'play_status' | 'rating' | 'not_now_at'>>): void {
     const id = this.current().id
     this.db.raw.prepare('INSERT OR IGNORE INTO user_games (user_id, game) VALUES (?, ?)').run(id, game)
     for (const [key, value] of Object.entries(patch)) this.db.raw.prepare(`UPDATE user_games SET ${key} = ? WHERE user_id = ? AND game = ?`).run(value, id, game)
@@ -306,8 +307,20 @@ export class Accounts {
     return copied
   }
   private mergeProgress(from: number, to: number): void {
-    this.db.raw.prepare(`INSERT INTO user_games SELECT ?, game, favorite_at, finished_at, last_played_at, play_time FROM user_games WHERE user_id = ?
-      ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time)`).run(to, from)
+    this.db.raw.prepare(`INSERT INTO user_games (user_id, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at)
+      SELECT ?, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ?
+      ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time),
+        play_status = CASE WHEN user_games.play_status = '' THEN excluded.play_status ELSE user_games.play_status END, rating = MAX(user_games.rating, excluded.rating), not_now_at = MAX(user_games.not_now_at, excluded.not_now_at)`).run(to, from)
+    // The play history moves with the person.
+    this.db.raw.prepare('UPDATE play_sessions SET user_id = ? WHERE user_id = ?').run(to, from)
+  }
+
+  /** Records played seconds as a session: one that ended in the last ten minutes goes on, else a new one starts. */
+  addPlayTime(game: string, seconds: number, now = Date.now()): void {
+    const id = this.current().id
+    const last = this.db.raw.prepare('SELECT id FROM play_sessions WHERE user_id = ? AND game = ? AND ended_at >= ? ORDER BY ended_at DESC LIMIT 1').get(id, game, now - 10 * 60_000) as { id: number } | undefined
+    if (last) this.db.raw.prepare('UPDATE play_sessions SET ended_at = ?, seconds = seconds + ? WHERE id = ?').run(now, seconds, last.id)
+    else this.db.raw.prepare('INSERT INTO play_sessions (user_id, game, started_at, ended_at, seconds) VALUES (?, ?, ?, ?, ?)').run(id, game, now - seconds * 1000, now, seconds)
   }
   private managed(id: number) {
     const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)
@@ -624,7 +637,7 @@ export class Accounts {
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
           this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
-          for (const table of ['sessions', 'tokens', 'identities', 'user_games']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
+          for (const table of ['sessions', 'tokens', 'identities', 'user_games', 'play_sessions']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
           this.db.raw.exec('COMMIT')
         } catch (error) {

@@ -20,6 +20,7 @@ import { applyMods } from './pipeline/applymods.js'
 import { runImport } from './pipeline/import.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
+import { createHistoryRouter } from './routes/history.js'
 import { createContentRouter } from './routes/content.js'
 import { createLibraryRouter } from './routes/library.js'
 import { createPlayRouter } from './routes/play.js'
@@ -186,6 +187,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content)(req, res, next))
   app.use('/api/games', createFilesRouter(db, builds, overlays, jobs, content))
   app.use('/api/games', createGamesRouter(deps))
+  app.use('/api/history', createHistoryRouter(db, catalog, accounts))
   app.use('/api', createLibraryRouter(deps))
   // Made pictures are named by their content, so they never change: browsers keep them.
   app.get('/api/art/:file', (req, res, next) => {
