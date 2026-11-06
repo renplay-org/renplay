@@ -37,7 +37,9 @@ later.
 
 ## Can I keep adult games out of sight?
 
-Yes. Set `RENPLAY_ADULT_GAMES=block`. See [Adult games](/start-here/adult-games/).
+Yes. Set `RENPLAY_ADULT_GAMES=off` to hide them for everyone, or `blurred` to show them without
+pictures. Each person can also choose less on their account page. See
+[Adult games](/start-here/adult-games/).
 
 ## Can I change a game’s title or cover?
 

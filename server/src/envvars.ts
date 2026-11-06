@@ -51,7 +51,7 @@ export const ENV_VARS: readonly EnvVar[] = [
   { name: 'RENPLAY_ADMIN_PASSWORD_FILE', group: 'Server', kind: 'text', fallback: '', shown: 'not set', description: 'Read the initial owner password from this secret file. Set this or RENPLAY_ADMIN_PASSWORD, not both.' },
   { name: 'RENPLAY_PUBLIC_URL', group: 'Behind a proxy', kind: 'text', fallback: '', shown: 'not set', description: 'Public address, such as https://play.example.org. Used to check request origins and secure cookies. Plain HTTP works too, but HTTPS protects passwords and saves in transit.' },
   { name: 'RENPLAY_TRUSTED_HOPS', group: 'Behind a proxy', kind: 'number', fallback: 1, description: 'Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly; never trust arbitrary forwarded headers.' },
-  { name: 'RENPLAY_ADULT_DEFAULT', group: 'Games and catalog', kind: 'choice', fallback: 'off', description: 'Ceiling and starting choice of adult games for newly created accounts: off, blurred or shown (allow and block work as before). The first admin always starts at shown; admins can change the ceiling per account in Users.' },
+  { name: 'RENPLAY_ADULT_DEFAULT', group: 'Games and catalog', kind: 'choice', fallback: 'off', description: 'Ceiling and starting choice of adult games for newly created accounts: off, blurred or shown (allow and block work as before). The first admin always starts at shown. Admins can change the ceiling per account in Users.' },
   {
     name: 'PORT',
     group: 'Server',
@@ -136,7 +136,7 @@ export const ENV_VARS: readonly EnvVar[] = [
     fallback: '',
     shown: 'not set',
     description:
-      'The installation level of adult games: off (they do not exist), blurred (they show with hidden art) or shown, and the choice is fixed. The 3.x spellings work too: allow is shown, block is off. Not set: the stored choice applies (shown until an install answers its first-run question), and admins can change it in Settings. At off the server reads the catalog’s safe-for-work index; below shown it never downloads adult art. Any other value counts as off.',
+      'The installation level of adult games: off (they do not exist), blurred (they show with hidden art) or shown, and the choice is fixed. The 3.x spellings work too: allow is shown, block is off. Not set: the stored choice applies (shown until an install answers its first-run question), and admins can change it in Settings. At off the server reads the catalog’s safe-for-work index. Below shown it never downloads adult art. Any other value counts as off.',
   },
   {
     name: 'RENPLAY_CATALOG_URLS',

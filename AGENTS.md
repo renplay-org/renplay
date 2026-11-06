@@ -41,6 +41,12 @@ These decide most review comments. Follow them without being asked.
   a capital letter too.
 - **Plain, short copy.** Full sentences, no jargon (say "save folder", not "config.save_directory",
   outside developer-facing places), no exclamation marks.
+- **Adult games have three levels.** Off (they do not exist for that person), Blurred (they show,
+  but no picture of them is ever sent) and Shown, set by the installation, the person's account (an
+  admin or a sign-in group), the person and the device. Each layer only narrows the one above. The
+  server enforces the person's level on every route (`content.ts`, tested route by route in
+  `adult-levels.test.ts`), so a new route must say what it does at each level. Safe-for-work games
+  are never affected.
 - **Safe for work on GitHub.** Nothing published (docs, screenshots, the website, the catalog)
   may show adult art, even though many games are adult. Covers of adult games are linked from the
   developers' hosting, never copied; screenshots use `--sfw` (adult pictures blurred) or

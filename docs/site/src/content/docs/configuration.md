@@ -125,7 +125,7 @@ Default: `off`
 
 </div>
 
-Ceiling and starting choice of adult games for newly created accounts: off, blurred or shown (allow and block work as before). The first admin always starts at shown; admins can change the ceiling per account in Users.
+Ceiling and starting choice of adult games for newly created accounts: off, blurred or shown (allow and block work as before). The first admin always starts at shown. Admins can change the ceiling per account in Users.
 
 </div>
 
@@ -167,7 +167,7 @@ Default: not set
 
 </div>
 
-The installation level of adult games: off (they do not exist), blurred (they show with hidden art) or shown, and the choice is fixed. The 3.x spellings work too: allow is shown, block is off. Not set: the stored choice applies (shown until an install answers its first-run question), and admins can change it in Settings. At off the server reads the catalog’s safe-for-work index; below shown it never downloads adult art. Any other value counts as off.
+The installation level of adult games: off (they do not exist), blurred (they show with hidden art) or shown, and the choice is fixed. The 3.x spellings work too: allow is shown, block is off. Not set: the stored choice applies (shown until an install answers its first-run question), and admins can change it in Settings. At off the server reads the catalog’s safe-for-work index. Below shown it never downloads adult art. Any other value counts as off.
 
 </div>
 

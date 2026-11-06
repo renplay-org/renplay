@@ -9,7 +9,7 @@ Open **Search** in the header (also available on phones), or press **⌘K** on A
 **Ctrl+K** elsewhere. Search titles, developers and tags across your library and the catalog,
 open a page, or resume your Up next game. Use arrow keys and Enter or tap a result. Catalog
 results show where to get the game; only admins see Add games, Activity and Users.
-The same adult-access and hidden-picture choices apply in search as in the library.
+Search follows your adult games level, as the library does.
 
 ## On a computer
 

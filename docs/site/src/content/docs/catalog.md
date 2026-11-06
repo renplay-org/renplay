@@ -67,4 +67,4 @@ Recipes point to the official download. The catalog never hosts a game.
 ## Safe-for-work index
 
 Next to `index.v3.json` the catalog publishes `index.v3.sfw.json` without adult games. Renplay reads
-it when adult games are blocked. See [Adult games](/start-here/adult-games/).
+it when the installation's adult games level is Off. See [Adult games](/start-here/adult-games/).

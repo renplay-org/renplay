@@ -7,6 +7,14 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- Adult games have three levels, Off, Blurred and Shown, in place of the four 3.x controls. Off leaves adult games out of everything, Blurred shows them without their pictures, Shown shows everything. The installation, each account, each person and each device can only go lower than the layer above. **Account → Adult games** shows all four and says why you see what you see.
+- Blurred is enforced by the server: it never sends a picture of an adult game to a person below Shown, and an installation at Blurred never downloads one.
+- `RENPLAY_ADULT_GAMES` and `RENPLAY_ADULT_DEFAULT` take `off`, `blurred` or `shown`. The 3.x values still work, `allow` as Shown and `block` as Off.
+- Sign-in groups set levels with `RENPLAY_OIDC_ADULT_GROUPS` and `RENPLAY_LDAP_ADULT_GROUPS`, for example `renplay-adults=shown,renplay-family=blurred`. A configured group replaces the setting in Users. The 3.x single group variables still work.
+- Upgrading keeps what each person saw: access becomes their account's level, and their 3.x picture preference becomes their own level, so hidden pictures stay hidden.
+
 ## [3.2.0] - 2026-11-06
 
 ### Added

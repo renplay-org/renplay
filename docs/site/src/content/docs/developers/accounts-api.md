@@ -23,7 +23,7 @@ rm /tmp/renplay-cookie
 ```
 
 Send `Authorization: Bearer <token>` afterwards. Tokens carry their user's current role and adult
-access, and stop working when revoked or the account is disabled. Cookie mutations require
+games levels, and stop working when revoked or the account is disabled. Cookie mutations require
 `Sec-Fetch-Site: same-origin` or `none`, or a matching `Origin` when that header is absent (or
 same-site). No content-type restriction is imposed: JSON, multipart, octet-stream and empty DELETEs
 all work. Bearer tokens bypass CSRF checks.
@@ -55,17 +55,17 @@ are rejected rather than matched differently by authorization and routing.
 | `PUT /me` | `{ name }` |
 | `POST /me/password` | `{ current, password }`; ends other sessions |
 | `POST /me/claim-owner` | Admin only, while unclaimed. Atomically reserves ownership before copying saves with history, moving identities and archiving the old folder. Competing claims return 409 before copying. A failed or interrupted claim can be retried |
-| `GET /me/prefs` | `{ adultPictures }`, absent means `hide-pictures` |
-| `PUT /me/prefs` | `{ adultPictures: "show" \| "hide-pictures" \| "hide-games" }` |
+| `GET /me/adult` | `{ installation: { level, fixed, chosen }, ceiling: { level, managed }, choice, effective }`. Levels are `off`, `blurred` or `shown`. `managed` is `group` when a sign-in group sets the ceiling. `effective` is the lowest of the three |
+| `PUT /me/adult` | `{ level }`, at or below the account's ceiling, else 409 |
 | `GET /me/sessions` | `{ sessions }`, including `current` and creation, touch and expiry times |
 | `DELETE /me/sessions` | Ends every session except this one |
 | `DELETE /me/sessions/:id` | Ends that session |
 | `GET /me/tokens` | `{ tokens }`; never includes secrets |
 | `POST /me/tokens` | `{ name }` → `{ id, token }` |
 | `DELETE /me/tokens/:id` | Revokes that token |
-| `GET /users` | `{ users, adultDefault }`. Each user includes `avatar`, `admin_source` (`manual`, `provider`, `allowlist`), `roleManaged`, `adultManaged`, `games` (nonempty save folders), `saves` (current files in those folders, excluding shared keys and history), and `protected` (owner or no-sign-in account). `adultDefault` is the new-user adult-access default |
-| `POST /users` | `{ username, name?, password, role?, adultAccess? }` → `{ user }`; role defaults to `player` |
-| `PUT /users/:id` | `{ name?, role?, disabled?, adultAccess? }` |
+| `GET /users` | `{ users, adultDefault }`. Each user includes `avatar`, `admin_source` (`manual`, `provider`, `allowlist`), `roleManaged`, `adultManaged`, `games` (nonempty save folders), `saves` (current files in those folders, excluding shared keys and history), and `protected` (owner or no-sign-in account). `adult_ceiling` and `adult_choice` are the person's levels. `adultDefault` is the level new people start at |
+| `POST /users` | `{ username, name?, password, role?, adultCeiling? }` → `{ user }`; role defaults to `player`, the ceiling to `RENPLAY_ADULT_DEFAULT`, and the person's own level starts at the ceiling |
+| `PUT /users/:id` | `{ name?, role?, disabled?, adultCeiling? }`. The ceiling is refused with 409 when a sign-in group sets it |
 | `POST /users/:id/password` | `{ password }`; ends all target sessions |
 | `DELETE /users/:id` | Archives the folder, removes credentials and personal rows |
 | `POST /users/:id/saves/copy` | `{ target: userId, game?: gameId }`; one game includes its verification keys; omitting game copies all folders and shared data |
@@ -123,7 +123,7 @@ API game progress comes from `user_games`, not the shared row.
 Sessions are opaque 256-bit values, hashed with SHA-256 in SQLite. They expire after 30 days,
 sliding with database writes at most every five minutes. The node-side session cache is bounded,
 refreshes every five seconds and is invalidated immediately for in-process revocations. Role,
-disabled and adult access are read live. Passwords use salted scrypt from `node:crypto`, stored as
+disabled and the adult games levels are read live. Passwords use salted scrypt from `node:crypto`, stored as
 `scrypt$1$131072$8$1$<salt>$<key>` (`N=131072`, `r=8`, `p=1`, 256 MiB `maxmem`). Legacy
 `salt:key` hashes still verify at their original work factor and upgrade after a successful
 sign-in; concurrent password resets cannot be overwritten by an upgrade.
