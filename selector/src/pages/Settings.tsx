@@ -134,7 +134,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
           <div className={section === 'general' ? 'stack' : 'hidden'} style={{ gap: 18 }}>
             {!auth && (
               <section className="panel">
-                <Setting title="Sign-in is off" hint={`Everyone who opens this address plays as ${userName}. That is fine on a private network; turn it on when more people or the internet can reach it.`}>
+                <Setting title="Sign-in is off" hint={`Everyone who opens this address plays as ${userName}. That is fine on a private network. Turn it on when more people or the internet can reach it.`}>
                   <Button size="sm" onClick={() => window.open('https://renplay.org/docs/accounts/', '_blank', 'noreferrer')}>
                     How to turn it on
                   </Button>
@@ -182,7 +182,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                     <p className="xs">Set with {[content.groups.oidc?.variable, content.groups.ldap?.variable].filter(Boolean).join(' and ')}.</p>
                   </div>
                 )}
-                <p style={{ marginTop: 10 }}>
+                <p style={{ marginTop: 'var(--s4)' }}>
                   <DocsLink path="start-here/adult-games/">Adult games</DocsLink>
                 </p>
               </section>

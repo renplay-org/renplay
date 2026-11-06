@@ -472,7 +472,7 @@ export default function Player() {
       {exiting && (
         <div className="absolute inset-0 z-50 flex animate-fade-in flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm">
           <Loader2 className="size-6 animate-spin text-accent-300" />
-          <p className="text-sm text-zinc-200">Saving your progress…</p>
+          <p className="text-sm text-zinc-200">Saving your progress</p>
         </div>
       )}
 
@@ -740,9 +740,9 @@ function SyncBadge({ sync }: { sync: { pending: number; online: boolean; lastSyn
     return () => clearInterval(t)
   }, [])
   const label = !sync.online
-    ? 'Offline — saves are kept and will upload when the server is back'
+    ? 'Offline. Saves are kept and upload when the server is back'
     : sync.pending
-      ? 'Uploading saves…'
+      ? 'Uploading saves'
       : sync.lastSync
         ? `Saves synced ${ago(sync.lastSync)}`
         : 'Saves are stored on the server'

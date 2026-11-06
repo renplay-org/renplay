@@ -78,8 +78,10 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/saves/         Save store with history; savefile.ts reads Ren'Py save metadata
   scripts/           screenshots.mjs (Playwright, phone and desktop)
 selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. No tests; type-checked.
-  src/pages/         Library, GamePage, AddGames, Player, Settings, Activity
-  src/components/    AppShell (navigation, footer), GameCard (art), SaveGallery, FileBrowser, ui.tsx
+  src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
+  src/lantern/       The 4.0 design system: Tile, Stage, the room, Sheet, controls, focus, travel
+                     (tokens and styles in src/index.css, the reference prototype in renplay-plans)
+  src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
   src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
 runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
 deploy/            nginx.conf.template and entrypoint.sh for the container

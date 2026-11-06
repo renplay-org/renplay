@@ -20,7 +20,7 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
       title="Recipe for the catalog"
       footer={
         <>
-          <span className="mr-auto text-xs text-zinc-500">{data?.sha256Pending ? 'Computing the archive checksum…' : `Save as recipes/${file}`}</span>
+          <span className="mr-auto text-xs text-zinc-500">{data?.sha256Pending ? 'Computing the archive checksum' : `Save as recipes/${file}`}</span>
           <Button
             variant="ghost"
             icon={<Download className="size-4" />}

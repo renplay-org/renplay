@@ -139,7 +139,7 @@ describe('catalog', () => {
     expect(cols).not.toContain('cover')
     expect(cols).not.toContain('save_dir_locked')
     expect(db.getGame('kept')).toMatchObject({ title: 'Kept', family: 'renpy', engine_label: '', entry: '' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(12)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
     db.close()
   })
 
@@ -192,7 +192,7 @@ describe('catalog', () => {
     db.close()
     db = Db.open(root)
     expect(db.getGame('kept')).toMatchObject({ title: 'Kept', favorite_at: '', source: '{"archive":"game.zip"}' })
-    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 12 })
+    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 13 })
     db.updateGame('kept', { favorite_at: '2026-11-04T12:00:00.000Z' })
     db.close()
     db = Db.open(root)

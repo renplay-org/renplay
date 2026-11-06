@@ -18,6 +18,10 @@ release notes say what).
 - Pictures show their colours the moment a page opens and sharpen as they load.
 - You can choose another picture for yourself, or upload your own, and an admin can choose for everyone (the picker comes in a later step of 4.0).
 - The catalog is read from `index.v4.json`. A catalog in the older format still works, its cover becoming the poster.
+- A new look, Lantern: a dark room lit by the game you are looking at. Games are posters in the library, the game page opens on the game's own art with its logo, and the picture travels from the tile to the page.
+- The Catalog has its own page, at the top left, and Activity is always one tap away in the header.
+- Every button and link has a 44 px touch area, and the layout fits phones from 390 px wide in portrait and landscape.
+- The reminder that sign-in is off is one sentence in Settings instead of a banner on every page.
 
 ## [3.2.0] - 2026-11-06
 

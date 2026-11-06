@@ -84,7 +84,7 @@ export default function FileBrowser({ game }: { game: Game }) {
   const apply = async () => {
     try {
       await post(`/api/games/${game.id}/files/apply`)
-      toast('Applying mods…', 'info')
+      toast('Applying mods', 'info')
       void qc.invalidateQueries({ queryKey: ['jobs'] })
     } catch (e) {
       toast(errorText(e), 'error')
@@ -228,7 +228,7 @@ export default function FileBrowser({ game }: { game: Game }) {
           setConfirmReset(false)
           try {
             await post(`/api/games/${game.id}/files/reset`)
-            toast('Restoring the original files…', 'info')
+            toast('Restoring the original files', 'info')
             refresh()
           } catch (e) {
             toast(errorText(e), 'error')

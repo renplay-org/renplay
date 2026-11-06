@@ -122,6 +122,17 @@ describe('the art cache', () => {
     expect((await sharp(join(root, 'data', 'art', set['logo']!.url1x.split('/').pop()!)).metadata()).hasAlpha).toBe(true)
   })
 
+  it('notices a logo of dark lettering, so it can be inverted on ink', async () => {
+    const lettering = (r: number) => sharp({ create: { width: 400, height: 150, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: Buffer.from(`<svg width="400" height="150"><rect x="20" y="40" width="360" height="70" fill="rgb(${r},${r},${r})"/></svg>`) }]).png().toBuffer()
+    const dark = await catalog([{ kind: 'logo', url: 'https://art.example/dark.png', source: 'steam', data: await lettering(30) }])
+    const light = await catalog([{ kind: 'logo', url: 'https://art.example/light.png', source: 'steam', data: await lettering(240) }])
+    const art = store()
+    for (const pictures of [dark, light]) await art.ready({ game: null, adult: false, pictures }, 0)
+    expect(art.forSubject({ game: null, adult: false, pictures: dark }, { scope: 0, blurred: false })['logo']).toMatchObject({ dark: true })
+    expect(art.forSubject({ game: null, adult: false, pictures: light }, { scope: 0, blurred: false })['logo']).not.toHaveProperty('dark')
+  })
+
   it('refuses a picture that changed since the catalog checked it', async () => {
     const pictures = await catalog([{ kind: 'grid', url: 'https://art.example/grid.png', source: 'steam', data: await png(600, 900) }])
     files['https://art.example/grid.png'] = await png(600, 900, '#ff0000')

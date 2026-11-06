@@ -41,7 +41,7 @@ export default function SaveGallery({ game }: { game: Game }) {
       if (!res.ok) throw new Error(r.error || 'Import failed')
       const parts = [`Imported ${r.imported.length} file${r.imported.length === 1 ? '' : 's'}`]
       if (r.trustedKeys) parts.push(`trusted ${r.trustedKeys} device key${r.trustedKeys === 1 ? '' : 's'}`)
-      if (r.skipped.length) parts.push(`skipped ${r.skipped.length}: ${r.skipped.map((s: any) => s.reason).join('; ')}`)
+      if (r.skipped.length) parts.push(`skipped ${r.skipped.length}: ${r.skipped.map((s: any) => s.reason).join('. ')}`)
       toast(parts.join(', '), r.imported.length ? 'success' : 'error')
       refresh()
     } catch (e) {

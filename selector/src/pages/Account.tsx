@@ -128,7 +128,7 @@ export default function Account() {
           </div>
         </AccountSection>
         <AccountSection title="Access tokens">
-          <p className="small muted">For scripts and the upload tool. A token acts as you; keep it private.</p>
+          <p className="small muted">For scripts and the upload tool. A token acts as you. Keep it private.</p>
           {tokens.isPending ? <Spinner /> : tokens.isError ? <p role="alert" className="small red">{errorText(tokens.error)}</p> : (
             <div className="list tight">
               {tokens.data.tokens.map((token) => (

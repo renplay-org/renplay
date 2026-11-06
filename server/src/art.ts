@@ -27,7 +27,7 @@ type Shaped = Exclude<ArtKind, 'logo'>
 export const SHAPES: Record<Shaped, readonly [number, number]> = { grid: [600, 900], wide: [920, 430], hero: [1920, 620], icon: [512, 512] }
 const LOGO_WIDTH = 640
 /** Raised when the making changes, so every picture is made again. */
-const ART_VERSION = 1
+const ART_VERSION = 2
 const MAX_SOURCE_BYTES = 16 << 20
 /** A crop must keep this share of the picture, unless the recipe gives a focal point. */
 export const MIN_CROP = 0.6
@@ -112,6 +112,8 @@ interface MadeRow {
   tint: string
   made: string
   adult: number
+  /** A logo of dark lettering, inverted on ink. */
+  dark: number
   created_at: number
 }
 
@@ -212,6 +214,20 @@ export function tintOf(rgba: Uint8Array | Buffer): string {
     b *= f
   }
   return `#${hex(r * 255)}${hex(g * 255)}${hex(b * 255)}`
+}
+
+/** Whether a transparent picture is dark lettering: the visible pixels average under a third of full brightness. */
+export async function isDarkLettering(data: Buffer): Promise<boolean> {
+  const { data: rgba } = await sharp(data, { failOn: 'none' }).resize(200, 200, { fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  let sum = 0
+  let weight = 0
+  for (let i = 0; i + 3 < rgba.length; i += 4) {
+    const a = rgba[i + 3]! / 255
+    if (a < 0.5) continue
+    sum += (a * (0.2126 * rgba[i]! + 0.7152 * rgba[i + 1]! + 0.0722 * rgba[i + 2]!)) / 255
+    weight += a
+  }
+  return weight > 0 && sum / weight < 0.33
 }
 
 /**
@@ -453,7 +469,7 @@ export class ArtStore {
         made: MADE[plan.mode],
         source: plan.source.source,
         credit: plan.source.credit,
-        ...(kind === 'logo' && plan.source.dark ? { dark: true } : {}),
+        ...(kind === 'logo' && (plan.source.dark || row?.dark) ? { dark: true } : {}),
       }
     }
     return out
@@ -560,9 +576,10 @@ export class ArtStore {
       const file2x = two === one ? file1x : await this.write(two)
       const outMeta = await sharp(one).metadata()
       const { thumbhash, tint } = await hashOf(one)
-      const row: MadeRow = { key, file1x, file2x, width: outMeta.width!, height: outMeta.height!, thumbhash, tint, made: MADE[plan.mode] ?? '', adult: adult ? 1 : 0, created_at: Date.now() }
-      this.db.raw.prepare('INSERT OR REPLACE INTO art_made (key, file1x, file2x, width, height, thumbhash, tint, made, adult, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(row.key, row.file1x, row.file2x, row.width, row.height, row.thumbhash, row.tint, row.made, row.adult, row.created_at)
+      const dark = plan.kind === 'logo' && (await isDarkLettering(one)) ? 1 : 0
+      const row: MadeRow = { key, file1x, file2x, width: outMeta.width!, height: outMeta.height!, thumbhash, tint, made: MADE[plan.mode] ?? '', adult: adult ? 1 : 0, dark, created_at: Date.now() }
+      this.db.raw.prepare('INSERT OR REPLACE INTO art_made (key, file1x, file2x, width, height, thumbhash, tint, made, adult, dark, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(row.key, row.file1x, row.file2x, row.width, row.height, row.thumbhash, row.tint, row.made, row.adult, row.dark, row.created_at)
       return row
     })
   }

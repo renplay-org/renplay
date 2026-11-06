@@ -16,7 +16,7 @@ export default function UpdateCard({ game }: { game: Game }) {
           <h2 className="h3">{broken ? 'This version does not work in Renplay' : update ? 'Update available' : game.recipe ? 'Up to date' : 'Not in the catalog yet'}</h2>
           <p className="small muted" style={{ marginTop: 6, lineHeight: 1.55 }}>
             {update
-              ? `${update.version} is out. Get it from the developer and add the download; your saves carry over.`
+              ? `${update.version} is out. Get it from the developer and add the download. Your saves carry over.`
               : broken
                 ? 'Check the developer’s downloads for a newer version. Your saves are kept.'
                 : game.recipe

@@ -239,6 +239,14 @@ export class Db {
       CREATE TABLE IF NOT EXISTS art_uploads (id TEXT NOT NULL, game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, focal TEXT NOT NULL DEFAULT '', thumbhash TEXT NOT NULL, tint TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (id, game, kind, scope));
       CREATE TABLE IF NOT EXISTS art_measured (id TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL);
       PRAGMA user_version = 12; COMMIT;`)
+    // 4.0: a made logo knows whether it is dark lettering, so it is inverted on ink even when the
+    // catalog does not say so. Pictures made before are made again (art.ts ART_VERSION).
+    if (v < 13) {
+      const columns = this.raw.prepare('PRAGMA table_info(art_made)').all().map(c => c.name)
+      this.raw.exec('BEGIN')
+      if (!columns.includes('dark')) this.raw.exec('ALTER TABLE art_made ADD COLUMN dark INTEGER NOT NULL DEFAULT 0')
+      this.raw.exec('PRAGMA user_version = 13; COMMIT')
+    }
     } catch (error) { this.raw.close(); throw error }
   }
 

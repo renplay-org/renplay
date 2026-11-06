@@ -350,7 +350,7 @@ function Details({ game }: { game: Game }) {
           </div>
           <p className="small muted" style={{ marginTop: 10 }}>
             {recipeStatus}
-            {game.update ? ' Download the new version from the developer and add it to update; saves carry over.' : ''}
+            {game.update ? ' Download the new version from the developer and add it to update. Saves carry over.' : ''}
           </p>
           <GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} showContent />
           {links.length > 0 && (

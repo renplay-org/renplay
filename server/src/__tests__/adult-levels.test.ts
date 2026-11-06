@@ -165,7 +165,7 @@ describe('migration from 3.x, and back', () => {
     expect(user('nogames')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'off' })
     expect(user('broken')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
     expect(user('no')).toMatchObject({ adult_ceiling: 'off', adult_choice: 'off' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(12)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
     // Downgrading to 3.2 reads the columns 4.0 keeps in step: access, the picture
     // preference and the allow/block install setting (covered by legacyMirror in content.test).
     const cols = db.raw.prepare('PRAGMA table_info(users)').all().map((c) => c.name)
