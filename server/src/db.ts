@@ -206,14 +206,25 @@ export class Db {
       this.raw.exec(`CREATE TABLE IF NOT EXISTS identity_metadata (provider TEXT NOT NULL, subject TEXT NOT NULL, username TEXT NOT NULL, PRIMARY KEY(provider, subject));
         PRAGMA user_version = 10; COMMIT;`)
     }
-    // 4.0: three adult levels. The 3.x access becomes the ceiling and the choice; adult_access and
-    // prefs stay written (content.ts legacyMirror) so a downgrade to 3.2 reads the same levels.
+    // 4.0: three adult levels. The 3.x access becomes the ceiling. The choice keeps what the person
+    // saw: their 3.x picture preference (show, hide-pictures, hide-games), where hide-pictures was
+    // also the default. adult_access and prefs stay written (content.ts legacyMirror) so a
+    // downgrade to 3.2 reads the same levels.
     if (v < 11) {
       const columns = this.raw.prepare('PRAGMA table_info(users)').all().map(c => c.name)
       this.raw.exec('BEGIN')
       if (!columns.includes('adult_ceiling')) this.raw.exec("ALTER TABLE users ADD COLUMN adult_ceiling TEXT NOT NULL DEFAULT ''")
       if (!columns.includes('adult_choice')) this.raw.exec("ALTER TABLE users ADD COLUMN adult_choice TEXT NOT NULL DEFAULT ''")
-      this.raw.exec("UPDATE users SET adult_ceiling = CASE adult_access WHEN 1 THEN 'shown' ELSE 'off' END, adult_choice = CASE adult_access WHEN 1 THEN 'shown' ELSE 'off' END WHERE adult_ceiling = ''")
+      this.raw.exec(`UPDATE users SET
+        adult_ceiling = CASE adult_access WHEN 1 THEN 'shown' ELSE 'off' END,
+        adult_choice = CASE
+          WHEN adult_access != 1 THEN 'off'
+          WHEN (CASE WHEN json_valid(prefs) THEN json_extract(prefs, '$.adultPictures') END) = 'show' THEN 'shown'
+          WHEN (CASE WHEN json_valid(prefs) THEN json_extract(prefs, '$.adultPictures') END) = 'hide-games' THEN 'off'
+          ELSE 'blurred' END
+        WHERE adult_ceiling = ''`)
+      // A new database has only the owner, who starts at shown like any first admin.
+      if (v === 0) this.raw.exec("UPDATE users SET adult_choice = 'shown' WHERE id = 1 AND adult_ceiling = 'shown'")
       this.raw.exec('PRAGMA user_version = 11; COMMIT')
     }
     } catch (error) { this.raw.close(); throw error }

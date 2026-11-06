@@ -138,20 +138,29 @@ describe('OIDC sign-in groups set the ceiling', () => {
 })
 
 describe('migration from 3.x, and back', () => {
-  it('turns 3.x access into ceilings and choices, and keeps the 3.x columns readable', () => {
+  it('turns 3.x access into ceilings and the 3.x picture preference into choices, and keeps the 3.x columns readable', () => {
     const root = mkdtempSync(join(tmpdir(), 'renplay-levels-mig-'))
     const path = join(root, 'library.db')
     // A 3.2 database: users with and without adult access, the install question answered.
     let db = new Db(path)
     db.raw.exec(`ALTER TABLE users DROP COLUMN adult_ceiling; ALTER TABLE users DROP COLUMN adult_choice; PRAGMA user_version = 10`)
-    db.raw.prepare("INSERT INTO users (username, name, role, adult_access, created_at) VALUES ('yes', 'Yes', 'player', 1, '2026-01-01'), ('no', 'No', 'player', 0, '2026-01-01')").run()
+    // 3.x hid pictures unless a person chose Show, so no preference means Blurred.
+    db.raw.prepare(`INSERT INTO users (username, name, role, adult_access, prefs, created_at) VALUES
+      ('yes', 'Yes', 'player', 1, '{"adultPictures":"show"}', '2026-01-01'),
+      ('hidden', 'Hidden', 'player', 1, '{"adultPictures":"hide-pictures"}', '2026-01-01'),
+      ('nogames', 'No games', 'player', 1, '{"adultPictures":"hide-games"}', '2026-01-01'),
+      ('broken', 'Broken', 'player', 1, 'not json', '2026-01-01'),
+      ('no', 'No', 'player', 0, '{"adultPictures":"show"}', '2026-01-01')`).run()
     db.raw.prepare('UPDATE users SET adult_access = 1 WHERE id = 1').run()
     db.setSetting('adult_games', 'block')
     db.close()
     db = new Db(path)
     const user = (username: string) => db.raw.prepare('SELECT * FROM users WHERE username = ?').get(username) as { adult_ceiling: string; adult_choice: string }
-    expect(user('owner')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'shown' })
+    expect(user('owner')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
     expect(user('yes')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'shown' })
+    expect(user('hidden')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
+    expect(user('nogames')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'off' })
+    expect(user('broken')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
     expect(user('no')).toMatchObject({ adult_ceiling: 'off', adult_choice: 'off' })
     expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(11)
     // Downgrading to 3.2 reads the columns 4.0 keeps in step: access, the picture
