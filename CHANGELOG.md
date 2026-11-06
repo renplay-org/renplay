@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-06
+
 ### Added
 
 - Optional `/downloads` storage separates downloads from installed games. Without it, Renplay keeps using `/games/_archives`. Existing files are never moved, and Settings shows the folder in use.
@@ -405,7 +407,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v3.1.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v3.2.0...dev
+[3.2.0]: https://github.com/renplay-org/renplay/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/renplay-org/renplay/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/renplay-org/renplay/compare/v2.11.1...v3.0.0
 [2.11.1]: https://github.com/renplay-org/renplay/compare/v2.11.0...v2.11.1
