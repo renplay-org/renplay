@@ -198,6 +198,20 @@ export function createGamesRouter(deps: GameDeps): Router {
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
+  router.delete('/:id/download', async (req, res) => {
+    const g = get(req)
+    if (jobs.isBusy() || jobs.activeFor(g.id)) throw new HttpError(409, 'Wait for install jobs to finish before deleting a download')
+    const source = parseJson<GameSource>(g.source, {})
+    if (!source.archive) throw new HttpError(404, 'No download is known for this game')
+    const rel = cleanRelPath(source.archive)
+    await unlink(safeJoin(cfg.archivesDir, rel)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') throw new HttpError(404, 'Download not found')
+      throw error
+    })
+    db.deleteArchive(rel)
+    res.json({ ok: true })
+  })
+
   router.post('/:id/reinstall', async (req, res) => {
     const g = get(req)
     const src = parseJson<GameSource>(g.source, {})

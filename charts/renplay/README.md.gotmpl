@@ -1,0 +1,104 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.description" . }}
+
+**Homepage:** <https://renplay.org>
+
+## Usage
+
+```sh
+helm install renplay oci://ghcr.io/renplay-org/charts/renplay
+kubectl port-forward service/renplay 8080:8080
+```
+
+Open http://localhost:8080 and create the owner account. A default StorageClass
+is required unless you supply existing claims or NFS storage for games.
+Kubernetes must be 1.25 or newer. Gateway API routes also require the Gateway API CRDs.
+
+Run one writer with `strategy.type: Recreate`. A rolling update is refused.
+The image runs as UID/GID 1000 with a read-only root filesystem, no capabilities
+and a writable `/tmp` emptyDir. Change `podSecurityContext` to match your volume
+permissions. NFS export permissions must be prepared by the operator. The chart
+never runs a root ownership-changing init container.
+
+## Storage
+
+- `/data`: a 5 GiB PVC on local disk for SQLite, accounts and saves. Back it up.
+  Never use a network filesystem for this volume.
+- `/games`: a 50 GiB PVC by default for games, engines and installation scratch.
+  Allow about twice the download size free during installs.
+- `/downloads`: optional separate PVC, existing claim or NFS share. Without it,
+  downloads stay in `/games/_archives`. Nothing is moved automatically.
+
+Each PVC created by the chart is retained on uninstall through
+`helm.sh/resource-policy: keep`. Reuse retained claims via `existingClaim` when
+reinstalling the chart. Delete claims manually only when you intend to discard
+their data. Deleting `/data` loses saves. Deleting `/games` also loses downloads
+unless you mounted them separately. Installed games can be rebuilt only while
+the original downloads are available. The optional downloads mount works with
+older images too because the chart sets `ARCHIVES_DIR=/downloads` explicitly.
+
+```yaml
+persistence:
+  data:
+    existingClaim: renplay-data
+  games:
+    nfs:
+      server: nas.example.com
+      path: /exports/renplay/games
+  downloads:
+    enabled: true
+    existingClaim: renplay-downloads
+```
+
+## Networking and sign-in
+
+Use `ingress` or `httpRoute` to expose the Service. Renplay must be served from
+the root of its origin. Configure your controller to allow large uploads and
+long requests. Use HTTPS outside a trusted local network. Set
+`RENPLAY_PUBLIC_URL` to your public URL when using external sign-in.
+
+```yaml
+config:
+  extraEnv:
+    - name: RENPLAY_PUBLIC_URL
+      value: https://renplay.example.com
+    - name: RENPLAY_OIDC_ISSUER
+      value: https://login.example.com
+    - name: RENPLAY_OIDC_CLIENT_ID
+      value: renplay
+  envFrom:
+    - configMapRef:
+        name: renplay-settings
+secret:
+  oidcClientSecret:
+    existingSecret: renplay-oidc
+    key: client-secret
+```
+
+OIDC and LDAP secrets are mounted read-only and passed through
+`RENPLAY_OIDC_CLIENT_SECRET_FILE` and `RENPLAY_LDAP_BIND_PASSWORD_FILE`.
+Do not set the corresponding plain environment variable at the same time.
+No secret values are stored in Helm values by the chart. Use
+`deploymentAnnotations` for a secret reloader if you need automatic restarts.
+
+Use `image.repository: docker.io/renplay/renplay` for the Docker Hub mirror.
+`image.tag` defaults to the chart appVersion. `image.digest` wins over the tag.
+The release workflow pins the published image digest in the packaged chart.
+`helm test renplay` checks `/api/health` through the Service using the app image's curl.
+
+See [application configuration](https://docs.renplay.org/configuration/) and
+[Kubernetes installation](https://docs.renplay.org/install/kubernetes/).
+
+{{ template "chart.maintainersSection" . }}
+
+{{ template "chart.sourcesSection" . }}
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
+
+---
+
+This README is generated with helm-docs from `Chart.yaml`, `values.yaml` and
+`README.md.gotmpl`. Run `helm-docs --chart-search-root charts/renplay` after changes.

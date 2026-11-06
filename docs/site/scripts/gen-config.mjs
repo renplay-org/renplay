@@ -50,8 +50,13 @@ read-only root filesystem, so any folder you point a variable at must be writabl
 | Folder | What is in it |
 |---|---|
 | \`/data\` | Saves and their history, accounts, the SQLite library, mods, covers, walkthroughs. **Local disk only. Back this up.** |
-| \`/games/_archives\` | Game downloads. Only completed Renplay uploads are deleted after install, unless \`RENPLAY_DELETE_ARCHIVES=false\`. Files you copied here stay here. |
-| \`/games\` (the rest) | Installed games. Renplay can rebuild them from the archives, while they are kept. |
+| \`/downloads\` | Optional downloads and drop folder. Used when it exists and is writable, or when selected with \`ARCHIVES_DIR\`. Downloads are kept by default. \`RENPLAY_KEEP_DOWNLOADS=false\` deletes only unchanged completed uploads after a successful install. Files copied in are never deleted automatically. |
+| \`/games/_archives\` | Downloads when no usable \`/downloads\` exists. Existing files are never moved. |
+| \`/games\` (the rest) | Installed games, engines and scratch space. Scratch stays on this filesystem for atomic installs. Rebuilding requires the original downloads. |
+
+Deleting \`/data\` loses saves and the library. Deleting \`/games\` also loses downloads stored
+inside it. Deleting a download means reinstalling needs that download again. Settings shows
+the downloads folder in use.
 `)
   return out.join('\n')
 }

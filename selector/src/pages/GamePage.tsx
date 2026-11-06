@@ -242,7 +242,7 @@ function Details({ game }: { game: Game }) {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const pdfRef = useRef<HTMLInputElement>(null)
-  const [confirm, setConfirm] = useState<null | 'uninstall' | 'forget'>(null)
+  const [confirm, setConfirm] = useState<null | 'uninstall' | 'forget' | 'download'>(null)
   const [reinstall, setReinstall] = useState(false)
   const [reapply, setReapply] = useState(true)
   const refresh = () => {
@@ -341,6 +341,7 @@ function Details({ game }: { game: Game }) {
             </Row>
           )}
           {game.source.archive && <Row label="Source">{game.source.archive}</Row>}
+          <Row label="Download">{game.canReinstall ? 'Kept for reinstalling' : 'Not kept. Add the download again to reinstall.'}</Row>
           {game.installedAt && <Row label="Installed">{capitalize(ago(game.installedAt))}</Row>}
         </div>
       </Card>
@@ -352,6 +353,7 @@ function Details({ game }: { game: Game }) {
               {game.status === 'installed' ? 'Reinstall' : 'Install'}
             </Button>
           )}
+          {game.canReinstall && <Button size="sm" variant="ghost" onClick={() => setConfirm('download')}>Delete download</Button>}
           {game.status === 'installed' && (
             <Button size="sm" variant="danger" icon={<Trash2 className="size-4" />} onClick={() => setConfirm('uninstall')}>
               Uninstall
@@ -385,6 +387,12 @@ function Details({ game }: { game: Game }) {
         )}
       </Modal>
 
+      <Confirm open={confirm === 'download'} onClose={() => setConfirm(null)} danger title="Delete this download?" confirmLabel="Delete download" onConfirm={async () => {
+        setConfirm(null)
+        await act(() => del(`/api/games/${game.id}/download`), 'Download deleted')
+      }}>
+        Deletes {game.source.archive}. Reinstalling this game, or another game using the same download, will need the download again. Installed games and saves are kept.
+      </Confirm>
       <Confirm
         open={confirm === 'uninstall'}
         onClose={() => setConfirm(null)}

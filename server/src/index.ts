@@ -10,7 +10,7 @@ async function main() {
   const { app, close } = await createApp(cfg, { runtimePath: process.env['RENPLAY_RUNTIME_PATH'] })
   const server = app.listen(cfg.port, '127.0.0.1', () => {
     console.log(`renplay server listening on 127.0.0.1:${cfg.port}`)
-    console.log(`  games=${cfg.gamesDir} archives=${cfg.archivesDir} data=${cfg.dataDir} internal=${cfg.internalDir}`)
+    console.log(`  games=${cfg.gamesDir} downloads=${cfg.archivesDir} data=${cfg.dataDir} internal=${cfg.internalDir}`)
   })
   server.requestTimeout = 0
   server.headersTimeout = 65_000

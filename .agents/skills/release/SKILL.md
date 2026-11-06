@@ -32,6 +32,8 @@ git checkout -b release-X.Y.Z origin/dev
 # taking anything from it, or the release PR conflicts:
 git merge -s ours origin/main -m "Merge main (PREVIOUS) into release-X.Y.Z"
 # server/package.json and selector/package.json: "version": "X.Y.Z"
+# charts/renplay/Chart.yaml: version and appVersion both X.Y.Z
+# Regenerate the chart values reference: helm-docs --chart-search-root charts/renplay
 # CHANGELOG.md: rename "## [Unreleased]" to "## [X.Y.Z] - YYYY-MM-DD" (today),
 #   add a fresh empty "## [Unreleased]" above it,
 #   and update the compare links at the bottom:
@@ -55,6 +57,10 @@ The maintainer squash-merges with the subject `Release X.Y.Z (#N)`. Agents do no
 gh run list --repo renplay-org/renplay --branch main --limit 1          # Release workflow passed
 gh release view vX.Y.Z --repo renplay-org/renplay                        # notes = changelog section
 docker buildx imagetools inspect ghcr.io/renplay-org/renplay:X.Y.Z       # image exists; note the digest
+helm show chart oci://ghcr.io/renplay-org/charts/renplay --version X.Y.Z # chart version matches
+cosign verify ghcr.io/renplay-org/charts/renplay:X.Y.Z \
+  --certificate-identity https://github.com/renplay-org/renplay/.github/workflows/release.yml@refs/heads/main \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 Then fast-forward `dev` to the release branch, so `dev` has the version bump and the dated

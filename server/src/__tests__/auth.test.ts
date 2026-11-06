@@ -47,6 +47,38 @@ async function add(a: App, cookie: string, username = 'player') {
 function game(a: App, id = 'safe', extras = {}) { a.db.insertGame({ id, title: id, recipe_id: `recipe-${id}`, status: 'installed', build: 'b1', save_dir: id, ...extras }) }
 
 describe('accounts authentication and security', () => {
+  it('restricts download retention and explicit deletion to admins without touching installed games or saves', async () => {
+    const cfg = config(), a = await start(cfg), admin = await login(a)
+    await add(a, admin)
+    const player = await login(a, 'player', 'player password')
+    const path = join(cfg.archivesDir, 'download.zip')
+    mkdirSync(cfg.archivesDir, { recursive: true })
+    writeFileSync(path, 'download')
+    game(a, 'download-game', { source: JSON.stringify({ archive: 'download.zip' }) })
+    mkdirSync(join(cfg.gamesDir, 'download-game/b1'), { recursive: true })
+    writeFileSync(join(cfg.gamesDir, 'download-game/b1/game.zip'), 'installed')
+    await a.accounts.store(1).write('download-game', '1.save', Buffer.from('sacred'))
+    expect((await request(a.app).get('/api/games/download-game').set('Cookie', admin)).body.game.canReinstall).toBe(true)
+    await request(a.app).put('/api/system/downloads').set(site).set('Cookie', player).send({ keepDownloads: false }).expect(403)
+    await request(a.app).delete('/api/games/download-game/download').set(site).set('Cookie', player).expect(403)
+    await request(a.app).put('/api/system/downloads').set(site).set('Cookie', admin).send({ keepDownloads: 'false' }).expect(400)
+    await request(a.app).put('/api/system/downloads').set(site).set('Cookie', admin).send({ keepDownloads: false }).expect(200)
+    expect(a.db.getSetting('keep_downloads', true)).toBe(false)
+    expect((await request(a.app).get('/api/system').set('Cookie', admin)).body.keepDownloads).toBe(false)
+    cfg.keepDownloadsLocked = true
+    cfg.keepDownloads = true
+    await request(a.app).put('/api/system/downloads').set(site).set('Cookie', admin).send({ keepDownloads: false }).expect(409)
+    expect((await request(a.app).get('/api/system').set('Cookie', admin)).body.keepDownloads).toBe(true)
+    const active = vi.spyOn(a.jobs, 'activeFor').mockReturnValue({} as never)
+    await request(a.app).delete('/api/games/download-game/download').set(site).set('Cookie', admin).expect(409)
+    active.mockRestore()
+    await request(a.app).delete('/api/games/download-game/download').set(site).set('Cookie', admin).expect(200)
+    const g = (await request(a.app).get('/api/games/download-game').set('Cookie', admin)).body.game
+    expect(g.canReinstall).toBe(false)
+    expect(g.status).toBe('installed')
+    expect(readFileSync(join(cfg.dataDir, 'users/1/saves/download-game/1.save'), 'utf8')).toBe('sacred')
+    await request(a.app).delete('/api/games/download-game/download').set(site).set('Cookie', admin).expect(404)
+  })
   it('supplies Account password state and Users save counts and protected accounts', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin)
     expect((await request(a.app).get('/api/me').set('Cookie', admin).expect(200)).body.hasPassword).toBe(true)

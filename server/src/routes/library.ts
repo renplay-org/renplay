@@ -1,9 +1,9 @@
 import { createWriteStream } from 'node:fs'
-import { mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
-import { archiveIdentity } from '../archive-origin.js'
+import { archiveIdentity, publishUpload } from '../archive-origin.js'
 import { installedRelease, type Catalog } from '../catalog.js'
 import type { Config } from '../config.js'
 import { ADULT_REASON } from '../content.js'
@@ -219,7 +219,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
     let dest = join(cfg.archivesDir, meta.name)
     let i = 1
     while (await exists(dest)) dest = join(cfg.archivesDir, meta.name.replace(/(\.[^.]+)?$/, `-${++i}$1`))
-    await rename(uploadPart(id), dest)
+    await publishUpload(uploadPart(id), dest)
     db.markUploadedArchive(relative(cfg.archivesDir, dest), archiveIdentity(await stat(dest)))
     await unlink(uploadMeta(id)).catch(() => {})
     res.json({ path: relative(cfg.archivesDir, dest) })

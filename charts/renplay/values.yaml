@@ -1,0 +1,207 @@
+---
+# Default values for Renplay. String, list and map values in pod configuration
+# and networking are rendered through tpl. No configuration is required.
+
+# -- Single writer. Only 0 (paused) or 1 is supported.
+replicaCount: 1
+# -- SQLite requires Recreate. RollingUpdate is unsupported.
+strategy:
+  type: Recreate
+image:
+  # -- Image repository. Docker Hub alternative: docker.io/renplay/renplay.
+  repository: ghcr.io/renplay-org/renplay
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+  # -- Image tag. Empty uses Chart.appVersion.
+  tag: ""
+  # -- Immutable sha256 digest. Takes precedence over tag.
+  digest: ""
+# -- Image pull secrets.
+imagePullSecrets: []
+# -- Override the chart name.
+nameOverride: ""
+# -- Override the full release name.
+fullnameOverride: ""
+config:
+  # -- Extra environment entries, including valueFrom references. See the application configuration reference.
+  extraEnv: []
+  # -- Environment sources, such as secretRef or configMapRef.
+  envFrom: []
+secret:
+  oidcClientSecret:
+    # -- Existing Secret for RENPLAY_OIDC_CLIENT_SECRET_FILE. Empty disables the mount.
+    existingSecret: ""
+    # -- Key in the OIDC Secret.
+    key: client-secret
+  ldapBindPassword:
+    # -- Existing Secret for RENPLAY_LDAP_BIND_PASSWORD_FILE. Empty disables the mount.
+    existingSecret: ""
+    # -- Key in the LDAP Secret.
+    key: bind-password
+serviceAccount:
+  # -- Create a ServiceAccount.
+  create: true
+  # -- Mount a Kubernetes API token. Renplay does not need one.
+  automount: false
+  # -- ServiceAccount annotations.
+  annotations: {}
+  # -- ServiceAccount name. Empty uses the release name.
+  name: ""
+# -- Deployment annotations.
+deploymentAnnotations: {}
+# -- Pod annotations.
+podAnnotations: {}
+# -- Additional pod labels.
+podLabels: {}
+# -- Pod security. Change runAsUser, runAsGroup and fsGroup to match your storage owner. NFS permissions must be prepared by the operator.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+# -- Container security. No root, writable root filesystem or capabilities are needed.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+service:
+  # -- Create the Service. Required for Ingress, HTTPRoute and helm test.
+  enabled: true
+  # -- Service type.
+  type: ClusterIP
+  # -- HTTP port. The container always listens on 8080.
+  port: 8080
+  # -- Service annotations.
+  annotations: {}
+ingress:
+  # -- Create an Ingress.
+  enabled: false
+  # -- IngressClass name.
+  className: ""
+  # -- Ingress annotations. Allow large uploads and long requests on your controller.
+  annotations: {}
+  # -- Hosts and paths. Renplay must be served at the origin root.
+  hosts:
+    - host: renplay.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  # -- TLS configuration.
+  tls: []
+httpRoute:
+  # -- Create a Gateway API v1 HTTPRoute. Requires Gateway API CRDs.
+  enabled: false
+  # -- HTTPRoute annotations.
+  annotations: {}
+  # -- HTTPRoute labels.
+  labels: {}
+  # -- Parent Gateways and listeners.
+  parentRefs: []
+  # -- Public hostnames.
+  hostnames: []
+  # -- Filters applied to the route.
+  filters: []
+  # -- Request matches. Serve Renplay from the origin root.
+  matches:
+    - path:
+        type: PathPrefix
+        value: /
+persistence:
+  data:
+    # -- Existing local-disk PVC. Empty creates a claim. Never use NFS for SQLite.
+    existingClaim: ""
+    # -- StorageClass. Empty uses the default. A literal dash disables dynamic provisioning.
+    storageClass: ""
+    # -- Data PVC access modes.
+    accessModes: [ReadWriteOnce]
+    # -- Data PVC size. Back up this volume.
+    size: 5Gi
+    # -- Data PVC annotations. Claims are retained on uninstall by default.
+    annotations:
+      helm.sh/resource-policy: keep
+  games:
+    # -- Existing games PVC. Mutually exclusive with nfs.server.
+    existingClaim: ""
+    # -- Games StorageClass. Empty uses the default. Dash means no StorageClass.
+    storageClass: ""
+    # -- Games PVC access modes.
+    accessModes: [ReadWriteOnce]
+    # -- Games PVC size. Allow space for installed games, engines and scratch space.
+    size: 50Gi
+    # -- Games PVC annotations.
+    annotations:
+      helm.sh/resource-policy: keep
+    nfs:
+      # -- NFS server. Empty uses a PVC.
+      server: ""
+      # -- Export path on the NFS server.
+      path: ""
+  downloads:
+    # -- Mount /downloads separately. Off keeps using /games/_archives.
+    enabled: false
+    # -- Existing downloads PVC. Mutually exclusive with nfs.server.
+    existingClaim: ""
+    # -- Downloads StorageClass. Empty uses the default. Dash means no StorageClass.
+    storageClass: ""
+    # -- Downloads PVC access modes.
+    accessModes: [ReadWriteOnce]
+    # -- Downloads PVC size.
+    size: 50Gi
+    # -- Downloads PVC annotations.
+    annotations:
+      helm.sh/resource-policy: keep
+    nfs:
+      # -- NFS server. Empty uses a PVC.
+      server: ""
+      # -- Export path on the NFS server.
+      path: ""
+# -- Resources. Image conversion can need several GiB. No CPU limit by default.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 4Gi
+# -- Liveness probe through nginx and Node.
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 20
+  timeoutSeconds: 5
+# -- Readiness probe.
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+# -- Startup probe allows migrations to finish before liveness checks begin.
+startupProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 5
+  failureThreshold: 60
+# -- Grace period for shutdown.
+terminationGracePeriodSeconds: 30
+# -- Node selector.
+nodeSelector: {}
+# -- Tolerations.
+tolerations: []
+# -- Affinity.
+affinity: {}
+tests:
+  # -- Enable the helm test connection hook. Requires service.enabled.
+  enabled: true
+  image:
+    # -- Connection test image. Uses the same Renplay image by default, which includes curl.
+    repository: ""
+    # -- Test image tag. Empty uses Chart.appVersion.
+    tag: ""
+    # -- Test image pull policy.
+    pullPolicy: IfNotPresent

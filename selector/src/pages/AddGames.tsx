@@ -93,10 +93,10 @@ function Downloads() {
       )}
       {sys && (
         <p className="text-xs text-zinc-500">
-          {sys.deleteArchives ? 'Downloads are deleted once they install, to save space. Add one again to reinstall its game.' : 'Downloads stay here after they install, so you can reinstall their games.'}
+          {sys.keepDownloads ? 'Downloads stay here after they install, so you can reinstall their games.' : 'Uploads through Renplay are deleted after a successful install. Files copied in stay here. Add a deleted download again to reinstall.'}
         </p>
       )}
-      {installing && <InstallDialog archive={installing} deletes={!!sys?.deleteArchives} onClose={() => setInstalling(null)} />}
+      {installing && <InstallDialog archive={installing} deletes={sys ? !sys.keepDownloads : false} onClose={() => setInstalling(null)} />}
     </div>
   )
 }
@@ -279,7 +279,7 @@ function InstallDialog({ archive, deletes, onClose }: { archive: Archive; delete
       <div className="space-y-5">
         <p className="text-sm text-zinc-400">
           From <span className="text-zinc-200">{archive.name}</span> ({bytes(archive.size)}). It installs on the server; big games take a few minutes, and you can leave this page.
-          {deletes ? ' The download is deleted once the game is installed.' : ''}
+          {deletes ? ' If uploaded through Renplay, the download is deleted after a successful install. Files copied in are kept.' : ''}
         </p>
         {target && (
           <div className="rounded-xl bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-100 ring-1 ring-inset ring-amber-500/20">

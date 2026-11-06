@@ -7,6 +7,13 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Optional `/downloads` storage separates downloads from installed games. Without it, Renplay keeps using `/games/_archives`. Existing files are never moved, and Settings shows the folder in use.
+- Downloads are kept by default. Admins can change **Keep downloads** in Settings, or operators can lock the choice with `RENPLAY_KEEP_DOWNLOADS`. Turning it off deletes only unchanged uploads through Renplay after a successful install. The old `RENPLAY_DELETE_ARCHIVES` variable remains a deprecated inverse alias.
+- Game details show whether a download is kept. Admins can delete it to free space without touching installed games or saves. Reinstalling then needs the download again.
+- An official Helm chart supports persistent storage, NFS for games and downloads, Ingress, Gateway API routes and existing sign-in secrets. Releases publish a signed OCI chart to GHCR.
+
 ## [3.1.0] - 2026-11-05
 
 ### Added

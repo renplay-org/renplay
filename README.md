@@ -92,8 +92,17 @@ More in the docs: [Docker Compose](https://docs.renplay.org/install/docker/),
 **Back up `/data` and keep it on local disk:** it holds your saves and their history, accounts,
 the SQLite library, mods and covers. SQLite must not be on a network share. `/games` and the
 archives folder can be shares. Allow about twice the game's download size free during install.
-By default only downloads uploaded through Renplay are deleted after install; files you copy into
-the archives folder stay there. `RENPLAY_DELETE_ARCHIVES=false` keeps uploads too.
+Downloads are kept by default. Turn off **Keep downloads** in Settings to delete only uploads
+through Renplay after a successful install. Files copied in are never deleted automatically.
+`RENPLAY_KEEP_DOWNLOADS=true` or `false` sets and locks the choice. The deprecated
+`RENPLAY_DELETE_ARCHIVES` alias still works with the opposite value.
+
+Optionally mount a downloads folder at `/downloads`. Renplay uses it when it exists and is
+writable, or uses `ARCHIVES_DIR` when set. Without that mount it keeps using `/games/_archives`.
+Existing files are never moved. Settings shows which folder is in use. Deleting `/games` also
+loses downloads stored inside it. Games can be rebuilt only while their downloads are available.
+Admins can use **Delete download** on a game's Details tab to free space without touching saves.
+Reinstalling then needs the download again.
 
 The image defaults to user `1000:1000`. You can use any non-root IDs with `--user 568:568`, or
 start as root with `--user 0:0 -e PUID=99 -e PGID=100`; the entrypoint drops root before starting
