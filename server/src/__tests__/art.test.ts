@@ -122,6 +122,18 @@ describe('the art cache', () => {
     expect((await sharp(join(root, 'data', 'art', set['logo']!.url1x.split('/').pop()!)).metadata()).hasAlpha).toBe(true)
   })
 
+  it('cuts the icon from a poster above its title, unless a focal point says otherwise', async () => {
+    // A tall poster: the subject in the upper half, the title lettering (busy, high contrast) at the bottom.
+    const title = Buffer.from(`<svg width="600" height="200"><rect width="600" height="200" fill="white"/>${Array.from({ length: 14 }, (_, i) => `<rect x="${20 + i * 40}" y="40" width="22" height="120" fill="black"/>`).join('')}</svg>`)
+    const subject = Buffer.from('<svg width="200" height="200"><circle cx="100" cy="100" r="90" fill="rgb(220,40,40)"/></svg>')
+    const poster = await sharp({ create: { width: 600, height: 900, channels: 3, background: '#2a2a40' } })
+      .composite([{ input: subject, left: 200, top: 150 }, { input: title, left: 0, top: 680 }]).png().toBuffer()
+    const { focalOf } = await import('../art.js')
+    const [, y] = await focalOf(poster, { width: 600, height: 900 }, null, 0.6)
+    expect(y).toBeLessThan(0.6)
+    expect(await focalOf(poster, { width: 600, height: 900 }, [0.5, 0.85], 0.6)).toEqual([0.5, 0.85])
+  })
+
   it('notices a logo of dark lettering, so it can be inverted on ink', async () => {
     const lettering = (r: number) => sharp({ create: { width: 400, height: 150, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
       .composite([{ input: Buffer.from(`<svg width="400" height="150"><rect x="20" y="40" width="360" height="70" fill="rgb(${r},${r},${r})"/></svg>`) }]).png().toBuffer()

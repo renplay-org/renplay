@@ -27,7 +27,7 @@ type Shaped = Exclude<ArtKind, 'logo'>
 export const SHAPES: Record<Shaped, readonly [number, number]> = { grid: [600, 900], wide: [920, 430], hero: [1920, 620], icon: [512, 512] }
 const LOGO_WIDTH = 640
 /** Raised when the making changes, so every picture is made again. */
-const ART_VERSION = 2
+const ART_VERSION = 3
 const MAX_SOURCE_BYTES = 16 << 20
 /** A crop must keep this share of the picture, unless the recipe gives a focal point. */
 export const MIN_CROP = 0.6
@@ -234,19 +234,29 @@ export async function isDarkLettering(data: Buffer): Promise<boolean> {
  * Where the picture matters: the recipe's or uploader's focal point, else sharp's attention guess.
  * sharp reports the point in the picture scaled to cover the square it was asked for.
  */
-export async function focalOf(data: Buffer, size: { width: number; height: number }, given: [number, number] | null): Promise<[number, number]> {
+export async function focalOf(data: Buffer, size: { width: number; height: number }, given: [number, number] | null, top = 1): Promise<[number, number]> {
   if (given) return given
   const box = 160
+  // `top` limits the search to the upper share of the picture (the icon looks above a poster's title).
+  const region = { left: 0, top: 0, width: size.width, height: Math.max(1, Math.round(size.height * top)) }
   const { info } = await sharp(data, { failOn: 'none', limitInputPixels: MAX_IMAGE_PIXELS })
+    .extract(region)
     .resize(box, box, { fit: 'cover', position: sharp.strategy.attention })
     .toBuffer({ resolveWithObject: true })
   const x = (info as { attentionX?: number }).attentionX
   const y = (info as { attentionY?: number }).attentionY
-  if (typeof x !== 'number' || typeof y !== 'number') return [0.5, 0.5]
-  const scale = Math.max(box / size.width, box / size.height)
+  if (typeof x !== 'number' || typeof y !== 'number') return [0.5, 0.5 * top]
+  const scale = Math.max(box / region.width, box / region.height)
   const clamp = (v: number) => Math.min(1, Math.max(0, v))
   return [clamp(x / (size.width * scale)), clamp(y / (size.height * scale))]
 }
+
+/**
+ * Posters carry their title in the lower part (Dear Devere, most visual novels), and attention
+ * loves lettering, so the icon cut from a picture that is not clearly wide looks for its subject in
+ * the top 60 percent.
+ */
+const ICON_SEARCH = 0.6
 
 /** The largest rectangle of the given aspect (or the given width) around the focal point, inside the picture. */
 function cropRect(w: number, h: number, aspect: number, focal: [number, number], side?: number) {
@@ -570,7 +580,8 @@ export class ArtStore {
     const [W, H] = plan.kind === 'logo' ? [LOGO_WIDTH, LOGO_WIDTH] : SHAPES[plan.kind]
     const pixels = Math.max(size.width * size.height, W * H * 4)
     return this.budget.run(Math.min(pixels, MAX_IMAGE_PIXELS), async () => {
-      const focal = plan.mode === 'crop' || plan.mode === 'cut' ? await focalOf(data, size, plan.source.focal) : ([0.5, 0.5] as [number, number])
+      const top = plan.mode === 'cut' && size.height >= size.width * 0.75 ? ICON_SEARCH : 1
+      const focal = plan.mode === 'crop' || plan.mode === 'cut' ? await focalOf(data, size, plan.source.focal, top) : ([0.5, 0.5] as [number, number])
       const one = await makeAt(plan, data, size, focal, 1)
       const two = needs2x(plan, size, focal) ? await makeAt(plan, data, size, focal, 2) : one
       const file1x = await this.write(one)
