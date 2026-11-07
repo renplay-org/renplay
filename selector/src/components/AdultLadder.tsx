@@ -86,7 +86,7 @@ export default function AdultChoice() {
           : <>An admin set your limit to {adultLabels[limit]}.</>
   return (
     <div className="stack" style={{ gap: 10, alignItems: 'flex-start' }}>
-      <LevelSeg label="Adult games" value={state.choice} max={limit} onChange={(level) => void choose(level)} busy={busy} />
+      <LevelSeg label="Adult games" value={yours} max={limit} onChange={(level) => void choose(level)} busy={busy} />
       <p className="small muted-2">{seeing(yours)}</p>
       {who && <p className="xs muted">{who}</p>}
       {device && here !== yours && (

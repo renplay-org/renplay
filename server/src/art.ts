@@ -170,9 +170,10 @@ export function planFormat(kind: ArtKind, chosen: Partial<Record<ArtKind, Pictur
   const others = (['grid', 'wide', 'hero'] as const).filter((k) => k !== kind).map((k) => chosen[k]).filter((p): p is Picture => !!p)
   const from = own ?? others.sort((a, b) => keeps(kind, b) - keeps(kind, a) || b.width * b.height - a.width * a.height)[0]
   if (!from) return null
-  // A crop keeps enough of the picture and enlarges it at most twice: a Steam header cut to a hero
-  // would be four times its size and blurry, so that hero glows instead.
-  if ((from.focal || keeps(kind, from) >= MIN_CROP) && enlarges(kind, from) <= MAX_ENLARGE) return { kind, mode: 'crop', source: from }
+  // A crop keeps enough of the picture. Made from a picture of another kind it also enlarges it at
+  // most about twice: a Steam header cut to a hero would be four times its size and blurry, so that
+  // hero glows instead. A picture chosen for this very kind is cropped as chosen.
+  if ((from.focal || keeps(kind, from) >= MIN_CROP) && (from === own || enlarges(kind, from) <= MAX_ENLARGE)) return { kind, mode: 'crop', source: from }
   if (kind === 'hero') return { kind, mode: 'glow', source: from }
   const aspect = from.width / from.height
   if (kind === 'wide' && aspect <= 0.8) return { kind, mode: 'poster', source: from }

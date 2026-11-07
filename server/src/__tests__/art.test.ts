@@ -46,6 +46,8 @@ describe('the making order', () => {
     expect(planFormat('hero', { wide: pic('wide', 460, 215, { focal: [0.5, 0.5] }) })?.mode).toBe('glow')
     // The same shape at twice the size crops.
     expect(planFormat('hero', { wide: pic('wide', 1380, 645) })?.mode).toBe('crop')
+    // A picture chosen for the hero itself is cropped as chosen, small or not.
+    expect(planFormat('hero', { hero: pic('hero', 460, 215) })?.mode).toBe('crop')
   })
 
   it('composes a wide from a poster and a grid from a wide picture, and makes a hero glow', () => {

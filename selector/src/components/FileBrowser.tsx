@@ -129,7 +129,7 @@ export default function FileBrowser({ game }: { game: Game }) {
                   Apply changes
                 </Pill>
               )}
-              <Pill variant={pending ? 's' : changed ? 's' : 'p'} size="sm" icon={<PackagePlus />} aria-disabled={uploading} onClick={() => zipRef.current?.click()}>
+              <Pill variant={pending ? 's' : changed ? 's' : 'p'} size="sm" icon={<PackagePlus />} aria-disabled={uploading} onClick={() => !uploading && zipRef.current?.click()}>
                 {uploading ? 'Adding' : 'Install mod zip'}
               </Pill>
               {changed > 0 && (

@@ -591,7 +591,8 @@ export default function Player() {
       }}>Continue</Button>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
       {legacySaves && <div role="status" className="fixed inset-x-4 top-4 z-[90] mx-auto max-w-md rounded-2xl bg-ink-950 p-4 text-sm shadow-xl"><p>Unowned browser saves are kept on this device. Their account is not known. Ask an admin to help recover them before clearing browser storage.</p><Button onClick={() => setLegacySaves(false)} className="mt-2">Dismiss</Button></div>}
       {/* Game stage */}
-      <div ref={stageRef} className={cx('rp-stage absolute inset-0', drawer && 'dim')}>
+      {/* A click in the bars around the game gives the keyboard back to the game. */}
+      <div ref={stageRef} className={cx('rp-stage absolute inset-0', drawer && 'dim')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
         <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
           <iframe
             ref={frameRef}
@@ -607,7 +608,7 @@ export default function Player() {
       </div>
 
       {/* The door: the stage's art grown to the viewport while the game loads. */}
-      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} muted={muted} onMute={toggleMute} fsMode={fsMode} fullscreen={fullscreen} onFullscreen={() => void toggleFullscreen()} onBack={() => navigate(`/game/${gameId}`)} insets={insets} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} homeTip={homeTip} onHomeTip={() => setPanel('fullscreen')} onDismissHomeTip={dismissHomeTip} />
+      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} muted={muted} onMute={toggleMute} fsMode={fsMode} fullscreen={fullscreen} onFullscreen={() => void toggleFullscreen()} onBack={() => (progress ? void exit('game') : navigate(`/game/${gameId}`))} insets={insets} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} homeTip={homeTip} onHomeTip={() => setPanel('fullscreen')} onDismissHomeTip={dismissHomeTip} />
 
       {/* Saving overlay */}
       {exiting && (
