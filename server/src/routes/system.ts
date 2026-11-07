@@ -1,5 +1,6 @@
 import { keepaliveToken } from '../auth.js'
 import type { SaveBackups } from '../backups.js'
+import { SYNC_SETTING, syncCodesOn } from './saves.js'
 import type { Catalog } from '../catalog.js'
 import { keepDownloads } from '../downloads.js'
 import { statfs } from 'node:fs/promises'
@@ -50,6 +51,14 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
     })
   })
 
+  // ---- Sync codes ------------------------------------------------------------
+
+  router.put('/system/sync', (req, res) => {
+    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'Expected { on: true or false }')
+    db.setSetting(SYNC_SETTING, req.body.on)
+    res.json({ on: req.body.on })
+  })
+
   // ---- save backups ---------------------------------------------------------
 
   router.get('/system/backups', async (_req, res) => {
@@ -77,6 +86,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
     const { orphans } = await builds.verify()
     res.json({
       version,
+      sync: { on: syncCodesOn(db), server: cfg.syncServer },
       engines: {
         installed: installed.map((e) => ({ ...e, usedBy: used.get(e.version) ?? [] })),
         available: available.map((e) => ({ version: e.version, renpy: e.renpy, bytes: Object.values(e.files).reduce((n, f) => n + f.size, 0) })),

@@ -272,6 +272,20 @@ Where a daily zip of everyone’s saves goes. Point it at another disk or a shar
 
 </div>
 
+<div class="config-entry" id="renplay-sync-server">
+
+**`RENPLAY_SYNC_SERVER`**
+
+<div class="config-default">
+
+Default: `https://sync.renpy.org`
+
+</div>
+
+The Ren’Py sync server for Sync codes, which an admin turns on in Settings. Change it only to use your own server that speaks the same protocol.
+
+</div>
+
 <div class="config-entry" id="renplay-backup-keep">
 
 **`RENPLAY_BACKUP_KEEP`**

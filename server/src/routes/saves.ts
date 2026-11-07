@@ -8,6 +8,7 @@ import type { ContentMode } from '../content.js'
 import type { Db, GameRow } from '../db.js'
 import { readSaveMeta, readSaveScreenshot, slotInfo } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
+import { downloadSync, uploadSync } from '../saves/sync.js'
 import { sha1 } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/paths.js'
 
@@ -50,7 +51,11 @@ export async function cachedSceneHash(store: SaveStore, dir: string, file: { nam
   return hash
 }
 
-export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode): Router {
+/** Sync codes are off until an admin turns them on: saves leave the server only then, and only when someone asks. */
+export const syncCodesOn = (db: Db): boolean => db.getSetting<boolean>(SYNC_SETTING, false) === true
+export const SYNC_SETTING = 'renpy_sync'
+
+export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer = 'https://sync.renpy.org'): Router {
   const router = Router({ caseSensitive: true, strict: true })
 
   const game = (req: Request): GameRow => {
@@ -208,7 +213,26 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     slots.sort((a, b) => b.ctime - a.ctime)
     // Second versions the conflict rule kept in History during the last two weeks.
     const conflicts = await store.conflicts(g.save_dir, Date.now() - 14 * 24 * 3600_000)
-    res.json({ saveDir: g.save_dir, slots, other, conflicts })
+    res.json({ saveDir: g.save_dir, slots, other, conflicts, sync: g.family === 'renpy' && syncCodesOn(db) })
+  })
+
+  // ---- Ren'Py Sync codes ------------------------------------------------------
+
+  const syncGame = (req: Request): string => {
+    const g = game(req)
+    if (!syncCodesOn(db)) throw new HttpError(409, 'Sync codes are off. An admin can turn them on in Settings.')
+    if (g.family !== 'renpy') throw new HttpError(409, 'Sync codes are for Ren’Py games.')
+    return requireSaveDir(g)
+  }
+
+  /** Sends this person's saves of the game to Ren'Py's sync server and returns the code. */
+  router.post('/:id/sync', async (req, res) => {
+    res.json(await uploadSync(syncServer, store, syncGame(req)))
+  })
+
+  /** Fetches the saves for a code made on another device. */
+  router.post('/:id/sync/download', async (req, res) => {
+    res.json(await downloadSync(syncServer, store, syncGame(req), req.body?.code))
   })
 
   /** A save's name, note and pin for this person. The save file itself is not touched. */

@@ -95,12 +95,14 @@ These are open to players and change only the person asking.
 | `PUT /saves/:id/meta?file=` | `{ title?, note?, pinned? }`. The name and note are this person's. A pinned save keeps every version |
 | `PUT /saves/:id/file?path=` | Raw body, with `x-mtime` and `x-base` (the server time of the version the device last saw, 0 for none). When another device saved the file in between, the newer copy stays and the answer says `conflict: kept` or `replaced` |
 | `GET /saves/:id` | Slots with `title`, `note`, `pinnedAt`, and `screenshotHash` instead of `screenshot` at Blurred, plus `conflicts` from the last two weeks |
+| `POST /saves/:id/sync` | Sends this person's saves of the game to the Ren'Py sync server, encrypted as Ren'Py's Upload Sync does, and returns `{ code, saves, expiresAt }`. 409 while Sync codes are off |
+| `POST /saves/:id/sync/download` | `{ code }`. Fetches and decrypts a code's saves and writes them with the conflict rule. The persistent data goes to the `sync` folder, where Ren'Py merges it. Returns `{ added, replaced, kept, same }` |
 | `GET /saves-import` | `{ dirs, games, catalog }`: this person's save files by folder, and the games each folder belongs to |
 | `POST /saves-import` | Multipart `meta` (a JSON list of `{ path, mtime }`) and `files` in the same order. Paths are `<save folder>/<file>` or `tokens/security_keys.txt`. Returns `{ added, replaced, kept, same, keys, skipped }` |
 
 Admins also have `POST /games/:id/walkthroughs`, `PUT` and `DELETE /games/:id/walkthroughs/:file`,
-and the save backups: `GET /system/backups`, `POST /system/backups` (back up now) and
-`GET /system/backups/:name`.
+the save backups: `GET /system/backups`, `POST /system/backups` (back up now) and
+`GET /system/backups/:name`, and `PUT /system/sync` with `{ on }` for Sync codes.
 
 ## Route permissions
 

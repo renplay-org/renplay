@@ -144,6 +144,8 @@ export interface Config {
   /** Where the daily save backup goes, or null when backups are off. */
   backupDir: string | null
   backupKeep: number
+  /** Ren'Py's sync server, for Sync codes. */
+  syncServer: string
 }
 
 export function loadConfig(): Config {
@@ -231,5 +233,6 @@ export function loadConfig(): Config {
       return raw || join(dataDir, 'backups', 'saves')
     })(),
     backupKeep: Math.max(1, envInt('RENPLAY_BACKUP_KEEP', fallbackOf('RENPLAY_BACKUP_KEEP'))),
+    syncServer: env('RENPLAY_SYNC_SERVER', fallbackOf('RENPLAY_SYNC_SERVER')).replace(/\/+$/, ''),
   }
 }

@@ -1,7 +1,7 @@
 import Sheet from './Sheet'
 import SceneCard from './SceneCard'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Download, FileArchive, History, MoreHorizontal, PencilLine, Pin, Play, Trash2, Upload } from 'lucide-react'
+import { ArrowLeftRight, Copy, Download, FileArchive, History, MoreHorizontal, PencilLine, Pin, Play, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, del, post, slotName, type Game, type SaveSlot } from '../lib/api'
@@ -34,6 +34,7 @@ export default function SaveGallery({ game }: { game: Game }) {
   const [confirmDelete, setConfirmDelete] = useState<SaveSlot | null>(null)
   const [copying, setCopying] = useState<SaveSlot | null>(null)
   const [history, setHistory] = useState<SaveSlot | 'all' | null>(null)
+  const [syncing, setSyncing] = useState(false)
   // Conflicts this browser was already told about.
   const seenKey = `renplay:conflicts-seen:${game.id}`
   const [conflictsSeen, setConflictsSeen] = useState(() => Number(localStorage.getItem(seenKey)) || 0)
@@ -132,6 +133,11 @@ export default function SaveGallery({ game }: { game: Game }) {
         <Button size="sm" variant="ghost" icon={<History />} onClick={() => setHistory('all')}>
           History
         </Button>
+        {data?.sync && (
+          <Button size="sm" variant="ghost" icon={<ArrowLeftRight />} onClick={() => setSyncing(true)}>
+            Sync code
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -251,6 +257,7 @@ export default function SaveGallery({ game }: { game: Game }) {
       </Confirm>
 
       {copying && <CopyDialog game={game} slot={copying} onClose={() => setCopying(null)} />}
+      {syncing && <SyncDialog game={game} onClose={() => setSyncing(false)} onDownloaded={refresh} />}
       {history && <HistoryDialog game={game} file={history === 'all' ? undefined : history.file} onClose={() => setHistory(null)} onRestored={refresh} />}
     </div>
   )
@@ -338,6 +345,108 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
           ))}
         </div>
       )}
+    </Modal>
+  )
+}
+
+/** Ren'Py 8.1 added Sync. Older versions of a game have no Upload Sync or Download Sync. */
+function hasSync(version: string | null | undefined): boolean {
+  const [major = 0, minor = 0] = (version ?? '').split('.').map(Number)
+  return !version || major > 8 || (major === 8 && minor >= 1)
+}
+
+/** Move saves with a Ren'Py Sync code, both ways. */
+function SyncDialog({ game, onClose, onDownloaded }: { game: Game; onClose: () => void; onDownloaded: () => void }) {
+  const toast = useToast()
+  const [made, setMade] = useState<{ code: string; saves: number; expiresAt: number } | null>(null)
+  const [making, setMaking] = useState(false)
+  const [code, setCode] = useState('')
+  const [fetching, setFetching] = useState(false)
+  const make = async () => {
+    setMaking(true)
+    try {
+      setMade(await post(`/api/saves/${game.id}/sync`))
+    } catch (e) {
+      toast(errorText(e), 'error')
+    } finally {
+      setMaking(false)
+    }
+  }
+  const fetchCode = async () => {
+    setFetching(true)
+    try {
+      const r = await post<{ added: number; replaced: number; kept: number; same: number }>(`/api/saves/${game.id}/sync/download`, { code })
+      const parts = [r.added && `${r.added} new`, r.replaced && `${r.replaced} newer`, r.kept && `${r.kept} older, kept in History`].filter(Boolean)
+      toast(parts.length ? `Saves brought in: ${parts.join(', ')}.` : 'These saves were already here.', 'success')
+      setCode('')
+      onDownloaded()
+    } catch (e) {
+      toast(errorText(e), 'error')
+    } finally {
+      setFetching(false)
+    }
+  }
+  return (
+    <Modal open onClose={onClose} title="Move saves with a Sync code" fullPhone>
+      <div className="stack" style={{ gap: 24 }}>
+        {!hasSync(game.renpyVersion) && (
+          <p className="notice amber small">
+            This version of {game.title} was made with Ren’Py {game.renpyVersion}, which has no Sync. Codes work with games made with Ren’Py 8.1 or newer.
+          </p>
+        )}
+        <section className="stack" style={{ gap: 10 }}>
+          <h3 style={{ fontWeight: 650 }}>To another device</h3>
+          {made ? (
+            <>
+              <div className="code" style={{ userSelect: 'all' }}>{made.code}</div>
+              <p className="small muted">
+                On your computer or Android phone, open {game.title}, choose Download Sync on its save or load screen and type the code. It works until{' '}
+                {new Date(made.expiresAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="small muted">
+                Renplay sends your saves of {game.title}, encrypted, to Ren’Py’s sync server and shows a code. Only someone with the code can open them, and
+                the server deletes them after an hour.
+              </p>
+              <div>
+                <Button variant="primary" loading={making} onClick={() => void make()}>
+                  Make a code
+                </Button>
+              </div>
+            </>
+          )}
+        </section>
+        <section className="stack" style={{ gap: 10, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
+          <h3 style={{ fontWeight: 650 }}>From another device</h3>
+          <p className="small muted">On the other device choose Upload Sync on the game’s save or load screen, then type its code here. Never use a code someone else made.</p>
+          <form
+            className="row wrap"
+            style={{ gap: 8 }}
+            onSubmit={(e) => {
+              e.preventDefault()
+              void fetchCode()
+            }}
+          >
+            <input
+              className="input"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="ABCDE-12345"
+              aria-label="Sync code"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={11}
+              style={{ width: 180, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', letterSpacing: '0.08em' }}
+            />
+            <Button type="submit" loading={fetching} disabled={code.replace(/-/g, '').trim().length !== 10}>
+              Bring in the saves
+            </Button>
+          </form>
+        </section>
+      </div>
     </Modal>
   )
 }

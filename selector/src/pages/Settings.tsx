@@ -266,6 +266,18 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                   Import from a computer
                 </Button>
               </div>
+              {sys?.sync && (
+                <div style={{ marginTop: 16 }}>
+                  <Setting
+                    title="Sync codes"
+                    hint="Let people move a game’s saves to and from desktop or Android Ren’Py with a code, as Ren’Py’s own Upload Sync and Download Sync do. Saves leave this server only when someone asks for a code, encrypted, to Ren’Py’s sync server, which keeps them for an hour."
+                    inline
+                    source={<SourceLabel kind="here" />}
+                  >
+                    <LanternSwitch checked={sys.sync.on} label="Sync codes" onChange={(on) => void run(() => put('/api/system/sync', { on }), on ? 'Sync codes are on' : 'Sync codes are off')} />
+                  </Setting>
+                </div>
+              )}
               <SaveBackups />
             </section>
 

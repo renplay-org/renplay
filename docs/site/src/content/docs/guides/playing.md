@@ -86,6 +86,16 @@ server's copy before anything is written. Older copies never replace newer ones:
 History. Saves for games you have not added yet wait on the server until you add them. To import
 saves for one game only, use **Import** under the game's **Saves**.
 
+### Sync codes
+
+Games made with Ren’Py 8.1 or newer have **Upload Sync** and **Download Sync** on their save and
+load screens. Renplay speaks the same codes, once an admin turns on **Sync codes** in
+**Settings**. Under the game's **Saves**, **Sync code** makes a code from your saves to type into
+Download Sync on a computer or Android phone, or brings in the saves from a code that Upload Sync
+made there. The saves travel encrypted through Ren’Py’s sync server, which keeps them for an hour,
+and they leave your server only when you ask for a code. Saves brought in follow the rule for two
+devices: the newer copy stays in the slot and the other is kept in History.
+
 ## Walkthroughs and play time
 
 A game can keep several walkthroughs: PDFs, pictures and text files. Admins add them under

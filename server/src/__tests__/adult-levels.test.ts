@@ -302,7 +302,7 @@ describe('the levels on every route', () => {
     ['GET /^\\/g\\/([a-z0-9][a-z0-9._-]*)\\/([a-z0-9]+)(?:\\.m[a-z0-9]+)?\\/game\\/(.+)$/', 'game'],
     ['GET /^\\/g\\/([a-z0-9][a-z0-9._-]*)\\/([a-z0-9]+)(?:\\.m([a-z0-9]+))?\\/(.+)$/', 'game'],
     // A save backup is the server's full copy of everyone's saves: never filtered, saves are sacred.
-    ['GET /system/backups', 'tool'], ['POST /system/backups', 'tool'], ['GET /system/backups/:name', 'tool'],
+    ['GET /system/backups', 'tool'], ['POST /system/backups', 'tool'], ['GET /system/backups/:name', 'tool'], ['PUT /system/sync', 'none'],
     ['GET /health', 'none'], ['GET /keepalive', 'none'], ['GET /system', 'list'], ['PUT /system/downloads', 'none'], ['POST /system/prune', 'none'],
     ['POST /system/engines/refresh', 'none'], ['GET /jobs', 'list'], ['GET /jobs/:id/log', 'tool'], ['POST /jobs/:id/cancel', 'tool'],
     ['POST /jobs/:id/retry', 'tool'], ['DELETE /jobs', 'tool'], ['GET /', 'none'], ['PUT /', 'none'], ['GET /api/saves-export', 'list'],
@@ -465,6 +465,7 @@ describe('the levels on every route', () => {
       ['delete', '/api/saves/adult/slot?file=1-1.save'], ['get', '/api/saves/adult/export'],
       ['post', '/api/saves/adult/import'], ['post', '/api/saves/adult/copy', { target: 'safe', file: '1-1.save' }],
       ['get', '/api/saves/adult/history'], ['post', '/api/saves/adult/history/restore', { id: 'none' }],
+      ['post', '/api/saves/adult/sync'], ['post', '/api/saves/adult/sync/download', { code: 'ABCDE-12345' }],
       ['put', '/api/saves/adult/meta?file=1-1.save', { title: 'x' }],
       ['get', '/g/adult/b1/'], ['get', '/g/adult/b1/index.html'], ['get', '/g/adult/b1/game.zip'], ['get', '/g/adult/b1/game/images/a.png'],
       ['get', adultPic], ['get', '/api/walkthroughs/adult.pdf'],

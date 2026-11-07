@@ -125,6 +125,8 @@ export interface SavesResponse {
   other: Array<{ name: string; size: number; mtime: number }>
   /** Second versions the conflict rule kept in History during the last two weeks, newest first. */
   conflicts?: Array<{ id: string; file: string; at: number }>
+  /** Sync codes are on and this is a Ren'Py game. */
+  sync?: boolean
 }
 
 export interface Job {
@@ -223,6 +225,8 @@ export interface Recipe {
 
 export interface SystemInfo {
   version: string
+  /** Ren'Py Sync codes: off until an admin turns them on. */
+  sync?: { on: boolean; server: string }
   engines: {
     installed: Array<{ version: string; bytes: number; usedBy: string[] }>
     available: Array<{ version: string; renpy: string; bytes: number }>

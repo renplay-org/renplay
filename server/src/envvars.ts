@@ -191,6 +191,13 @@ export const ENV_VARS: readonly EnvVar[] = [
     description: 'Where a daily zip of everyone’s saves goes. Point it at another disk or a share to keep a copy apart from the data folder. `off` turns save backups off. A server that sleeps when idle makes the backup the next time it runs.',
   },
   {
+    name: 'RENPLAY_SYNC_SERVER',
+    group: 'Images and saves',
+    kind: 'text',
+    fallback: 'https://sync.renpy.org',
+    description: 'The Ren’Py sync server for Sync codes, which an admin turns on in Settings. Change it only to use your own server that speaks the same protocol.',
+  },
+  {
     name: 'RENPLAY_BACKUP_KEEP',
     group: 'Images and saves',
     kind: 'number',
