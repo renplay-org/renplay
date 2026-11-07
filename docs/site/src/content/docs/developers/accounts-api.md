@@ -80,17 +80,40 @@ before archiving its folder; stale requests cannot recreate it. Concurrent remov
 enabled admin. Save exports are current files, not a replacement for a backup of save history. Merges keep the latest timestamps and the larger play-time value rather
 than double-counting copied progress.
 
+## Personal game and save routes
+
+These are open to players and change only the person asking.
+
+| Method and path | Body or result |
+|---|---|
+| `PUT /games/:id/status` | `{ status }`: `playing`, `stalled`, `dropped`, `finished`, or an empty string to clear it. Finished stays in step with `finished_at` |
+| `PUT /games/:id/rating` | `{ rating }` from 1 to 5, 0 clears it |
+| `POST /games/:id/not-now` | Takes the game out of Up next until it is played again. `DELETE` undoes it |
+| `GET /games/:id/art?kind=` | The candidates for one format. `PUT` with `{ kind, candidate, scope }` chooses one, `DELETE` returns to the default. `scope` is `me`, or `everyone` for admins |
+| `POST /games/:id/art/upload?kind=&scope=&focal=x,y` | Raw image body, kept on this server |
+| `GET /history?days=&before=&game=` | Play sessions by day with totals, paged by `before` |
+| `PUT /saves/:id/meta?file=` | `{ title?, note?, pinned? }`. The name and note are this person's. A pinned save keeps every version |
+| `PUT /saves/:id/file?path=` | Raw body, with `x-mtime` and `x-base` (the server time of the version the device last saw, 0 for none). When another device saved the file in between, the newer copy stays and the answer says `conflict: kept` or `replaced` |
+| `GET /saves/:id` | Slots with `title`, `note`, `pinnedAt`, and `screenshotHash` instead of `screenshot` at Blurred, plus `conflicts` from the last two weeks |
+| `GET /saves-import` | `{ dirs, games, catalog }`: this person's save files by folder, and the games each folder belongs to |
+| `POST /saves-import` | Multipart `meta` (a JSON list of `{ path, mtime }`) and `files` in the same order. Paths are `<save folder>/<file>` or `tokens/security_keys.txt`. Returns `{ added, replaced, kept, same, keys, skipped }` |
+
+Admins also have `POST /games/:id/walkthroughs`, `PUT` and `DELETE /games/:id/walkthroughs/:file`,
+and the save backups: `GET /system/backups`, `POST /system/backups` (back up now) and
+`GET /system/backups/:name`.
+
 ## Route permissions
 
 Players can list games and the permitted catalog, play, read walkthroughs, change their own
-favourites, Finished, last played and play time, and use their own save, history, import, copy and
-export endpoints. Install progress remains visible on cards, read only.
+favourites, Finished, status, rating, Not now, art choices, last played and play time, read their
+play history, and use their own save, name, note, pin, history, import, copy and export endpoints.
+Install progress remains visible on cards, read only.
 
 Only admins can install, reinstall, uninstall, use archives or uploads, browse or change game
 files and mods, change walkthroughs, upload compiled caches, export recipes, refresh the catalog,
 change instance content mode, inspect system paths, prune or refresh engines, view Activity or
-control jobs, and manage users. New routes default to admin-only unless the player allowlist is
-extended and tested.
+control jobs, run or download save backups, choose art for everyone, and manage users. New routes
+default to admin-only unless the player allowlist is extended and tested.
 
 ## Database and request boundary
 
