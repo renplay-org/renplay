@@ -362,6 +362,9 @@ describe('the levels on every route', () => {
     await request(app.app).delete('/api/games/adult/art?kind=grid').expect(404)
     // Safe games keep their pictures at every level.
     await request(app.app).get(safePic).expect(200)
+    // An art error about an adult game without a recipe names it only at Shown.
+    ;(app.catalog as unknown as { errors: Array<{ text: string; recipe?: string }> }).errors.push({ text: 'grid of adult-two (an upload): the uploaded picture is gone', recipe: 'adult-two' })
+    expect(JSON.stringify((await request(app.app).get('/api/catalog').expect(200)).body.status.errors)).not.toContain('adult-two')
     // Saves list without picture URLs. A save's picture is its hash only, as art is.
     const saves = (await request(app.app).get('/api/saves/adult').expect(200)).body
     expect(JSON.stringify(saves)).not.toContain('screenshot?')

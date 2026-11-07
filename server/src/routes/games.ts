@@ -223,7 +223,11 @@ export function createGamesRouter(deps: GameDeps): Router {
     const kind = kindOf(req.body?.kind)
     const scope = scopeOf(req.body?.scope)
     const subject = deps.catalog.gameSubject(g)
-    if (!subject.pictures.some((p) => p.kind === kind && p.id === req.body?.candidate)) throw new HttpError(404, 'That picture is not a choice for this game')
+    const picture = subject.pictures.find((p) => p.kind === kind && p.id === req.body?.candidate)
+    if (!picture) throw new HttpError(404, 'That picture is not a choice for this game')
+    // For everyone: a catalog picture or one uploaded for everyone. A personal upload is not on the others' lists.
+    if (scope === 0 && picture.upload && !deps.catalog.art!.isShared(picture.id, g.id))
+      throw new HttpError(409, 'Upload this picture for everyone first, then choose it for everyone.')
     deps.catalog.art!.choose(g.id, kind, req.body.candidate, scope)
     await deps.catalog.art!.ready(subject, scope)
     res.json({ art: deps.catalog.art!.forSubject(subject) })

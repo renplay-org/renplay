@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp, type App } from '../app.js'
+import sharp from 'sharp'
 import yazl from 'yazl'
 import { readZipEntries } from '../saves/savefile.js'
 
@@ -174,6 +175,17 @@ describe('names, notes and pins of saves', () => {
     // The raw read says which version it sent.
     await app.saves.write('Story-1', '7-1-LT1.save', Buffer.from('x'), { mtimeMs: seen })
     expect((await request(app.app).get('/api/saves/story/raw?path=Story-1/7-1-LT1.save').expect(200)).headers['x-renplay-mtime']).toBe(String(seen))
+  })
+
+  it('chooses for everyone only a picture everyone has: a personal upload is refused', async () => {
+    const pngOf = (color: string) => sharp({ create: { width: 600, height: 900, channels: 3, background: color } }).png().toBuffer()
+    const mine = (await request(app.app).post('/api/games/story/art/upload?kind=grid&scope=me').set('content-type', 'image/png').send(await pngOf('#335')).expect(200)).body
+    const id = mine.id ?? mine.candidate ?? mine.picture
+    expect(id).toBeTruthy()
+    await request(app.app).put('/api/games/story/art').send({ kind: 'grid', candidate: id, scope: 'me' }).expect(200)
+    expect((await request(app.app).put('/api/games/story/art').send({ kind: 'grid', candidate: id, scope: 'everyone' }).expect(409)).body.error).toContain('for everyone first')
+    const shared = (await request(app.app).post('/api/games/story/art/upload?kind=grid&scope=everyone').set('content-type', 'image/png').send(await pngOf('#553')).expect(200)).body
+    await request(app.app).put('/api/games/story/art').send({ kind: 'grid', candidate: shared.id ?? shared.candidate ?? shared.picture, scope: 'everyone' }).expect(200)
   })
 
   it('tells a device about a conflict and lists it with the saves', async () => {

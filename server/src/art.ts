@@ -146,7 +146,10 @@ export function planFormat(kind: ArtKind, chosen: Partial<Record<ArtKind, Pictur
   if (kind === 'logo') return own ? { kind, mode: 'resize', source: own } : null
   if (own && inShape(kind, own)) return { kind, mode: 'resize', source: own }
   if (kind === 'icon') {
-    const from = own ?? chosen.grid ?? chosen.wide ?? chosen.hero
+    // An icon of another shape is cropped to its largest square. The cut, a closer square, is for an
+    // icon made from the grid or another format.
+    if (own) return { kind, mode: 'crop', source: own }
+    const from = chosen.grid ?? chosen.wide ?? chosen.hero
     return from ? { kind, mode: 'cut', source: from } : null
   }
   const others = (['grid', 'wide', 'hero'] as const).filter((k) => k !== kind).map((k) => chosen[k]).filter((p): p is Picture => !!p)
@@ -350,8 +353,14 @@ export function needs2x(plan: Plan, meta: { width: number; height: number }, foc
   return detail() >= 1.5
 }
 
+/** A failed download waits this long before the next try. */
+const RETRY_AFTER = 15 * 60_000
+/** Uploads up to this many pixels are taken and scaled down to what the making allows. */
+const UPLOAD_PIXELS = 4 * MAX_IMAGE_PIXELS
+
 function creditOf(img: CatalogImage): Credit {
-  if (img.source === 'sgdb' && img.by) return { by: img.by, byUrl: img.byUrl, asset: img.asset }
+  const https = (u: unknown) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : undefined)
+  if (img.source === 'sgdb' && img.by) return { by: img.by, byUrl: https(img.byUrl), asset: https(img.asset) }
   if (img.source === 'steam') return { store: 'Steam' }
   if (img.source === 'itch') return { store: 'itch.io' }
   if (img.source === 'renplay') return { renplay: true }
@@ -396,6 +405,7 @@ export class ArtStore {
   private readonly budget = new PixelBudget()
   private readonly pending = new Map<string, Promise<MadeRow | null>>()
   private readonly downloads = new Map<string, Promise<Buffer>>()
+  private readonly failed = new Map<string, { at: number; message: string }>()
   private active = 0
   private readonly queue: Array<() => void> = []
 
@@ -414,6 +424,11 @@ export class ArtStore {
   /** The scope a choice is read for: the person, then everyone. */
   private viewerScope(): number {
     return viewer()?.user.id ?? EVERYONE
+  }
+
+  /** True when an upload was made for everyone. */
+  isShared(id: string, game: string): boolean {
+    return !!this.db.raw.prepare('SELECT 1 FROM art_uploads WHERE id = ? AND game = ? AND scope = 0').get(id, game)
   }
 
   uploads(game: string, scope: number): Picture[] {
@@ -494,17 +509,17 @@ export class ArtStore {
     // For everyone: only what an admin chose for everyone, not the catalog default.
     const everyone = subject.game ? (this.db.raw.prepare('SELECT candidate FROM art_choices WHERE game = ? AND kind = ? AND scope = 0').get(subject.game, kind) as { candidate: string } | undefined)?.candidate : undefined
     const choice = subject.game ? (this.db.raw.prepare('SELECT candidate FROM art_choices WHERE game = ? AND kind = ? AND scope = ?').get(subject.game, kind, scope) as { candidate: string } | undefined)?.candidate : undefined
-    const out = []
-    for (const p of subject.pictures.filter((x) => x.kind === kind)) {
+    // Made side by side (the making slots still limit how many at once), so one slow picture does
+    // not hold up the list.
+    return Promise.all(subject.pictures.filter((x) => x.kind === kind).map(async (p) => {
       const plan = planFormat(kind, { ...chosen, [kind]: p })
       let preview: ArtOut | null = null
       if (plan && p.width > 0) {
         const row = await this.ensure(plan, subject.adult).catch(() => null)
         if (row) preview = { url1x: `/api/art/${row.file1x}`, url2x: `/api/art/${row.file2x}`, width: row.width, height: row.height, thumbhash: row.thumbhash, tint: row.tint, made: MADE[plan.mode], source: p.source, credit: p.credit }
       }
-      out.push({ id: p.id, current: chosen[kind]?.id === p.id, everyone: everyone === p.id, mine: choice === p.id, inShape: p.width > 0 && inShape(kind, p), width: p.width, height: p.height, source: p.source, credit: p.credit, upload: p.upload, preview })
-    }
-    return out
+      return { id: p.id, current: chosen[kind]?.id === p.id, everyone: everyone === p.id, mine: choice === p.id, inShape: p.width > 0 && inShape(kind, p), width: p.width, height: p.height, source: p.source, credit: p.credit, upload: p.upload, preview }
+    }))
   }
 
   /** Makes every format of a subject for one scope now, so the answer to a choice has its pictures. */
@@ -524,12 +539,27 @@ export class ArtStore {
    * Stores an uploaded picture for one game and format. A picture of another size is accepted
    * and placed with the focal point crop, so the answer carries a warning with its size.
    */
-  async upload(game: string, kind: ArtKind, data: Buffer, focal: [number, number] | null, scope: number): Promise<{ id: string; warning: { width: number; height: number } | null }> {
+  async upload(game: string, kind: ArtKind, input: Buffer, focal: [number, number] | null, scope: number): Promise<{ id: string; warning: { width: number; height: number } | null }> {
+    let data = input
     if (data.length > MAX_SOURCE_BYTES) throw new HttpError(413, 'Pictures can be up to 16 MB')
     if (!isImage(data)) throw new HttpError(400, 'Upload a WebP, PNG or JPEG picture')
-    const meta = await sharp(data, { failOn: 'error', limitInputPixels: MAX_IMAGE_PIXELS }).metadata().catch(() => null)
+    let meta = await sharp(data, { failOn: 'error', limitInputPixels: UPLOAD_PIXELS }).metadata().catch(() => null)
     if (!meta?.width || !meta.height) throw new HttpError(400, 'This picture cannot be read')
+    if (meta.width * meta.height > UPLOAD_PIXELS) throw new HttpError(413, 'Pictures can be up to 64 megapixels')
     if (kind === 'logo' && !meta.hasAlpha) throw new HttpError(400, 'A logo needs a transparent background. Upload a PNG with transparency.')
+    // A phone photo stands upright by a tag the rest of the pipeline does not read, and a camera
+    // picture can be larger than the making allows: both are turned and scaled once, here.
+    const turned = (meta.orientation ?? 1) > 1
+    const pixels = meta.width * meta.height
+    if (turned || pixels > MAX_IMAGE_PIXELS) {
+      const scale = Math.min(1, Math.sqrt(MAX_IMAGE_PIXELS / pixels))
+      data = await this.budget.run(Math.min(pixels, MAX_IMAGE_PIXELS), async () => {
+        const s = sharp(data, { failOn: 'error', limitInputPixels: UPLOAD_PIXELS }).rotate()
+        const sized = scale < 1 ? s.resize(Math.floor((turned && (meta!.orientation ?? 1) >= 5 ? meta!.height! : meta!.width!) * scale)) : s
+        return meta!.format === 'jpeg' ? sized.jpeg({ quality: 92 }).toBuffer() : sized.webp({ quality: 92, alphaQuality: 100 }).toBuffer()
+      })
+      meta = await sharp(data, { failOn: 'error', limitInputPixels: MAX_IMAGE_PIXELS }).metadata()
+    }
     const id = createHash('sha256').update(data).digest('hex')
     await mkdir(this.sources, { recursive: true })
     const path = join(this.sources, id)
@@ -608,7 +638,15 @@ export class ArtStore {
   private original(p: Picture): Promise<Buffer> {
     const running = this.downloads.get(p.id)
     if (running) return running
-    const job = this.load(p).finally(() => this.downloads.delete(p.id))
+    // A download that failed is not tried again for a while, however many pages ask for it.
+    const failed = this.failed.get(p.id)
+    if (failed && Date.now() - failed.at < RETRY_AFTER) return Promise.reject(new Error(failed.message))
+    const job = this.load(p)
+      .then((data) => (this.failed.delete(p.id), data), (e: Error) => {
+        this.failed.set(p.id, { at: Date.now(), message: e.message })
+        throw e
+      })
+      .finally(() => this.downloads.delete(p.id))
     this.downloads.set(p.id, job)
     return job
   }
@@ -620,11 +658,24 @@ export class ArtStore {
     if (p.upload || !p.url) throw new Error('the uploaded picture is gone')
     const url = new URL(p.url, p.base)
     if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('not an http(s) address')
-    const res = await fetch(url, { signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'Renplay (https://renplay.org)' } })
+    // Uncompressed, and read only up to the limit: a small compressed answer cannot grow in memory.
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000), headers: { 'user-agent': 'Renplay (https://renplay.org)', 'accept-encoding': 'identity' } })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const encoding = res.headers.get('content-encoding')
+    if (encoding && encoding !== 'identity') throw new Error('the picture was sent compressed')
     const length = Number(res.headers.get('content-length') ?? 0)
     if (length > MAX_SOURCE_BYTES) throw new Error('the picture is over 16 MB')
-    const data = Buffer.from(await res.arrayBuffer())
+    const chunks: Buffer[] = []
+    let total = 0
+    for await (const chunk of res.body ?? []) {
+      total += chunk.length
+      if (total > MAX_SOURCE_BYTES) {
+        await res.body?.cancel().catch(() => {})
+        throw new Error('the picture is over 16 MB')
+      }
+      chunks.push(Buffer.from(chunk))
+    }
+    const data = Buffer.concat(chunks)
     if (data.length > MAX_SOURCE_BYTES || !isImage(data)) throw new Error('not a WebP, PNG, JPEG or GIF picture under 16 MB')
     const sha256 = createHash('sha256').update(data).digest('hex')
     if (p.sha256 && p.sha256 !== sha256) throw new Error('the picture changed since the catalog checked it')

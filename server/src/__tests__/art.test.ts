@@ -44,6 +44,16 @@ describe('the making order', () => {
     expect(planFormat('wide', { grid: pic('grid', 630, 500) })?.mode).toBe('whole')
   })
 
+  it('keeps only https links in credits', () => {
+    const [p] = catalogPictures([{ kind: 'grid', url: 'https://a.example/g.png', source: 'sgdb', by: 'Someone', byUrl: 'javascript:alert(1)', asset: 'https://www.steamgriddb.com/grid/1' } as CatalogImage])
+    expect(p!.credit).toEqual({ by: 'Someone', byUrl: undefined, asset: 'https://www.steamgriddb.com/grid/1' })
+  })
+
+  it('crops an icon of another shape to its largest square, and cuts one only from another format', () => {
+    const icon = pic('icon', 600, 500)
+    expect(planFormat('icon', { icon, grid: pic('grid', 600, 900) })).toMatchObject({ mode: 'crop', source: icon })
+  })
+
   it('cuts the icon from the grid unless one is supplied', () => {
     expect(planFormat('icon', { grid: pic('grid', 600, 900) })).toMatchObject({ mode: 'cut', source: { kind: 'grid' } })
     expect(planFormat('icon', { icon: pic('icon', 512, 512), grid: pic('grid', 600, 900) })?.mode).toBe('resize')
@@ -145,6 +155,26 @@ describe('the art cache', () => {
     expect(art.forSubject({ game: null, adult: false, pictures: light }, { scope: 0, blurred: false })['logo']).not.toHaveProperty('dark')
   })
 
+  it('reads a download only up to its limit, refuses a compressed one, and waits before trying a failed one again', async () => {
+    const art = store()
+    const pictures = await catalog([{ kind: 'grid', url: 'https://art.example/packed.png', source: 'steam', data: await png(600, 900) }])
+    vi.stubGlobal('fetch', async (url: URL | string, init?: RequestInit) => {
+      fetched.push(String(url))
+      expect(new Headers(init?.headers).get('accept-encoding')).toBe('identity')
+      return new Response(new Uint8Array(64), { status: 200, headers: { 'content-encoding': 'gzip' } })
+    })
+    const plan = planFormat('grid', { grid: pictures[0]! })!
+    await expect(art.ensure(plan, false)).rejects.toThrow(/sent compressed/)
+    await expect(art.ensure(plan, false)).rejects.toThrow(/sent compressed/)
+    expect(fetched).toHaveLength(1)
+    // An answer with no length that keeps sending stops at 16 MB.
+    const endless = await catalog([{ kind: 'grid', url: 'https://art.example/endless.png', source: 'steam', data: await png(600, 900, '#123456') }])
+    let sent = 0
+    vi.stubGlobal('fetch', async () => new Response(new ReadableStream({ pull(c) { sent += 1 << 20; c.enqueue(new Uint8Array(1 << 20)) } }), { status: 200 }))
+    await expect(art.ensure(planFormat('grid', { grid: endless[0]! })!, false)).rejects.toThrow(/over 16 MB/)
+    expect(sent).toBeLessThan(20 << 20)
+  })
+
   it('refuses a picture that changed since the catalog checked it', async () => {
     const pictures = await catalog([{ kind: 'grid', url: 'https://art.example/grid.png', source: 'steam', data: await png(600, 900) }])
     files['https://art.example/grid.png'] = await png(600, 900, '#ff0000')
@@ -219,6 +249,20 @@ describe('the art cache', () => {
     await expect(art.upload('g', 'logo', await png(400, 200), null, 7)).rejects.toThrow(/transparent/)
     await expect(art.upload('g', 'grid', Buffer.from('not a picture'), null, 7)).rejects.toThrow(/WebP, PNG or JPEG/)
     expect(fetched).toEqual([])
+  })
+
+  it('stands a phone photo upright and scales a camera picture down to what the making allows', async () => {
+    const art = store()
+    // 900 wide and 600 tall in pixels, shown upright (orientation 6) as 600 by 900.
+    const photo = await sharp({ create: { width: 900, height: 600, channels: 3, background: '#468' } }).jpeg().withMetadata({ orientation: 6 }).toBuffer()
+    const { id, warning } = await art.upload('g', 'grid', photo, null, 7)
+    expect(warning).toBeNull()
+    expect(art.uploads('g', 7).find((u) => u.id === id)).toMatchObject({ width: 600, height: 900 })
+    const camera = await sharp({ create: { width: 6000, height: 4000, channels: 3, background: '#864' } }).png().toBuffer()
+    const big = await art.upload('g', 'wide', camera, null, 7)
+    const stored = art.uploads('g', 7).find((u) => u.id === big.id)!
+    expect(stored.width * stored.height).toBeLessThanOrEqual(4096 * 4096)
+    expect(stored.width / stored.height).toBeCloseTo(1.5, 1)
   })
 
   it('forgets made pictures and originals nothing uses, keeping uploads and fresh work', async () => {

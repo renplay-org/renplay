@@ -452,7 +452,8 @@ export class Catalog {
   /** Errors about an adult recipe name it and its art, so only a person at Shown sees them. */
   private visibleErrors(): string[] {
     const shown = this.content.viewerLevel() === 'shown'
-    return this.errors.filter((e) => shown || !e.recipe || !this.isAdultId(e.recipe)).map((e) => e.text)
+    // The name can be a recipe, or a library game without one (then its own adult flag counts).
+    return this.errors.filter((e) => shown || !e.recipe || !(this.isAdultId(e.recipe) || this.db.getGame(e.recipe)?.adult === 1)).map((e) => e.text)
   }
 
   private visibleCount(): number {
