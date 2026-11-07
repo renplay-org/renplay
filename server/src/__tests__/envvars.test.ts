@@ -12,7 +12,7 @@ describe('environment variables', () => {
       (m) => m[1],
     )
     const entrypoint = readFileSync(new URL('../../../deploy/entrypoint.sh', import.meta.url), 'utf8')
-    read.push(...[...entrypoint.matchAll(/\$\{(PUID|PGID):-/g)].map((m) => m[1]))
+    read.push(...[...entrypoint.matchAll(/\$\{(PUID|PGID|RENPLAY_LOG_LEVEL):-/g)].map((m) => m[1]))
     const listed = ENV_VARS.map((v) => v.name)
     expect([...new Set([...read, ...[...source.matchAll(/secret\('([A-Z_]+)'/g)].map((m) => `${m[1]}_FILE`)])].sort()).toEqual([...listed].sort())
     expect(new Set(listed).size).toBe(listed.length)

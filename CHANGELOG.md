@@ -7,6 +7,19 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-11-07
+
+The server log is easier to read, and `RENPLAY_LOG_LEVEL` chooses how much it says.
+
+### Changed
+
+- The server log is easier to read. Every line has the date and time, the level, where it comes from and what happened, in the same columns for Renplay and its web server. The start lists the version, the library, sign-in, the adult games level, the catalog, save backups and the folders, and installs, catalog updates, backups and sign-ins each get a line. Requests show the visitor's address instead of the proxy's.
+- `RENPLAY_LOG_LEVEL` chooses how much is logged: `error`, `warn`, `info` (the default, which leaves out plain page and data reads) or `debug` (every request, and each install as it runs).
+
+### Fixed
+
+- The log no longer starts with "Failed to connect" lines while the server comes up.
+
 ## [4.0.0] - 2026-11-07
 
 Renplay 4.0 is a new look, Lantern, with three levels for adult games, art for every game, a
@@ -457,7 +470,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.0.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.0.1...dev
+[4.0.1]: https://github.com/renplay-org/renplay/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/renplay-org/renplay/compare/v3.2.0...v4.0.0
 [3.2.0]: https://github.com/renplay-org/renplay/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/renplay-org/renplay/compare/v3.0.0...v3.1.0

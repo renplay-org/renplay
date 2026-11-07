@@ -31,7 +31,7 @@ function adultGames(): '' | AdultLevel {
   if (!raw) return ''
   const level = parseAdultLevel(raw, true)
   if (level) return level
-  console.warn(`RENPLAY_ADULT_GAMES=${raw} is not off, blurred or shown; adult games are off`)
+  console.warn(`config: RENPLAY_ADULT_GAMES=${raw} is not off, blurred or shown. Adult games are off.`)
   return 'off'
 }
 
@@ -40,7 +40,7 @@ function adultDefault(): AdultLevel {
   if (!raw) return 'off'
   const level = parseAdultLevel(raw, true)
   if (level) return level
-  console.warn(`RENPLAY_ADULT_DEFAULT=${raw} is not off, blurred or shown; new people start with adult games off`)
+  console.warn(`config: RENPLAY_ADULT_DEFAULT=${raw} is not off, blurred or shown. New people start with adult games off.`)
   return 'off'
 }
 
@@ -50,11 +50,11 @@ function adultGroups(raw: string, variable: string, alias: string, aliasVariable
     // A mapping with no valid entry still means the groups decide: nobody matches, so everyone is
     // at Off until it is fixed. Reading a typo as no mapping would leave hand settings in force.
     const map = parseAdultGroups(raw, variable) ?? {}
-    if (!Object.keys(map).length) console.error(`${variable} has no valid group=off, =blurred or =shown entry; everyone who signs in through it gets adult games off`)
+    if (!Object.keys(map).length) console.error(`config: ${variable} has no valid group=off, =blurred or =shown entry. Everyone who signs in through it gets adult games off.`)
     return { map, variable }
   }
   if (alias) {
-    console.warn(`${aliasVariable} is a 3.x alias of ${variable}; it means ${alias}=shown and everyone else off`)
+    console.warn(`config: ${aliasVariable} is a 3.x alias of ${variable}. It means ${alias}=shown and everyone else off.`)
     return { map: { [alias]: 'shown' }, variable: aliasVariable }
   }
   return null
@@ -155,7 +155,7 @@ export function loadConfig(): Config {
   const legacyDownloads = !!process.env['RENPLAY_DELETE_ARCHIVES']?.trim()
   const keepDownloadsLocked = !!process.env['RENPLAY_KEEP_DOWNLOADS']?.trim() || legacyDownloads
   if (legacyDownloads && !warnedDeleteArchives) {
-    console.warn('RENPLAY_DELETE_ARCHIVES is deprecated. Use RENPLAY_KEEP_DOWNLOADS with the opposite value. RENPLAY_KEEP_DOWNLOADS takes precedence.')
+    console.warn('config: RENPLAY_DELETE_ARCHIVES is deprecated. Use RENPLAY_KEEP_DOWNLOADS with the opposite value. RENPLAY_KEEP_DOWNLOADS takes precedence.')
     warnedDeleteArchives = true
   }
   const keepDownloads = process.env['RENPLAY_KEEP_DOWNLOADS']?.trim()
@@ -164,7 +164,7 @@ export function loadConfig(): Config {
   const auth = env('RENPLAY_AUTH', '')
   if (auth && auth !== 'on' && auth !== 'off') throw new Error('RENPLAY_AUTH must be on or off')
   if (process.env['RENPLAY_LDAP_ADULT_GROUPS']?.trim() && process.env['RENPLAY_LDAP_ADULT_FILTER']?.trim())
-    console.warn('RENPLAY_LDAP_ADULT_GROUPS is set; the RENPLAY_LDAP_ADULT_FILTER alias is ignored')
+    console.warn('config: RENPLAY_LDAP_ADULT_GROUPS is set, so the RENPLAY_LDAP_ADULT_FILTER alias is ignored.')
   const oidcGroups = adultGroups(env('RENPLAY_OIDC_ADULT_GROUPS', ''), 'RENPLAY_OIDC_ADULT_GROUPS', env('RENPLAY_OIDC_ADULT_GROUP', ''), 'RENPLAY_OIDC_ADULT_GROUP')
   const ldapGroups = adultGroups(env('RENPLAY_LDAP_ADULT_GROUPS', ''), 'RENPLAY_LDAP_ADULT_GROUPS', '', '')
   return {

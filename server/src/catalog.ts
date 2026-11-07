@@ -9,6 +9,7 @@ import { ContentMode, parseAdultLevel, sfwIndexUrl } from './content.js'
 import { parseJson, type Db, type GameRow, type GameSource, type JobRow } from './db.js'
 import type { JobContext } from './jobs.js'
 import { cleanRelPath } from './util/paths.js'
+import { log } from './util/log.js'
 
 export interface RecipeArchive {
   name: string
@@ -325,11 +326,11 @@ export class Catalog {
           idx = await fetchIndex(sfw)
           from = sfw
         } catch (e) {
-          console.warn(`catalog: no safe-for-work index at ${sfw} (${(e as Error).message}); dropping adult games from ${url}`)
+          console.warn(`catalog: No safe-for-work index at ${sfw} (${(e as Error).message}). Adult games from ${url} are left out.`)
           this.errors.push({ text: `${sfw}: ${(e as Error).message}` })
         }
       } else if (off) {
-        console.warn(`catalog: ${url} has no safe-for-work index; dropping its adult games`)
+        console.warn(`catalog: ${url} has no safe-for-work index. Its adult games are left out.`)
       }
       try {
         idx ??= await fetchIndex(url)
@@ -359,6 +360,9 @@ export class Catalog {
       this.link()
       await this.syncArt()
     }
+    const failed = this.errors.length
+    if (!all.length && failed) log('catalog', `Could not update: ${this.errors.map((e) => e.text).join('. ')}`, 'warn')
+    else log('catalog', `Updated: ${all.length} recipes${failed ? `, ${failed} ${failed === 1 ? 'problem' : 'problems'} listed in Settings` : ''}`, failed ? 'warn' : 'info')
   }
 
   /**

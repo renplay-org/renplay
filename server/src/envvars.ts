@@ -176,6 +176,13 @@ export const ENV_VARS: readonly EnvVar[] = [
     description: 'Images converted in parallel during an install. `0` picks the CPU count.',
   },
   {
+    name: 'RENPLAY_LOG_LEVEL',
+    group: 'Server',
+    kind: 'choice',
+    fallback: 'info',
+    description: 'How much the server logs. `error`: errors only. `warn`: also warnings and requests that failed on the server. `info`: also the start summary, installs, catalog updates, backups, sign-ins, and requests that change something or fail. `debug`: every request and each install as it runs.',
+  },
+  {
     name: 'RENPLAY_SAVE_HISTORY',
     group: 'Images and saves',
     kind: 'number',
