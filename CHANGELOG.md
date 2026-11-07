@@ -19,6 +19,7 @@ release notes say what).
 
 ### Fixed
 
+- On the **Account** page the rows of **Adult games** that cannot be changed lay over the others, so a tap on **You** could miss.
 - After an upload's answer was lost on a bad connection, the next save could show that another device had saved too.
 - Removing a person or forgetting a game left their art choices and uploads behind.
 
