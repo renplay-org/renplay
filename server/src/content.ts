@@ -38,7 +38,7 @@ export function parseAdultGroups(value: string, variable: string): Record<string
     const eq = entry.lastIndexOf('=')
     const level = eq > 0 ? parseAdultLevel(entry.slice(eq + 1), true) : null
     if (eq > 0 && entry.slice(0, eq).trim() && level) out[entry.slice(0, eq).trim()] = level
-    else console.warn(`${variable}: skipping "${entry}", which is not group=off, =blurred or =shown`)
+    else console.warn(`config: ${variable}: skipping "${entry}", which is not group=off, =blurred or =shown`)
   }
   return Object.keys(out).length ? out : null
 }

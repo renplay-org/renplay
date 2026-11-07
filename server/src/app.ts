@@ -32,6 +32,7 @@ import { SaveStore } from './saves/store.js'
 import { sha256File } from './util/fsx.js'
 import { HttpError, cleanRelPath, safeJoin } from './util/paths.js'
 import { Purger } from './util/purge.js'
+import { log } from './util/log.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -62,6 +63,7 @@ export interface App {
   catalog: Catalog
   purger: Purger
   backups: SaveBackups
+  summary(): string[]
   close(): void
 }
 
@@ -233,11 +235,28 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   } catch {}
   await purger.resume()
   const check = await builds.verify()
-  if (check.missing.length) console.log(`builds missing for: ${check.missing.join(', ')}`)
-  if (check.orphans.length) console.log(`folders in ${cfg.gamesDir} that belong to no game: ${check.orphans.join(', ')}`)
+  if (check.missing.length) log('library', `Builds missing for ${check.missing.join(', ')}`, 'warn')
+  if (check.orphans.length) log('library', `Folders in ${cfg.gamesDir} that belong to no game: ${check.orphans.join(', ')}`, 'warn')
   if (opts.startJobs !== false) jobs.start()
 
-  return { app, db, jobs, builds, engines, saves, accounts, catalog, purger, backups, close: () => (catalog.stop(), backups.stop(), db.close()) }
+  /** What this server is, in a few lines for the start of the log. */
+  const summary = (): string[] => {
+    const games = db.allGames()
+    const methods = [cfg.authLocal && 'passwords', cfg.oidcIssuer && `OpenID Connect at ${cfg.oidcIssuer.replace(/^https?:\/\//, '')}`, cfg.ldapUrl && 'LDAP'].filter(Boolean)
+    const signIn = accounts.enabled ? `on, with ${methods.join(', ')}` : 'off, everyone plays as the owner'
+    const people = (db.raw.prepare('SELECT COUNT(*) n FROM users WHERE disabled = 0').get() as { n: number }).n
+    return [
+      `Renplay ${version}`,
+      `Library: ${games.length} games, ${games.filter((g) => g.status === 'installed').length} installed, ${people} ${people === 1 ? 'person' : 'people'}`,
+      `Sign-in: ${signIn}`,
+      `Adult games: ${content.level} for this installation`,
+      `Catalog: ${cfg.catalogUrls.join(', ')}`,
+      `Save backups: ${backups.dir ? `daily to ${backups.dir}, the newest ${cfg.backupKeep} kept` : 'off'}`,
+      `Folders: games ${cfg.gamesDir}, downloads ${cfg.archivesDir}, data ${cfg.dataDir}`,
+    ]
+  }
+
+  return { app, db, jobs, builds, engines, saves, accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
 }
 
 /** Development server: serve *.gz engine files with their encoding, like nginx does. */

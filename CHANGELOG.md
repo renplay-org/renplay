@@ -7,6 +7,15 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- The server log is easier to read. Every line has the date and time, the level, where it comes from and what happened, in the same columns for Renplay and its web server. The start lists the version, the library, sign-in, the adult games level, the catalog, save backups and the folders, and installs, catalog updates, backups and sign-ins each get a line. Requests show the visitor's address instead of the proxy's.
+- `RENPLAY_LOG_LEVEL` chooses how much is logged: `error`, `warn`, `info` (the default, which leaves out plain page and data reads) or `debug` (every request, and each install as it runs).
+
+### Fixed
+
+- The log no longer starts with "Failed to connect" lines while the server comes up.
+
 ## [4.0.0] - 2026-11-07
 
 Renplay 4.0 is a new look, Lantern, with three levels for adult games, art for every game, a

@@ -2,6 +2,7 @@ import { mkdirSync, rmSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { migrateAccountFolders } from './accounts-migration.js'
+import { log } from './util/log.js'
 
 export type GameStatus = 'installed' | 'not_installed' | 'installing'
 
@@ -302,7 +303,7 @@ export class Db {
       const p = join(dataDir, old)
       if (existsSync(p)) {
         rmSync(p, { force: true })
-        if (old === 'renplay.db') console.log('removed the old library database (renplay.db)')
+        if (old === 'renplay.db') log('server', 'Removed the old library database (renplay.db)')
       }
     }
     return new Db(join(dataDir, 'library.db'), folders)

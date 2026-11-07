@@ -838,6 +838,20 @@ Port of the Renplay server inside the container. nginx listens on 8080 and forwa
 
 </div>
 
+<div class="config-entry" id="renplay-log-level">
+
+**`RENPLAY_LOG_LEVEL`**
+
+<div class="config-default">
+
+Default: `info`
+
+</div>
+
+How much the server logs. `error`: errors only. `warn`: also warnings and requests that failed on the server. `info`: also the start summary, installs, catalog updates, backups, sign-ins, and requests that change something or fail. `debug`: every request and each install as it runs.
+
+</div>
+
 
 ## Folders inside the container
 

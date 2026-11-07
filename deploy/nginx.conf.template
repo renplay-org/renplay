@@ -1,6 +1,6 @@
 worker_processes auto;
 pid /tmp/nginx/nginx.pid;
-error_log /dev/stderr warn;
+error_log /dev/stderr ${RENPLAY_NGINX_ERRORS};
 
 events {
   worker_connections 4096;
@@ -45,11 +45,51 @@ http {
   gzip_min_length 1024;
   gzip_types text/plain text/css application/javascript application/json image/svg+xml application/wasm;
 
-  log_format compact '$remote_addr "$request" $status $body_bytes_sent ${request_time}s';
-  map $uri $loggable {
-    ~^/g/      0;
-    ~^/engine/ 0;
-    default    1;
+  # One line per request in the server's own columns: date and time, level, [http], then the
+  # method and path, the status, how long it took, the size and who asked (the first forwarded
+  # address, as the proxy in front saw them). The path is the one asked for, before any rewrite to
+  # the interface, and without its query (sign-in callbacks carry codes there).
+  map $time_iso8601 $log_time {
+    ~^(?<day>[\d-]+)T(?<hms>[\d:]+) "$day $hms";
+    default                         $time_iso8601;
+  }
+  map $request_uri $log_path {
+    ~^(?<path>[^?]*) $path;
+  }
+  map $http_x_forwarded_for $log_client {
+    ~^(?<first>[^,\s]+) $first;
+    default             $remote_addr;
+  }
+  map $request_time $log_took {
+    ~^0\.0*(?<ms>[1-9]\d*)$          "$ms ms";
+    ~^(?<s>[1-9]\d*)\.(?<frac>\d+)$  "$s.$frac s";
+    default                          "0 ms";
+  }
+  # A request's level: reads are debug, changes info, client errors warn, server errors error.
+  map "$request_method:$status" $log_level {
+    ~:5                     "error";
+    ~:4                     "warn ";
+    ~^(GET|HEAD|OPTIONS):   "debug";
+    default                 "info ";
+  }
+  log_format compact '$log_time  $log_level  [http]     $request_method $log_path $status in $log_took, $body_bytes_sent B, from $log_client';
+  # Games, the engine, pictures, the interface's own files, health checks and the play time heartbeat
+  # are never logged: they are many and say nothing new.
+  map $uri $log_worth {
+    ~^/g/                         0;
+    ~^/engine/                    0;
+    ~^/api/(art|avatars)/         0;
+    ~^/assets/                    0;
+    ~^/api/health$                0;
+    ~^/api/auth/check$            0;
+    ~^/api/games/[^/]+/play-time$ 0;
+    ~\.(ico|png|svg|webmanifest)$ 0;
+    default                       1;
+  }
+  # RENPLAY_LOG_LEVEL decides which levels are logged (the entrypoint fills in the rules).
+  map "$log_worth:$log_level" $loggable {
+    default 0;
+    ${RENPLAY_LOG_RULES}
   }
   access_log /dev/stdout compact if=$loggable;
 

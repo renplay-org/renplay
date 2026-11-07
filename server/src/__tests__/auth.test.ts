@@ -186,7 +186,7 @@ describe('accounts authentication and security', () => {
   it('uses a per-boot setup code and a bounded attempt budget, and claims the owner without moving saves', async () => {
     const logs = vi.spyOn(console, 'log').mockImplementation(() => {})
     const a = await start(config(), false)
-    const code = logs.mock.calls.find((c) => String(c[0]).startsWith('Setup code:'))![0].split(': ')[1]
+    const code = String(logs.mock.calls.find((c) => String(c[0]).includes('Setup code: '))![0]).split('Setup code: ')[1]!
     expect((await request(a.app).get('/api/auth/providers')).body.setup).toBe(true)
     await a.saves.write('safe', 'persistent', Buffer.from('before'))
     await request(a.app).post('/api/auth/setup').set(site).send({ username: 'owner', password: 'owner password' }).expect(403)
