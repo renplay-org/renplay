@@ -7,45 +7,55 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-07
+
+Renplay 4.0 is a new look, Lantern, with three levels for adult games, art for every game, a
+player without a toolbar and saves that move safely between devices. **Before you upgrade:** back
+up `/data` as usual. Nothing needs changing. On its first start 4.0 updates the database, and 3.2.0
+still runs on it if you go back. Each person's 3.x picture preference becomes their own level for
+adult games: Show becomes Shown, Hide adult games becomes Off, and Hide pictures or no preference
+becomes Blurred. Someone who never chose sees adult games without their pictures until they choose
+Shown under **Account → Adult games**. Daily save backups start in `/data/backups/saves`.
+
+### Added
+
+- A new look, Lantern: a dark room lit by the game you are looking at. Games are posters in the library, the game page opens on the game's own art with its logo, and the picture travels from the tile to the page.
+- Games have art in five formats, the shapes SteamGridDB uses: a 600 × 900 poster, a wide banner, a hero for the top of the game page, a logo and an icon. Pictures come from the catalog (Steam, itch.io, SteamGridDB credited to their author, the developer). Renplay keeps them in its data folder and makes any missing format from the others, without adding text. The game page says where its art came from, and pictures show their colours the moment a page opens.
+- **Change art** on a game's page, or **Details → Art**, opens the art picker: every picture is shown as it will look in place, and a tap chooses it. Your choice changes only what you see, an admin can choose for everyone, and **Use the default** goes back. Upload your own picture too, cropped around the point you tap.
+- After an install finishes, **Choose artwork** opens once with the catalog's pictures picked, so one tap on **Keep this art** keeps them.
+- Each game has a status for you, Playing, Stalled, Dropped or Finished, and a rating from one to five stars. Stalled, Dropped and Finished leave Up next, and the library sorts by Rating and Time played.
+- **Not now** on the library home takes a game out of Up next until you play it again.
+- **Play history** shows your time day by day and per game, and a game's page shows its last sessions.
+- The player's menu: a quiet **Renplay** pill at the top left opens Saves, Guide and Options, **Save now** and **Save and exit**. A swipe from the left edge opens it too.
+- Walkthroughs open in a window beside the game that you can move, resize and see through, or in a reading sheet on a phone held upright. A game can keep several walkthroughs, as PDFs, pictures or text files.
+- The player's **Options** set the text size (Normal, Large, Larger), open Ren'Py's own accessibility menu where the game offers it, and for you alone turn on **Rollback**, **Skip** and the **Developer console** where a game turns them off. They follow you to every device with the game's saves.
+- Saves can have your own name and a note, and a **pinned** save keeps every previous version. Only you see them, and the save file itself never changes.
+- **Import from a computer** (in **Settings**) brings in the saves from desktop Ren’Py. It shows where Ren’Py keeps saves on your system, reads the folder or a zip of it in the browser, and previews every game's saves as new, newer or older before anything is written.
+- **Sync codes**, once an admin turns them on in **Settings**: a game's **Saves** can make a code for Ren’Py's own Download Sync on a computer or Android phone, or bring in the saves from a code made with Upload Sync there. Saves travel encrypted through Ren’Py's sync server and leave your server only when someone asks for a code. Games made with Ren’Py 8.1 or newer have Sync.
+- Renplay backs up everyone's saves once a day as a zip, keeping the newest 14, in `/data/backups/saves` or the folder set by `RENPLAY_BACKUP_DIR`. **Settings** lists them for download and has **Back up now**.
+- **Lighter background** under This browser in **Settings** shows a plain background instead of the game's art. Until you choose, it follows the device's reduced motion and data saver settings.
+- A game's page says how it plays on phones (Great on phones, Playable on phones, Needs a bigger screen) when its recipe says so.
+
 ### Changed
 
 - Adult games have three levels, Off, Blurred and Shown, in place of the four 3.x controls. Off leaves adult games out of everything, Blurred shows them without their pictures, Shown shows everything. The installation, each account, each person and each device can only go lower than the layer above. **Account → Adult games** shows all four and says why you see what you see.
-- Blurred is enforced by the server: it never sends a picture of an adult game to a person below Shown, and an installation at Blurred never downloads one.
-- `RENPLAY_ADULT_GAMES` and `RENPLAY_ADULT_DEFAULT` take `off`, `blurred` or `shown`. The 3.x values still work, `allow` as Shown and `block` as Off.
-- Sign-in groups set levels with `RENPLAY_OIDC_ADULT_GROUPS` and `RENPLAY_LDAP_ADULT_GROUPS`, for example `renplay-adults=shown,renplay-family=blurred`. A configured group replaces the setting in Users. The 3.x single group variables still work.
-- Upgrading keeps what each person saw: access becomes their account's level, and their 3.x picture preference becomes their own level, so hidden pictures stay hidden.
-- Games have art in five formats, the shapes SteamGridDB uses: a 600 × 900 poster, a wide banner, a hero for the top of the game page, a logo and an icon. Pictures come from the catalog (Steam, itch.io, SteamGridDB credited to their author, the developer). Renplay keeps them in its data folder and makes any missing format from the others, without adding text. The game page says where its art came from.
-- Pictures show their colours the moment a page opens and sharpen as they load.
-- **Change art** on a game's page, or **Details → Art**, opens the art picker: every picture is shown as it will look in place, hovering previews it, a tap chooses it. Your choice changes only what you see, an admin can choose for everyone, and **Use the default** goes back. Upload your own picture too: another size is accepted with a warning, cropped around the point you tap.
-- After an install finishes, **Choose artwork** opens once with the catalog's pictures picked, so one tap on **Keep this art** keeps them. An admin's choice there is the default for everyone. **Skip for now** leaves it for later.
-- The catalog is read from `index.v4.json`. A catalog in the older format still works, its cover becoming the poster.
-- A new look, Lantern: a dark room lit by the game you are looking at. Games are posters in the library, the game page opens on the game's own art with its logo, and the picture travels from the tile to the page.
-- The Catalog has its own page, at the top left, and Activity is always one tap away in the header.
-- Every button and link has a 44 px touch area, and the layout fits phones from 390 px wide in portrait and landscape.
-- The reminder that sign-in is off is one sentence in Settings instead of a banner on every page.
-- Each game has a status for you, Playing, Stalled, Dropped or Finished, and a rating from one to five stars. Stalled, Dropped and Finished leave Up next. The Finished switch of 3.x is the same thing.
-- **Not now** on the library home takes a game out of Up next until you play it again, with Undo.
-- **Play history** shows your time day by day and per game, and a game's page shows its last sessions.
-- The library sorts by Rating and Time played.
-- The player has no toolbar any more. The game fills the screen with a quiet **Renplay** pill at the top left, which opens one menu with Saves, Guide and Options, **Save now** and **Save and exit**. **Esc** or a swipe from the left edge opens it too, and the game dims behind it. A sync pill appears only while saves wait.
-- **Save and exit** makes an autosave first, or a quick save in games without autosave, and waits until it reaches the server. When saves cannot get there it asks before leaving: they stay on the device and go up the next time the game opens there. **Main menu** saves first too.
-- The player's **Options** set the text size (Normal, Large, Larger) and, for you alone, turn on **Rollback**, **Skip** and the **Developer console** where a game turns them off. They are kept with the game's saves, so they follow you to every device.
-- On iPhone and iPad a PDF walkthrough opens in its own tab, because Safari shows only its first page inside the player.
-- Play time stops counting after 15 minutes without a tap, click or key, two open windows of a game no longer count twice, and History groups your play by your own days rather than the server's.
-- Walkthroughs open in a window beside the game that you can move, resize and see through, with a tab per file, or in a reading sheet on a phone held upright.
-- **Options** opens Ren'Py's own accessibility menu (text size, fonts, self-voicing) where the game offers it.
-- **Lighter background** under This browser in **Settings** shows a plain background instead of the game's art behind each screen. Until you choose, it follows the device's reduced motion and data saver settings.
-- A game's page says how it plays on phones (Great on phones, Playable on phones, Needs a bigger screen) when its recipe says so.
-- **Sync codes**, once an admin turns them on in **Settings**: a game's **Saves** can make a code for Ren’Py's own Download Sync on a computer or Android phone, or bring in the saves from a code made with Upload Sync there. Saves travel encrypted through Ren’Py's sync server and leave your server only when someone asks for a code. Games made with Ren’Py 8.1 or newer have Sync.
-- **Import from a computer** (in **Settings**) brings in the saves from desktop Ren’Py. It shows where Ren’Py keeps saves on your system, reads the folder or a zip of it in the browser, and previews every game's saves as new, newer or older before anything is written. Older copies go to History instead of replacing newer ones, and saves for games not added yet wait on the server.
-- At the Blurred level, save cards of adult games show a soft blur of the picture's colours instead of a blank card. The picture itself still never leaves the server.
+- Blurred is enforced by the server: it never sends a picture of an adult game to a person below Shown, and an installation at Blurred never downloads one. Save pictures of adult games show only a soft blur of their colours.
+- `RENPLAY_ADULT_GAMES` and `RENPLAY_ADULT_DEFAULT` take `off`, `blurred` or `shown`. The 3.x values still work, `allow` as Shown and `block` as Off. Sign-in groups set levels with `RENPLAY_OIDC_ADULT_GROUPS` and `RENPLAY_LDAP_ADULT_GROUPS`, for example `renplay-adults=shown,renplay-family=blurred`. The 3.x single group variables still work.
 - When two devices change the same save, the copy saved later stays in the slot and the other is kept in History. Before, the last upload always won. The player and the game's saves tell you when this happens.
-- Several messages at once now stack instead of covering each other.
-- Uploading mod files into the top of the game folder failed with “Only files inside game/ can be modded”. It works now.
-- Renplay backs up everyone's saves once a day as a zip, keeping the newest 14, in `/data/backups/saves` or the folder set by `RENPLAY_BACKUP_DIR`. **Settings** lists them for download and has **Back up now**.
-- Saves can have your own name and a note, and a **pinned** save keeps every previous version in its history. Only you see them, and the save file itself never changes.
-- A game can keep several walkthroughs, as PDFs, pictures or text files, each with a title and a place in the list. The 3.x walkthrough becomes the first one.
-- A game's page has its sections in one row: Play, Saves, Walkthroughs, Mods and options, Details and Manage.
+- **Save and exit** makes an autosave first, or a quick save in games without autosave, and waits until it reaches the server. When saves cannot get there it asks before leaving: they stay on the device and go up the next time the game opens there. **Main menu** saves first too.
+- The player has no toolbar any more, and the game fills the screen.
+- The catalog is read from `index.v4.json`. A catalog in the older format still works, its cover becoming the poster.
+- The Catalog has its own page, and Activity is always one tap away in the header. A game's page has its sections in one row: Play, Saves, Walkthroughs, Mods and options, Details and Manage.
+- Every button and link has a 44 px touch area, and the layout fits phones from 390 px wide in portrait and landscape.
+- Play time stops counting after 15 minutes without a tap, click or key, and History groups your play by your own days.
+- The reminder that sign-in is off is one sentence in Settings instead of a banner on every page.
+
+### Fixed
+
+- Uploading mod files into the top of the game folder failed with “Only files inside game/ can be modded”.
+- Two open windows of a game counted play time twice.
+- Several messages at once covered each other. They now stack.
+- On iPhone and iPad a PDF walkthrough showed only its first page. It now opens in its own tab.
 
 ## [3.2.0] - 2026-11-06
 
@@ -447,7 +457,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v3.2.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.0.0...dev
+[4.0.0]: https://github.com/renplay-org/renplay/compare/v3.2.0...v4.0.0
 [3.2.0]: https://github.com/renplay-org/renplay/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/renplay-org/renplay/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/renplay-org/renplay/compare/v2.11.1...v3.0.0
