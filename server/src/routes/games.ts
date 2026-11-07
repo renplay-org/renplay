@@ -15,7 +15,7 @@ import type { JobManager } from '../jobs.js'
 import type { Overlays } from '../mods.js'
 import type { SaveStore } from '../saves/store.js'
 import { playPath } from './play.js'
-import { cachedSaveMeta } from './saves.js'
+import { cachedSaveMeta, cachedSceneHash } from './saves.js'
 import { slotInfo } from '../saves/savefile.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, safeJoin } from '../util/paths.js'
@@ -66,7 +66,8 @@ export async function toGame(row: GameRow, deps: GameDeps) {
   if (deps.accounts) row = deps.accounts.progress(row)
   const source = parseJson<GameSource>(row.source, {})
   const job = deps.jobs.activeFor(row.id)
-  let latestSave: { file: string; label: string; name: string; ctime: number; runtime: number | undefined; screenshot: string | null } | null = null
+  let latestSave: { file: string; label: string; name: string; ctime: number; runtime: number | undefined; screenshot: string | null; screenshotHash?: string | null } | null = null
+  let latestFile: { name: string; mtimeMs: number; size: number } | null = null
   let saves = { count: 0, latest: 0 }
   if (row.save_dir) {
     try {
@@ -76,9 +77,12 @@ export async function toGame(row: GameRow, deps: GameDeps) {
         const meta = await cachedSaveMeta(deps.saves, row.save_dir, f)
         if (!meta) continue
         const ctime = meta.ctime ? meta.ctime * 1000 : f.mtimeMs
-        if (!latestSave || ctime > latestSave.ctime) latestSave = {
-          file: f.name, label: slotInfo(f.name).label, name: meta.name ?? '', ctime, runtime: meta.runtime,
-          screenshot: meta.hasScreenshot ? `/api/saves/${row.id}/screenshot?user=${deps.accounts?.current().id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
+        if (!latestSave || ctime > latestSave.ctime) {
+          latestSave = {
+            file: f.name, label: slotInfo(f.name).label, name: meta.name ?? '', ctime, runtime: meta.runtime,
+            screenshot: meta.hasScreenshot ? `/api/saves/${row.id}/screenshot?user=${deps.accounts?.current().id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
+          }
+          latestFile = f
         }
       }
     } catch {}
@@ -90,7 +94,11 @@ export async function toGame(row: GameRow, deps: GameDeps) {
   const modded = row.build.includes('.m')
   // Blurred: the game shows with its title and metadata, but no picture URL leaves the server.
   const blurred = deps.catalog.content.blurs(row)
-  if (blurred && latestSave) latestSave.screenshot = null
+  if (blurred && latestSave && latestFile && row.save_dir) {
+    // Only the picture's hash, a soft blur of its colours.
+    latestSave.screenshotHash = latestSave.screenshot ? await cachedSceneHash(deps.saves, row.save_dir, latestFile) : null
+    latestSave.screenshot = null
+  }
   return {
     id: row.id,
     // Title, developer, tags and cover come from the catalog; a game without a

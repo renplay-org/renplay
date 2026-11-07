@@ -221,6 +221,9 @@ describe('the levels on every route', () => {
       mkdirSync(join(cfg.savesDir, `${id}-1`), { recursive: true })
       writeFileSync(join(cfg.savesDir, `${id}-1`, '1-1.save'), 'x')
     }
+    // A save with a real picture, for its hash at Blurred.
+    const shot = await sharp({ create: { width: 384, height: 216, channels: 3, background: '#c42' } }).png().toBuffer()
+    writeFileSync(join(cfg.savesDir, 'adult-1', '2-1.save'), await zipBuffer({ json: JSON.stringify({ _save_name: 'A picture', _ctime: 1700000000 }), 'screenshot.png': shot, log: 'x', renpy_version: '8.5.3' }))
     // Each recipe's grid is in the art cache's originals already: made without any download.
     const grids: Record<string, { sha256: string }> = {}
     mkdirSync(join(cfg.dataDir, 'art', 'src'), { recursive: true })
@@ -357,9 +360,12 @@ describe('the levels on every route', () => {
     await request(app.app).delete('/api/games/adult/art?kind=grid').expect(404)
     // Safe games keep their pictures at every level.
     await request(app.app).get(safePic).expect(200)
-    // Saves list without picture URLs.
+    // Saves list without picture URLs. A save's picture is its hash only, as art is.
     const saves = (await request(app.app).get('/api/saves/adult').expect(200)).body
     expect(JSON.stringify(saves)).not.toContain('screenshot?')
+    const pictured = saves.slots.find((s: { file: string }) => s.file === '2-1.save')
+    expect(pictured).toMatchObject({ screenshot: null, screenshotHash: expect.stringMatching(/^[A-Za-z0-9+/]{8,64}={0,2}$/) })
+    expect((await request(app.app).get('/api/games/adult')).body.game.latestSave).toMatchObject({ file: '2-1.save', screenshot: null, screenshotHash: pictured.screenshotHash })
 
     // The game itself still plays: the page renders with the engine's presplash, and its files stream.
     const page = await request(app.app).get('/g/adult/b1/').expect(200)
@@ -414,6 +420,11 @@ describe('the levels on every route', () => {
     const adult = (await request(app.app).get('/api/games/adult')).body.game
     expect(adult.art.grid).toMatchObject({ url1x: adultPic, width: 600, height: 900, made: null, credit: { store: 'Steam' } })
     expect((await request(app.app).get('/api/games/adult/art?kind=grid').expect(200)).body.candidates).toHaveLength(1)
+    // The save's real picture, and no hash.
+    const pictured = (await request(app.app).get('/api/saves/adult').expect(200)).body.slots.find((s: { file: string }) => s.file === '2-1.save')
+    expect(pictured.screenshot).toContain('/api/saves/adult/screenshot?')
+    expect(pictured.screenshotHash).toBeNull()
+    await request(app.app).get(pictured.screenshot).expect(200)
   })
 
   it('at off hides adult games from lists and refuses every route addressed to one with 404', async () => {

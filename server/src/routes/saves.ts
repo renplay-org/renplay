@@ -1,5 +1,7 @@
 import express, { Router, type Request } from 'express'
 import { readFile } from 'node:fs/promises'
+import sharp from 'sharp'
+import { rgbaToThumbHash } from 'thumbhash'
 import { saveImport } from '../saves/import-upload.js'
 import { viewer } from '../accounts-context.js'
 import type { ContentMode } from '../content.js'
@@ -21,6 +23,31 @@ export async function cachedSaveMeta(store: SaveStore, dir: string, file: { name
     if (metaCache.size > 5000) metaCache.delete(metaCache.keys().next().value!)
   }
   return meta
+}
+
+/** Scene hashes (thumbhash) of save pictures, keyed like the metadata. */
+const hashCache = new Map<string, string | null>()
+
+/**
+ * A save picture as a thumbhash: a few dozen bytes that draw only a soft blur of its colours. Sent at
+ * the Blurred level instead of the picture, the way art below Shown carries only its hash.
+ */
+export async function cachedSceneHash(store: SaveStore, dir: string, file: { name: string; mtimeMs: number; size: number }): Promise<string | null> {
+  const key = `${store.root}/${dir}/${file.name}/${file.mtimeMs}/${file.size}`
+  let hash = hashCache.get(key)
+  if (hash === undefined) {
+    hash = null
+    try {
+      const png = await readSaveScreenshot(await store.read(dir, file.name))
+      if (png) {
+        const { data, info } = await sharp(png).resize(100, 100, { fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+        hash = Buffer.from(rgbaToThumbHash(info.width, info.height, data)).toString('base64')
+      }
+    } catch {}
+    hashCache.set(key, hash)
+    if (hashCache.size > 5000) hashCache.delete(hashCache.keys().next().value!)
+  }
+  return hash
 }
 
 export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode): Router {
@@ -171,6 +198,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
         runtime: meta?.runtime,
         // Blurred: the save's picture is the adult game's art and never leaves the server.
         screenshot: meta?.hasScreenshot && !content.blurs(g) ? `/api/saves/${g.id}/screenshot?user=${viewer()?.user.id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
+        screenshotHash: meta?.hasScreenshot && content.blurs(g) ? await cachedSceneHash(store, g.save_dir, f) : null,
         valid: !!meta,
         title: notes.get(f.name)?.title || null,
         note: notes.get(f.name)?.note || null,

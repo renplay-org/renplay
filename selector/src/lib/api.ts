@@ -74,7 +74,7 @@ export interface Game {
   notNowAt: string | null
   /** How it plays on a phone, curated in the recipe. */
   phone: 'great' | 'playable' | 'desktop' | null
-  latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot'> | null
+  latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot' | 'screenshotHash'> | null
   free?: boolean
   renpyVersion: string | null
   engine: string | null
@@ -109,6 +109,8 @@ export interface SaveSlot {
   gameVersion?: string
   runtime?: number
   screenshot: string | null
+  /** At the Blurred level, the picture as a thumbhash instead. */
+  screenshotHash?: string | null
   valid: boolean
   /** This person's own name for the save, over the game's. */
   title: string | null
