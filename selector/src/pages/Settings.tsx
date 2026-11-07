@@ -4,11 +4,11 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import RecipeDialog from '../components/RecipeDialog'
 import DocsLink from '../components/DocsLink'
-import { Button, Confirm, Progress, Spinner, errorText, useToast } from '../components/ui'
+import { Button, Confirm, Modal, Progress, Spinner, errorText, useToast } from '../components/ui'
 import { LevelSeg, DeviceAdultRow } from '../components/AdultLadder'
 import { SourceLabel, LanternSwitch } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
-import { api, post, put, type CatalogSource, type SystemInfo } from '../lib/api'
+import { api, del, post, put, type CatalogSource, type SystemInfo } from '../lib/api'
 import { setLighterBackground, useLighterBackground } from '../lib/backdrop'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
@@ -116,6 +116,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
   const [recipeFor, setRecipeFor] = useState('')
   const recipeGame = installed.find((g) => g.id === recipeFor)
   const [recipeOpen, setRecipeOpen] = useState(false)
+  const [storageOpen, setStorageOpen] = useState(false)
   const qc = useQueryClient()
   const toast = useToast()
   const { data: content } = useContent()
@@ -221,6 +222,11 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                   <p className="small muted">
                     {sys.library.installed} of {sys.library.games} games installed, {bytes(sys.library.bytes)} in total.
                   </p>
+                  <div>
+                    <Button size="sm" onClick={() => setStorageOpen(true)}>
+                      Show what uses space
+                    </Button>
+                  </div>
                   <div className="stack xs muted" style={{ gap: 4, overflowWrap: 'anywhere' }}>
                     {(
                       [
@@ -347,6 +353,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
             </section>
 
             {recipeOpen && recipeGame && <RecipeDialog game={recipeGame} onClose={() => setRecipeOpen(false)} />}
+            {storageOpen && <StorageSheet onClose={() => setStorageOpen(false)} />}
           </div>
           <section className={`${section === 'browser' ? '' : 'hidden'} panel stack`} style={{ gap: 14 }}>
             <h2 className="h3">This browser</h2>
@@ -497,5 +504,128 @@ function CatalogSources({ sources, label }: { sources: CatalogSource[]; label: (
         </div>
       ))}
     </div>
+  )
+}
+
+interface StorageReport {
+  games: Array<{ id: string; title: string; status: string; builds: Array<{ name: string; current: boolean; bytes: number }>; download: { name: string; bytes: number } | null; bytes: number }>
+  engines: Array<{ version: string; bytes: number; used: boolean }>
+  orphans: Array<{ name: string; bytes: number }>
+  totals: { builds: number; downloads: number; engines: number }
+  freeable: { downloads: number; engines: number }
+}
+
+/** What uses space, game by game, and what Renplay can free. */
+function StorageSheet({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const { data, isLoading } = useQuery({ queryKey: ['storage'], queryFn: () => api<StorageReport>('/api/system/storage') })
+  const [confirm, setConfirm] = useState<StorageReport['games'][number] | null>(null)
+  const refresh = async () => {
+    await post('/api/system/storage/refresh')
+    await qc.invalidateQueries({ queryKey: ['storage'] })
+    void qc.invalidateQueries({ queryKey: ['system'] })
+  }
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    try {
+      await fn()
+      toast(ok, 'success')
+      await refresh()
+    } catch (e) {
+      toast(errorText(e), 'error')
+    }
+  }
+  return (
+    <Modal open onClose={onClose} title="What uses space" wide fullPhone>
+      {isLoading || !data ? (
+        <Spinner />
+      ) : (
+        <div className="stack" style={{ gap: 20 }}>
+          <p className="small muted">
+            Games {bytes(data.totals.builds)}, downloads {bytes(data.totals.downloads)}, engines {bytes(data.totals.engines)}.
+            {data.freeable.downloads + data.freeable.engines > 0
+              ? ` Up to ${bytes(data.freeable.downloads + data.freeable.engines)} can be freed: downloads of installed games (add them again to reinstall) and engines no game uses.`
+              : ''}
+          </p>
+          <section>
+            <h3 className="small" style={{ fontWeight: 650, marginBottom: 6 }}>Games</h3>
+            <div className="list tight">
+              {data.games.map((g) => (
+                <div key={g.id} className="row between wrap" style={{ gap: 8, minHeight: 'var(--hit)', padding: '6px 0' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>{g.title}</div>
+                    <div className="xs muted">
+                      {[
+                        g.builds.filter((b) => b.current).map((b) => `game ${bytes(b.bytes)}`)[0],
+                        g.builds.some((b) => !b.current) && `other builds ${bytes(g.builds.filter((b) => !b.current).reduce((n, b) => n + b.bytes, 0))}`,
+                        g.download && `download ${bytes(g.download.bytes)}`,
+                      ]
+                        .filter(Boolean)
+                        .join(', ') || 'Nothing on disk'}
+                    </div>
+                  </div>
+                  <span className="row" style={{ gap: 8 }}>
+                    <span className="small muted tnum">{bytes(g.bytes)}</span>
+                    {g.download && g.status === 'installed' && (
+                      <Button size="sm" variant="ghost" onClick={() => setConfirm(g)}>
+                        Delete download
+                      </Button>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+          {data.engines.length > 0 && (
+            <section>
+              <h3 className="small" style={{ fontWeight: 650, marginBottom: 6 }}>Engines</h3>
+              <div className="list tight">
+                {data.engines.map((e) => (
+                  <div key={e.version} className="row between" style={{ minHeight: 'var(--hit)' }}>
+                    <span>
+                      Ren’Py {e.version} <span className="xs muted">{e.used ? 'in use' : 'no game uses it'}</span>
+                    </span>
+                    <span className="small muted tnum">{bytes(e.bytes)}</span>
+                  </div>
+                ))}
+              </div>
+              {data.freeable.engines > 0 && (
+                <Button size="sm" style={{ marginTop: 8 }} onClick={() => void run(() => post('/api/system/prune'), 'Unused engines removed')}>
+                  Remove unused engines
+                </Button>
+              )}
+            </section>
+          )}
+          {data.orphans.length > 0 && (
+            <section>
+              <h3 className="small" style={{ fontWeight: 650, marginBottom: 6 }}>Folders of no game</h3>
+              <p className="xs muted" style={{ marginBottom: 6 }}>In the games folder but not in the library. Renplay leaves them alone, delete them yourself if you do not need them.</p>
+              <div className="list tight">
+                {data.orphans.map((o) => (
+                  <div key={o.name} className="row between" style={{ minHeight: 'var(--hit)' }}>
+                    <code>{o.name}</code>
+                    <span className="small muted tnum">{bytes(o.bytes)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+      <Confirm
+        open={!!confirm}
+        onClose={() => setConfirm(null)}
+        danger
+        title="Delete this download?"
+        confirmLabel="Delete download"
+        onConfirm={() => {
+          const g = confirm!
+          setConfirm(null)
+          void run(() => del(`/api/games/${g.id}/download`), 'Download deleted')
+        }}
+      >
+        Deletes {confirm?.download?.name}. Reinstalling {confirm?.title} will need the download again. The installed game and its saves are kept.
+      </Confirm>
+    </Modal>
   )
 }

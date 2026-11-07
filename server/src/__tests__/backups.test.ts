@@ -80,6 +80,26 @@ describe('save backups', () => {
     expect((await request(app.app).get('/api/widget').expect(200)).body).toMatchObject({ games: 0, installed: 0, installing: 0, playedTodayMinutes: 0, lastPlayed: null, recent: [] })
   })
 
+  it('shows what uses space: each game’s builds and download, engines, and folders of no game', async () => {
+    const cfg = loadConfig()
+    app.db.insertGame({ id: 'big', title: 'Big', status: 'installed', save_dir: 'Big-1', build: 'b2', source: JSON.stringify({ archive: 'Big-1.0-pc.zip' }) })
+    mkdirSync(join(cfg.gamesDir, 'big', 'b2'), { recursive: true })
+    writeFileSync(join(cfg.gamesDir, 'big', 'b2', 'assets.pack'), Buffer.alloc(3000))
+    mkdirSync(join(cfg.gamesDir, 'big', 'b2.mabc'), { recursive: true })
+    writeFileSync(join(cfg.gamesDir, 'big', 'b2.mabc', 'game.zip'), Buffer.alloc(500))
+    mkdirSync(cfg.archivesDir, { recursive: true })
+    writeFileSync(join(cfg.archivesDir, 'Big-1.0-pc.zip'), Buffer.alloc(7000))
+    mkdirSync(join(cfg.gamesDir, 'stray'), { recursive: true })
+    writeFileSync(join(cfg.gamesDir, 'stray', 'x'), Buffer.alloc(100))
+    await request(app.app).post('/api/system/storage/refresh').expect(200)
+    const s = (await request(app.app).get('/api/system/storage').expect(200)).body
+    expect(s.games[0]).toMatchObject({ id: 'big', bytes: 10500, download: { name: 'Big-1.0-pc.zip', bytes: 7000 } })
+    expect(s.games[0].builds).toEqual(expect.arrayContaining([{ name: 'b2', current: true, bytes: 3000 }, { name: 'b2.mabc', current: false, bytes: 500 }]))
+    expect(s.orphans).toEqual([{ name: 'stray', bytes: 100 }])
+    expect(s.freeable.downloads).toBe(7000)
+    expect(s.totals).toMatchObject({ builds: 3500, downloads: 7000 })
+  })
+
   it('says where each server setting comes from, and never a secret', async () => {
     const sys = (await request(app.app).get('/api/system').expect(200)).body
     expect(sys.setBy).toMatchObject({ RENPLAY_AUTH: 'server', RENPLAY_BACKUP_DIR: 'server', RENPLAY_LOG_LEVEL: 'default' })

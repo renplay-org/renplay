@@ -11,6 +11,7 @@ release notes say what).
 
 - **Your recipes:** recipe files in a folder on your server (`/data/recipes`, or `RENPLAY_RECIPES_DIR`) are read as one more catalog, in the catalog's own format. A recipe there takes the place of the catalog's recipe with the same id, so you can fix a game or add one without waiting for the catalog. Art and patches can be files in the folder. **Settings** lists each source with its recipes and any problems.
 - Tags on the Catalog page can be included or left out: a tap includes a tag, the next leaves it out, the next clears it. **All tags** lists every tag by group, with how many games have it. Your choices are kept with your account.
+- **Show what uses space** in **Settings → Storage** lists each game with its build, other builds and download, largest first, the engines, and folders in the games folder that belong to no game. It says how much can be freed, and deletes a download or unused engines from there.
 - Dashboards: `/metrics` gives Prometheus counts about the server, for admins, and `/api/widget` gives JSON for Homepage's custom API widget: the library's size, installs running, and what you played last and today. Both take an access token from **Account → Access tokens**.
 - The art picker lists your uploads with **Delete**. Each person keeps up to ten pictures of each kind per game.
 

@@ -3,16 +3,18 @@ import type { SaveBackups } from '../backups.js'
 import { SYNC_SETTING, syncCodesOn } from './saves.js'
 import type { Catalog } from '../catalog.js'
 import { keepDownloads } from '../downloads.js'
-import { statfs } from 'node:fs/promises'
+import { readdir, stat, statfs } from 'node:fs/promises'
+import { join } from 'node:path'
 import { Router } from 'express'
 import type { Builds } from '../builds.js'
 import type { Config } from '../config.js'
 import type { ContentMode } from '../content.js'
-import type { Db } from '../db.js'
+import { parseJson, type Db } from '../db.js'
 import type { EngineStore } from '../engines.js'
 import type { JobManager } from '../jobs.js'
-import { HttpError } from '../util/paths.js'
+import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
 import type { Purger } from '../util/purge.js'
+import { dirSize } from '../util/fsx.js'
 
 async function disk(path: string) {
   try {
@@ -52,6 +54,62 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
       clearInterval(tick)
       clearTimeout(done)
     })
+  })
+
+  // ---- storage -----------------------------------------------------------------
+
+  /**
+   * What uses space, game by game (the build played, other builds such as mods, the download), the
+   * engines, and folders of no game, with what could be freed. Counted at most once a minute.
+   */
+  let storage: { at: number; body: unknown; level: string } | null = null
+  router.get('/system/storage', async (_req, res) => {
+    const level = content.viewerLevel()
+    if (storage && storage.level === level && Date.now() - storage.at < 60_000) {
+      res.json(storage.body)
+      return
+    }
+    const games = []
+    for (const g of db.allGames().filter((x) => !content.hides(x))) {
+      const folders = await readdir(join(cfg.gamesDir, g.id), { withFileTypes: true }).catch(() => [])
+      const builds = []
+      for (const f of folders.filter((d) => d.isDirectory())) builds.push({ name: f.name, current: f.name === g.build, bytes: (await dirSize(join(cfg.gamesDir, g.id, f.name))).bytes })
+      const archive = parseJson<{ archive?: string }>(g.source, {}).archive
+      const st = archive ? await stat(safeJoin(cfg.archivesDir, cleanRelPath(archive))).catch(() => null) : null
+      const download = st?.isFile() ? { name: archive!, bytes: st.size } : null
+      const buildBytes = builds.reduce((n, b) => n + b.bytes, 0)
+      games.push({ id: g.id, title: catalog.recipe(g.recipe_id)?.title || g.title, status: g.status, builds, download, bytes: buildBytes + (download?.bytes ?? 0) })
+    }
+    games.sort((a, b) => b.bytes - a.bytes)
+    const installed = await engines.installed()
+    const used = new Set(db.allGames().filter((g) => g.status === 'installed' && g.engine).map((g) => g.engine))
+    const { orphans } = await builds.verify()
+    const orphanSizes = []
+    for (const name of orphans) orphanSizes.push({ name, bytes: (await dirSize(join(cfg.gamesDir, name))).bytes })
+    const enginesOut = installed.map((e) => ({ version: e.version, bytes: e.bytes, used: used.has(e.version) }))
+    const body = {
+      games,
+      engines: enginesOut,
+      orphans: orphanSizes,
+      totals: {
+        builds: games.reduce((n, g) => n + g.builds.reduce((m, b) => m + b.bytes, 0), 0),
+        downloads: games.reduce((n, g) => n + (g.download?.bytes ?? 0), 0),
+        engines: enginesOut.reduce((n, e) => n + e.bytes, 0),
+      },
+      // What Renplay can free: downloads of installed games (they can be added again), engines no game
+      // uses. Folders of no game are listed, never deleted by Renplay.
+      freeable: {
+        downloads: games.filter((g) => g.status === 'installed').reduce((n, g) => n + (g.download?.bytes ?? 0), 0),
+        engines: enginesOut.filter((e) => !e.used).reduce((n, e) => n + e.bytes, 0),
+      },
+    }
+    storage = { at: Date.now(), body, level }
+    res.json(body)
+  })
+
+  router.post('/system/storage/refresh', (_req, res) => {
+    storage = null
+    res.json({ ok: true })
   })
 
   // ---- Sync codes ------------------------------------------------------------
