@@ -3268,6 +3268,98 @@ input[type="range"] {
   }
 }
 
+/* Mods and files: a breadcrumb of folders and rows a finger can hit. */
+.files .crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.files .crumbs button {
+  min-height: 44px;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--fg-2);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.files .crumbs button[aria-current] {
+  color: var(--fg);
+}
+.files .crumbs button:hover {
+  background: var(--plate-2);
+}
+.files .crumbs .sep {
+  width: 14px;
+  height: 14px;
+  color: var(--fg-3);
+  flex: none;
+}
+.ib.plate {
+  background: var(--plate-2);
+  color: var(--fg);
+}
+.frows {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--plate);
+}
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 6px 4px 14px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--fg);
+  border-top: 1px solid var(--line);
+}
+.frow:first-child {
+  border-top: 0;
+}
+button.frow:hover {
+  background: var(--plate-2);
+}
+.frow > svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--fg-3);
+}
+.frow > svg.dir {
+  color: var(--pink-2);
+}
+.frow .n {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.frow .link-n {
+  text-align: left;
+  min-height: 40px;
+}
+.frow .link-n:hover {
+  text-decoration: underline;
+}
+.frow .m {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--fg-3);
+  padding-right: 8px;
+}
+.frow.gone .n {
+  text-decoration: line-through;
+  color: var(--fg-3);
+}
+
 /* The account menu's first row: who is signed in. */
 .menu-who {
   gap: 10px;

@@ -190,7 +190,7 @@ export default function GamePage() {
             // Save slots and mods are Ren'Py's; other engines' games keep their saves themselves.
             ...(renpy ? [{ value: 'saves' as const, label: <><Save /> Saves</> }] : []),
             { value: 'walkthroughs' as const, label: <><BookOpen /> Walkthroughs</> },
-            ...(admin && renpy ? [{ value: 'files' as const, label: 'Mods and options' }] : []),
+            ...(admin && renpy ? [{ value: 'files' as const, label: 'Mods and files' }] : []),
             { value: 'details' as const, label: <><Info /> Details</> },
             ...(admin ? [{ value: 'manage' as const, label: 'Manage' }] : []),
           ]}

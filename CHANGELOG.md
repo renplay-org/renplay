@@ -21,6 +21,7 @@ release notes say what).
 - The library's stage on a phone shows where you are in two short lines, and **Not now** sits centred under the two buttons.
 - **Adult games** on your account is one choice: Off, Blurred or Shown. Levels above your limit cannot be chosen, and one line says who sets that limit: the installation, an admin or a sign-in group. The admin's limit for everyone is **Highest level for everyone** in **Settings**, and each person's in **Users**.
 - Showing less in one browser, for a shared screen, is in **Settings → This browser**, and **Hide adult games here** in the account menu does it in one tap. Your account page says when this browser shows less, with **Follow my choice here**.
+- **Mods and files** (the game page tab that was **Mods and options**) starts with what your mods change and **Install mod zip**, **Apply changes** and **Remove all mods**, then the game's files with rows a finger can hit, a **+** for a new file or an upload, and long folders shown 200 at a time.
 - **Fit** shows the game in its own shape with the player's bars around it, and **Fill** crops only the sides, never the top or bottom where games keep their dialogue.
 
 ### Fixed
