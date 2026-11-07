@@ -7,6 +7,13 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-11-07
+
+Renplay 4.1 lets you keep recipes of your own, filter the catalog by tags you include or leave out,
+switch people on a shared device with a PIN, set defaults for everyone, see what uses space, and
+connect a dashboard. Settings now says where each value comes from. Nothing needs changing: the
+database updates itself on the first start.
+
 ### Added
 
 - **Your recipes:** recipe files in a folder on your server (`/data/recipes`, or `RENPLAY_RECIPES_DIR`) are read as one more catalog, in the catalog's own format. A recipe there takes the place of the catalog's recipe with the same id, so you can fix a game or add one without waiting for the catalog. Art and patches can be files in the folder. A recipe without an `nsfw` line counts as an adult game. **Settings** lists each source with its recipes and any problems.
@@ -493,7 +500,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.0.1...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.1.0...dev
+[4.1.0]: https://github.com/renplay-org/renplay/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/renplay-org/renplay/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/renplay-org/renplay/compare/v3.2.0...v4.0.0
 [3.2.0]: https://github.com/renplay-org/renplay/compare/v3.1.0...v3.2.0
