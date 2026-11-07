@@ -248,6 +248,16 @@ describe('names, notes and pins of saves', () => {
     app.db.raw.prepare('DELETE FROM jobs WHERE id = ?').run(id)
   })
 
+  it('keeps each person’s tag preferences for the catalog', async () => {
+    expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: [], exclude: [], source: 'default' })
+    expect((await request(app.app).put('/api/me/tags').send({ include: ['romance', 'romance'], exclude: ['horror', 'romance'] }).expect(200)).body).toEqual({ include: ['romance'], exclude: ['horror'], source: 'you' })
+    expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: ['romance'], exclude: ['horror'], source: 'you' })
+    await request(app.app).put('/api/me/tags').send({ include: ['Not A Tag'] }).expect(400)
+    await request(app.app).put('/api/me/tags').send({ exclude: 'horror' }).expect(400)
+    // The 3.x picture preference stays beside it, for a downgrade.
+    expect(JSON.parse((app.db.raw.prepare('SELECT prefs FROM users WHERE id = 1').get() as { prefs: string }).prefs)).toMatchObject({ tags: { include: ['romance'] } })
+  })
+
   it('tells a device about a conflict and lists it with the saves', async () => {
     const put = (body: string, mtime: number, base?: number) => {
       const r = request(app.app).put('/api/saves/story/file?path=Story-1/3-1-LT1.save').set('content-type', 'application/octet-stream').set('x-mtime', String(mtime))

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -203,6 +203,22 @@ describe('the art cache', () => {
     const local = await catalog([{ kind: 'grid', url: 'http://catalog.lan/art/grid.png', source: 'steam', data: files2['http://catalog.lan/art/grid.png'] }])
     const own = new ArtStore({ dataDir: join(root, 'data'), imageConcurrency: 2, catalogUrls: ['http://catalog.lan/index.json'] } as Config, db, { get level() { return level }, viewerLevel: () => level } as never)
     expect(await own.ensure(planFormat('grid', { grid: local[0]! })!, false)).toBeTruthy()
+  })
+
+  it('reads a picture from Your recipes, checked against the hash taken when the recipes were read', async () => {
+    const dir = join(root, 'data', 'recipes')
+    mkdirSync(join(dir, 'art'), { recursive: true })
+    const data = await png(600, 900, '#0a0b0c')
+    writeFileSync(join(dir, 'art', 'grid.png'), data)
+    const [picture] = catalogPictures([{ kind: 'grid', url: 'local:art/grid.png', source: 'developer', sha256: sha(data), width: 600, height: 900 } as CatalogImage])
+    const local = new ArtStore({ dataDir: join(root, 'data'), imageConcurrency: 2, recipesDir: dir } as Config, db, { get level() { return level }, viewerLevel: () => level } as never)
+    expect(await local.ensure(planFormat('grid', { grid: picture! })!, false)).toMatchObject({ width: 600, height: 900 })
+    expect(fetched).toEqual([])
+    writeFileSync(join(dir, 'art', 'grid.png'), await png(600, 900, '#ffffff'))
+    const [changed] = catalogPictures([{ kind: 'grid', url: 'local:art/grid.png', source: 'developer', sha256: sha(data).replace(/^./, 'f'), width: 600, height: 900 } as CatalogImage])
+    await expect(local.ensure(planFormat('grid', { grid: changed! })!, false)).rejects.toThrow(/changed since the recipes were read/)
+    const [escape] = catalogPictures([{ kind: 'grid', url: 'local:../../etc/passwd', source: 'developer', sha256: 'a'.repeat(64), width: 600, height: 900 } as CatalogImage])
+    await expect(local.ensure(planFormat('grid', { grid: escape! })!, false)).rejects.toThrow()
   })
 
   it('refuses a picture that changed since the catalog checked it', async () => {

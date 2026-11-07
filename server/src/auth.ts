@@ -26,6 +26,38 @@ const random = () => randomBytes(32).toString('base64url')
 const DAYS30 = 30 * 86400_000
 export const keepaliveToken = random()
 
+/**
+ * Defaults for everyone: what a person starts with until they choose. Each value is null when the
+ * admin leaves it to Renplay's own default.
+ */
+export interface Defaults {
+  /** Tags left out on the Catalog page. */
+  tagsExclude: string[]
+  /** Lighter background on browsers that did not choose. */
+  lighterBackground: boolean | null
+  /** Ren'Py text size in games where the person did not choose one. */
+  textSize: number | null
+  rollback: boolean | null
+  skip: boolean | null
+}
+export const DEFAULTS_KEY = 'defaults_for_everyone'
+export function readDefaults(db: Db): Defaults {
+  const d = db.getSetting<Partial<Defaults>>(DEFAULTS_KEY, {})
+  return {
+    tagsExclude: Array.isArray(d.tagsExclude) ? d.tagsExclude.filter((t) => typeof t === 'string') : [],
+    lighterBackground: typeof d.lighterBackground === 'boolean' ? d.lighterBackground : null,
+    textSize: typeof d.textSize === 'number' && [1, 1.25, 1.5].includes(d.textSize) ? d.textSize : null,
+    rollback: typeof d.rollback === 'boolean' ? d.rollback : null,
+    skip: typeof d.skip === 'boolean' ? d.skip : null,
+  }
+}
+
+/** An account as the API sends it: never its PIN's hash or lock. */
+export function publicUser<T extends Partial<User>>(u: T): Omit<T, 'pin_hash' | 'pin_failures' | 'pin_locked_until'> & { hasPin: boolean } {
+  const { pin_hash, pin_failures: _f, pin_locked_until: _l, ...rest } = u
+  return { ...rest, hasPin: !!pin_hash }
+}
+
 export async function passwordHash(password: unknown): Promise<string> {
   if (typeof password !== 'string' || password.length < 10 || password.length > 1024) throw new HttpError(400, 'Use a password with 10 to 1024 characters')
   const salt = randomBytes(16).toString('hex')
@@ -58,7 +90,7 @@ export function playerRoute(method: string, path: string): boolean {
   if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export' || path === '/api/saves-import') return true
   if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art)?$/.test(path))) return true
   // A player chooses and uploads art for their own view (the route refuses everyone).
-  if ((method === 'GET' || method === 'HEAD') && path === '/api/history') return true
+  if ((method === 'GET' || method === 'HEAD') && (path === '/api/history' || path === '/api/widget' || path === '/api/defaults')) return true
   return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
 }
 
@@ -523,12 +555,72 @@ export class Accounts {
       this.newSession(req, res, row.user_id)
       res.json({ ok: true })
     })
+    // ---- PINs: switching to a person on a device that is already signed in ------------------
+
+    /** Sets (4 to 8 digits) or clears this person's PIN. Admins always use their full sign-in. */
+    r.put('/me/pin', async (req, res) => {
+      const u = this.current()
+      if (!this.enabled) throw new HttpError(409, 'Sign-in is off, so there is no one to switch between')
+      const pin = req.body?.pin
+      if (pin === '' || pin === null) {
+        this.db.raw.prepare("UPDATE users SET pin_hash = '', pin_failures = 0, pin_locked_until = 0 WHERE id = ?").run(u.id)
+        res.json({ hasPin: false })
+        return
+      }
+      if (u.role === 'admin') throw new HttpError(409, 'Admins switch in with their full sign-in, so an admin account has no PIN')
+      if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) throw new HttpError(400, 'A PIN has 4 to 8 digits')
+      const salt = randomBytes(16).toString('hex')
+      const encoded = `${PASSWORD_PREFIX}${salt}$${(await scrypt(pin, salt, 131072)).toString('hex')}`
+      this.db.raw.prepare('UPDATE users SET pin_hash = ?, pin_failures = 0, pin_locked_until = 0 WHERE id = ?').run(encoded, u.id)
+      res.json({ hasPin: true })
+    })
+
+    /** The people a device may switch to: those it names (who signed in here before) with a PIN. */
+    r.get('/auth/switch', (req, res) => {
+      const me = this.current()
+      if (!this.enabled || viewer()?.bearer) {
+        res.json({ people: [] })
+        return
+      }
+      const ids = String(req.query['people'] ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 20)
+      const people = ids.length
+        ? (this.db.raw.prepare(`SELECT id, name, avatar FROM users WHERE id IN (${ids.map(() => '?').join(',')}) AND id != ? AND disabled = 0 AND role != 'admin' AND pin_hash != ''`).all(...ids, me.id) as Array<{ id: number; name: string; avatar: string }>)
+        : []
+      res.json({ people })
+    })
+
+    /**
+     * Switches this device to another person by their PIN, ending the current session. Five wrong
+     * PINs lock switching to that person for 15 minutes.
+     */
+    r.post('/auth/switch', async (req, res) => {
+      this.current()
+      if (!this.enabled) throw new HttpError(409, 'Sign-in is off, so there is no one to switch between')
+      if (viewer()?.bearer) throw new HttpError(403, 'Switch people in the browser')
+      const id = Number(req.body?.user)
+      const target = Number.isInteger(id) ? (this.db.raw.prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as User | undefined) : undefined
+      if (!target || target.disabled || target.role === 'admin' || !target.pin_hash) throw new HttpError(404, 'This person cannot be switched to with a PIN')
+      if (target.pin_locked_until > Date.now()) throw new HttpError(429, `Too many wrong PINs. Try again in ${Math.ceil((target.pin_locked_until - Date.now()) / 60_000)} minutes.`)
+      if (!(await passwordMatches(String(req.body?.pin ?? ''), target.pin_hash))) {
+        const failures = target.pin_failures + 1
+        const locked = failures >= 5
+        this.db.raw.prepare('UPDATE users SET pin_failures = ?, pin_locked_until = ? WHERE id = ?').run(locked ? 0 : failures, locked ? Date.now() + 15 * 60_000 : 0, target.id)
+        throw new HttpError(locked ? 429 : 403, locked ? 'Too many wrong PINs. Try again in 15 minutes.' : 'That PIN is not right')
+      }
+      this.db.raw.prepare('UPDATE users SET pin_failures = 0, pin_locked_until = 0 WHERE id = ?').run(target.id)
+      // The person who was here is signed out on this device: back again takes their PIN or sign-in.
+      if (viewer()?.session) this.db.raw.prepare('DELETE FROM sessions WHERE hash = ?').run(viewer()!.session)
+      this.invalidate()
+      this.newSession(req, res, target.id)
+      res.json({ ok: true, user: publicUser(this.user(target.id)) })
+    })
+
     r.post('/auth/logout', (req, res) => {
       if (viewer()?.session) this.db.raw.prepare('DELETE FROM sessions WHERE hash = ?').run(viewer()!.session)
       this.invalidate(); this.cookie(req, res, '')
       res.json({ ok: true })
     })
-    r.get('/me', (_req, res) => res.json({ user: this.current(), auth: this.enabled, unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) }))
+    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) }))
     r.put('/me', async (req, res) => {
       this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(name(req.body?.name), this.current().id)
       await this.tag(this.user(this.current().id)); res.json({ ok: true })
@@ -540,6 +632,30 @@ export class Accounts {
       const encoded = await passwordHash(req.body?.password)
       this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, u.id)
       this.revoke(u.id, viewer()!.session); res.json({ ok: true })
+    })
+    // Tag preferences: the tags this person includes and leaves out on the Catalog page, kept with
+    // their account so every device shows the same catalog.
+    r.get('/me/tags', (_req, res) => {
+      const tags = parseJson<{ tags?: { include?: string[]; exclude?: string[] } }>(this.current().prefs, {}).tags
+      // Until a person chooses, the admin's default for everyone.
+      if (!tags) {
+        const d = readDefaults(this.db)
+        res.json({ include: [], exclude: d.tagsExclude, source: d.tagsExclude.length ? 'admin' : 'default' })
+        return
+      }
+      res.json({ include: tags.include ?? [], exclude: tags.exclude ?? [], source: 'you' })
+    })
+    r.put('/me/tags', (req, res) => {
+      const list = (v: unknown): string[] => {
+        if (!Array.isArray(v) || v.length > 60 || v.some((t) => typeof t !== 'string' || !/^[a-z0-9-]{1,40}$/.test(t))) throw new HttpError(400, 'Tags are lists of tag ids')
+        return [...new Set(v as string[])]
+      }
+      const include = list(req.body?.include ?? [])
+      const exclude = list(req.body?.exclude ?? []).filter((t) => !include.includes(t))
+      const u = this.current()
+      const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), tags: { include, exclude } }
+      this.db.raw.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify(prefs), u.id)
+      res.json({ include, exclude, source: 'you' })
     })
     r.get('/me/adult', (_req, res) => {
       const u = this.current()
@@ -576,7 +692,7 @@ export class Accounts {
         // Counts follow the admin's own level: an Off admin's counts leave hidden games' saves out.
         const store = this.store(u.id), dirs = this.content.visibleSaveDirs(await store.listDirs())
         const files = await Promise.all(dirs.map((dir) => store.list(dir)))
-        return { ...u, games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser, ...this.managed(u.id) }
+        return { ...publicUser(u), games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser, ...this.managed(u.id) }
       }))
       res.json({ users, adultDefault: this.cfg.adultDefault })
     })
@@ -596,7 +712,7 @@ export class Accounts {
         this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, ?, ?)").run(login, id, encoded)
         this.db.raw.exec('COMMIT')
       } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
-      await this.tag(this.user(id)); res.status(201).json({ user: this.user(id) })
+      await this.tag(this.user(id)); res.status(201).json({ user: publicUser(this.user(id)) })
     })
     r.put('/users/:id', async (req, res) => {
       const target = this.user(Number(req.params.id)), b = req.body ?? {}
@@ -613,7 +729,7 @@ export class Accounts {
       this.db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ? WHERE id = ?').run(b.name === undefined ? target.name : name(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), target.id)
       if (ceiling !== undefined || choice !== undefined) this.writeLevels(target.id, { ceiling, choice })
       if (b.role !== undefined) this.db.raw.prepare("UPDATE users SET admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(target.id)
-      this.invalidate(); await this.tag(this.user(target.id)); res.json({ user: this.user(target.id) })
+      this.invalidate(); await this.tag(this.user(target.id)); res.json({ user: publicUser(this.user(target.id)) })
     })
     r.post('/users/:id/password', async (req, res) => {
       const target = this.user(Number(req.params.id)), encoded = await passwordHash(req.body?.password)

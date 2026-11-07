@@ -9,10 +9,17 @@ release notes say what).
 
 ### Added
 
+- **Your recipes:** recipe files in a folder on your server (`/data/recipes`, or `RENPLAY_RECIPES_DIR`) are read as one more catalog, in the catalog's own format. A recipe there takes the place of the catalog's recipe with the same id, so you can fix a game or add one without waiting for the catalog. Art and patches can be files in the folder. **Settings** lists each source with its recipes and any problems.
+- Tags on the Catalog page can be included or left out: a tap includes a tag, the next leaves it out, the next clears it. **All tags** lists every tag by group, with how many games have it. Your choices are kept with your account.
+- **Show what uses space** in **Settings → Storage** lists each game with its build, other builds and download, largest first, the engines, and folders in the games folder that belong to no game. It says how much can be freed, and deletes a download or unused engines from there.
+- **Defaults for everyone** in **Settings**: tags left out on the Catalog page, Lighter background, the text size in games, and Rollback and Skip. People start with these until they choose their own, and the player's Options say when a value is the admin's default.
+- **Who is playing?** in the account menu switches a shared device to another person with their PIN, without their password. Each person sets a PIN of 4 to 8 digits in **Account**. Only people who signed in on that browser before appear, admins always use their full sign-in, and five wrong PINs lock switching to that person for 15 minutes.
+- Dashboards: `/metrics` gives Prometheus counts about the server, for admins, and `/api/widget` gives JSON for Homepage's custom API widget: the library's size, installs running, and what you played last and today. Both take an access token from **Account → Access tokens**.
 - The art picker lists your uploads with **Delete**. Each person keeps up to ten pictures of each kind per game.
 
 ### Changed
 
+- **Settings** says where each value comes from: the default, a choice made here, or a variable set on the server (the folders, sign-in, backups, the catalog and Your recipes, Keep downloads, Sync codes).
 - **Choose artwork** opens only for the person who started the install.
 - Sync codes write save times in your own time zone, so desktop Ren’Py sorts the saves correctly.
 - Art and recipe patches are downloaded only from the public internet, or from the catalog's own server, so a catalog cannot make Renplay reach into your local network.

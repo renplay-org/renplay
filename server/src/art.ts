@@ -11,6 +11,7 @@ import { MAX_IMAGE_PIXELS, PixelBudget } from './pipeline/image-memory.js'
 import { exists, writeFileAtomic } from './util/fsx.js'
 import { HttpError } from './util/paths.js'
 import { catalogHosts, fetchPublic } from './util/net.js'
+import { readLocalFile } from './recipes-local.js'
 
 /**
  * The art system (DESIGN 0.4). A game has five formats in SteamGridDB's shapes. The catalog links
@@ -685,6 +686,15 @@ export class ArtStore {
     const path = join(this.sources, p.id)
     if (await exists(path)) return readFile(path)
     if (p.upload || !p.url) throw new Error('the uploaded picture is gone')
+    if (p.url.startsWith('local:')) {
+      // A picture in Your recipes: read from the folder and checked like a download.
+      const data = await readLocalFile(this.cfg.recipesDir, p.url)
+      if (data.length > MAX_SOURCE_BYTES || !isImage(data)) throw new Error('not a WebP, PNG, JPEG or GIF picture under 16 MB')
+      if (p.sha256 && p.sha256 !== createHash('sha256').update(data).digest('hex')) throw new Error('the picture changed since the recipes were read')
+      await mkdir(this.sources, { recursive: true })
+      await writeFileAtomic(path, data)
+      return data
+    }
     const url = new URL(p.url, p.base)
     // Uncompressed, and read only up to the limit: a small compressed answer cannot grow in memory.
     // Only from the public internet (or the catalog's own host), redirects included.
