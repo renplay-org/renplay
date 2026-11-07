@@ -293,7 +293,7 @@ describe('the levels on every route', () => {
     ['POST /me/identities/oidc', 'person'], ['POST /me/identities/ldap', 'person'], ['GET /me/identities', 'person'], ['DELETE /me/identities', 'person'],
     ['POST /me/avatar', 'person'], ['GET /avatars/:file', 'person'], ['POST /auth/setup/verify', 'none'], ['POST /auth/setup', 'person'],
     ['POST /auth/login', 'person'], ['POST /auth/logout', 'person'], ['GET /me', 'person'], ['PUT /me', 'person'], ['POST /me/password', 'person'],
-    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/sessions', 'person'], ['DELETE /me/sessions', 'person'], ['DELETE /me/sessions/:id', 'person'],
+    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/tags', 'person'], ['PUT /me/tags', 'person'], ['GET /me/sessions', 'person'], ['DELETE /me/sessions', 'person'], ['DELETE /me/sessions/:id', 'person'],
     ['GET /me/tokens', 'person'], ['POST /me/tokens', 'person'], ['DELETE /me/tokens/:id', 'person'],
     ['GET /users', 'tool'], ['POST /users', 'person'], ['PUT /users/:id', 'person'], ['POST /users/:id/password', 'person'],
     ['POST /users/:id/saves/copy', 'tool'], ['GET /users/:id/saves/export', 'tool'], ['POST /users/:id/saves/import', 'person'],

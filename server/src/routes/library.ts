@@ -243,7 +243,7 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
   router.get('/catalog', async (_req, res) => {
     const games = db.allGames().filter((g) => !catalog.content.hides(g))
     res.json({
-      status: { ...catalog.status(), count: catalog.list().length },
+      status: { ...catalog.status(), count: catalog.list().length, sources: catalog.sources() },
       vocabulary: catalog.content.hidesRecipe(true) ? Object.fromEntries(Object.entries(catalog.vocabulary).filter(([, v]) => v.group !== 'content')) : catalog.vocabulary,
       games: catalog.list().map((r) => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)

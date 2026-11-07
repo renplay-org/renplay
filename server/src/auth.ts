@@ -541,6 +541,24 @@ export class Accounts {
       this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, u.id)
       this.revoke(u.id, viewer()!.session); res.json({ ok: true })
     })
+    // Tag preferences: the tags this person includes and leaves out on the Catalog page, kept with
+    // their account so every device shows the same catalog.
+    r.get('/me/tags', (_req, res) => {
+      const tags = parseJson<{ tags?: { include?: string[]; exclude?: string[] } }>(this.current().prefs, {}).tags
+      res.json({ include: tags?.include ?? [], exclude: tags?.exclude ?? [] })
+    })
+    r.put('/me/tags', (req, res) => {
+      const list = (v: unknown): string[] => {
+        if (!Array.isArray(v) || v.length > 60 || v.some((t) => typeof t !== 'string' || !/^[a-z0-9-]{1,40}$/.test(t))) throw new HttpError(400, 'Tags are lists of tag ids')
+        return [...new Set(v as string[])]
+      }
+      const include = list(req.body?.include ?? [])
+      const exclude = list(req.body?.exclude ?? []).filter((t) => !include.includes(t))
+      const u = this.current()
+      const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), tags: { include, exclude } }
+      this.db.raw.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify(prefs), u.id)
+      res.json({ include, exclude })
+    })
     r.get('/me/adult', (_req, res) => {
       const u = this.current()
       const ceiling = parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
