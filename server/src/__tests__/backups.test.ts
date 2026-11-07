@@ -69,6 +69,17 @@ describe('save backups', () => {
     await request(app.app).get('/api/system/backups/saves-1999-01-01-0000.zip').expect(404)
   })
 
+  it('gives Prometheus counts about the server, and a widget for the person asking', async () => {
+    const text = (await request(app.app).get('/api/metrics').expect(200).expect('content-type', /text\/plain/)).text
+    expect(text).toMatch(/^renplay_info\{version="[^"]+"\} 1$/m)
+    expect(text).toMatch(/^renplay_people 2$/m)
+    expect(text).toMatch(/^renplay_save_files 2$/m)
+    expect(text).toMatch(/^renplay_jobs\{status="running"\} 0$/m)
+    expect(text).toMatch(/^renplay_disk_free_bytes\{volume="data"\} \d+$/m)
+    expect(text).toMatch(/# TYPE renplay_play_seconds_total counter/)
+    expect((await request(app.app).get('/api/widget').expect(200)).body).toMatchObject({ games: 0, installed: 0, installing: 0, playedTodayMinutes: 0, lastPlayed: null, recent: [] })
+  })
+
   it('says where each server setting comes from, and never a secret', async () => {
     const sys = (await request(app.app).get('/api/system').expect(200)).body
     expect(sys.setBy).toMatchObject({ RENPLAY_AUTH: 'server', RENPLAY_BACKUP_DIR: 'server', RENPLAY_LOG_LEVEL: 'default' })

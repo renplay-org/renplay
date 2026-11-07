@@ -293,7 +293,9 @@ describe('the levels on every route', () => {
     ['POST /me/identities/oidc', 'person'], ['POST /me/identities/ldap', 'person'], ['GET /me/identities', 'person'], ['DELETE /me/identities', 'person'],
     ['POST /me/avatar', 'person'], ['GET /avatars/:file', 'person'], ['POST /auth/setup/verify', 'none'], ['POST /auth/setup', 'person'],
     ['POST /auth/login', 'person'], ['POST /auth/logout', 'person'], ['GET /me', 'person'], ['PUT /me', 'person'], ['POST /me/password', 'person'],
-    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/tags', 'person'], ['PUT /me/tags', 'person'], ['GET /me/sessions', 'person'], ['DELETE /me/sessions', 'person'], ['DELETE /me/sessions/:id', 'person'],
+    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/tags', 'person'], ['PUT /me/tags', 'person'],
+    // Dashboards: metrics are counts for admins, never titles. The widget lists only what the person may see.
+    ['GET /metrics', 'tool'], ['GET /widget', 'list'], ['GET /me/sessions', 'person'], ['DELETE /me/sessions', 'person'], ['DELETE /me/sessions/:id', 'person'],
     ['GET /me/tokens', 'person'], ['POST /me/tokens', 'person'], ['DELETE /me/tokens/:id', 'person'],
     ['GET /users', 'tool'], ['POST /users', 'person'], ['PUT /users/:id', 'person'], ['POST /users/:id/password', 'person'],
     ['POST /users/:id/saves/copy', 'tool'], ['GET /users/:id/saves/export', 'tool'], ['POST /users/:id/saves/import', 'person'],
@@ -442,6 +444,11 @@ describe('the levels on every route', () => {
 
   it('at off hides adult games from lists and refuses every route addressed to one with 404', async () => {
     await setLevel('off')
+    // The dashboard widget lists only what the person may see.
+    for (const g of ['adult', 'safe']) app.db.raw.prepare("INSERT OR REPLACE INTO user_games (user_id, game, last_played_at) VALUES (1, ?, ?)").run(g, new Date().toISOString())
+    const widget = (await request(app.app).get('/api/widget').expect(200)).body
+    expect(widget.recent.map((r: { id: string }) => r.id)).toEqual(['safe'])
+    expect(JSON.stringify(widget)).not.toMatch(/"adult/)
     // Import from a computer skips an adult game's save folder at Off.
     const hiddenSave = await zipBuffer({ log: 'x', json: JSON.stringify({ _save_name: 'x', _ctime: 1700000000 }) })
     const imported = await request(app.app).post('/api/saves-import').field('meta', JSON.stringify([{ path: 'adult-1/9-9-LT1.save', mtime: Date.now() }])).attach('files', hiddenSave, '9-9-LT1.save').expect(200)

@@ -58,7 +58,7 @@ export function playerRoute(method: string, path: string): boolean {
   if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export' || path === '/api/saves-import') return true
   if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art)?$/.test(path))) return true
   // A player chooses and uploads art for their own view (the route refuses everyone).
-  if ((method === 'GET' || method === 'HEAD') && path === '/api/history') return true
+  if ((method === 'GET' || method === 'HEAD') && (path === '/api/history' || path === '/api/widget')) return true
   return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
 }
 
