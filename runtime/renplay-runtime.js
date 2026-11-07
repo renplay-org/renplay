@@ -1233,6 +1233,16 @@
     })
   }
 
+  /** The patches asked for, as a Python dict of known names and True or False only. */
+  function patchArg(p) {
+    if (!p || typeof p !== 'object') return 'None'
+    var out = []
+    ;['rollback', 'skip', 'console'].forEach(function (k) {
+      if (typeof p[k] === 'boolean') out.push('"' + k + '": ' + (p[k] ? 'True' : 'False'))
+    })
+    return out.length ? '{' + out.join(', ') + '}' : 'None'
+  }
+
   function pyStr(s) {
     return JSON.stringify(String(s))
   }
@@ -1352,6 +1362,77 @@
           .catch(function () {
             post('saved-now', { ok: false, saved: false, id: d.id })
           })
+        break
+      case 'renplay:options':
+        // This person's patches for the game (kept in its persistent data, so they follow the person
+        // to every device) and Ren'Py's text size. Applied when the game is ready and after a load.
+        exec(
+          [
+          "def _renplay_options(want, size):",
+          "    import renpy",
+          "    st = renpy.store",
+          "    config = st.config",
+          "    p = st.persistent",
+          "    cur = dict(getattr(p, \"_renplay_patches\", None) or {})",
+          "    orig = getattr(renpy, \"_renplay_orig\", None)",
+          "    if orig is None:",
+          "        orig = renpy._renplay_orig = dict(rollback=config.rollback_enabled, hard=config.hard_rollback_limit, skip=config.allow_skipping, console=config.console)",
+          "    off = []",
+          "    if want:",
+          "        for k in (\"rollback\", \"skip\", \"console\"):",
+          "            if k in want:",
+          "                if cur.get(k) and not want[k]:",
+          "                    off.append(k)",
+          "                cur[k] = bool(want[k])",
+          "        p._renplay_patches = cur",
+          "    def keep():",
+          "        c = getattr(st.persistent, \"_renplay_patches\", None) or {}",
+          "        if c.get(\"rollback\"):",
+          "            config.rollback_enabled = True",
+          "            config.hard_rollback_limit = max(config.hard_rollback_limit, 100)",
+          "        if c.get(\"skip\"):",
+          "            config.allow_skipping = True",
+          "            st._skipping = True",
+          "        if c.get(\"console\"):",
+          "            config.console = True",
+          "            if st._console.console is None:",
+          "                st._console.console = st._console.DebugConsole()",
+          "                renpy._renplay_console_made = True",
+          "    if \"rollback\" in off:",
+          "        config.rollback_enabled = orig[\"rollback\"]",
+          "        config.hard_rollback_limit = orig[\"hard\"]",
+          "    if \"skip\" in off:",
+          "        config.allow_skipping = orig[\"skip\"]",
+          "    if \"console\" in off:",
+          "        config.console = orig[\"console\"]",
+          "        if getattr(renpy, \"_renplay_console_made\", False):",
+          "            st._console.console = None",
+          "            renpy._renplay_console_made = False",
+          "    keep()",
+          "    previous = getattr(renpy, \"_renplay_keep\", None)",
+          "    config.after_load_callbacks = [f for f in config.after_load_callbacks if f is not previous] + [keep]",
+          "    config.interact_callbacks = [f for f in config.interact_callbacks if f is not previous] + [keep]",
+          "    renpy._renplay_keep = keep",
+          "    if size is not None:",
+          "        st._preferences.font_size = float(size)",
+          "        st.renpy.free_memory()",
+          "        renpy.display.interface.display_reset = True",
+          "        st.renpy.restart_interaction()",
+          "    if want or size is not None:",
+          "        st.renpy.save_persistent()",
+          "    return dict(patches=cur, fontSize=st._preferences.font_size)",
+            'result = _renplay_options(' + patchArg(d.patches) + ', ' + (typeof d.fontSize === 'number' && d.fontSize >= 0.5 && d.fontSize <= 2 ? String(d.fontSize) : 'None') + ')',
+          ].join('\n'),
+          6000,
+        ).then(
+          function (r) {
+            post('options', { ok: true, patches: (r && r.patches) || {}, fontSize: r && r.fontSize })
+          },
+          function (er) {
+            console.warn('[renplay] options', er)
+            post('options', { ok: false })
+          },
+        )
         break
       case 'renplay:accessibility':
         // Ren'Py's own accessibility menu (shift+A), where the game offers it.

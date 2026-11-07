@@ -29,6 +29,7 @@ release notes say what).
 - The library sorts by Rating and Time played.
 - The player has no toolbar any more. The game fills the screen with a quiet **Renplay** pill at the top left, which opens one menu with Saves, Guide and Options, **Save now** and **Save and exit**. **Esc** or a swipe from the left edge opens it too, and the game dims behind it. A sync pill appears only while saves wait.
 - **Save and exit** makes an autosave first, or a quick save in games without autosave, and waits until it reaches the server. When saves cannot get there it asks before leaving: they stay on the device and go up the next time the game opens there. **Main menu** saves first too.
+- The player's **Options** set the text size (Normal, Large, Larger) and, for you alone, turn on **Rollback**, **Skip** and the **Developer console** where a game turns them off. They are kept with the game's saves, so they follow you to every device.
 - On iPhone and iPad a PDF walkthrough opens in its own tab, because Safari shows only its first page inside the player.
 - Play time stops counting after 15 minutes without a tap, click or key, two open windows of a game no longer count twice, and History groups your play by your own days rather than the server's.
 - Walkthroughs open in a window beside the game that you can move, resize and see through, with a tab per file, or in a reading sheet on a phone held upright.

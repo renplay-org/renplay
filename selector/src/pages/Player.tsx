@@ -106,6 +106,8 @@ export default function Player() {
   // Save and exit could not get every save to the server: where the person meant to go.
   const [unsent, setUnsent] = useState<'library' | 'game' | null>(null)
   const savingId = useRef<string | null>(null)
+  // Ren'Py games: the patches this person chose and the text size, as the game reports them.
+  const [gameOptions, setGameOptions] = useState<{ patches: { rollback?: boolean; skip?: boolean; console?: boolean }; fontSize: number } | null>(null)
   const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === '1')
   // Esc is locked (a tap reaches the game), shown as a hint for a few seconds,
   // and currently held down.
@@ -184,6 +186,12 @@ export default function Player() {
           }
           send({ type: 'renplay:focus' })
           send({ type: 'renplay:mute', value: muted })
+          // This person's patches and text size, applied now and read back for Options.
+          if (!sandboxed) send({ type: 'renplay:options' })
+          break
+        case 'renplay:options':
+          if (d.ok) setGameOptions({ patches: d.patches ?? {}, fontSize: typeof d.fontSize === 'number' ? d.fontSize : 1 })
+          else toast('The game did not take that change.')
           break
         case 'renplay:sync':
           setSync({ pending: d.pending, online: d.online, lastSync: d.lastSync })
@@ -679,12 +687,48 @@ export default function Player() {
                   {fullscreen ? 'Leave full screen' : 'Full screen'}
                 </Button>
               )}
+              {!sandboxed && gameOptions && (
+                <div className="stack" style={{ gap: 8 }}>
+                  <div className="small" style={{ fontWeight: 600 }}>Text size</div>
+                  <Seg
+                    small
+                    label="Text size"
+                    value={String(TEXT_SIZES.find((t) => Math.abs(t.value - gameOptions.fontSize) < 0.01)?.value ?? '')}
+                    onChange={(v) => send({ type: 'renplay:options', fontSize: Number(v) })}
+                    options={TEXT_SIZES.map((t) => ({ value: String(t.value), label: t.label }))}
+                  />
+                </div>
+              )}
               {!sandboxed && (
                 <div>
                   <Button size="sm" onClick={() => send({ type: 'renplay:accessibility' })}>
                     Accessibility menu
                   </Button>
-                  <p className="xs muted" style={{ marginTop: 6 }}>Ren’Py’s own menu for text size, fonts, self-voicing and mono audio, where the game offers it.</p>
+                  <p className="xs muted" style={{ marginTop: 6 }}>Ren’Py’s own menu for fonts, self-voicing and mono audio, where the game offers it.</p>
+                </div>
+              )}
+              {!sandboxed && gameOptions && (
+                <div className="stack" style={{ gap: 4 }}>
+                  <div className="small" style={{ fontWeight: 600 }}>For you in this game</div>
+                  <Switch
+                    checked={!!gameOptions.patches.rollback}
+                    label="Rollback"
+                    hint="Go back to earlier lines with the mouse wheel or Page Up, even where the game turns it off."
+                    onChange={(rollback) => send({ type: 'renplay:options', patches: { rollback } })}
+                  />
+                  <Switch
+                    checked={!!gameOptions.patches.skip}
+                    label="Skip"
+                    hint="Skip text you have read with Ctrl or Tab, even where the game turns it off."
+                    onChange={(skip) => send({ type: 'renplay:options', patches: { skip } })}
+                  />
+                  <Switch
+                    checked={!!gameOptions.patches.console}
+                    label="Developer console"
+                    hint="Ren’Py’s console, opened with Shift and O. For changing variables, at your own risk."
+                    onChange={(console) => send({ type: 'renplay:options', patches: { console } })}
+                  />
+                  <p className="xs muted">Kept with this game’s saves, so they follow you to every device. The game’s files do not change.</p>
                 </div>
               )}
               <DisplayPanel
@@ -891,6 +935,13 @@ function SidePanel({ title, onClose, children, top, narrow }: { title: string; o
     </div>
   )
 }
+
+/** Named text sizes: Ren'Py's own text size preference, kept with the game's persistent data. */
+const TEXT_SIZES = [
+  { value: 1, label: 'Normal' },
+  { value: 1.25, label: 'Large' },
+  { value: 1.5, label: 'Larger' },
+]
 
 function SavesPanel({ gameId, onLoad }: { gameId: string; onLoad: (slot: string) => void }) {
   const { data, isLoading, refetch } = useSaves(gameId)

@@ -16,7 +16,10 @@ Search follows your adult games level, as the library does.
 Open the game and press **Play**. The game paces itself to your display and fills the screen.
 The **Renplay** pill at the top left (or **Esc**, or a swipe from the left edge on a phone) opens
 the player menu: **Saves** to load one, **Guide** for the game's walkthroughs, and **Options** for
-sound, full screen, the display and Ren'Py's own accessibility menu. **Save now** makes a quick
+sound, full screen, the display, the text size and Ren'Py's own accessibility menu. Under **For you
+in this game**, **Rollback**, **Skip** and the **Developer console** turn those on even where the
+game turns them off. They are kept with the game's saves, so they follow you to every device, and
+the game's files do not change. **Save now** makes a quick
 save, and **Save and exit** saves and goes back to the library. Walkthroughs open in a window
 beside the game that you can move, resize and see through, or below it on a phone held upright.
 **Up next** on the library home opens your latest save straight away.
