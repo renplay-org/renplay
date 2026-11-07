@@ -73,11 +73,12 @@ function Shell() {
   ]
   const online = useOnline()
   const { data: games } = useGames()
-  // A kept copy of a game that is gone (uninstalled, or hidden at Off) goes too.
+  // A kept copy of an uninstalled game goes too. A copy belongs to the browser, so a game this person
+  // does not see (another person kept it) stays.
   useEffect(() => {
     if (!online || !games) return
-    const present = new Set(games.filter((g) => g.status === 'installed').map((g) => g.id))
-    for (const id of Object.keys(keptGames())) if (!present.has(id)) void removeKept(id)
+    const uninstalled = new Set(games.filter((g) => g.status !== 'installed').map((g) => g.id))
+    for (const id of Object.keys(keptGames())) if (uninstalled.has(id)) void removeKept(id)
   }, [online, games])
   return (
     <>

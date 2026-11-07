@@ -77,7 +77,7 @@ export function offlineSupport(): 'ok' | 'browser' | 'home-screen' {
   return 'ok'
 }
 
-/** One form of each address, the service worker's too, so a file is found however it was encoded. */
+/** One form of each address, the service worker's too, so a file is found however it was encoded. The device's adult level is not part of it. */
 function keyOf(url: string): string {
   const u = new URL(url, location.origin)
   const path = u.pathname
@@ -90,11 +90,13 @@ function keyOf(url: string): string {
       }
     })
     .join('/')
+  u.searchParams.delete('adult')
   return u.origin + path + u.search
 }
 
+/** The worker reads the kept games again (also when this page is not controlled, after a hard reload). */
 function tellWorker(): void {
-  navigator.serviceWorker?.controller?.postMessage({ type: 'renplay:kept-changed' })
+  navigator.serviceWorker?.ready.then((r) => r.active?.postMessage({ type: 'renplay:kept-changed' })).catch(() => {})
 }
 
 const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -124,6 +126,8 @@ async function download(url: string, signal: AbortSignal, onBytes: (n: number) =
         try {
           const { done, value } = await reader.read()
           if (done) {
+            // A connection that closed early is not a whole file.
+            if (total && received < total) throw new Error(`${url} ended at ${received} of ${total} bytes`)
             controller.close()
             return
           }
@@ -135,7 +139,7 @@ async function download(url: string, signal: AbortSignal, onBytes: (n: number) =
           if (signal.aborted || ++failures > 8 || !total) throw e
           await new Promise((r) => setTimeout(r, Math.min(30_000, 1000 * 2 ** failures)))
           const res = await fetch(url, { signal, cache: 'no-store', credentials: 'same-origin', headers: { Range: `bytes=${received}-` } })
-          if (res.status !== 206 || !res.body) throw new Error(`Could not resume ${url} (${res.status})`)
+          if (res.status !== 206 || !res.body || !(res.headers.get('content-range') ?? '').startsWith(`bytes ${received}-`)) throw new Error(`Could not resume ${url} (${res.status})`)
           reader = res.body.getReader()
         }
       }

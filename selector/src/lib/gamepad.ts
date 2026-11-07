@@ -84,6 +84,12 @@ function read(): Set<Input> {
 }
 
 let running = false
+let gameHasPad = false
+
+/** While a game plays and its drawer is closed, the game has the controller, wherever focus is. */
+export function setGameHasPad(on: boolean): void {
+  gameHasPad = on
+}
 
 /** Starts listening once a controller connects. Call once. */
 export function installGamepad(): void {
@@ -99,7 +105,7 @@ export function installGamepad(): void {
     const held = read()
     // A game in a frame with focus has the controller. Buttons it was given count as held here, so
     // the press that opened the drawer does not reach the drawer as a new one.
-    if (document.activeElement?.tagName === 'IFRAME') {
+    if (gameHasPad || document.activeElement?.tagName === 'IFRAME') {
       for (const input of held) if (!since.has(input)) since.set(input, now)
       for (const input of [...since.keys()]) if (!held.has(input)) since.delete(input)
       requestAnimationFrame(tick)

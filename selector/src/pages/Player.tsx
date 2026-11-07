@@ -47,6 +47,7 @@ import { ago } from '../lib/format'
 import { useDefaults, useGame, useSaves, type Defaults } from '../lib/queries'
 import { queueHtmlSave, uploadHtmlSave, replayHtmlSaves } from '../lib/html-save-queue'
 import { keptGame, useOnline } from '../lib/offline'
+import { setGameHasPad } from '../lib/gamepad'
 
 type Panel = null | 'fullscreen'
 
@@ -446,7 +447,8 @@ export default function Player() {
   // The drawer has the controller while it is open, and its Menu button closes it again.
   useEffect(() => {
     if (ready && !sandboxed) send({ type: 'renplay:pads', toGame: !drawer })
-    if (!drawer) return
+    setGameHasPad(ready && !sandboxed && !drawer)
+    if (!drawer) return () => setGameHasPad(false)
     const onMenu = () => closeDrawer()
     window.addEventListener('renplay:pad-menu', onMenu)
     return () => window.removeEventListener('renplay:pad-menu', onMenu)

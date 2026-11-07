@@ -17,6 +17,9 @@ const API = 'renplay-api-v1'
 const KEPT = 'renplay-offline-'
 const GAMEZIP = 'renplay-gamezip-v1'
 
+/** How long a page or an answer may take when a copy is there: Wi-Fi without internet waits much longer. */
+const WAIT = 6000
+
 /** Answers kept for offline: who is signed in, the library, a game, and the defaults. */
 const ANSWERS = /^\/api\/(me|auth\/providers|defaults|content|games|games\/[a-z0-9][a-z0-9._-]*)$/
 
@@ -26,14 +29,42 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 /** The games kept in this browser, read from the caches' names. */
 let kept = null
 function keptGames() {
-  if (!kept) kept = caches.keys().then((names) => new Set(names.filter((n) => n.startsWith(KEPT)).map((n) => n.slice(KEPT.length))))
+  if (!kept) {
+    kept = caches.keys().then(
+      (names) => new Set(names.filter((n) => n.startsWith(KEPT)).map((n) => n.slice(KEPT.length))),
+      () => {
+        kept = null
+        return new Set()
+      },
+    )
+  }
   return kept
 }
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'renplay:kept-changed') kept = null
 })
 
-/** One form of each address, so a file is found however its name was encoded. */
+/**
+ * From the server, cached when it answers well. With a copy at hand, a server that does not answer in
+ * time or answers with an error (a gateway's 502) counts as unreachable. The download goes on, and
+ * its answer still updates the copy.
+ */
+function network(req, save, hasCopy) {
+  const answered = fetch(req).then((res) => {
+    if (res.ok && save) save(res.clone()).catch(() => {})
+    return res
+  })
+  if (!hasCopy) return answered
+  return Promise.race([
+    answered.then((res) => {
+      if (res.status >= 500) throw new Error(`The server answered ${res.status}`)
+      return res
+    }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('The server did not answer in time')), WAIT)),
+  ])
+}
+
+/** One form of each address, so a file is found however its name was encoded. The device's adult level is not part of it. */
 function keyOf(url) {
   const path = url.pathname
     .split('/')
@@ -45,7 +76,10 @@ function keyOf(url) {
       }
     })
     .join('/')
-  return url.origin + path + url.search
+  const params = new URLSearchParams(url.search)
+  params.delete('adult')
+  const search = params.toString()
+  return url.origin + path + (search ? `?${search}` : '')
 }
 
 self.addEventListener('fetch', (event) => {
@@ -53,11 +87,12 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
   const path = url.pathname
-  if (req.method !== 'GET') {
-    // Another person, or nobody: the last answers were someone else's.
-    if (/^\/api\/auth\/(login|logout|switch)$/.test(path)) event.waitUntil(caches.delete(API))
+  // Another person, or nobody: the last answers were someone else's.
+  if ((req.method !== 'GET' && /^\/api\/auth\/(login|logout|switch)$/.test(path)) || (req.mode === 'navigate' && path.startsWith('/api/auth/'))) {
+    event.waitUntil(caches.delete(API))
     return
   }
+  if (req.method !== 'GET') return
   if (path.startsWith('/g/')) {
     const id = path.split('/')[2]
     event.respondWith(fromKept(req, url, id))
@@ -76,15 +111,11 @@ self.addEventListener('fetch', (event) => {
 
 /** The library's page: from the server, or the last one seen. */
 async function shellPage(req) {
+  const hit = await caches.match('/index.html', { cacheName: SHELL, ignoreVary: true })
+  const save = (res) => ((res.headers.get('content-type') || '').includes('text/html') ? caches.open(SHELL).then((c) => c.put('/index.html', res)) : Promise.resolve())
   try {
-    const res = await fetch(req)
-    if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) {
-      const copy = res.clone()
-      caches.open(SHELL).then((c) => c.put('/index.html', copy)).catch(() => {})
-    }
-    return res
+    return await network(req, save, !!hit)
   } catch (e) {
-    const hit = await caches.match('/index.html', { cacheName: SHELL, ignoreVary: true })
     if (hit) return hit
     throw e
   }
@@ -103,18 +134,41 @@ async function shellFile(req) {
 
 /** An answer from the server, or the last one when the server cannot be reached. */
 async function answer(req, cacheName = API) {
+  const hit = await caches.match(req, { cacheName, ignoreVary: true })
   try {
-    const res = await fetch(req)
-    if (res.ok) {
-      const copy = res.clone()
-      caches.open(cacheName).then((c) => c.put(req, copy)).catch(() => {})
-    }
-    return res
+    return await network(req, (res) => caches.open(cacheName).then((c) => c.put(req, res)), !!hit)
   } catch (e) {
-    const hit = await caches.match(req, { cacheName, ignoreVary: true })
     if (hit) return hit
     throw e
   }
+}
+
+async function cachedAnswer(path) {
+  const hit = await caches.match(path, { cacheName: API, ignoreVary: true })
+  return hit ? hit.json().catch(() => null) : null
+}
+
+/**
+ * A kept game's page offline, made for whoever is signed in on this browser now: the page holds the
+ * person it was made for, and the game keeps each person's unsent saves apart by it. Without a
+ * signed-in person, or a game they may not see, it does not play. At Blurred the game's own
+ * presplash gives way to the engine's.
+ */
+async function offlinePage(hit, id) {
+  const [me, answer] = await Promise.all([cachedAnswer('/api/me'), cachedAnswer(`/api/games/${id}`)])
+  const user = me && me.user && me.user.id
+  if (!Number.isInteger(user) || !answer || !answer.game) {
+    return new Response(
+      '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Renplay</title><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#000;color:#ccc;font:16px system-ui;text-align:center;padding:24px"><p>Open this game once with a network while you are signed in, and then it plays offline for you.</p>',
+      { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+    )
+  }
+  let html = await hit.text()
+  html = html.replace(/("userId":)\d+/, `$1${user}`)
+  const blurred = answer.game.nsfw && !Object.values(answer.game.art || {}).some((a) => a && a.url1x)
+  const engine = /"engineBase":"(\/engine\/[^"]+\/)"/.exec(html)
+  if (blurred && engine) html = html.replace(/(<img[^>]*id="presplash"[^>]*src=)"[^"]*"/i, `$1"${engine[1]}web-presplash.jpg"`)
+  return new Response(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
 }
 
 /**
@@ -135,16 +189,12 @@ async function fromKept(req, url, id) {
     return null
   }
   if (id && /^\/g\/[^/]+\/[^/]+\/(index\.html)?$/.test(url.pathname)) {
+    const hit = await find()
+    const save = (res) => (res.redirected ? Promise.resolve() : caches.open(KEPT + id).then((c) => c.put(key, res)))
     try {
-      const res = await fetch(req)
-      if (res.ok && !res.redirected) {
-        const copy = res.clone()
-        caches.open(KEPT + id).then((c) => c.put(key, copy)).catch(() => {})
-      }
-      return res
+      return await network(req, save, !!hit)
     } catch (e) {
-      const hit = await find()
-      if (hit) return hit
+      if (hit) return offlinePage(hit, id)
       throw e
     }
   }

@@ -10,7 +10,7 @@ release notes say what).
 ### Added
 
 - **Keep offline** on a Ren’Py game's page keeps the game in that browser, so it plays with no network. Saves made offline wait on the device and are sent when the network is back, with the usual rule when another device saved too. The library opens offline and says so. On iPhone and iPad this works from Renplay on the Home Screen, because Safari clears what a tab keeps after a week.
-- Controllers: the d-pad or left stick moves around Renplay, A presses and B goes back. In a game the controller plays through Ren’Py’s own buttons, and the Menu button opens the player's drawer (Ren’Py's game menu stays on B).
+- Controllers: the d-pad or left stick moves around Renplay, A presses and B closes sheets and menus. In a game the controller plays through Ren’Py’s own buttons, and the Menu button opens the player's drawer (Ren’Py's game menu stays on B).
 
 ### Changed
 

@@ -1347,6 +1347,7 @@
     switch (d.type) {
       case 'renplay:pads':
         // The player's drawer has the controller while it is open.
+        if (d.toGame !== false && !pads.toGame) pads.held = true
         pads.toGame = d.toGame !== false
         break
       case 'renplay:resume-sync':
@@ -1539,12 +1540,27 @@
    * opens the player's drawer: Ren'Py's game menu stays on B. While the drawer is open the player
    * has the controller, so the game sees none (pads.toGame).
    */
-  var pads = { toGame: true, start: false, polling: false }
+  var pads = { toGame: true, held: false, start: false, polling: false }
   var realPads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null
+  function anyPressed(list) {
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i]
+      if (p && p.connected && [].some.call(p.buttons, function (b) { return b.pressed })) return true
+    }
+    return false
+  }
   if (realPads) {
     try {
       navigator.getGamepads = function () {
-        return pads.toGame ? realPads() : []
+        if (!pads.toGame) return []
+        // Back from the drawer, the button that closed it is not a press in the game.
+        if (pads.held) {
+          var list = realPads()
+          if (anyPressed(list)) return []
+          pads.held = false
+          return list
+        }
+        return realPads()
       }
     } catch (e) {}
   }
@@ -1558,7 +1574,11 @@
       any = true
       if (p.mapping === 'standard' && p.buttons[9] && p.buttons[9].pressed) down = true
     }
-    if (down && !pads.start && pads.toGame) post('menu')
+    if (down && !pads.start && pads.toGame && !pads.held) {
+      post('menu')
+      // Again on each press: a game that restarts reads its bindings anew.
+      unbindStart(1)
+    }
     pads.start = down
     if (any) requestAnimationFrame(padPoll)
     else pads.polling = false
@@ -1569,10 +1589,14 @@
     requestAnimationFrame(padPoll)
   }
   window.addEventListener('gamepadconnected', padsWatch)
-  function padsReady() {
-    exec('config.pad_bindings["pad_start_press"] = []\nconfig.pad_bindings["repeat_pad_start_press"] = []\nrenpy.clear_keymap_cache()\nresult = True').catch(function (e) {
-      log('controller menu button not given to the player', e && e.message)
+  function unbindStart(tries) {
+    exec('config.pad_bindings["pad_start_press"] = []\nconfig.pad_bindings["repeat_pad_start_press"] = []\nrenpy.clear_keymap_cache()\nresult = True', 10000).catch(function (e) {
+      if (tries > 1) setTimeout(function () { unbindStart(tries - 1) }, 2000)
+      else log('controller menu button not given to the player', e && e.message)
     })
+  }
+  function padsReady() {
+    unbindStart(5)
     if (realPads && [].some.call(realPads(), function (p) { return p && p.connected })) padsWatch()
   }
 
