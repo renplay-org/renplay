@@ -4,6 +4,8 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { api, ApiError } from './api'
 import { Spinner } from '../components/ui'
 import { rememberPerson } from '../components/WhoIsPlaying'
+import { setAdminLighterBackground } from './backdrop'
+import { useDefaults } from './queries'
 
 export interface Account {
   id: number
@@ -44,5 +46,10 @@ function Remember({ id }: { id: number | null }) {
   useEffect(() => {
     if (id) rememberPerson(id)
   }, [id])
+  // The admin's default for Lighter background, for browsers that did not choose.
+  const defaults = useDefaults()
+  useEffect(() => {
+    setAdminLighterBackground(defaults.data?.lighterBackground ?? null)
+  }, [defaults.data?.lighterBackground])
   return <Outlet />
 }

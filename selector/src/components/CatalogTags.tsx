@@ -64,7 +64,7 @@ function withState(prefs: TagPrefs, id: string, state: State): TagPrefs {
  * Tag chips for the catalog: a tap includes a tag, the next leaves it out, the next clears it.
  * All tags opens every tag by group, with how many of the games shown have it.
  */
-export default function CatalogTags({ games, vocabulary, prefs, onChange }: { games: Tagged[]; vocabulary: Vocabulary; prefs: TagPrefs; onChange: (next: TagPrefs) => void }) {
+export default function CatalogTags({ games, vocabulary, prefs, onChange, excludeOnly = false }: { games: Tagged[]; vocabulary: Vocabulary; prefs: TagPrefs; onChange: (next: TagPrefs) => void; excludeOnly?: boolean }) {
   const [all, setAll] = useState(false)
   const counts = new Map<string, { id: string; label: string; group: string; count: number }>()
   for (const g of games) for (const t of gameTags(g, vocabulary)) {
@@ -76,7 +76,8 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange }: { ga
   // The row: chosen tags first, then the most common play and story tags.
   const common = [...counts.values()].filter((t) => (t.group === 'play' || t.group === 'story') && t.count >= 2 && !chosen.includes(t.id)).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
   const label = (id: string) => counts.get(id)?.label ?? vocabulary[id]?.label ?? id
-  const next = (id: string): State => ({ off: 'include', include: 'exclude', exclude: 'off' } as const)[stateOf(prefs, id)]
+  // Leaving out only (the defaults for everyone): off and left out.
+  const next = (id: string): State => (excludeOnly ? (stateOf(prefs, id) === 'exclude' ? 'off' : 'exclude') : ({ off: 'include', include: 'exclude', exclude: 'off' } as const)[stateOf(prefs, id)])
   const chip = (id: string, n?: number) => {
     const state = stateOf(prefs, id)
     return (
@@ -103,7 +104,9 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange }: { ga
       {all && (
         <Sheet open onClose={() => setAll(false)} title="Tags" wide fullPhone>
           <p className="small muted" style={{ marginBottom: 16 }}>
-            Include a tag to see only games that have it. Leave one out to hide games that have it. Your choices are kept for next time, on every device.
+            {excludeOnly
+              ? 'Games with a tag left out here are hidden in the catalog for everyone who has not chosen their own tags.'
+              : 'Include a tag to see only games that have it. Leave one out to hide games that have it. Your choices are kept for next time, on every device.'}
           </p>
           <div className="stack" style={{ gap: 20 }}>
             {GROUPS.map(([group, title]) => {
@@ -121,9 +124,9 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange }: { ga
                             {t.label} <span className="muted tnum">{t.count}</span>
                           </span>
                           <span className="row" style={{ gap: 6 }}>
-                            <Pill variant={state === 'include' ? 'p' : 'q'} size="sm" aria-pressed={state === 'include'} onClick={() => onChange(withState(prefs, t.id, state === 'include' ? 'off' : 'include'))}>
+                            {!excludeOnly && <Pill variant={state === 'include' ? 'p' : 'q'} size="sm" aria-pressed={state === 'include'} onClick={() => onChange(withState(prefs, t.id, state === 'include' ? 'off' : 'include'))}>
                               Include
-                            </Pill>
+                            </Pill>}
                             <Pill variant={state === 'exclude' ? 'd' : 'q'} size="sm" aria-pressed={state === 'exclude'} onClick={() => onChange(withState(prefs, t.id, state === 'exclude' ? 'off' : 'exclude'))}>
                               Leave out
                             </Pill>

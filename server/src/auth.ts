@@ -26,6 +26,32 @@ const random = () => randomBytes(32).toString('base64url')
 const DAYS30 = 30 * 86400_000
 export const keepaliveToken = random()
 
+/**
+ * Defaults for everyone: what a person starts with until they choose. Each value is null when the
+ * admin leaves it to Renplay's own default.
+ */
+export interface Defaults {
+  /** Tags left out on the Catalog page. */
+  tagsExclude: string[]
+  /** Lighter background on browsers that did not choose. */
+  lighterBackground: boolean | null
+  /** Ren'Py text size in games where the person did not choose one. */
+  textSize: number | null
+  rollback: boolean | null
+  skip: boolean | null
+}
+export const DEFAULTS_KEY = 'defaults_for_everyone'
+export function readDefaults(db: Db): Defaults {
+  const d = db.getSetting<Partial<Defaults>>(DEFAULTS_KEY, {})
+  return {
+    tagsExclude: Array.isArray(d.tagsExclude) ? d.tagsExclude.filter((t) => typeof t === 'string') : [],
+    lighterBackground: typeof d.lighterBackground === 'boolean' ? d.lighterBackground : null,
+    textSize: typeof d.textSize === 'number' && [1, 1.25, 1.5].includes(d.textSize) ? d.textSize : null,
+    rollback: typeof d.rollback === 'boolean' ? d.rollback : null,
+    skip: typeof d.skip === 'boolean' ? d.skip : null,
+  }
+}
+
 /** An account as the API sends it: never its PIN's hash or lock. */
 export function publicUser<T extends Partial<User>>(u: T): Omit<T, 'pin_hash' | 'pin_failures' | 'pin_locked_until'> & { hasPin: boolean } {
   const { pin_hash, pin_failures: _f, pin_locked_until: _l, ...rest } = u
@@ -64,7 +90,7 @@ export function playerRoute(method: string, path: string): boolean {
   if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export' || path === '/api/saves-import') return true
   if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art)?$/.test(path))) return true
   // A player chooses and uploads art for their own view (the route refuses everyone).
-  if ((method === 'GET' || method === 'HEAD') && (path === '/api/history' || path === '/api/widget')) return true
+  if ((method === 'GET' || method === 'HEAD') && (path === '/api/history' || path === '/api/widget' || path === '/api/defaults')) return true
   return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
 }
 
@@ -611,7 +637,13 @@ export class Accounts {
     // their account so every device shows the same catalog.
     r.get('/me/tags', (_req, res) => {
       const tags = parseJson<{ tags?: { include?: string[]; exclude?: string[] } }>(this.current().prefs, {}).tags
-      res.json({ include: tags?.include ?? [], exclude: tags?.exclude ?? [] })
+      // Until a person chooses, the admin's default for everyone.
+      if (!tags) {
+        const d = readDefaults(this.db)
+        res.json({ include: [], exclude: d.tagsExclude, source: d.tagsExclude.length ? 'admin' : 'default' })
+        return
+      }
+      res.json({ include: tags.include ?? [], exclude: tags.exclude ?? [], source: 'you' })
     })
     r.put('/me/tags', (req, res) => {
       const list = (v: unknown): string[] => {
@@ -623,7 +655,7 @@ export class Accounts {
       const u = this.current()
       const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), tags: { include, exclude } }
       this.db.raw.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify(prefs), u.id)
-      res.json({ include, exclude })
+      res.json({ include, exclude, source: 'you' })
     })
     r.get('/me/adult', (_req, res) => {
       const u = this.current()

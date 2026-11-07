@@ -100,6 +100,17 @@ describe('save backups', () => {
     expect(s.totals).toMatchObject({ builds: 3500, downloads: 7000 })
   })
 
+  it('keeps defaults for everyone, which a person’s own choice replaces', async () => {
+    expect((await request(app.app).get('/api/defaults').expect(200)).body).toEqual({ tagsExclude: [], lighterBackground: null, textSize: null, rollback: null, skip: null })
+    await request(app.app).put('/api/defaults').send({ textSize: 2 }).expect(400)
+    await request(app.app).put('/api/defaults').send({ rollback: 'yes' }).expect(400)
+    await request(app.app).put('/api/defaults').send({ tagsExclude: ['horror', 'horror'], lighterBackground: true, textSize: 1.25, rollback: true }).expect(200)
+    expect((await request(app.app).get('/api/defaults').expect(200)).body).toEqual({ tagsExclude: ['horror'], lighterBackground: true, textSize: 1.25, rollback: true, skip: null })
+    expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: [], exclude: ['horror'], source: 'admin' })
+    await request(app.app).put('/api/me/tags').send({ include: [], exclude: [] }).expect(200)
+    expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: [], exclude: [], source: 'you' })
+  })
+
   it('says where each server setting comes from, and never a secret', async () => {
     const sys = (await request(app.app).get('/api/system').expect(200)).body
     expect(sys.setBy).toMatchObject({ RENPLAY_AUTH: 'server', RENPLAY_BACKUP_DIR: 'server', RENPLAY_LOG_LEVEL: 'default' })

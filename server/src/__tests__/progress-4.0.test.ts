@@ -249,9 +249,9 @@ describe('names, notes and pins of saves', () => {
   })
 
   it('keeps each person’s tag preferences for the catalog', async () => {
-    expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: [], exclude: [] })
-    expect((await request(app.app).put('/api/me/tags').send({ include: ['romance', 'romance'], exclude: ['horror', 'romance'] }).expect(200)).body).toEqual({ include: ['romance'], exclude: ['horror'] })
-    expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: ['romance'], exclude: ['horror'] })
+    expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: [], exclude: [], source: 'default' })
+    expect((await request(app.app).put('/api/me/tags').send({ include: ['romance', 'romance'], exclude: ['horror', 'romance'] }).expect(200)).body).toEqual({ include: ['romance'], exclude: ['horror'], source: 'you' })
+    expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: ['romance'], exclude: ['horror'], source: 'you' })
     await request(app.app).put('/api/me/tags').send({ include: ['Not A Tag'] }).expect(400)
     await request(app.app).put('/api/me/tags').send({ exclude: 'horror' }).expect(400)
     // The 3.x picture preference stays beside it, for a downgrade.
