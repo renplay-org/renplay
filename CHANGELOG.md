@@ -29,6 +29,7 @@ release notes say what).
 - Menus, sheets and the tab bar had no blur behind them in Chrome, Edge and other Chromium browsers, so text behind them showed through. The build dropped the property those browsers read.
 - Pages no longer jump while they load: the footer, a game's logo and the Add games page held their place.
 - **Resume** and **Play** show the focus ring when reached with the keyboard.
+- A picture is never cut and stretched to more than about twice its size for a game's art: a small store header no longer becomes a blurry background, and the soft background made instead is a smooth glow of the game's colours. Every game's art is made again once after the upgrade.
 - A game with saves but under a minute of play time said "Not played yet". It now says "Under a minute played".
 
 ## [4.2.0] - 2026-11-07

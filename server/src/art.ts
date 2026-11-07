@@ -29,10 +29,15 @@ type Shaped = Exclude<ArtKind, 'logo'>
 export const SHAPES: Record<Shaped, readonly [number, number]> = { grid: [600, 900], wide: [920, 430], hero: [1920, 620], icon: [512, 512] }
 const LOGO_WIDTH = 640
 /** Raised when the making changes, so every picture is made again. */
-const ART_VERSION = 3
+const ART_VERSION = 4
 const MAX_SOURCE_BYTES = 16 << 20
 /** A crop must keep this share of the picture, unless the recipe gives a focal point. */
 export const MIN_CROP = 0.6
+/**
+ * A crop may enlarge its piece of the picture at most this much: more is a blur, not art. A Steam
+ * capsule (920 wide) behind a 1920 hero is 2.1 times, and fine under the stage's shade.
+ */
+export const MAX_ENLARGE = 2.25
 /** The icon cut from a grid: this share of the grid's short side. */
 const ICON_SHARE = 0.62
 
@@ -134,6 +139,14 @@ export function keeps(kind: Shaped, p: { width: number; height: number }): numbe
   return Math.min(a / t, t / a)
 }
 
+/** How much a crop to the format enlarges the picture (1 means none). */
+export function enlarges(kind: Shaped, p: { width: number; height: number }): number {
+  const [w, h] = SHAPES[kind]
+  const t = w / h
+  const width = p.width / p.height > t ? p.height * t : p.width
+  return w / width
+}
+
 /**
  * How a format is made from the chosen pictures (DESIGN 0.4):
  * 1. real art in the shape, resized,
@@ -157,7 +170,9 @@ export function planFormat(kind: ArtKind, chosen: Partial<Record<ArtKind, Pictur
   const others = (['grid', 'wide', 'hero'] as const).filter((k) => k !== kind).map((k) => chosen[k]).filter((p): p is Picture => !!p)
   const from = own ?? others.sort((a, b) => keeps(kind, b) - keeps(kind, a) || b.width * b.height - a.width * a.height)[0]
   if (!from) return null
-  if (from.focal || keeps(kind, from) >= MIN_CROP) return { kind, mode: 'crop', source: from }
+  // A crop keeps enough of the picture and enlarges it at most twice: a Steam header cut to a hero
+  // would be four times its size and blurry, so that hero glows instead.
+  if ((from.focal || keeps(kind, from) >= MIN_CROP) && enlarges(kind, from) <= MAX_ENLARGE) return { kind, mode: 'crop', source: from }
   if (kind === 'hero') return { kind, mode: 'glow', source: from }
   const aspect = from.width / from.height
   if (kind === 'wide' && aspect <= 0.8) return { kind, mode: 'poster', source: from }
@@ -274,12 +289,15 @@ function cropRect(w: number, h: number, aspect: number, focal: [number, number],
   return { left, top, width: cw, height: ch }
 }
 
-/** The picture enlarged to fill the frame, blurred and darkened: the glow behind compositions. */
+/**
+ * The picture's colours as a smooth field, darkened: the glow behind compositions and the hero of a
+ * game without one. So small before it is enlarged that no shape of the picture is left to smear.
+ */
 async function glow(data: Buffer, w: number, h: number, brightness: number): Promise<Buffer> {
-  // Blurred small, then enlarged: smooth at any size, and cheap.
+  // Blurred tiny, then enlarged: smooth at any size, and cheap.
   const small = await sharp(data, { failOn: 'none', limitInputPixels: MAX_IMAGE_PIXELS })
-    .resize(Math.max(8, Math.round(w / 16)), Math.max(8, Math.round(h / 16)), { fit: 'cover' })
-    .blur(2.5)
+    .resize(Math.max(6, Math.round(w / 48)), Math.max(6, Math.round(h / 48)), { fit: 'cover' })
+    .blur(1.2)
     .png()
     .toBuffer()
   return sharp(small)
@@ -311,7 +329,7 @@ async function makeAt(plan: Plan, data: Buffer, meta: { width: number; height: n
       return webp(input().extract(rect).resize(W, H, { fit: 'cover' }))
     }
     case 'glow':
-      return webp(sharp(await glow(data, W, H, 0.75)))
+      return webp(sharp(await glow(data, W, H, 0.6)))
     case 'poster': {
       const pad = Math.round(H * 0.07)
       const ph = H - 2 * pad
