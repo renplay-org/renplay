@@ -1,4 +1,5 @@
-import { Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
+import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
+import { useOnline } from '../lib/offline'
 import ChooseArtwork from './ChooseArtwork'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { api, jobTitle } from '../lib/api'
@@ -69,6 +70,7 @@ function Shell() {
     ...(admin ? [{ to: '/add', label: 'Add games', icon: Plus, end: false }] : []),
     { to: '/account', label: 'You', icon: User, end: false },
   ]
+  const online = useOnline()
   return (
     <>
       <header className="top">
@@ -101,6 +103,12 @@ function Shell() {
         </div>
       </header>
       <main className="rise">
+        {!online && (
+          <p className="notice amber" role="status" style={{ margin: '12px 16px 0' }}>
+            <CloudOff aria-hidden />
+            Offline. Games kept in this browser still play, and their saves are sent when you are back online.
+          </p>
+        )}
         <Outlet />
       </main>
       <Footer />

@@ -46,6 +46,7 @@ import {
 import { ago } from '../lib/format'
 import { useDefaults, useGame, useSaves, type Defaults } from '../lib/queries'
 import { queueHtmlSave, uploadHtmlSave, replayHtmlSaves } from '../lib/html-save-queue'
+import { keptGame, useOnline } from '../lib/offline'
 
 type Panel = null | 'fullscreen'
 
@@ -77,6 +78,7 @@ export default function Player() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: game, isLoading } = useGame(gameId)
+  const online = useOnline()
 
   useEffect(() => {
     document.title = game ? `${game.title} · Renplay` : 'Renplay'
@@ -540,6 +542,13 @@ export default function Player() {
     return (
       <div className="flex h-dvh items-center justify-center bg-black">
         <Spinner />
+      </div>
+    )
+  if (!online && !keptGame(gameId))
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-black p-6 text-center text-zinc-300">
+        <p>You are offline, and this game is not kept in this browser. Keep it offline from its page next time you have a network.</p>
+        <Button onClick={() => navigate('/')}>Go back</Button>
       </div>
     )
   if (!game || !game.playUrl)
