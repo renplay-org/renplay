@@ -7,6 +7,13 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-11-07
+
+Renplay 4.2 plays Ren’Py games with no network and with a controller. Keep a game offline from its
+page, and it plays from that browser, with saves sent when the network is back. A controller moves
+around the library, plays the game through Ren’Py’s own buttons, and opens the player's drawer with
+its Menu button. Nothing needs changing to upgrade.
+
 ### Added
 
 - **Keep offline** on a Ren’Py game's page keeps the game in that browser, so it plays with no network. Saves made offline wait on the device and are sent when the network is back, with the usual rule when another device saved too. The library opens offline and says so. On iPhone and iPad this works from Renplay on the Home Screen, because Safari clears what a tab keeps after a week.
@@ -509,7 +516,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.1.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.2.0...dev
+[4.2.0]: https://github.com/renplay-org/renplay/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/renplay-org/renplay/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/renplay-org/renplay/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/renplay-org/renplay/compare/v3.2.0...v4.0.0
