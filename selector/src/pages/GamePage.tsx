@@ -328,7 +328,7 @@ function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
               </p>
               <p style={{ marginTop: 4 }}>
                 {playedTime(game.playTime)} · {game.saves.count} {game.saves.count === 1 ? 'save' : 'saves'}
-                {game.saves.count > 0 ? ' · Synced' : ''}
+                {game.saves.count > 0 && navigator.onLine ? ' · Synced' : ''}
               </p>
             </div>
           </div>

@@ -1,9 +1,10 @@
 import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
-import { useOnline } from '../lib/offline'
+import { keptGames, removeKept, useOnline } from '../lib/offline'
 import ChooseArtwork from './ChooseArtwork'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { api, jobTitle } from '../lib/api'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { useAuth } from '../lib/auth'
 import AccountMenu from './AccountMenu'
 import SearchPalette from './SearchPalette'
@@ -71,6 +72,13 @@ function Shell() {
     { to: '/account', label: 'You', icon: User, end: false },
   ]
   const online = useOnline()
+  const { data: games } = useGames()
+  // A kept copy of a game that is gone (uninstalled, or hidden at Off) goes too.
+  useEffect(() => {
+    if (!online || !games) return
+    const present = new Set(games.filter((g) => g.status === 'installed').map((g) => g.id))
+    for (const id of Object.keys(keptGames())) if (!present.has(id)) void removeKept(id)
+  }, [online, games])
   return (
     <>
       <header className="top">
