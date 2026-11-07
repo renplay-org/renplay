@@ -300,7 +300,7 @@ describe('the levels on every route', () => {
     ['GET /users', 'tool'], ['POST /users', 'person'], ['PUT /users/:id', 'person'], ['POST /users/:id/password', 'person'],
     ['POST /users/:id/saves/copy', 'tool'], ['GET /users/:id/saves/export', 'tool'], ['POST /users/:id/saves/import', 'person'],
     ['POST /me/claim-owner', 'person'], ['POST /users/:id/merge', 'person'], ['DELETE /users/:id', 'person'], ['POST /games/:id/safe', 'game'],
-    ['GET /api/auth/check', 'game'], ['GET /g/:id/:build/,/g/:id/:build/index.html', 'game'],
+    ['GET /api/auth/check', 'game'], ['GET /g/:id/:build/,/g/:id/:build/index.html', 'game'], ['GET /api/games/:id/offline', 'game'],
     ['GET /^\\/g\\/([a-z0-9][a-z0-9._-]*)\\/([a-z0-9]+)(?:\\.m[a-z0-9]+)?\\/game\\/(.+)$/', 'game'],
     ['GET /^\\/g\\/([a-z0-9][a-z0-9._-]*)\\/([a-z0-9]+)(?:\\.m([a-z0-9]+))?\\/(.+)$/', 'game'],
     // A save backup is the server's full copy of everyone's saves: never filtered, saves are sacred.
