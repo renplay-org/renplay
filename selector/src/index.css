@@ -3108,3 +3108,13 @@ input[type="range"] {
   max-width: calc(100vw - 16px);
   padding: 6px;
 }
+
+/* A file path to copy, in a quiet chip. */
+.path-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--plate);
+  overflow-wrap: anywhere;
+}

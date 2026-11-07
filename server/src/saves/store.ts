@@ -116,7 +116,7 @@ export class SaveStore {
    * conflict rule applies: the copy saved later stays in the slot and the other goes to History as
    * a conflict. `conflict` says which: `kept` (the server's copy stayed) or `replaced`.
    */
-  async write(saveDir: string, name: string, data: Buffer, opts: { mtimeMs?: number; reason?: string; base?: number } = {}): Promise<SaveFile & { conflict?: 'kept' | 'replaced' }> {
+  async write(saveDir: string, name: string, data: Buffer, opts: { mtimeMs?: number; reason?: string; base?: number; everyKind?: boolean } = {}): Promise<SaveFile & { conflict?: 'kept' | 'replaced' }> {
     const rel = cleanRelPath(name)
     if (isJunk(rel)) throw new HttpError(400, 'Refusing temporary file')
     if (data.length > MAX_FILE) throw new HttpError(413, 'Save file too large')
@@ -129,13 +129,17 @@ export class SaveStore {
         oldMtime = Math.floor((await stat(full)).mtimeMs)
       } catch {}
       if (old && old.equals(data)) {
+        // The same bytes from a writer that tracks versions (a device, an import) never move the
+        // server's time back: an older copy of the same save is still the same save.
+        if (opts.base !== undefined && opts.mtimeMs && opts.mtimeMs < oldMtime) return { name: rel, size: data.length, mtimeMs: oldMtime }
         if (opts.mtimeMs) await utimes(full, new Date(), new Date(opts.mtimeMs)).catch(() => {})
         return { name: rel, size: data.length, mtimeMs: opts.mtimeMs ?? Date.now() }
       }
       const mtime = clampMtime(opts.mtimeMs)
-      // Only saves: Ren'Py merges its persistent data itself. A millisecond either way is the same
-      // version, because file times are stored in seconds as floating point.
-      if (old && opts.base !== undefined && rel.endsWith('.save') && Math.abs(oldMtime - opts.base) > 1) {
+      // Only saves, unless asked (an import): Ren'Py merges its persistent data itself while it runs.
+      // A millisecond either way is the same version, because file times are stored in seconds as
+      // floating point.
+      if (old && opts.base !== undefined && (opts.everyKind || rel.endsWith('.save')) && Math.abs(oldMtime - opts.base) > 1) {
         if (mtime < oldMtime) {
           await this.snapshot(saveDir, rel, data, 'conflict')
           return { name: rel, size: old.length, mtimeMs: oldMtime, conflict: 'kept' as const }

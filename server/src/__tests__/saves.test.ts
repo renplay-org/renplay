@@ -82,6 +82,11 @@ describe('SaveStore', () => {
     // A device that knew no file, while another created it.
     await store.write('G', '2-1-LT1.save', Buffer.from('one'), { base: 0 })
     expect((await store.write('G', '2-1-LT1.save', Buffer.from('two'), { base: 0 })).conflict).toBe('replaced')
+    // The same bytes with an older time leave the server's time alone.
+    const slotTime = (await store.stat('G', '1-1-LT1.save'))!.mtimeMs
+    const slotNow = (await store.read('G', '1-1-LT1.save')).toString()
+    expect((await store.write('G', '1-1-LT1.save', Buffer.from(slotNow), { mtimeMs: slotTime - 50_000, base: 0 })).mtimeMs).toBe(slotTime)
+    expect((await store.stat('G', '1-1-LT1.save'))!.mtimeMs).toBe(slotTime)
     // No base (older runtimes, imports, restores) and the persistent file: the rule does not apply.
     expect((await store.write('G', '2-1-LT1.save', Buffer.from('three'))).conflict).toBeUndefined()
     await store.write('G', 'persistent', Buffer.from('p1'), { base: 0 })

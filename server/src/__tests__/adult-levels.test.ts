@@ -306,6 +306,8 @@ describe('the levels on every route', () => {
     ['GET /health', 'none'], ['GET /keepalive', 'none'], ['GET /system', 'list'], ['PUT /system/downloads', 'none'], ['POST /system/prune', 'none'],
     ['POST /system/engines/refresh', 'none'], ['GET /jobs', 'list'], ['GET /jobs/:id/log', 'tool'], ['POST /jobs/:id/cancel', 'tool'],
     ['POST /jobs/:id/retry', 'tool'], ['DELETE /jobs', 'tool'], ['GET /', 'none'], ['PUT /', 'none'], ['GET /api/saves-export', 'list'],
+    // The guided import: the index leaves out adult save folders at Off, the import writes this person's saves.
+    ['GET /', 'list'], ['POST /', 'person'],
     ['PUT /:id/status', 'game'], ['PUT /:id/rating', 'game'], ['POST /:id/not-now', 'game'], ['DELETE /:id/not-now', 'game'], ['GET /', 'list'],
     ['GET /api/art/:file', 'game'], ['GET /:id/art', 'game'], ['PUT /:id/art', 'game'], ['DELETE /:id/art', 'game'], ['POST /:id/art/upload', 'game'],
     ['GET /:id/files', 'game'], ['GET /:id/files/raw', 'game'], ['PUT /:id/files/raw', 'game'], ['DELETE /:id/files/raw', 'game'],

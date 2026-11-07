@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, ExternalLink, FileCode2, HardDrive, Package, RefreshCw } from 'lucide-react'
+import { Download, ExternalLink, FileCode2, HardDrive, Package, RefreshCw, Upload } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import RecipeDialog from '../components/RecipeDialog'
@@ -257,10 +257,13 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
 
             <section className="panel">
               <h2 className="h3" style={{ marginBottom: 6 }}>Saves</h2>
-              <p className="small muted">Every save, autosave and persistent change is stored on the server when the game writes it, with previous versions kept. Export everything as a zip that works with desktop Ren’Py.</p>
-              <div style={{ marginTop: 12 }}>
+              <p className="small muted">Every save, autosave and persistent change is stored on the server when the game writes it, with previous versions kept. Export everything as a zip that works with desktop Ren’Py, or bring in the saves from a computer.</p>
+              <div className="row wrap" style={{ marginTop: 12, gap: 8 }}>
                 <Button size="sm" icon={<Download />} href="/api/saves-export">
                   Export all saves
+                </Button>
+                <Button size="sm" icon={<Upload />} to="/import-saves">
+                  Import from a computer
                 </Button>
               </div>
               <SaveBackups />

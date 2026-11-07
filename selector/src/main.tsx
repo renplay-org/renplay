@@ -19,6 +19,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Account = lazy(() => import('./pages/Account'))
 const Users = lazy(() => import('./pages/Users'))
 const History = lazy(() => import('./pages/History'))
+const ImportSaves = lazy(() => import('./pages/ImportSaves'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: true } },
@@ -61,6 +62,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/history" element={<History />} />
+                <Route path="/import-saves" element={<ImportSaves />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
               </Route>

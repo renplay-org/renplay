@@ -76,8 +76,15 @@ Serve Renplay over HTTPS so the browser can cache the game and the home-screen a
 ## Export to desktop Ren’Py, and import from it
 
 Export a game’s saves from its page, or all of them in **Settings**. Put the files in the desktop
-game’s save folder and it loads them. The other way works too: import a desktop game’s saves
-into Renplay.
+game’s save folder and it loads them.
+
+To bring saves the other way, open **Settings** on the computer where you played and choose
+**Import from a computer**. Renplay shows where Ren’Py keeps saves on that system
+(`~/Library/RenPy` on a Mac, `%APPDATA%\RenPy` on Windows, `~/.renpy` on Linux). Choose that
+folder, or a zip of it, and a preview lists each game's saves as new, newer or older than the
+server's copy before anything is written. Older copies never replace newer ones: they are kept in
+History. Saves for games you have not added yet wait on the server until you add them. To import
+saves for one game only, use **Import** under the game's **Saves**.
 
 ## Walkthroughs and play time
 

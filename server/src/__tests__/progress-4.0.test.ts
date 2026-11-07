@@ -161,4 +161,39 @@ describe('names, notes and pins of saves', () => {
     const listed = (await request(app.app).get('/api/saves/story').expect(200)).body.conflicts
     expect(listed).toEqual([expect.objectContaining({ file: '3-1-LT1.save' })])
   })
+
+  it('imports a computer’s Ren’Py folder: newer copies take the slot, older ones go to History', async () => {
+    const index = (await request(app.app).get('/api/saves-import').expect(200)).body
+    expect(index.games['Story-1']).toEqual({ id: 'story', title: 'Story' })
+    const server = index.dirs['Story-1']
+    expect(Object.keys(server)).toEqual(expect.arrayContaining(['1-1-LT1.save', '3-1-LT1.save']))
+    await app.saves.write('Story-1', 'persistent', Buffer.from('web persistent'))
+    const persistent = (await app.saves.stat('Story-1', 'persistent'))!.mtimeMs
+    const files: Array<[string, string, number]> = [
+      ['Story-1/1-1-LT1.save', 'older on the computer', server['1-1-LT1.save'].mtime - 60_000],
+      ['Story-1/3-1-LT1.save', 'newer on the computer', server['3-1-LT1.save'].mtime + 1000],
+      ['Story-1/9-1-LT1.save', 'only on the computer', Date.now() - 5000],
+      ['Story-1/persistent', 'desktop persistent', persistent - 60_000],
+      ['Later-7/1-1-LT1.save', 'a game added later', Date.now() - 5000],
+      ['Story-1/sync/1-1-LT1.save', 'a sync copy', Date.now() - 5000],
+      ['tokens/security_keys.txt', 'signing-key ' + 'ab'.repeat(32), Date.now()],
+    ]
+    let r = request(app.app).post('/api/saves-import').field('meta', JSON.stringify(files.map(([path, , mtime]) => ({ path, mtime }))))
+    for (const [path, body] of files) r = r.attach('files', Buffer.from(body), path.split('/').pop()!)
+    const report = (await r.expect(200)).body
+    expect(report).toMatchObject({ added: 2, replaced: 1, kept: 2, same: 0, skipped: ['Story-1/sync/1-1-LT1.save'] })
+    expect((await app.saves.read('Story-1', '1-1-LT1.save')).toString()).toBe('a save')
+    expect((await app.saves.read('Story-1', '3-1-LT1.save')).toString()).toBe('newer on the computer')
+    expect((await app.saves.read('Story-1', 'persistent')).toString()).toBe('web persistent')
+    expect((await app.saves.read('Later-7', '1-1-LT1.save')).toString()).toBe('a game added later')
+    const kept = (await app.saves.history('Story-1')).filter((v) => v.reason === 'conflict').map((v) => v.name)
+    expect(kept).toEqual(expect.arrayContaining(['1-1-LT1.save', 'persistent', '3-1-LT1.save']))
+    // The same folder again changes nothing.
+    let again = request(app.app).post('/api/saves-import').field('meta', JSON.stringify([{ path: 'Story-1/3-1-LT1.save', mtime: 1 }]))
+    again = again.attach('files', Buffer.from('newer on the computer'), '3-1-LT1.save')
+    expect((await again.expect(200)).body).toMatchObject({ added: 0, replaced: 0, kept: 0, same: 1 })
+    // A path out of the save folders, and a list that does not match the files.
+    await request(app.app).post('/api/saves-import').field('meta', JSON.stringify([{ path: '../escape.save', mtime: 1 }])).attach('files', Buffer.from('x'), 'escape.save').expect(400)
+    await request(app.app).post('/api/saves-import').field('meta', '[]').attach('files', Buffer.from('x'), 'x.save').expect(400)
+  })
 })
