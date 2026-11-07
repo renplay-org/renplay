@@ -11,30 +11,12 @@ import { errorText } from './ui'
  * on this browser before and set a PIN. Admins are never switched to by PIN.
  */
 
-const KEY = 'renplay:people'
-
-/** The people who signed in on this browser, most recent first. */
-export function peopleHere(): number[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? '[]')
-    return Array.isArray(v) ? v.filter((n): n is number => Number.isInteger(n) && n > 0).slice(0, 20) : []
-  } catch {
-    return []
-  }
-}
-
-export function rememberPerson(id: number): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify([id, ...peopleHere().filter((n) => n !== id)].slice(0, 20)))
-  } catch {}
-}
-
 export default function WhoIsPlaying({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const ids = peopleHere()
+  // The server knows who signed in on this browser (its own cookie), so the list cannot be made up here.
   const people = useQuery({
-    queryKey: ['switch', ids.join(',')],
+    queryKey: ['switch'],
     enabled: open,
-    queryFn: () => api<{ people: Array<{ id: number; name: string; avatar: string }> }>(`/api/auth/switch?people=${ids.join(',')}`).then((r) => r.people),
+    queryFn: () => api<{ people: Array<{ id: number; name: string; avatar: string }> }>('/api/auth/switch').then((r) => r.people),
   })
   const [chosen, setChosen] = useState<{ id: number; name: string } | null>(null)
   const [pin, setPin] = useState('')

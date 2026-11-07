@@ -233,7 +233,7 @@ function PinSection({ admin, hasPin }: { admin: boolean; hasPin: boolean }) {
             void save(pin)
           }}
         >
-          <p className="small muted">With a PIN you can switch in on a shared device that someone is signed in on, without your password. It works only on browsers you signed in on before.</p>
+          <p className="small muted">With a PIN you can switch in on a shared device that someone is signed in on, without your password. It works only on browsers you signed in on before. Signing out everywhere or changing your password removes it.</p>
           <label className="field">
             <span>PIN, 4 to 8 digits</span>
             <input className={accountInput} type="password" inputMode="numeric" autoComplete="new-password" pattern="\d{4,8}" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} />

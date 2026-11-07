@@ -90,19 +90,40 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
    * engines, and folders of no game, with what could be freed. Counted at most once a minute.
    */
   let storage: { at: number; body: unknown; level: string } | null = null
+  // One count at a time for each level: a second request waits for the one running.
+  let counting: { level: string; body: Promise<unknown> } | null = null
   router.get('/system/storage', async (_req, res) => {
     const level = content.viewerLevel()
     if (storage && storage.level === level && Date.now() - storage.at < 60_000) {
       res.json(storage.body)
       return
     }
+    if (counting?.level !== level) {
+      const body = countStorage().finally(() => {
+        if (counting?.body === body) counting = null
+      })
+      counting = { level, body }
+    }
+    const body = await counting.body
+    storage = { at: Date.now(), body, level }
+    res.json(body)
+  })
+  const archiveAt = (archive: string) => {
+    try {
+      return safeJoin(cfg.archivesDir, cleanRelPath(archive))
+    } catch {
+      return null
+    }
+  }
+  async function countStorage() {
     const games = []
     for (const g of db.allGames().filter((x) => !content.hides(x))) {
       const folders = await readdir(join(cfg.gamesDir, g.id), { withFileTypes: true }).catch(() => [])
       const builds = []
       for (const f of folders.filter((d) => d.isDirectory())) builds.push({ name: f.name, current: f.name === g.build, bytes: (await dirSize(join(cfg.gamesDir, g.id, f.name))).bytes })
       const archive = parseJson<{ archive?: string }>(g.source, {}).archive
-      const st = archive ? await stat(safeJoin(cfg.archivesDir, cleanRelPath(archive))).catch(() => null) : null
+      const at = archive ? archiveAt(archive) : null
+      const st = at ? await stat(at).catch(() => null) : null
       const download = st?.isFile() ? { name: archive!, bytes: st.size } : null
       const buildBytes = builds.reduce((n, b) => n + b.bytes, 0)
       games.push({ id: g.id, title: catalog.recipe(g.recipe_id)?.title || g.title, status: g.status, builds, download, bytes: buildBytes + (download?.bytes ?? 0) })
@@ -130,12 +151,12 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
         engines: enginesOut.filter((e) => !e.used).reduce((n, e) => n + e.bytes, 0),
       },
     }
-    storage = { at: Date.now(), body, level }
-    res.json(body)
-  })
+    return body
+  }
 
   router.post('/system/storage/refresh', (_req, res) => {
     storage = null
+    counting = null
     res.json({ ok: true })
   })
 

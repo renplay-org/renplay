@@ -150,6 +150,16 @@ export function normalizeRecipe(g: any): Recipe {
   }
 }
 
+/** A catalog's recipe never names files in Your recipes (`local:`): only recipes there may. */
+function withoutLocalFiles(g: Recipe): Recipe {
+  const remote = (x: { url?: string }) => typeof x?.url !== 'string' || !x.url.startsWith('local:')
+  return {
+    ...g,
+    art: g.art?.filter(remote),
+    build: g.build?.patches ? { ...g.build, patches: g.build.patches.filter(remote) } : g.build,
+  }
+}
+
 /** An adult recipe reduced to what recognizes its archives and save folder. */
 function stub(r: Recipe): Recipe {
   return {
@@ -338,7 +348,7 @@ export class Catalog {
       }
       try {
         idx ??= await fetchIndex(url)
-        let games: Recipe[] = (idx.games ?? []).filter(valid).map((g) => ({ ...normalizeRecipe(g), _base: from, _origin: url }))
+        let games: Recipe[] = (idx.games ?? []).filter(valid).map((g) => withoutLocalFiles({ ...normalizeRecipe(g), _base: from, _origin: url }))
         let vocab = idx.vocabulary ?? {}
         if (off) {
           const kept = withoutAdult(games, vocab)

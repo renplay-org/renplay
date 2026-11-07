@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { api, ApiError } from './api'
 import { Spinner } from '../components/ui'
-import { rememberPerson } from '../components/WhoIsPlaying'
 import { setAdminLighterBackground } from './backdrop'
 import { useDefaults } from './queries'
 
@@ -38,14 +37,11 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
   if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />
   if (!me.data) return <p className="p-6 text-zinc-300">Could not reach Renplay. Reload to try again.</p>
   if (admin && me.data.user.role !== 'admin') return <Navigate to="/" replace />
-  return <Remember id={me.data.auth ? me.data.user.id : null} />
+  return <WithDefaults />
 }
 
-/** This browser remembers who signed in on it, for Who is playing. */
-function Remember({ id }: { id: number | null }) {
-  useEffect(() => {
-    if (id) rememberPerson(id)
-  }, [id])
+/** The signed-in pages, with the admin's defaults applied to this browser. */
+function WithDefaults() {
   // The admin's default for Lighter background, for browsers that did not choose.
   const defaults = useDefaults()
   useEffect(() => {

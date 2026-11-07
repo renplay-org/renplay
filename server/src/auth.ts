@@ -199,6 +199,20 @@ export class Accounts {
     const token = random(), now = Date.now()
     this.db.raw.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?)').run(hash(token), id, now, now, now + DAYS30, (req.get('user-agent') ?? '').slice(0, 200))
     this.cookie(req, res, token)
+    this.db.raw.prepare('INSERT OR REPLACE INTO device_people VALUES (?, ?, ?)').run(this.device(req, res), id, now)
+  }
+  /**
+   * This browser, for Who is playing: a cookie of its own that outlives sign-out, stored hashed.
+   * Given a response, a browser without one gets one. Without, it is '' then.
+   */
+  private device(req: Request, res?: Response): string {
+    let token = req.get('cookie')?.match(/(?:^|;\s*)renplay_device=([A-Za-z0-9_-]{40,64})(?:;|$)/)?.[1]
+    if (!token) {
+      if (!res) return ''
+      token = random()
+      res.cookie('renplay_device', token, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/', maxAge: 400 * 86400_000 })
+    }
+    return hash(token)
   }
   private session(key: string): Viewer | null {
     const now = Date.now()
@@ -311,8 +325,14 @@ export class Accounts {
     const { n } = this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }
     if (n <= 1) throw new HttpError(409, 'Keep at least one enabled admin')
   }
-  private revoke(id: number, except = ''): void {
+  /**
+   * Signs a person out everywhere but `except`. Their PIN goes too, and other browsers forget them,
+   * so whoever held a session or a token cannot come back with a PIN they set.
+   */
+  private revoke(id: number, except = '', keepDevice = ''): void {
     this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash != ?').run(id, except)
+    this.db.raw.prepare("UPDATE users SET pin_hash = '', pin_failures = 0, pin_locked_until = 0 WHERE id = ?").run(id)
+    this.db.raw.prepare('DELETE FROM device_people WHERE user_id = ? AND device != ?').run(id, keepDevice)
     this.invalidate()
   }
   /**
@@ -499,7 +519,7 @@ export class Accounts {
       if (adultManaged) this.writeLevels(id, { ceiling: 'off' })
       this.db.raw.prepare('DELETE FROM identities WHERE user_id = ? AND provider = ? AND subject = ?').run(id, provider, subject)
       this.db.raw.prepare('DELETE FROM identity_metadata WHERE provider = ? AND subject = ?').run(provider, subject)
-      this.revoke(id, viewer()!.session); res.json({ ok: true })
+      this.revoke(id, viewer()!.session, this.device(req)); res.json({ ok: true })
     })
     r.post('/me/avatar', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '2mb' }), async (req, res) => {
       if (!Buffer.isBuffer(req.body)) throw new HttpError(400, 'Upload a JPEG, PNG or WebP picture')
@@ -561,6 +581,7 @@ export class Accounts {
     r.put('/me/pin', async (req, res) => {
       const u = this.current()
       if (!this.enabled) throw new HttpError(409, 'Sign-in is off, so there is no one to switch between')
+      if (viewer()?.bearer) throw new HttpError(403, 'Set your PIN in the browser')
       const pin = req.body?.pin
       if (pin === '' || pin === null) {
         this.db.raw.prepare("UPDATE users SET pin_hash = '', pin_failures = 0, pin_locked_until = 0 WHERE id = ?").run(u.id)
@@ -575,16 +596,12 @@ export class Accounts {
       res.json({ hasPin: true })
     })
 
-    /** The people a device may switch to: those it names (who signed in here before) with a PIN. */
+    /** The people this browser may switch to: those who signed in on it before and have a PIN. */
     r.get('/auth/switch', (req, res) => {
       const me = this.current()
-      if (!this.enabled || viewer()?.bearer) {
-        res.json({ people: [] })
-        return
-      }
-      const ids = String(req.query['people'] ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 20)
-      const people = ids.length
-        ? (this.db.raw.prepare(`SELECT id, name, avatar FROM users WHERE id IN (${ids.map(() => '?').join(',')}) AND id != ? AND disabled = 0 AND role != 'admin' AND pin_hash != ''`).all(...ids, me.id) as Array<{ id: number; name: string; avatar: string }>)
+      const device = this.enabled && !viewer()?.bearer ? this.device(req) : ''
+      const people = device
+        ? this.db.raw.prepare("SELECT u.id, u.name, u.avatar FROM device_people d JOIN users u ON u.id = d.user_id WHERE d.device = ? AND u.id != ? AND u.disabled = 0 AND u.role != 'admin' AND u.pin_hash != '' ORDER BY d.seen_at DESC LIMIT 20").all(device, me.id)
         : []
       res.json({ people })
     })
@@ -597,16 +614,24 @@ export class Accounts {
       this.current()
       if (!this.enabled) throw new HttpError(409, 'Sign-in is off, so there is no one to switch between')
       if (viewer()?.bearer) throw new HttpError(403, 'Switch people in the browser')
-      const id = Number(req.body?.user)
-      const target = Number.isInteger(id) ? (this.db.raw.prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as User | undefined) : undefined
-      if (!target || target.disabled || target.role === 'admin' || !target.pin_hash) throw new HttpError(404, 'This person cannot be switched to with a PIN')
-      if (target.pin_locked_until > Date.now()) throw new HttpError(429, `Too many wrong PINs. Try again in ${Math.ceil((target.pin_locked_until - Date.now()) / 60_000)} minutes.`)
-      if (!(await passwordMatches(String(req.body?.pin ?? ''), target.pin_hash))) {
-        const failures = target.pin_failures + 1
-        const locked = failures >= 5
-        this.db.raw.prepare('UPDATE users SET pin_failures = ?, pin_locked_until = ? WHERE id = ?').run(locked ? 0 : failures, locked ? Date.now() + 15 * 60_000 : 0, target.id)
-        throw new HttpError(locked ? 429 : 403, locked ? 'Too many wrong PINs. Try again in 15 minutes.' : 'That PIN is not right')
+      this.limit(`ip:${req.ip}`)
+      const id = Number(req.body?.user), pin = String(req.body?.pin ?? ''), device = this.device(req)
+      const target = Number.isInteger(id) && device
+        ? (this.db.raw.prepare('SELECT u.* FROM users u JOIN device_people d ON d.user_id = u.id WHERE u.id = ? AND d.device = ?').get(id, device) as unknown as User | undefined)
+        : undefined
+      // Anyone who cannot be switched to here gets the same answer after the same wait, so it says
+      // nothing about who exists or has a PIN.
+      if (!target || target.disabled || target.role === 'admin' || !target.pin_hash) {
+        await passwordMatches(pin, this.dummyPassword)
+        throw new HttpError(403, 'That PIN is not right')
       }
+      const now = Date.now()
+      if (target.pin_locked_until > now) throw new HttpError(429, `Too many wrong PINs. Try again in ${Math.ceil((target.pin_locked_until - now) / 60_000)} minutes.`)
+      // Each try counts before its PIN is checked (nothing runs in between), so tries sent at the
+      // same time cannot get past the limit. The right PIN clears the count.
+      const failures = target.pin_failures + 1, locked = failures >= 5
+      this.db.raw.prepare('UPDATE users SET pin_failures = ?, pin_locked_until = ? WHERE id = ?').run(locked ? 0 : failures, locked ? now + 15 * 60_000 : 0, target.id)
+      if (!(await passwordMatches(pin, target.pin_hash))) throw new HttpError(locked ? 429 : 403, locked ? 'Too many wrong PINs. Try again in 15 minutes.' : 'That PIN is not right')
       this.db.raw.prepare('UPDATE users SET pin_failures = 0, pin_locked_until = 0 WHERE id = ?').run(target.id)
       // The person who was here is signed out on this device: back again takes their PIN or sign-in.
       if (viewer()?.session) this.db.raw.prepare('DELETE FROM sessions WHERE hash = ?').run(viewer()!.session)
@@ -631,7 +656,7 @@ export class Accounts {
       if (!identity || !await passwordMatches(req.body?.current, identity.password)) throw new HttpError(403, 'The current password is wrong')
       const encoded = await passwordHash(req.body?.password)
       this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, u.id)
-      this.revoke(u.id, viewer()!.session); res.json({ ok: true })
+      this.revoke(u.id, viewer()!.session, this.device(req)); res.json({ ok: true })
     })
     // Tag preferences: the tags this person includes and leaves out on the Catalog page, kept with
     // their account so every device shows the same catalog.
@@ -678,7 +703,7 @@ export class Accounts {
       res.json({ ok: true, choice: level })
     })
     r.get('/me/sessions', (_req, res) => res.json({ sessions: this.db.raw.prepare('SELECT hash AS id, created_at, touched_at, expires_at, label FROM sessions WHERE user_id = ? AND expires_at > ?').all(this.current().id, Date.now()).map((s) => ({ ...s, current: s.id === viewer()?.session })) }))
-    r.delete('/me/sessions', (_req, res) => { this.revoke(this.current().id, viewer()!.session); res.json({ ok: true }) })
+    r.delete('/me/sessions', (req, res) => { this.revoke(this.current().id, viewer()!.session, this.device(req)); res.json({ ok: true }) })
     r.delete('/me/sessions/:id', (req, res) => { this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash = ?').run(this.current().id, req.params.id); this.invalidate(); res.json({ ok: true }) })
     r.get('/me/tokens', (_req, res) => res.json({ tokens: this.db.raw.prepare('SELECT id, name, created_at FROM tokens WHERE user_id = ?').all(this.current().id) }))
     r.post('/me/tokens', (req, res) => {
@@ -775,7 +800,7 @@ export class Accounts {
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
           this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
-          for (const table of ['sessions', 'tokens', 'identities', 'user_games', 'play_sessions', 'save_meta']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
+          for (const table of ['sessions', 'tokens', 'identities', 'user_games', 'play_sessions', 'save_meta', 'device_people']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
           // Their own art choices and uploads. Choices for everyone stay.
           for (const table of ['art_choices', 'art_uploads']) this.db.raw.prepare(`DELETE FROM ${table} WHERE scope = ?`).run(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
