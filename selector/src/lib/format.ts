@@ -44,9 +44,10 @@ export function capitalize(s: string): string {
 }
 
 /** Play time as a phrase: "6 h 10 m played", "40 m played". */
-export function playedTime(seconds: number): string {
+/** Time played. Under a minute it says so, unless the game was never played: then there are no saves either. */
+export function playedTime(seconds: number, played = false): string {
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 1) return 'Not played yet'
+  if (minutes < 1) return played || seconds > 0 ? 'Under a minute played' : 'Not played yet'
   return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} m played` : `${minutes} m played`
 }
 

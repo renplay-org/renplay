@@ -328,7 +328,7 @@ function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
                 {game.latestSave ? `${game.latestSave.label} · ${ago(game.latestSave.ctime)}` : game.lastPlayedAt ? `Last played ${ago(game.lastPlayedAt)}` : 'Not played yet'}
               </p>
               <p style={{ marginTop: 4 }}>
-                {playedTime(game.playTime)} · {game.saves.count} {game.saves.count === 1 ? 'save' : 'saves'}
+                {playedTime(game.playTime, game.saves.count > 0 || !!game.lastPlayedAt)} · {game.saves.count} {game.saves.count === 1 ? 'save' : 'saves'}
                 {game.saves.count > 0 && navigator.onLine ? ' · Synced' : ''}
               </p>
             </div>

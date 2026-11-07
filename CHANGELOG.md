@@ -17,6 +17,8 @@ release notes say what).
 - The loading screen has **Game page**, **Sound** and **Full screen**, so you can leave, mute or go full screen before the game starts. Its progress is one bar that only goes up, from the engine to the game's first screen.
 - **Full screen** sits beside the **Renplay** pill over the game, and the drawer has **Sound** and **Full screen** at its top. The pill is lit for the first seconds of a game, then quiet.
 - A game's page opens at its top, at once and without a spinner, and its picture flies from the tile to the poster. **Back** returns to where you were in the library. On a phone the page rises in without the flight.
+- On phones, **Resume** and **Play** come right under a game's title, before its tags and summary, so they are on the first screen in portrait and landscape. Held sideways, the stage is shorter. The bar with **Resume** at the bottom appears as soon as the button is behind the tab bar.
+- The library's stage on a phone shows where you are in two short lines, and **Not now** sits centred under the two buttons.
 - **Fit** shows the game in its own shape with the player's bars around it, and **Fill** crops only the sides, never the top or bottom where games keep their dialogue.
 
 ### Fixed
@@ -24,6 +26,7 @@ release notes say what).
 - Menus, sheets and the tab bar had no blur behind them in Chrome, Edge and other Chromium browsers, so text behind them showed through. The build dropped the property those browsers read.
 - Pages no longer jump while they load: the footer, a game's logo and the Add games page held their place.
 - **Resume** and **Play** show the focus ring when reached with the keyboard.
+- A game with saves but under a minute of play time said "Not played yet". It now says "Under a minute played".
 
 ## [4.2.0] - 2026-11-07
 

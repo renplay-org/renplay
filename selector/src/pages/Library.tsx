@@ -60,29 +60,23 @@ function resumeUrl(g: Game): string {
   return `/play/${g.id}${g.latestSave ? `?resume=${encodeURIComponent(slotName(g.latestSave.file))}` : ''}`
 }
 
+/** The stage's line about where you are: one line on a wide screen, two short lines on a phone. */
 function stageMeta(g: Game) {
   const save = g.latestSave
+  const played = !!save || g.saves.count > 0 || !!g.lastPlayedAt
+  const rest = [playedTime(g.playTime, played), g.rating ? '★'.repeat(g.rating) : '', g.saves.count > 0 ? `${g.saves.count} ${g.saves.count === 1 ? 'save' : 'saves'}` : ''].filter(Boolean)
   return (
-    <>
-      <span>{save ? `${save.label} · ${ago(save.ctime)}` : 'Not played yet'}</span>
-      <span className="sep">·</span>
-      <span>{playedTime(g.playTime)}</span>
-      {g.rating && (
+    <span className="meta-lines">
+      {save && (
         <>
-          <span className="sep">·</span>
-          <span aria-label={`Rated ${g.rating} of 5`}>{'★'.repeat(g.rating)}</span>
-        </>
-      )}
-      {g.saves.count > 0 && (
-        <>
-          <span className="sep">·</span>
           <span>
-            {g.saves.count} {g.saves.count === 1 ? 'save' : 'saves'}
-            {navigator.onLine ? ' · Synced' : ''}
+            {save.label} · {ago(save.ctime)}
           </span>
+          <span className="sep">·</span>
         </>
       )}
-    </>
+      <span aria-label={g.rating ? `${rest.join(', ')}, rated ${g.rating} of 5` : undefined}>{rest.join(' · ')}</span>
+    </span>
   )
 }
 
@@ -115,7 +109,7 @@ function StageActions({ g }: { g: Game }) {
       <Pill variant="s" size="lg" to={`/game/${g.id}`}>
         Game page
       </Pill>
-      <Pill variant="q" size="lg" onClick={() => void notNow()}>
+      <Pill variant="q" size="lg" className="not-now" onClick={() => void notNow()}>
         Not now
       </Pill>
     </>
