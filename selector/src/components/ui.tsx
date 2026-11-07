@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -200,14 +201,36 @@ export function Menu({ trigger, children, align = 'right' }: { trigger: (open: (
   const ref = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState({ top: 0, left: 0 })
+  const anchor = useRef<DOMRect | null>(null)
+  // Once the menu is drawn, its real size places it: below the button, or above it when the
+  // screen has no room below, and always inside the screen.
+  const place = useCallback(() => {
+    const box = ref.current?.getBoundingClientRect() ?? anchor.current
+    const menu = menuRef.current
+    if (!box || !menu) return
+    const h = menu.offsetHeight
+    const w = menu.offsetWidth
+    const below = box.bottom + 8
+    const top = below + h <= window.innerHeight - 8 ? below : Math.max(8, box.top - 8 - h)
+    const left = Math.max(8, Math.min(align === 'right' ? box.right - w : box.left, window.innerWidth - w - 8))
+    setPosition({ top, left })
+  }, [align])
+  useLayoutEffect(() => {
+    if (open) place()
+  }, [open, place])
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    // Scrolling the page (a smooth or momentum scroll still running after the tap, too) moves the
+    // menu with its button. It closes only once the button has left the screen.
     const onScroll = (e: Event) => {
-      if (!menuRef.current?.contains(e.target as Node)) setOpen(false)
+      if (menuRef.current?.contains(e.target as Node)) return
+      const box = ref.current?.getBoundingClientRect()
+      if (!box || box.bottom < 0 || box.top > window.innerHeight) setOpen(false)
+      else place()
     }
     const onResize = () => setOpen(false)
     document.addEventListener('mousedown', onDown)
@@ -220,21 +243,16 @@ export function Menu({ trigger, children, align = 'right' }: { trigger: (open: (
       document.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', onResize)
     }
-  }, [open])
+  }, [open, place])
   return (
     <div ref={ref} className="relative" style={{ display: 'inline-flex' }}>
       {trigger(() => {
-        const box = ref.current?.getBoundingClientRect()
-        if (box)
-          setPosition({
-            top: Math.min(box.bottom + 8, Math.max(8, window.innerHeight - 320)),
-            left: Math.max(8, Math.min(align === 'right' ? box.right - 240 : box.left, window.innerWidth - 248)),
-          })
+        anchor.current = ref.current?.getBoundingClientRect() ?? null
         setOpen((value) => !value)
       })}
       {open &&
         createPortal(
-          <div ref={menuRef} role="group" aria-label="Actions" data-actions-menu style={position} className="pop">
+          <div ref={menuRef} role="group" aria-label="Actions" data-actions-menu style={position} className="pop menu-pop">
             <div className="menu">{children(() => setOpen(false))}</div>
           </div>,
           document.body,

@@ -165,7 +165,7 @@ describe('migration from 3.x, and back', () => {
     expect(user('nogames')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'off' })
     expect(user('broken')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
     expect(user('no')).toMatchObject({ adult_ceiling: 'off', adult_choice: 'off' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(15)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(16)
     // Downgrading to 3.2 reads the columns 4.0 keeps in step: access, the picture
     // preference and the allow/block install setting (covered by legacyMirror in content.test).
     const cols = db.raw.prepare('PRAGMA table_info(users)').all().map((c) => c.name)
@@ -450,6 +450,7 @@ describe('the levels on every route', () => {
       ['delete', '/api/saves/adult/slot?file=1-1.save'], ['get', '/api/saves/adult/export'],
       ['post', '/api/saves/adult/import'], ['post', '/api/saves/adult/copy', { target: 'safe', file: '1-1.save' }],
       ['get', '/api/saves/adult/history'], ['post', '/api/saves/adult/history/restore', { id: 'none' }],
+      ['put', '/api/saves/adult/meta?file=1-1.save', { title: 'x' }],
       ['get', '/g/adult/b1/'], ['get', '/g/adult/b1/index.html'], ['get', '/g/adult/b1/game.zip'], ['get', '/g/adult/b1/game/images/a.png'],
       ['get', adultPic], ['get', '/api/walkthroughs/adult.pdf'],
       ['get', '/api/games/adult/art'], ['get', '/api/games/adult/art?kind=grid'], ['put', '/api/games/adult/art', { kind: 'grid', candidate: 'x' }],

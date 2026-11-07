@@ -102,3 +102,46 @@ describe('status, rating, Not now and play history', () => {
     expect(await game()).toMatchObject({ rating: 5, playStatus: 'dropped' })
   })
 })
+
+describe('names, notes and pins of saves', () => {
+  let root = ''
+  let app: App
+
+  beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), 'renplay-savemeta-'))
+    process.env['DATA_DIR'] = join(root, 'data')
+    process.env['GAMES_DIR'] = join(root, 'games')
+    process.env['RENPLAY_AUTH'] = 'off'
+    process.env['RENPLAY_CATALOG_URLS'] = 'http://127.0.0.1:9/none'
+    process.env['RENPLAY_ENGINES_URL'] = 'http://127.0.0.1:9/none'
+    const cfg = loadConfig()
+    const db = Db.open(cfg.dataDir)
+    db.insertGame({ id: 'story', title: 'Story', status: 'installed', save_dir: 'Story-1' })
+    db.close()
+    app = await createApp(cfg, { startJobs: false })
+    await app.saves.write('Story-1', '1-1-LT1.save', Buffer.from('a save'))
+  })
+  afterAll(() => {
+    app?.close()
+    rmSync(root, { recursive: true, force: true })
+    for (const k of ['DATA_DIR', 'GAMES_DIR', 'RENPLAY_AUTH', 'RENPLAY_CATALOG_URLS', 'RENPLAY_ENGINES_URL']) delete process.env[k]
+  })
+
+  it('names, notes and pins a save for this person, and the file stays as it was', async () => {
+    const before = (await app.saves.read('Story-1', '1-1-LT1.save')).toString()
+    await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ title: 'Before the storm', note: 'Choose the lake next time.', pinned: true }).expect(200)
+    const slot = (await request(app.app).get('/api/saves/story').expect(200)).body.slots.find((s: { file: string }) => s.file === '1-1-LT1.save')
+    expect(slot).toMatchObject({ title: 'Before the storm', note: 'Choose the lake next time.' })
+    expect(slot.pinnedAt).toMatch(/^\d{4}-/)
+    expect((await app.saves.read('Story-1', '1-1-LT1.save')).toString()).toBe(before)
+    // A pinned save keeps its history.
+    expect(app.saves.pinned('Story-1', '1-1-LT1.save')).toBe(true)
+    await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ pinned: false }).expect(200)
+    expect(app.saves.pinned('Story-1', '1-1-LT1.save')).toBe(false)
+    await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ title: 'x'.repeat(81) }).expect(400)
+    await request(app.app).put('/api/saves/story/meta?file=../x.save').send({ title: 'x' }).expect(400)
+    // Clearing everything removes the row.
+    await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ title: '', note: '' }).expect(200)
+    expect((app.db.raw.prepare('SELECT COUNT(*) n FROM save_meta').get() as { n: number }).n).toBe(0)
+  })
+})

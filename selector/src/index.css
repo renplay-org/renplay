@@ -3011,3 +3011,32 @@ input[type="range"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s2);
 }
+
+/* A pinned save: an amber ring and a pin before its name. Its note under the name. */
+.save.pinned {
+  box-shadow: 0 0 0 2px var(--amber);
+}
+.save .n .pin {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--amber);
+  fill: currentColor;
+}
+.save .note {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--fg-2);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* An actions menu: a narrow list, not a popover card. */
+.pop.menu-pop {
+  width: 240px;
+  max-width: calc(100vw - 16px);
+  padding: 6px;
+}

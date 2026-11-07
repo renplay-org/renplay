@@ -99,6 +99,7 @@ export class Accounts {
     if (!s) {
       const root = join(this.cfg.dataDir, 'users', String(id))
       s = new SaveStore(join(root, 'saves'), join(root, 'save-history'), this.cfg.saveHistoryVersions)
+      s.pinned = (saveDir, rel) => !!this.db.raw.prepare("SELECT 1 FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ? AND pinned_at != ''").get(id, saveDir, rel)
       this.stores.set(id, s)
     }
     return s
@@ -311,8 +312,10 @@ export class Accounts {
       SELECT ?, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ?
       ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time),
         play_status = CASE WHEN user_games.play_status = '' THEN excluded.play_status ELSE user_games.play_status END, rating = MAX(user_games.rating, excluded.rating), not_now_at = MAX(user_games.not_now_at, excluded.not_now_at)`).run(to, from)
-    // The play history moves with the person.
+    // The play history moves with the person, and their names, notes and pins of saves where the
+    // other person has none for the same file.
     this.db.raw.prepare('UPDATE play_sessions SET user_id = ? WHERE user_id = ?').run(to, from)
+    this.db.raw.prepare('INSERT OR IGNORE INTO save_meta (user_id, save_dir, file, title, note, pinned_at) SELECT ?, save_dir, file, title, note, pinned_at FROM save_meta WHERE user_id = ?').run(to, from)
   }
 
   /** Records played seconds as a session: one that ended in the last ten minutes goes on, else a new one starts. */
@@ -637,7 +640,7 @@ export class Accounts {
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
           this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
-          for (const table of ['sessions', 'tokens', 'identities', 'user_games', 'play_sessions']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
+          for (const table of ['sessions', 'tokens', 'identities', 'user_games', 'play_sessions', 'save_meta']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
           this.db.raw.exec('COMMIT')
         } catch (error) {

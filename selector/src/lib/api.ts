@@ -110,6 +110,11 @@ export interface SaveSlot {
   runtime?: number
   screenshot: string | null
   valid: boolean
+  /** This person's own name for the save, over the game's. */
+  title: string | null
+  note: string | null
+  /** Pinned: the save keeps every previous version. */
+  pinnedAt: string | null
 }
 
 export interface SavesResponse {

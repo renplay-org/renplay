@@ -1,7 +1,7 @@
 import Sheet from './Sheet'
 import SceneCard from './SceneCard'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Download, FileArchive, History, MoreHorizontal, Play, Trash2, Upload } from 'lucide-react'
+import { Copy, Download, FileArchive, History, MoreHorizontal, PencilLine, Pin, Play, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, del, post, slotName, type Game, type SaveSlot } from '../lib/api'
@@ -13,6 +13,17 @@ import { Button, Confirm, Empty, MenuItem, Modal, Spinner, errorText, useToast }
 type Kind = 'all' | 'manual' | 'auto' | 'quick'
 
 export default function SaveGallery({ game }: { game: Game }) {
+  const [editing, setEditing] = useState<{ slot: SaveSlot; title: string; note: string } | null>(null)
+  /** A save's name, note and pin for this person. */
+  const saveMeta = async (slot: SaveSlot, body: { title?: string; note?: string; pinned?: boolean }, ok: string) => {
+    try {
+      await api(`/api/saves/${game.id}/meta?file=${encodeURIComponent(slot.file)}`, { method: 'PUT', json: body })
+      toast(ok, 'success')
+      refresh()
+    } catch (e) {
+      toast(errorText(e), 'error')
+    }
+  }
   const { data, isLoading } = useSaves(game.id)
   const qc = useQueryClient()
   const toast = useToast()
@@ -97,7 +108,7 @@ export default function SaveGallery({ game }: { game: Game }) {
       ) : (
         <div className="saves">
           {slots.map((s) => (
-            <div key={s.file} className="save">
+            <div key={s.file} className={`save ${s.pinnedAt ? 'pinned' : ''}`.trim()}>
               <button
                 className="relative block w-full"
                 onClick={() => game.playUrl && navigate(`/play/${game.id}?resume=${encodeURIComponent(slotName(s.file))}`)}
@@ -109,7 +120,11 @@ export default function SaveGallery({ game }: { game: Game }) {
               </button>
               <div className="b row" style={{ gap: 8 }}>
                 <div className="grow">
-                  <div className="n truncate">{s.name || <span className="muted">Untitled</span>}</div>
+                  <div className="n">
+                    {s.pinnedAt && <Pin className="pin" aria-label="Pinned" />}
+                    <span className="truncate">{s.title || s.name || <span className="muted">Untitled</span>}</span>
+                  </div>
+                  {s.note && <p className="note">{s.note}</p>}
                   <div className="m" title={dateTime(s.ctime)}>
                     {ago(s.ctime)}
                     {duration(s.runtime) ? ` · ${duration(s.runtime)} played` : ''}
@@ -125,6 +140,12 @@ export default function SaveGallery({ game }: { game: Game }) {
                   {(close) => (
                     <>
                       <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); navigate(`/play/${game.id}?resume=${encodeURIComponent(slotName(s.file))}`) }}>Load</MenuItem>
+                      <MenuItem icon={<Pin />} onClick={() => { close(); void saveMeta(s, { pinned: !s.pinnedAt }, s.pinnedAt ? 'Unpinned' : 'Pinned. Every previous version is kept.') }}>
+                        {s.pinnedAt ? 'Unpin' : 'Pin'}
+                      </MenuItem>
+                      <MenuItem icon={<PencilLine />} onClick={() => { close(); setEditing({ slot: s, title: s.title ?? '', note: s.note ?? '' }) }}>
+                        Name and note
+                      </MenuItem>
                       <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.id}/download?file=${encodeURIComponent(s.file)}`))}>
                         Download
                       </MenuItem>
@@ -147,8 +168,31 @@ export default function SaveGallery({ game }: { game: Game }) {
       )}
 
       <p className="xs muted" style={{ marginTop: 20 }}>
-        Every save is stored on the server. Overwrites and deletes keep a previous version you can restore from History.
+        Every save is stored on the server. Overwrites and deletes keep a previous version you can restore from History. A pinned save keeps all of them.
       </p>
+
+      <Modal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title="Name and note"
+        footer={
+          <Button variant="primary" onClick={() => { const e = editing!; setEditing(null); void saveMeta(e.slot, { title: e.title, note: e.note }, 'Saved') }}>
+            Save
+          </Button>
+        }
+      >
+        <div className="stack" style={{ gap: 12 }}>
+          <p className="small muted">Only you see these. The save itself does not change.</p>
+          <label className="block small muted-2">
+            Name
+            <input className="input" style={{ marginTop: 8, width: '100%' }} maxLength={80} placeholder={editing?.slot.name || 'Untitled'} value={editing?.title ?? ''} onChange={(e) => setEditing((x) => (x ? { ...x, title: e.target.value } : x))} />
+          </label>
+          <label className="block small muted-2">
+            Note
+            <textarea className="input" style={{ marginTop: 8, width: '100%', minHeight: 96, paddingTop: 10 }} maxLength={500} value={editing?.note ?? ''} onChange={(e) => setEditing((x) => (x ? { ...x, note: e.target.value } : x))} />
+          </label>
+        </div>
+      </Modal>
 
       <Confirm
         open={!!confirmDelete}

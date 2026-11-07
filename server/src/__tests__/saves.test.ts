@@ -45,6 +45,16 @@ describe('SaveStore', () => {
     expect((await store.history('G', 'persistent')).length).toBe(3)
   })
 
+  it('keeps every version of a pinned save', async () => {
+    store.pinned = (dir, rel) => dir === 'Game-1' && rel === 'pinned.save'
+    for (let i = 0; i < 6; i++) {
+      await store.write('Game-1', 'pinned.save', Buffer.from(`v${i}`))
+      await store.write('Game-1', 'other.save', Buffer.from(`v${i}`))
+    }
+    expect(await store.history('Game-1', 'pinned.save')).toHaveLength(5)
+    expect(await store.history('Game-1', 'other.save')).toHaveLength(3)
+  })
+
   it('keeps a version when a save is deleted', async () => {
     await store.write('G', 'auto-1-LT1.save', Buffer.from('x'))
     expect(await store.remove('G', 'auto-1-LT1.save')).toBe(true)

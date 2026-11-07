@@ -41,6 +41,9 @@ export class SaveStore {
   private static locks = new Map<string, Promise<unknown>>()
   private acceptingWrites = true
 
+  /** Whether a save is pinned: its history keeps every version. Set by the owner of the store. */
+  pinned: (saveDir: string, rel: string) => boolean = () => false
+
   constructor(
     readonly root: string,
     readonly historyRoot: string,
@@ -154,7 +157,8 @@ export class SaveStore {
     await mkdir(dir, { recursive: true })
     const id = `${Date.now()}__${reason.replace(/[^a-z-]/g, '')}__${sha1(data).slice(0, 10)}`
     await writeFileAtomic(join(dir, id), data)
-    // Prune old versions.
+    // Prune old versions, except of a pinned save.
+    if (this.pinned(saveDir, rel)) return
     const versions = (await readdir(dir)).filter((n) => !n.startsWith('.')).sort()
     for (const v of versions.slice(0, Math.max(0, versions.length - this.keepVersions))) await unlink(join(dir, v)).catch(() => {})
   }

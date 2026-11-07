@@ -142,6 +142,8 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
       return
     }
     const files = await store.list(g.save_dir)
+    const user = viewer()?.user.id ?? 1
+    const notes = new Map((db.raw.prepare('SELECT file, title, note, pinned_at FROM save_meta WHERE user_id = ? AND save_dir = ?').all(user, g.save_dir) as Array<{ file: string; title: string; note: string; pinned_at: string }>).map((r) => [r.file, r]))
     const slots = []
     const other = []
     for (const f of files) {
@@ -167,10 +169,36 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
         // Blurred: the save's picture is the adult game's art and never leaves the server.
         screenshot: meta?.hasScreenshot && !content.blurs(g) ? `/api/saves/${g.id}/screenshot?user=${viewer()?.user.id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
         valid: !!meta,
+        title: notes.get(f.name)?.title || null,
+        note: notes.get(f.name)?.note || null,
+        pinnedAt: notes.get(f.name)?.pinned_at || null,
       })
     }
     slots.sort((a, b) => b.ctime - a.ctime)
     res.json({ saveDir: g.save_dir, slots, other })
+  })
+
+  /** A save's name, note and pin for this person. The save file itself is not touched. */
+  router.put('/:id/meta', (req, res) => {
+    const g = game(req)
+    const saveDir = requireSaveDir(g)
+    const file = cleanRelPath(req.query['file'])
+    if (!file.endsWith('.save') || file.includes('/')) throw new HttpError(400, 'Choose a save file')
+    const b = req.body ?? {}
+    for (const [key, max] of [['title', 80], ['note', 500]] as const) {
+      if (b[key] !== undefined && (typeof b[key] !== 'string' || b[key].length > max)) throw new HttpError(400, `The ${key === 'title' ? 'name' : 'note'} is text of up to ${max} characters`)
+    }
+    if (b.pinned !== undefined && typeof b.pinned !== 'boolean') throw new HttpError(400, 'Pinned must be true or false')
+    const user = viewer()?.user.id ?? 1
+    const row = (db.raw.prepare('SELECT title, note, pinned_at FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').get(user, saveDir, file) as { title: string; note: string; pinned_at: string } | undefined) ?? { title: '', note: '', pinned_at: '' }
+    const next = {
+      title: b.title !== undefined ? b.title.trim() : row.title,
+      note: b.note !== undefined ? b.note.trim() : row.note,
+      pinned_at: b.pinned === undefined ? row.pinned_at : b.pinned ? row.pinned_at || new Date().toISOString() : '',
+    }
+    if (!next.title && !next.note && !next.pinned_at) db.raw.prepare('DELETE FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').run(user, saveDir, file)
+    else db.raw.prepare('INSERT INTO save_meta (user_id, save_dir, file, title, note, pinned_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (user_id, save_dir, file) DO UPDATE SET title = excluded.title, note = excluded.note, pinned_at = excluded.pinned_at').run(user, saveDir, file, next.title, next.note, next.pinned_at)
+    res.json({ ok: true, title: next.title || null, note: next.note || null, pinnedAt: next.pinned_at || null })
   })
 
   router.get('/:id/screenshot', async (req, res) => {

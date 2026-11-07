@@ -285,6 +285,11 @@ export class Db {
       CREATE INDEX IF NOT EXISTS walkthroughs_game ON walkthroughs (game, position);
       INSERT OR IGNORE INTO walkthroughs (file, game, title, kind, added_at, position) SELECT walkthrough, id, 'Walkthrough', 'pdf', COALESCE(NULLIF(installed_at, ''), '${now()}'), 0 FROM games WHERE walkthrough != '';
       PRAGMA user_version = 15; COMMIT;`)
+    // 4.0: each person's name, note and pin for a save file. A pinned save keeps every version
+    // in its history (saves/store.ts). The file itself is untouched.
+    if (v < 16) this.raw.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS save_meta (user_id INTEGER NOT NULL, save_dir TEXT NOT NULL, file TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', pinned_at TEXT NOT NULL DEFAULT '', PRIMARY KEY (user_id, save_dir, file));
+      PRAGMA user_version = 16; COMMIT;`)
     } catch (error) { this.raw.close(); throw error }
   }
 
