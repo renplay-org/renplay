@@ -1,4 +1,5 @@
 import { ArtStore } from './art.js'
+import { SaveBackups } from './backups.js'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, stat } from 'node:fs/promises'
@@ -59,6 +60,7 @@ export interface App {
   accounts: Accounts
   catalog: Catalog
   purger: Purger
+  backups: SaveBackups
   close(): void
 }
 
@@ -185,7 +187,9 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     }
     tryNext(0)
   })
-  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content, catalog))
+  const backups = new SaveBackups(cfg, db)
+  if (opts.startJobs !== false) backups.start()
+  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content, catalog, backups))
   app.use('/api/content', createContentRouter(cfg, content, catalog))
   app.get('/api/saves-export', (req, res, next) => { void createSavesExportAll(accounts.store(), db, content)(req, res).catch(next) })
   app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content)(req, res, next))
@@ -231,7 +235,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   if (check.orphans.length) console.log(`folders in ${cfg.gamesDir} that belong to no game: ${check.orphans.join(', ')}`)
   if (opts.startJobs !== false) jobs.start()
 
-  return { app, db, jobs, builds, engines, saves, accounts, catalog, purger, close: () => (catalog.stop(), db.close()) }
+  return { app, db, jobs, builds, engines, saves, accounts, catalog, purger, backups, close: () => (catalog.stop(), backups.stop(), db.close()) }
 }
 
 /** Development server: serve *.gz engine files with their encoding, like nginx does. */

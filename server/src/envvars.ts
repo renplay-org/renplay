@@ -183,6 +183,21 @@ export const ENV_VARS: readonly EnvVar[] = [
     description: 'Earlier versions kept per save file.',
   },
   {
+    name: 'RENPLAY_BACKUP_DIR',
+    group: 'Images and saves',
+    kind: 'text',
+    fallback: '',
+    shown: 'backups/saves in the data folder',
+    description: 'Where a daily zip of everyone’s saves goes. Point it at another disk or a share to keep a copy apart from the data folder. `off` turns save backups off. A server that sleeps when idle makes the backup the next time it runs.',
+  },
+  {
+    name: 'RENPLAY_BACKUP_KEEP',
+    group: 'Images and saves',
+    kind: 'number',
+    fallback: 14,
+    description: 'Save backups kept. Older ones are deleted.',
+  },
+  {
     name: 'RENPLAY_KEEPALIVE_URL',
     group: 'Behind a proxy',
     kind: 'text',

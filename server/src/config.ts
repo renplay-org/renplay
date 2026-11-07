@@ -141,6 +141,9 @@ export interface Config {
   imageQuality: number
   imageConcurrency: number
   saveHistoryVersions: number
+  /** Where the daily save backup goes, or null when backups are off. */
+  backupDir: string | null
+  backupKeep: number
 }
 
 export function loadConfig(): Config {
@@ -222,5 +225,11 @@ export function loadConfig(): Config {
     imageQuality: envInt('RENPLAY_IMAGE_QUALITY', fallbackOf('RENPLAY_IMAGE_QUALITY')),
     imageConcurrency: envInt('RENPLAY_IMAGE_CONCURRENCY', fallbackOf('RENPLAY_IMAGE_CONCURRENCY')),
     saveHistoryVersions: envInt('RENPLAY_SAVE_HISTORY', fallbackOf('RENPLAY_SAVE_HISTORY')),
+    backupDir: (() => {
+      const raw = env('RENPLAY_BACKUP_DIR', '').trim()
+      if (raw.toLowerCase() === 'off') return null
+      return raw || join(dataDir, 'backups', 'saves')
+    })(),
+    backupKeep: Math.max(1, envInt('RENPLAY_BACKUP_KEEP', fallbackOf('RENPLAY_BACKUP_KEEP'))),
   }
 }

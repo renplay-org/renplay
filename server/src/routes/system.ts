@@ -1,4 +1,5 @@
 import { keepaliveToken } from '../auth.js'
+import type { SaveBackups } from '../backups.js'
 import type { Catalog } from '../catalog.js'
 import { keepDownloads } from '../downloads.js'
 import { statfs } from 'node:fs/promises'
@@ -21,7 +22,7 @@ async function disk(path: string) {
   }
 }
 
-export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode, catalog: Catalog): Router {
+export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode, catalog: Catalog, backups: SaveBackups): Router {
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/health', (_req, res) => {
@@ -47,6 +48,24 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
       clearInterval(tick)
       clearTimeout(done)
     })
+  })
+
+  // ---- save backups ---------------------------------------------------------
+
+  router.get('/system/backups', async (_req, res) => {
+    res.json(await backups.info())
+  })
+
+  router.post('/system/backups', async (_req, res) => {
+    if (!backups.dir) throw new HttpError(409, 'Save backups are off. Set RENPLAY_BACKUP_DIR to a folder to turn them on.')
+    const name = await backups.run()
+    res.json({ ok: true, name, ...(await backups.info()) })
+  })
+
+  router.get('/system/backups/:name', (req, res, next) => {
+    const path = backups.path(req.params.name)
+    if (!path) throw new HttpError(404, 'Backup not found')
+    res.download(path, req.params.name, (err) => err && next(new HttpError(404, 'Backup not found')))
   })
 
   router.get('/system', async (_req, res) => {

@@ -258,6 +258,34 @@ Earlier versions kept per save file.
 
 </div>
 
+<div class="config-entry" id="renplay-backup-dir">
+
+**`RENPLAY_BACKUP_DIR`**
+
+<div class="config-default">
+
+Default: backups/saves in the data folder
+
+</div>
+
+Where a daily zip of everyone’s saves goes. Point it at another disk or a share to keep a copy apart from the data folder. `off` turns save backups off. A server that sleeps when idle makes the backup the next time it runs.
+
+</div>
+
+<div class="config-entry" id="renplay-backup-keep">
+
+**`RENPLAY_BACKUP_KEEP`**
+
+<div class="config-default">
+
+Default: `14`
+
+</div>
+
+Save backups kept. Older ones are deleted.
+
+</div>
+
 
 ## Behind a proxy
 

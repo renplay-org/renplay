@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, ExternalLink, FileCode2, HardDrive, Package, RefreshCw } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -8,7 +8,7 @@ import { Button, Confirm, Progress, Spinner, errorText, useToast } from '../comp
 import { LevelSeg, DeviceAdultRow } from '../components/AdultLadder'
 import { SourceLabel, LanternSwitch } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
-import { post, put } from '../lib/api'
+import { api, post, put } from '../lib/api'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
 import { adultLabels, adultLevels, type AdultLevel } from '../lib/adult'
@@ -263,6 +263,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                   Export all saves
                 </Button>
               </div>
+              <SaveBackups />
             </section>
 
             <section className="panel">
@@ -324,6 +325,73 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+interface BackupInfo {
+  dir: string | null
+  keep: number
+  files: Array<{ name: string; size: number; at: number }>
+  last: number | null
+  next: number | null
+  running: boolean
+  error: string | null
+}
+
+/** Save backups: a daily zip of everyone's saves, the last few kept, and Back up now. */
+function SaveBackups() {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  const { data } = useQuery({ queryKey: ['backups'], queryFn: () => api<BackupInfo>('/api/system/backups') })
+  if (!data) return null
+  const now = async () => {
+    setBusy(true)
+    try {
+      await post('/api/system/backups')
+      toast('Saves backed up', 'success')
+      void qc.invalidateQueries({ queryKey: ['backups'] })
+    } catch (e) {
+      toast(errorText(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' }} className="stack">
+      <h3 style={{ fontWeight: 650 }}>Daily backups</h3>
+      {data.dir ? (
+        <>
+          <p className="small muted">
+            A zip of everyone’s saves goes to <code>{data.dir}</code> once a day, and the newest {data.keep} are kept.{' '}
+            {data.last ? `The last one was ${ago(data.last)}.` : 'None yet.'} A server that sleeps when idle makes it the next time it runs.
+          </p>
+          {data.error && <p className="small" style={{ color: 'var(--amber)' }}>The last backup failed: {data.error}</p>}
+          {data.files.length > 0 && (
+            <div className="list tight">
+              {data.files.slice(0, 5).map((f) => (
+                <div key={f.name} className="row between small" style={{ minHeight: 'var(--hit)', gap: 12 }}>
+                  <span className="muted-2">{new Date(f.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  <span className="row" style={{ gap: 12 }}>
+                    <span className="muted tnum">{bytes(f.size)}</span>
+                    <a className="link" href={`/api/system/backups/${encodeURIComponent(f.name)}`}>
+                      Download
+                    </a>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div>
+            <Button size="sm" loading={busy || data.running} onClick={() => void now()}>
+              Back up now
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="small muted">Save backups are off. Set RENPLAY_BACKUP_DIR to a folder to turn them on.</p>
+      )}
     </div>
   )
 }

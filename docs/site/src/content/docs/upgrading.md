@@ -63,6 +63,15 @@ default. `RENPLAY_KEEP_DOWNLOADS=true` locks that choice. Back up downloads you 
 Deleting `/games` also deletes downloads stored inside it. Games whose downloads were deleted
 must be added again, but their saves are safe in `/data`.
 
+### Daily save backups
+
+Once a day Renplay also writes a zip of everyone's saves to `/data/backups/saves` and keeps the
+newest 14. Set `RENPLAY_BACKUP_DIR` to a folder on another disk or a share to keep that copy apart
+from `/data`, `RENPLAY_BACKUP_KEEP` for how many to keep, or `RENPLAY_BACKUP_DIR=off` to turn them
+off. A server that sleeps when idle makes the backup the next time it runs. **Settings** lists the
+backups with a download link and has **Back up now**. To restore a game's saves, import its folder
+from the zip on the game's page, under **Saves**.
+
 ## An important change in this release line
 
 Older versions read the catalog and engines from addresses that no longer exist (they moved to

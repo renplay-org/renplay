@@ -66,6 +66,10 @@ Serve Renplay over HTTPS so the browser can cache the game and the home-screen a
 - **Every overwrite and delete keeps the earlier version.** `RENPLAY_SAVE_HISTORY` sets how many
   versions are kept per save file (20 by default). Look at them in the game’s saves view.
 - Uninstalling or reinstalling a game never deletes saves.
+- Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every
+  earlier version instead of the newest few. Only you see names, notes and pins, and the save file
+  itself never changes.
+- Admins also get a daily zip of everyone's saves. See [Backups](/upgrading/#daily-save-backups).
 
 ## Export to desktop Ren’Py, and import from it
 
