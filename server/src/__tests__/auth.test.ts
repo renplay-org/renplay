@@ -231,6 +231,40 @@ describe('accounts authentication and security', () => {
     await request(a.app).post('/api/auth/login').set(site).send({ username: 'admin', password: 'bad' }).expect(429)
     expect(a.app.get('trust proxy')).toBe(1)
   })
+  it('switches a signed-in device to another person by their PIN, never to an admin, and locks after five wrong PINs', async () => {
+    const a = await start(), admin = await login(a)
+    const anna = await add(a, admin, 'anna'), ben = await add(a, admin, 'ben')
+    await request(a.app).put('/api/me/pin').set(site).set('Cookie', admin).send({ pin: '1234' }).expect(409)
+    const annaCookie = await login(a, 'anna', 'player password')
+    await request(a.app).put('/api/me/pin').set(site).set('Cookie', annaCookie).send({ pin: '12a4' }).expect(400)
+    await request(a.app).put('/api/me/pin').set(site).set('Cookie', annaCookie).send({ pin: '2468' }).expect(200)
+    const me = (await request(a.app).get('/api/me').set('Cookie', annaCookie).expect(200)).body.user
+    expect(me).toMatchObject({ hasPin: true })
+    expect(JSON.stringify(me)).not.toMatch(/pin_hash|scrypt/)
+    expect(JSON.stringify((await request(a.app).get('/api/users').set('Cookie', admin).expect(200)).body)).not.toMatch(/pin_hash|scrypt/)
+    // Only with a session, and only people with a PIN who are not admins.
+    await request(a.app).get(`/api/auth/switch?people=${anna}`).expect(401)
+    const benCookie = await login(a, 'ben', 'player password')
+    expect((await request(a.app).get(`/api/auth/switch?people=${anna},${ben},1`).set('Cookie', benCookie).expect(200)).body.people.map((p: { id: number }) => p.id)).toEqual([anna])
+    await request(a.app).post('/api/auth/switch').set(site).set('Cookie', benCookie).send({ user: 1, pin: '1234' }).expect(404)
+    for (let i = 0; i < 4; i++) await request(a.app).post('/api/auth/switch').set(site).set('Cookie', benCookie).send({ user: anna, pin: '0000' }).expect(403)
+    await request(a.app).post('/api/auth/switch').set(site).set('Cookie', benCookie).send({ user: anna, pin: '0000' }).expect(429)
+    await request(a.app).post('/api/auth/switch').set(site).set('Cookie', benCookie).send({ user: anna, pin: '2468' }).expect(429)
+    a.db.raw.prepare('UPDATE users SET pin_locked_until = 0 WHERE id = ?').run(anna)
+    const switched = await request(a.app).post('/api/auth/switch').set(site).set('Cookie', benCookie).send({ user: anna, pin: '2468' }).expect(200)
+    const cookies = ([] as string[]).concat(switched.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]!)
+    const annaHere = cookies.filter((c) => c !== benCookie && !c.endsWith('=')).pop()!
+    // A browser keeps the last cookie of a name: the new person's must come last.
+    expect(cookies[cookies.length - 1]).toBe(annaHere)
+    expect((await request(a.app).get('/api/me').set('Cookie', annaHere).expect(200)).body.user.username).toBe('anna')
+    // Ben is signed out on this device.
+    await request(a.app).get('/api/me').set('Cookie', benCookie).expect(401)
+    // Clearing the PIN takes the person off every switch list.
+    await request(a.app).put('/api/me/pin').set(site).set('Cookie', annaHere).send({ pin: '' }).expect(200)
+    const benAgain = await login(a, 'ben', 'player password')
+    expect((await request(a.app).get(`/api/auth/switch?people=${anna}`).set('Cookie', benAgain).expect(200)).body.people).toEqual([])
+  })
+
   it('maps all management route families to admins and keeps the last admin', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password'); game(a)
     const routes: [string, string][] = [['get', '/api/archives'], ['post', '/api/archives/inspect'], ['post', '/api/archives/hash'], ['delete', '/api/archives'], ['post', '/api/imports'], ['post', '/api/uploads'], ['get', '/api/uploads/u1'], ['put', '/api/uploads/u1'], ['post', '/api/uploads/u1/complete'], ['delete', '/api/uploads/u1'], ['get', '/api/games/safe/files'], ['put', '/api/games/safe/files/raw'], ['delete', '/api/games/safe/files/raw'], ['get', '/api/games/safe/files/raw'], ['post', '/api/games/safe/files/upload'], ['post', '/api/games/safe/files/revert'], ['post', '/api/games/safe/files/apply'], ['post', '/api/games/safe/files/reset'], ['delete', '/api/games/safe'], ['post', '/api/games/safe/reinstall'], ['post', '/api/games/safe/walkthroughs'], ['delete', '/api/games/safe/walkthroughs/safe.pdf'], ['put', '/api/games/safe/cache'], ['get', '/api/games/safe/recipe'], ['get', '/api/system'], ['post', '/api/system/prune'], ['post', '/api/system/engines/refresh'], ['get', '/api/jobs'], ['get', '/api/jobs/j1/log'], ['post', '/api/jobs/j1/cancel'], ['post', '/api/jobs/j1/retry'], ['delete', '/api/jobs'], ['post', '/api/catalog/refresh'], ['put', '/api/content'], ['get', '/api/users'], ['post', '/api/users'], ['put', `/api/users/${id}`], ['delete', `/api/users/${id}`], ['post', `/api/users/${id}/password`], ['post', `/api/users/${id}/merge`], ['post', `/api/users/${id}/saves/copy`], ['get', `/api/users/${id}/saves/export`], ['post', `/api/users/${id}/saves/import`], ['post', '/api/games/safe/safe'], ['get', '/api/system/backups'], ['post', '/api/system/backups'], ['get', '/api/system/backups/saves-2026-01-01-000000.zip'], ['put', '/api/system/sync'], ['get', '/api/metrics'], ['get', '/api/system/storage']]

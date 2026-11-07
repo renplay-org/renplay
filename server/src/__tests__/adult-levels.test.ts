@@ -165,7 +165,7 @@ describe('migration from 3.x, and back', () => {
     expect(user('nogames')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'off' })
     expect(user('broken')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
     expect(user('no')).toMatchObject({ adult_ceiling: 'off', adult_choice: 'off' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(16)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
     // Downgrading to 3.2 reads the columns 4.0 keeps in step: access, the picture
     // preference and the allow/block install setting (covered by legacyMirror in content.test).
     const cols = db.raw.prepare('PRAGMA table_info(users)').all().map((c) => c.name)
@@ -293,7 +293,7 @@ describe('the levels on every route', () => {
     ['POST /me/identities/oidc', 'person'], ['POST /me/identities/ldap', 'person'], ['GET /me/identities', 'person'], ['DELETE /me/identities', 'person'],
     ['POST /me/avatar', 'person'], ['GET /avatars/:file', 'person'], ['POST /auth/setup/verify', 'none'], ['POST /auth/setup', 'person'],
     ['POST /auth/login', 'person'], ['POST /auth/logout', 'person'], ['GET /me', 'person'], ['PUT /me', 'person'], ['POST /me/password', 'person'],
-    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/tags', 'person'], ['PUT /me/tags', 'person'],
+    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/tags', 'person'], ['PUT /me/tags', 'person'], ['PUT /me/pin', 'person'], ['GET /auth/switch', 'person'], ['POST /auth/switch', 'person'],
     // Dashboards: metrics are counts for admins, never titles. The widget lists only what the person may see.
     ['GET /metrics', 'tool'], ['GET /widget', 'list'], ['GET /me/sessions', 'person'], ['DELETE /me/sessions', 'person'], ['DELETE /me/sessions/:id', 'person'],
     ['GET /me/tokens', 'person'], ['POST /me/tokens', 'person'], ['DELETE /me/tokens/:id', 'person'],

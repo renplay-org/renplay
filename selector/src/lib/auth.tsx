@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { api, ApiError } from './api'
 import { Spinner } from '../components/ui'
+import { rememberPerson } from '../components/WhoIsPlaying'
 
 export interface Account {
   id: number
@@ -16,6 +17,8 @@ export interface Account {
   admin_source?: 'manual' | 'provider' | 'allowlist'
   roleManaged?: boolean
   adultManaged?: boolean
+  /** Has a PIN for switching on a shared device. */
+  hasPin?: boolean
 }
 export function useAuth() {
   return useQuery({ queryKey: ['me'], queryFn: () => api<{ user: Account; auth: boolean; unclaimed: boolean; hasPassword: boolean }>('/api/me'), retry: false })
@@ -33,5 +36,13 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
   if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />
   if (!me.data) return <p className="p-6 text-zinc-300">Could not reach Renplay. Reload to try again.</p>
   if (admin && me.data.user.role !== 'admin') return <Navigate to="/" replace />
+  return <Remember id={me.data.auth ? me.data.user.id : null} />
+}
+
+/** This browser remembers who signed in on it, for Who is playing. */
+function Remember({ id }: { id: number | null }) {
+  useEffect(() => {
+    if (id) rememberPerson(id)
+  }, [id])
   return <Outlet />
 }
