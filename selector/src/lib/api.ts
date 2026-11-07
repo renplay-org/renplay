@@ -3,8 +3,17 @@ import { deviceLevel } from './device'
 export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
 export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
 
+/** A catalog source and what it gave the person asking. */
+export interface CatalogSource {
+  kind: 'catalog' | 'folder'
+  location: string
+  recipes: number
+  pictures: number
+  problems: string[]
+}
+
 export interface CatalogResponse {
-  status: { fetchedAt: number; urls: string[]; errors: string[]; count: number }
+  status: { fetchedAt: number; urls: string[]; errors: string[]; count: number; sources?: CatalogSource[] }
   vocabulary: Vocabulary
   games: Recipe[]
 }
@@ -222,6 +231,8 @@ export interface Recipe {
   engine?: string
   releases: RecipeRelease[]
   local: { id: string; status: string; version: string; detectedVersion: string } | null
+  /** From the recipes folder on this server, not the catalog. */
+  fromYourRecipes?: boolean
 }
 
 export interface SystemInfo {

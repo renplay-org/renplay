@@ -9,6 +9,8 @@ release notes say what).
 
 ### Added
 
+- **Your recipes:** recipe files in a folder on your server (`/data/recipes`, or `RENPLAY_RECIPES_DIR`) are read as one more catalog, in the catalog's own format. A recipe there takes the place of the catalog's recipe with the same id, so you can fix a game or add one without waiting for the catalog. Art and patches can be files in the folder. **Settings** lists each source with its recipes and any problems.
+- Tags on the Catalog page can be included or left out: a tap includes a tag, the next leaves it out, the next clears it. **All tags** lists every tag by group, with how many games have it. Your choices are kept with your account.
 - The art picker lists your uploads with **Delete**. Each person keeps up to ten pictures of each kind per game.
 
 ### Changed

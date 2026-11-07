@@ -8,7 +8,7 @@ import { Button, Confirm, Progress, Spinner, errorText, useToast } from '../comp
 import { LevelSeg, DeviceAdultRow } from '../components/AdultLadder'
 import { SourceLabel, LanternSwitch } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
-import { api, post, put } from '../lib/api'
+import { api, post, put, type CatalogSource } from '../lib/api'
 import { setLighterBackground, useLighterBackground } from '../lib/backdrop'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
@@ -302,6 +302,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
               <p className="small muted">
                 Titles, art and install settings come from {catalog?.status.count ?? 0} recipes in the catalog{catalog?.status.fetchedAt ? `, updated ${ago(catalog.status.fetchedAt, true)}` : ''}.
               </p>
+              {catalog?.status.sources && <CatalogSources sources={catalog.status.sources} />}
               <div className="actions" style={{ marginTop: 12 }}>
                 <Button size="sm" icon={<RefreshCw />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>
                   Refresh catalog
@@ -312,7 +313,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
               </div>
               {installed.length > 0 && (
                 <div style={{ borderTop: '1px solid var(--line)', marginTop: 14, paddingTop: 14 }}>
-                  <p className="small muted" style={{ marginBottom: 10 }}>Add a game to the catalog: export a recipe filled in from its installation, then open a pull request.</p>
+                  <p className="small muted" style={{ marginBottom: 10 }}>Add a game to the catalog: export a recipe filled in from its installation, then open a pull request, or keep it in Your recipes.</p>
                   <div className="actions">
                     <select aria-label="Choose a game" value={recipeFor} onChange={(e) => setRecipeFor(e.target.value)} className="input" style={{ maxWidth: 280 }}>
                       <option value="">Choose a game</option>
@@ -424,6 +425,54 @@ function SaveBackups() {
       ) : (
         <p className="small muted">Save backups are off. Set RENPLAY_BACKUP_DIR to a folder to turn them on.</p>
       )}
+    </div>
+  )
+}
+
+/** Where recipes come from: each catalog, then Your recipes, with what each gives this person. */
+function CatalogSources({ sources }: { sources: CatalogSource[] }) {
+  const name = (s: CatalogSource) => {
+    if (s.kind === 'folder') return 'Your recipes'
+    try {
+      const u = new URL(s.location)
+      return u.hostname === 'catalog.renplay.org' ? 'The Renplay catalog' : u.hostname
+    } catch {
+      return s.location
+    }
+  }
+  return (
+    <div className="list tight" style={{ marginTop: 12 }}>
+      {sources.map((s) => (
+        <div key={s.kind + s.location} className="stack" style={{ gap: 4, padding: '8px 0' }}>
+          <div className="row between wrap" style={{ gap: 8 }}>
+            <span style={{ fontWeight: 600 }}>{name(s)}</span>
+            <span className="small muted tnum">
+              {s.recipes} {s.recipes === 1 ? 'recipe' : 'recipes'}, {s.pictures} {s.pictures === 1 ? 'picture' : 'pictures'}
+            </span>
+          </div>
+          {s.kind === 'folder' ? (
+            <p className="xs muted">
+              Recipe files in <code>{s.location}</code>, in the catalog’s format. A recipe there takes the place of the catalog’s recipe with the same id, so you can fix a game or add one without waiting for the catalog.
+            </p>
+          ) : (
+            <p className="xs muted truncate">{s.location}</p>
+          )}
+          {s.problems.length > 0 && (
+            <details className="xs">
+              <summary className="amber" style={{ minHeight: 'var(--hit)', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                {s.problems.length} {s.problems.length === 1 ? 'problem' : 'problems'}
+              </summary>
+              <ul className="stack" style={{ gap: 4, paddingLeft: 16 }}>
+                {s.problems.map((p) => (
+                  <li key={p} className="muted">
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
