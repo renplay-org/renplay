@@ -45,11 +45,13 @@ export function createPlayRouter(
     if (!game || game.status !== 'installed' || !game.build || content.hides(game)) throw new HttpError(404, 'Game not installed')
     if (req.params.build !== game.build || !BUILD_RE.test(req.params.build) || isWebGame(game)) {
       // Old build ids redirect to the current one, so bookmarks keep working.
-      res.redirect(302, playPath(game))
+      const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+      res.redirect(302, playPath(game) + query)
       return
     }
     const template = await engines.template(game.engine)
-    const presplash = await findPresplash(builds.dir(id, baseOf(game.build)))
+    // Blurred: no byte of the game's art leaves the server, so the build's presplash stays out.
+    const presplash = content.blurs(game) ? null : await findPresplash(builds.dir(id, baseOf(game.build)))
     const html = renderPage(template, {
       id,
       build: game.build,

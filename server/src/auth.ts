@@ -4,6 +4,7 @@ import { dirname as pathDirname, relative as pathRelative } from 'node:path'
 import { join } from 'node:path'
 import express, { Router, type Request, type Response } from 'express'
 import type { Config } from './config.js'
+import { legacyMirror, lowestLevel, parseAdultLevel, type AdultLevel, type ContentMode } from './content.js'
 import type { Db, GameRow } from './db.js'
 import { parseJson } from './db.js'
 import { viewer, viewers, type User, type Viewer } from './accounts-context.js'
@@ -53,9 +54,11 @@ function name(value: unknown): string {
 /** A closed player allowlist makes new management endpoints admin-only by default. */
 export function playerRoute(method: string, path: string): boolean {
   if (/^\/api\/me(?:\/|$)/.test(path) || /^\/api\/avatars\/[a-f0-9]{64}\.webp$/.test(path) && ['GET', 'HEAD'].includes(method)) return true
-  if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export') return true
-  if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(covers|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+$/.test(path))) return true
-  return /^(PUT \/api\/games\/[^/]+\/(favorite|finished)|POST \/api\/games\/[^/]+\/(played|play-time))$/.test(`${method} ${path}`)
+  if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export' || path === '/api/saves-import') return true
+  if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art)?$/.test(path))) return true
+  // A player chooses and uploads art for their own view (the route refuses everyone).
+  if ((method === 'GET' || method === 'HEAD') && path === '/api/history') return true
+  return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now))$/.test(`${method} ${path}`)
 }
 
 export class Accounts {
@@ -71,7 +74,7 @@ export class Accounts {
   private readonly limits = new Map<string, { count: number; until: number }>()
   private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
   private dummyPassword = ''
-  constructor(readonly db: Db, readonly cfg: Config) {
+  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode) {
     this.enabled = (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
   }
@@ -96,6 +99,7 @@ export class Accounts {
     if (!s) {
       const root = join(this.cfg.dataDir, 'users', String(id))
       s = new SaveStore(join(root, 'saves'), join(root, 'save-history'), this.cfg.saveHistoryVersions)
+      s.pinned = (saveDir, rel) => !!this.db.raw.prepare("SELECT 1 FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ? AND pinned_at != ''").get(id, saveDir, rel)
       this.stores.set(id, s)
     }
     return s
@@ -122,6 +126,15 @@ export class Accounts {
       if (!await lstat(legacy!).catch(() => null)) { await mkdir(join(legacy!, '..'), { recursive: true }); await symlink(pathRelative(pathDirname(legacy!), target!), legacy!, 'dir') }
     }
   }
+  /** Writes a person's ceiling and choice, and the 3.x columns a downgrade to 3.2 still reads. */
+  private writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
+    const u = this.user(id)
+    const ceiling = patch.ceiling ?? parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
+    const choice = patch.choice ?? parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
+    const mirror = legacyMirror(ceiling, choice, this.content.level)
+    const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), adultPictures: mirror.adultPictures }
+    this.db.raw.prepare('UPDATE users SET adult_ceiling = ?, adult_choice = ?, adult_access = ?, prefs = ? WHERE id = ?').run(ceiling, choice, mirror.adultAccess, JSON.stringify(prefs), id)
+  }
   private invalidate(): void { this.sessionCache.clear() }
   private async claim(raw: unknown, display: unknown, password: unknown): Promise<void> {
     const login = username(raw), displayName = name(display), encoded = await passwordHash(password)
@@ -129,7 +142,8 @@ export class Accounts {
     if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != 1').get(login)) throw new HttpError(409, 'That username is taken')
     this.db.raw.exec('BEGIN IMMEDIATE')
     try {
-      this.db.raw.prepare("UPDATE users SET username = ?, name = ?, adult_access = 1 WHERE id = 1").run(login, displayName)
+      this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = 1').run(login, displayName)
+      this.writeLevels(1, { ceiling: 'shown', choice: 'shown' })
       this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, 1, ?)").run(login, encoded)
       this.db.raw.exec('COMMIT')
     } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
@@ -219,6 +233,9 @@ export class Accounts {
       return v ? viewers.run(v, proceed) : proceed()
     }
     if (!v) return next(new HttpError(401, 'Sign in to Renplay'))
+    // This device's level: a header on API calls, a query on the game page. It can only narrow.
+    const device = parseAdultLevel(req.get('x-renplay-adult')) ?? parseAdultLevel(typeof req.query['adult'] === 'string' ? req.query['adult'] : undefined)
+    if (device === 'off' || device === 'blurred') v = { ...v, device }
     viewers.run(v, () => {
       try {
         this.csrf(req)
@@ -246,10 +263,10 @@ export class Accounts {
     return this.session(session)
   }
   progress(row: GameRow): GameRow {
-    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time FROM user_games WHERE user_id = ? AND game = ?').get(this.current().id, row.id)
-    return { ...row, favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, ...u }
+    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ? AND game = ?').get(this.current().id, row.id)
+    return { ...row, favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, play_status: '', rating: 0, not_now_at: '', ...u }
   }
-  setProgress(game: string, patch: Partial<Pick<GameRow, 'favorite_at' | 'finished_at' | 'last_played_at' | 'play_time'>>): void {
+  setProgress(game: string, patch: Partial<Pick<GameRow, 'favorite_at' | 'finished_at' | 'last_played_at' | 'play_time' | 'play_status' | 'rating' | 'not_now_at'>>): void {
     const id = this.current().id
     this.db.raw.prepare('INSERT OR IGNORE INTO user_games (user_id, game) VALUES (?, ?)').run(id, game)
     for (const [key, value] of Object.entries(patch)) this.db.raw.prepare(`UPDATE user_games SET ${key} = ? WHERE user_id = ? AND game = ?`).run(value, id, game)
@@ -264,34 +281,67 @@ export class Accounts {
     this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash != ?').run(id, except)
     this.invalidate()
   }
-  private async copy(from: number, to: number, game?: string): Promise<number> {
+  /**
+   * Copies saves between accounts. `visibleOnly` is for the admin's copy action, which copies what
+   * the admin may see. Merging and claiming the owner account move every save, always.
+   */
+  private async copy(from: number, to: number, game?: string, visibleOnly = false): Promise<number> {
     if (from === to) throw new HttpError(400, 'Choose two different users')
     this.user(from); this.user(to)
     const source = this.store(from), target = this.store(to)
     let dirs: string[]
     if (game) {
       const g = this.db.getGame(game)
-      if (!g?.save_dir) throw new HttpError(404, 'Game save folder not found')
+      if (!g?.save_dir || (visibleOnly && this.content.hides(g))) throw new HttpError(404, 'Game save folder not found')
       dirs = [g.save_dir, 'tokens']
-    } else dirs = [...await source.listDirs(), ...SHARED_DIRS]
+    } else {
+      const all = await source.listDirs()
+      dirs = [...(visibleOnly ? this.content.visibleSaveDirs(all) : all), ...SHARED_DIRS]
+    }
     let copied = 0
     for (const dir of dirs) for (const file of await source.list(dir)) {
       const data = await source.read(dir, file.name)
       if (dir === 'tokens' && file.name === 'security_keys.txt') await target.mergeSecurityKeys(data.toString('utf-8'))
+      // A copy lands as copied. What it replaces stays in History for at least 30 days.
       else await target.write(dir, file.name, data, { reason: 'user-copy', mtimeMs: file.mtimeMs })
       copied++
     }
     return copied
   }
   private mergeProgress(from: number, to: number): void {
-    this.db.raw.prepare(`INSERT INTO user_games SELECT ?, game, favorite_at, finished_at, last_played_at, play_time FROM user_games WHERE user_id = ?
-      ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time)`).run(to, from)
+    this.db.raw.prepare(`INSERT INTO user_games (user_id, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at)
+      SELECT ?, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ?
+      ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time),
+        play_status = CASE WHEN user_games.play_status = '' THEN excluded.play_status ELSE user_games.play_status END, rating = MAX(user_games.rating, excluded.rating), not_now_at = MAX(user_games.not_now_at, excluded.not_now_at)`).run(to, from)
+    // Finished stays in step with finished_at: a game either account finished is finished.
+    this.db.raw.prepare("UPDATE user_games SET play_status = 'finished' WHERE user_id = ? AND finished_at IS NOT NULL AND finished_at != '' AND play_status != 'finished'").run(to)
+    this.db.raw.prepare("UPDATE user_games SET finished_at = ? WHERE user_id = ? AND play_status = 'finished' AND (finished_at IS NULL OR finished_at = '')").run(new Date().toISOString(), to)
+    // The play history moves with the person, and their names, notes and pins of saves where the
+    // other person has none for the same file.
+    this.db.raw.prepare('UPDATE play_sessions SET user_id = ? WHERE user_id = ?').run(to, from)
+    this.db.raw.prepare('INSERT OR IGNORE INTO save_meta (user_id, save_dir, file, title, note, pinned_at) SELECT ?, save_dir, file, title, note, pinned_at FROM save_meta WHERE user_id = ?').run(to, from)
+  }
+
+  /** Records played seconds as a session: one that ended in the last ten minutes goes on, else a new one starts. */
+  /** Adds reported play time to the person's session and returns the seconds counted. */
+  addPlayTime(game: string, seconds: number, now = Date.now()): number {
+    const id = this.current().id
+    const last = this.db.raw.prepare('SELECT id, ended_at FROM play_sessions WHERE user_id = ? AND game = ? AND ended_at >= ? ORDER BY ended_at DESC LIMIT 1').get(id, game, now - 10 * 60_000) as { id: number; ended_at: number } | undefined
+    // A session grows by at most the time that passed since its last report (and a little slack), so
+    // two open windows or a repeated report never count more time than there was.
+    if (last) {
+      const counted = Math.max(0, Math.min(seconds, Math.ceil((now - last.ended_at) / 1000) + 5))
+      this.db.raw.prepare('UPDATE play_sessions SET ended_at = ?, seconds = seconds + ? WHERE id = ?').run(now, counted, last.id)
+      return counted
+    }
+    this.db.raw.prepare('INSERT INTO play_sessions (user_id, game, started_at, ended_at, seconds) VALUES (?, ?, ?, ?, ?)').run(id, game, now - seconds * 1000, now, seconds)
+    return seconds
   }
   private managed(id: number) {
     const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)
     const oidc = identities.some(i => i.provider === this.providers.oidcProvider), ldap = identities.some(i => i.provider === this.providers.ldapProvider)
     const u = this.user(id)
-    return { roleManaged: !(u.role === 'admin' && u.admin_source === 'manual') && !!(oidc && this.cfg.oidcAdminGroup || ldap && this.cfg.ldapAdminFilter), adultManaged: !!(oidc && this.cfg.oidcAdultGroup || ldap && this.cfg.ldapAdultFilter) }
+    return { roleManaged: !(u.role === 'admin' && u.admin_source === 'manual') && !!(oidc && this.cfg.oidcAdminGroup || ldap && this.cfg.ldapAdminFilter), adultManaged: !!(oidc && this.cfg.oidcAdultGroups || ldap && (this.cfg.ldapAdultGroups || this.cfg.ldapAdultFilter)) }
   }
   private methodAvailable(id: number, provider: string, subject: string, removingLocal = ''): boolean {
     if (provider === 'local') return this.cfg.authLocal
@@ -315,12 +365,16 @@ export class Accounts {
       if (newOwner) {
         id = 1
         const ownerLogin = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != 1').get(identity.username) ? `sso-${signInRandom().slice(0, 12)}` : identity.username.slice(0, 64)
-        this.db.raw.prepare('UPDATE users SET username = ?, name = ?, adult_access = 1 WHERE id = 1').run(ownerLogin, identity.name.slice(0, 100))
+        this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = 1').run(ownerLogin, identity.name.slice(0, 100))
+        this.writeLevels(1, { ceiling: 'shown', choice: 'shown' })
       } else if (id === undefined) {
         // Display names and emails are never used to match or merge accounts.
         const login = identity.username.toLowerCase().replace(/[^a-z0-9._-]/g, '-').slice(0, 48) || 'player'
         const unique = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login) ? `${login}-${signInRandom().slice(0, 8)}` : login
-        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, adult_access, created_at) VALUES (?, ?, ?, ?, ?)').run(unique, identity.name.slice(0, 100), identity.admin ? 'admin' : 'player', Number(identity.adult ?? (identity.admin || this.cfg.adultDefault)), new Date().toISOString()).lastInsertRowid)
+        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, created_at) VALUES (?, ?, ?, ?)').run(unique, identity.name.slice(0, 100), identity.admin ? 'admin' : 'player', new Date().toISOString()).lastInsertRowid)
+        // The sign-in group's level, or the starting level for new people (the first admin starts at shown).
+        const ceiling = identity.ceiling ?? (identity.admin ? 'shown' : this.cfg.adultDefault)
+        this.writeLevels(id, { ceiling, choice: ceiling })
       }
       if (linking) this.requireLiveLink(linking.user, linking.session, linking.bearer)
       if (!existing) this.db.raw.prepare('INSERT INTO identities (provider, subject, user_id) VALUES (?, ?, ?)').run(identity.provider, identity.subject, id!)
@@ -335,7 +389,8 @@ export class Accounts {
         }
         this.db.raw.prepare('UPDATE users SET role = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = ?').run(identity.admin ? 'admin' : 'player', identity.roleManaged ? 'provider' : 'allowlist', identity.provider, identity.subject, id!)
       }
-      if (identity.adultManaged) this.db.raw.prepare('UPDATE users SET adult_access = ? WHERE id = ?').run(Number(identity.adult), id!)
+      // A configured sign-in group replaces the hand setting and is recomputed at each sign-in.
+      if (identity.adultManaged) this.writeLevels(id!, { ceiling: identity.ceiling! })
       if (u.disabled) throw new HttpError(403, 'This account is disabled')
       this.db.raw.exec('COMMIT')
     } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
@@ -400,9 +455,9 @@ export class Accounts {
       if (!remaining.length) throw new HttpError(409, 'Keep at least one enabled way to sign in')
       const u = this.user(id)
       const roleManaged = u.admin_source !== 'manual' && u.admin_provider === provider && u.admin_subject === subject
-      const adultManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdultGroup || provider === this.providers.ldapProvider && !!this.cfg.ldapAdultFilter
+      const adultManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdultGroups || provider === this.providers.ldapProvider && !!(this.cfg.ldapAdultGroups || this.cfg.ldapAdultFilter)
       if (roleManaged) { this.guardLastAdmin(u, { role: 'player' }); this.db.raw.prepare("UPDATE users SET role = 'player', admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(id) }
-      if (adultManaged) this.db.raw.prepare('UPDATE users SET adult_access = 0 WHERE id = ?').run(id)
+      if (adultManaged) this.writeLevels(id, { ceiling: 'off' })
       this.db.raw.prepare('DELETE FROM identities WHERE user_id = ? AND provider = ? AND subject = ?').run(id, provider, subject)
       this.db.raw.prepare('DELETE FROM identity_metadata WHERE provider = ? AND subject = ?').run(provider, subject)
       this.revoke(id, viewer()!.session); res.json({ ok: true })
@@ -479,12 +534,25 @@ export class Accounts {
       this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, u.id)
       this.revoke(u.id, viewer()!.session); res.json({ ok: true })
     })
-    r.get('/me/prefs', (_req, res) => res.json(parseJson(this.current().prefs, {})))
-    r.put('/me/prefs', (req, res) => {
-      const mode = req.body?.adultPictures
-      if (!['show', 'hide-pictures', 'hide-games'].includes(mode)) throw new HttpError(400, 'Choose Show, Hide pictures or Hide adult games')
-      this.db.raw.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify({ adultPictures: mode }), this.current().id)
-      res.json({ adultPictures: mode })
+    r.get('/me/adult', (_req, res) => {
+      const u = this.current()
+      const ceiling = parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
+      const choice = parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
+      res.json({
+        installation: { level: this.content.level, fixed: this.content.locked, chosen: this.content.chosen },
+        ceiling: { level: ceiling, managed: this.managed(u.id).adultManaged ? 'group' : null },
+        choice,
+        effective: lowestLevel(this.content.level, ceiling, choice),
+      })
+    })
+    r.put('/me/adult', (req, res) => {
+      const level = parseAdultLevel(req.body?.level)
+      if (!level) throw new HttpError(400, 'Choose Off, Blurred or Shown')
+      const u = this.current()
+      const ceiling = parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
+      if (lowestLevel(level, ceiling) !== level) throw new HttpError(409, `Your account allows at most ${ceiling}`)
+      this.writeLevels(u.id, { choice: level })
+      res.json({ ok: true, choice: level })
     })
     r.get('/me/sessions', (_req, res) => res.json({ sessions: this.db.raw.prepare('SELECT hash AS id, created_at, touched_at, expires_at, label FROM sessions WHERE user_id = ? AND expires_at > ?').all(this.current().id, Date.now()).map((s) => ({ ...s, current: s.id === viewer()?.session })) }))
     r.delete('/me/sessions', (_req, res) => { this.revoke(this.current().id, viewer()!.session); res.json({ ok: true }) })
@@ -498,7 +566,8 @@ export class Accounts {
     r.delete('/me/tokens/:id', (req, res) => { this.db.raw.prepare('DELETE FROM tokens WHERE user_id = ? AND id = ?').run(this.current().id, req.params.id); res.json({ ok: true }) })
     r.get('/users', async (_req, res) => {
       const users = await Promise.all((this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]).map(async (u) => {
-        const store = this.store(u.id), dirs = await store.listDirs()
+        // Counts follow the admin's own level: an Off admin's counts leave hidden games' saves out.
+        const store = this.store(u.id), dirs = this.content.visibleSaveDirs(await store.listDirs())
         const files = await Promise.all(dirs.map((dir) => store.list(dir)))
         return { ...u, games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser, ...this.managed(u.id) }
       }))
@@ -509,10 +578,14 @@ export class Accounts {
       if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login)) throw new HttpError(409, 'That username is taken')
       const role = req.body?.role ?? 'player'
       if (!['admin', 'player'].includes(role)) throw new HttpError(400, 'Choose Admin or Player')
+      const ceiling = req.body?.adultCeiling === undefined ? this.cfg.adultDefault : parseAdultLevel(req.body?.adultCeiling)
+      if (!ceiling) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games ceiling')
       this.db.raw.exec('BEGIN IMMEDIATE')
       let id: number
       try {
-        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, adult_access, created_at) VALUES (?, ?, ?, ?, ?)').run(login, display, role, req.body?.adultAccess === true || (req.body?.adultAccess === undefined && this.cfg.adultDefault) ? 1 : 0, new Date().toISOString()).lastInsertRowid)
+        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, created_at) VALUES (?, ?, ?, ?)').run(login, display, role, new Date().toISOString()).lastInsertRowid)
+        // The ceiling an admin chooses here is also where the person's own choice starts.
+        this.writeLevels(id, { ceiling, choice: ceiling })
         this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, ?, ?)").run(login, id, encoded)
         this.db.raw.exec('COMMIT')
       } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
@@ -522,11 +595,16 @@ export class Accounts {
       const target = this.user(Number(req.params.id)), b = req.body ?? {}
       if (this.removing.has(target.id)) throw new HttpError(409, 'This account is being archived')
       if (b.role !== undefined && !['admin', 'player'].includes(b.role)) throw new HttpError(400, 'Choose Admin or Player')
-      for (const key of ['disabled', 'adultAccess']) if (b[key] !== undefined && typeof b[key] !== 'boolean') throw new HttpError(400, `${key} must be a boolean`)
+      if (b.disabled !== undefined && typeof b.disabled !== 'boolean') throw new HttpError(400, 'disabled must be a boolean')
+      const ceiling = b.adultCeiling === undefined ? undefined : parseAdultLevel(b.adultCeiling) ?? undefined
+      if (b.adultCeiling !== undefined && !ceiling) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games ceiling')
+      const choice = b.adultChoice === undefined ? undefined : parseAdultLevel(b.adultChoice) ?? undefined
+      if (b.adultChoice !== undefined && !choice) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games choice')
       const managed = this.managed(target.id)
-      if (b.role !== undefined && managed.roleManaged || b.adultAccess !== undefined && managed.adultManaged) throw new HttpError(409, 'This permission is set by the sign-in provider')
+      if (b.role !== undefined && managed.roleManaged || ceiling !== undefined && managed.adultManaged) throw new HttpError(409, 'This permission is set by the sign-in provider')
       this.guardLastAdmin(target, b)
-      this.db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ?, adult_access = ? WHERE id = ?').run(b.name === undefined ? target.name : name(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), b.adultAccess === undefined ? target.adult_access : Number(b.adultAccess), target.id)
+      this.db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ? WHERE id = ?').run(b.name === undefined ? target.name : name(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), target.id)
+      if (ceiling !== undefined || choice !== undefined) this.writeLevels(target.id, { ceiling, choice })
       if (b.role !== undefined) this.db.raw.prepare("UPDATE users SET admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(target.id)
       this.invalidate(); await this.tag(this.user(target.id)); res.json({ user: this.user(target.id) })
     })
@@ -535,11 +613,11 @@ export class Accounts {
       this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, target.id)
       this.revoke(target.id); res.json({ ok: true })
     })
-    r.post('/users/:id/saves/copy', async (req, res) => res.json({ copied: await this.copy(Number(req.params.id), Number(req.body?.target), req.body?.game) }))
+    r.post('/users/:id/saves/copy', async (req, res) => res.json({ copied: await this.copy(Number(req.params.id), Number(req.body?.target), req.body?.game, true) }))
     r.get('/users/:id/saves/export', async (req, res) => {
       const id = this.user(Number(req.params.id)).id, store = this.store(id)
       res.attachment(`renplay-user-${id}-saves.zip`).type('application/zip')
-      await store.exportZip(await store.listDirs(), res, { includeTokens: true })
+      await store.exportZip(this.content.visibleSaveDirs(await store.listDirs()), res, { includeTokens: true })
     })
     r.post('/users/:id/saves/import', saveImport('file', async (req, res) => {
       const target = this.store(this.user(Number(req.params.id)).id)
@@ -574,7 +652,7 @@ export class Accounts {
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
           this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
-          for (const table of ['sessions', 'tokens', 'identities', 'user_games']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
+          for (const table of ['sessions', 'tokens', 'identities', 'user_games', 'play_sessions', 'save_meta']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
           this.db.raw.exec('COMMIT')
         } catch (error) {
@@ -614,7 +692,8 @@ export class Accounts {
           if (!now || now.disabled || now.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
           this.mergeProgress(u.id, 1)
           this.db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
-          this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', adult_access = ?, avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(now.username, now.name, now.adult_access, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject)
+          this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(now.username, now.name, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject)
+          this.writeLevels(1, { ceiling: parseAdultLevel(now.adult_ceiling) ?? this.cfg.adultDefault, choice: parseAdultLevel(now.adult_choice) ?? this.cfg.adultDefault })
           this.db.raw.prepare('UPDATE identities SET user_id = 1 WHERE user_id = ?').run(u.id)
           this.db.raw.prepare('UPDATE sessions SET user_id = 1 WHERE hash = ?').run(session)
           this.db.raw.prepare('UPDATE tokens SET user_id = 1 WHERE hash = ?').run(session)
@@ -638,7 +717,8 @@ export class Accounts {
     r.delete('/users/:id', async (req, res) => { await remove(Number(req.params.id)); res.json({ ok: true }) })
     r.post('/games/:id/safe', (req, res) => {
       const g = this.db.getGame(req.params.id)
-      if (!g || g.recipe_id) throw new HttpError(409, 'Only games without a recipe can be marked safe')
+      if (!g || this.content.hides(g)) throw new HttpError(404, 'Game not found')
+      if (g.recipe_id) throw new HttpError(409, 'Only games without a recipe can be marked safe')
       if (typeof req.body?.safe !== 'boolean') throw new HttpError(400, 'Safe must be a boolean')
       if (req.body.safe) this.db.raw.prepare('INSERT OR IGNORE INTO safe_games VALUES (?)').run(g.id)
       else this.db.raw.prepare('DELETE FROM safe_games WHERE game = ?').run(g.id)

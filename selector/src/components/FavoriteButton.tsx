@@ -22,13 +22,15 @@ export default function FavoriteButton({ game }: { game: Game }) {
   }
   return (
     <button
+      type="button"
       disabled={busy}
       aria-label={game.favoriteAt ? 'Remove from favourites' : 'Add to favourites'}
       aria-pressed={!!game.favoriteAt}
-      className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/5 text-rose-300"
+      className="btn q lg"
+      style={game.favoriteAt ? { color: 'var(--pink-2)' } : undefined}
       onClick={() => void toggle()}
     >
-      <Heart className={game.favoriteAt ? 'size-5 fill-current' : 'size-5'} />
+      <Heart fill={game.favoriteAt ? 'currentColor' : 'none'} />
     </button>
   )
 }

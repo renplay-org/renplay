@@ -43,6 +43,22 @@ export function capitalize(s: string): string {
   return s ? s[0]!.toLocaleUpperCase() + s.slice(1) : s
 }
 
+/** Play time as a phrase: "6 h 10 m played", "40 m played". */
+export function playedTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 1) return 'Not played yet'
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} m played` : `${minutes} m played`
+}
+
 export function pct(f: number): string {
   return `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%`
+}
+
+/** This browser's time zone, so the server groups play by the person's own days. */
+export function timeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+  } catch {
+    return ''
+  }
 }

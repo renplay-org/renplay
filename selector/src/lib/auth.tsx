@@ -9,7 +9,8 @@ export interface Account {
   username: string
   name: string
   role: 'admin' | 'player'
-  adult_access: number
+  adult_ceiling?: string
+  adult_choice?: string
   prefs: string
   avatar?: string
   admin_source?: 'manual' | 'provider' | 'allowlist'

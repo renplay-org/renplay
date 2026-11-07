@@ -38,17 +38,16 @@ Other engines are added only when their normal download plays as easily; the
   desktop version, export them back, or copy them between games.
 - **One-click installs.** Drop in the PC zip (or 7z, rar). Renplay unpacks it, shrinks the images
   and prepares it for the web. No Ren’Py SDK, and the game’s code never runs on your server.
-- **A curated catalog.** Known games get their proper title, cover, links and tested settings from
+- **A curated catalog.** Known games get their proper title, art, links and tested settings from
   the [catalog](https://renplay.org/catalog), and Renplay tells you when a newer tested
   version exists.
 - **Resume in one tap.** Up next opens your latest save straight away, with play time and your
   last save on the library home. Mark a story Finished on its game page to leave it out of Up next;
   its saves stay safe.
-- **Pictures stay private.** Adult pictures start hidden in a new browser. Covers become title
-  cards and saves become scene cards, without fetching the hidden art. Catalog covers marked safe
-  for work stay visible. Choose Show, Hide pictures or Hide adult games in Account, with a device
-  override that can hide more but never show more than the account allows. An admin decides who
-  has adult access.
+- **Adult games, your way.** Three levels, Off, Blurred and Shown. Off leaves adult games out
+  completely, Blurred shows them without their pictures, and the server never sends a picture a
+  person is not meant to see. The installation, each account, each person and each device can only
+  go lower than the layer above. Account shows all four and says why you see what you see.
 - **Find your next game.** Keep favourites at the top of your library, sort by last played,
   title or recently added, and search titles, developers and tags. Recent combines last played and
   recently added. Library filters stay in the
@@ -90,7 +89,7 @@ More in the docs: [Docker Compose](https://docs.renplay.org/install/docker/),
 [troubleshooting](https://docs.renplay.org/troubleshooting/).
 
 **Back up `/data` and keep it on local disk:** it holds your saves and their history, accounts,
-the SQLite library, mods and covers. SQLite must not be on a network share. `/games` and the
+the SQLite library, mods and the art cache. SQLite must not be on a network share. `/games` and the
 archives folder can be shares. Allow about twice the game's download size free during install.
 Downloads are kept by default. Turn off **Keep downloads** in Settings to delete only uploads
 through Renplay after a successful install. Files copied in are never deleted automatically.
@@ -128,13 +127,13 @@ termination, set `RENPLAY_PUBLIC_URL` to the public HTTPS address. Keep proxy ho
 with `RENPLAY_TRUSTED_HOPS` (the included nginx is one hop).
 
 Single sign-on supports OIDC providers such as Pocket ID, Authentik, Authelia and Keycloak, plus
-LDAP directories such as LLDAP. Groups can control roles and adult access. Register OIDC's exact
+LDAP directories such as LLDAP. Groups can control roles and adult games levels. Register OIDC's exact
 callback `/api/auth/oidc/callback`; see the [provider examples](https://docs.renplay.org/accounts/).
 Local usernames take precedence over LDAP and accounts are only linked explicitly while signed in.
 
 Open **Account** from the account menu (the **You** tab on phones) to upload a profile picture, link sign-ins, change your name, password
-and adult-picture preferences, manage sessions and script tokens, or export your saves. Admins use
-**Settings → Users** to add users, change roles and adult access, disable accounts, reset passwords,
+and adult games level, manage sessions and script tokens, or export your saves. Admins use
+**Settings → Users** to add users, change roles and adult games levels, disable accounts, reset passwords,
 and copy, merge, export or import save folders. Overwrites keep history; removing a user archives
 their folder. These tools work with sign-in off too. More in [Accounts](https://docs.renplay.org/accounts/)
 and the [Accounts API](https://docs.renplay.org/developers/accounts-api/).
@@ -160,7 +159,7 @@ More in the [FAQ](https://docs.renplay.org/faq/).
 - [CONTRIBUTING.md](CONTRIBUTING.md): the short version
 - [AGENTS.md](AGENTS.md): product rules and lessons learned, for people and AI agents alike
 - [CHANGELOG.md](CHANGELOG.md): what changed in each version
-- Related: [catalog](https://renplay.org/github/catalog) (recipes and covers),
+- Related: [catalog](https://renplay.org/github/catalog) (recipes and art),
   [engines](https://renplay.org/github/engines) (Ren’Py web engines),
   [website](https://renplay.org)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Container contract tests, shared by CI and local Docker (Python standard library only).
 
-Usage: python3 deploy/test-contract.py renplay:contract [users|smoke|upgrade|all] [--downloads]
+Usage: python3 deploy/test-contract.py renplay:contract [users|smoke|upgrade|upgrade32|all] [--downloads]
 The fixture engine is deliberately data-only: this tests native install/HTTP paths,
 not Ren'Py execution in a browser. No game or engine downloads are needed.
 """
@@ -19,9 +19,12 @@ import zlib
 
 IMAGE = sys.argv[1]
 SUITE = sys.argv[2] if len(sys.argv) > 2 else 'all'
-if SUITE not in ('users', 'smoke', 'upgrade', 'all'):
-    raise SystemExit('Suite must be users, smoke, upgrade or all')
+if SUITE not in ('users', 'smoke', 'upgrade', 'upgrade32', 'all'):
+    raise SystemExit('Suite must be users, smoke, upgrade, upgrade32 or all')
 OLD = 'ghcr.io/renplay-org/renplay:2.11.1'
+# The release before 4.0: its database is version 10, 4.0 adds the adult levels, art, progress,
+# save notes and walkthrough tables on top.
+PREVIOUS = 'ghcr.io/renplay-org/renplay:3.2.0'
 PREFIX = 'renplay-contract-' + uuid.uuid4().hex[:10]
 DOWNLOADS = '--downloads' in sys.argv
 
@@ -267,7 +270,104 @@ def upgrade():
         lib.close()
 
 
+def upgrade32():
+    lib = Library('upgrade32')
+    try:
+        docker('pull', PREVIOUS)
+        lib.start(PREVIOUS)
+        js(lib.name, """
+            const { Db } = await import('/app/server/dist/db.js');
+            const db = Db.open('/data');
+            db.insertGame({id:'story', title:'Story', status:'installed', save_dir:'Story-1'});
+            db.insertGame({id:'grown-up', title:'Grown Up', status:'installed', save_dir:'Grown-1'});
+            db.raw.prepare("UPDATE games SET adult = 1 WHERE id = 'grown-up'").run();
+            db.close();
+        """)
+        lib.request('/api/content', {'adultGames': 'allow'}, 'PUT')
+        lib.request('/api/me/prefs', {'adultPictures': 'hide-pictures'}, 'PUT')
+        lib.request('/api/games/story/favorite', {'on': True}, 'PUT')
+        lib.request('/api/games/story/finished', {'on': True}, 'PUT')
+        lib.request('/api/games/story/play-time', {'seconds': 30}, 'POST')
+        path = '/api/saves/story/file?path=Story-1/1-1-LT1.save'
+        lib.request(path, b'first save', 'PUT')
+        lib.request(path, b'second save', 'PUT')
+        lib.request('/api/saves/grown-up/file?path=Grown-1/1-1-LT1.save', b'adult save', 'PUT')
+        history = lib.request('/api/saves/story/history')['versions']
+        assert len(history) == 1, history
+        before = lib.request('/api/games/story')['game']
+
+        def save_tree():
+            return json.loads(js(lib.name, """
+                import { readdirSync, readFileSync } from 'node:fs';
+                const files = {};
+                function walk(dir) {
+                    for (const entry of readdirSync(dir, {withFileTypes:true})) {
+                        const path = dir + '/' + entry.name;
+                        if (entry.isDirectory()) walk(path);
+                        else if (entry.isFile() && /\\/(saves|save-history)\\//.test(path)) files[path] = readFileSync(path).toString('base64');
+                    }
+                }
+                walk('/data/users');
+                console.log(JSON.stringify(files));
+            """))
+
+        tree = save_tree()
+        assert len(tree) >= 3, tree
+        lib.stop()
+
+        # 4.0 on the 3.2 data: nothing about saves changes, the 3.2 choices carry over.
+        lib.start()
+        def verify_40():
+            game = lib.request('/api/games/story')['game']
+            assert game['favoriteAt'] == before['favoriteAt'] and game['finishedAt'] == before['finishedAt'], game
+            assert game['playTime'] == 30 and game['playStatus'] == 'finished', game
+            assert lib.request('/api/saves/story/raw?path=Story-1/1-1-LT1.save') == b'second save'
+            assert lib.request('/api/saves/grown-up/raw?path=Grown-1/1-1-LT1.save') == b'adult save'
+            adult = lib.request('/api/me/adult')
+            assert adult['installation']['level'] == 'shown' and adult['choice'] == 'blurred' and adult['effective'] == 'blurred', adult
+            grown = lib.request('/api/games/grown-up')['game']
+            assert grown['nsfw'] and '/api/art/' not in json.dumps(grown['art']), grown
+        verify_40()
+        assert lib.request('/api/saves/story/history')['versions'] == history
+        assert save_tree() == tree, 'Save or history bytes changed on the upgrade to 4.0'
+        version = js(lib.name, """
+            import { DatabaseSync } from 'node:sqlite';
+            const db = new DatabaseSync('/data/library.db', { readOnly: true });
+            console.log(db.prepare('PRAGMA user_version').get().user_version);
+        """)
+        assert int(version) >= 16, version
+        # Things only 4.0 knows: a name, note and pin, a rating, a status. And one more save.
+        lib.request('/api/saves/story/meta?file=1-1-LT1.save', {'title': 'Before the storm', 'note': 'Lake next time.', 'pinned': True}, 'PUT')
+        lib.request('/api/games/story/rating', {'rating': 4}, 'PUT')
+        lib.request(path, b'third save', 'PUT')
+        lib.stop()
+
+        # Back to 3.2: it starts, plays and sees the same saves and the same adult games.
+        lib.start(PREVIOUS)
+        game = lib.request('/api/games/story')['game']
+        assert game['favoriteAt'] == before['favoriteAt'] and game['playTime'] == 30, game
+        assert lib.request('/api/saves/story/raw?path=Story-1/1-1-LT1.save') == b'third save'
+        assert len(lib.request('/api/saves/story/history')['versions']) == 2
+        assert lib.request('/api/content')['adultGames'] == 'allow'
+        assert lib.request('/api/me/prefs')['adultPictures'] == 'hide-pictures'
+        assert 'grown-up' in [g['id'] for g in lib.request('/api/games')['games']]
+        lib.request(path, b'fourth save', 'PUT')
+        lib.stop()
+
+        # And up again: 4.0's own data survived 3.2.
+        lib.start()
+        assert lib.request('/api/saves/story/raw?path=Story-1/1-1-LT1.save') == b'fourth save'
+        slot = [s for s in lib.request('/api/saves/story')['slots'] if s['file'] == '1-1-LT1.save']
+        assert slot and slot[0]['title'] == 'Before the storm' and slot[0]['note'] == 'Lake next time.' and slot[0]['pinnedAt'], slot
+        game = lib.request('/api/games/story')['game']
+        assert game['rating'] == 4 and game['playStatus'] == 'finished', game
+        assert len(lib.request('/api/saves/story/history')['versions']) == 3
+        print('PASS upgrade from 3.2.0, downgrade to it and upgrade again')
+    finally:
+        lib.close()
+
+
 if __name__ == '__main__':
-    for name, test in [('users', users), ('smoke', smoke), ('upgrade', upgrade)]:
+    for name, test in [('users', users), ('smoke', smoke), ('upgrade', upgrade), ('upgrade32', upgrade32)]:
         if SUITE in (name, 'all'):
             test()

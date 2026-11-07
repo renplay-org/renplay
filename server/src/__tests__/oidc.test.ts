@@ -19,20 +19,20 @@ describe('OIDC authorization code sign-in', () => {
   it('uses PKCE, state, nonce, discovery and verified tokens, claims owner without moving its saves, and updates group permissions', async () => {
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
     provider.setClaims({ groups: ['admins', 'adults'] })
-    const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroup: 'adults' })
+    const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroups: { adults: 'shown' } })
     await app.accounts.store(1).write('test', 'persistent', Buffer.from('owner save'))
     expect((await callback(agent)).status).toBe(302)
     expect(provider.authorize?.searchParams.get('code_challenge_method')).toBe('S256')
     expect(provider.authorize?.searchParams.get('scope')).toBe('openid profile email groups')
     expect(provider.tokenBody?.get('code_verifier')).toHaveLength(43)
-    expect((await agent.get('/api/me')).body).toMatchObject({ user: { id: 1, role: 'admin', adult_access: 1 }, unclaimed: false })
+    expect((await agent.get('/api/me')).body).toMatchObject({ user: { id: 1, role: 'admin', adult_ceiling: 'shown', adult_choice: 'shown' }, unclaimed: false })
     expect((await app.accounts.store(1).read('test', 'persistent')).toString()).toBe('owner save')
     const users = (await agent.get('/api/users')).body.users
     expect(users[0]).toMatchObject({ roleManaged: true, adultManaged: true })
-    await agent.put('/api/users/1').set(site).send({ adultAccess: false }).expect(409)
+    await agent.put('/api/users/1').set(site).send({ adultCeiling: 'off' }).expect(409)
     provider.setClaims({ groups: [] })
     expect((await callback(agent)).status).toBe(302)
-    expect((await agent.get('/api/me')).body.user).toMatchObject({ id: 1, role: 'player', adult_access: 0 })
+    expect((await agent.get('/api/me')).body.user).toMatchObject({ id: 1, role: 'player', adult_ceiling: 'off' })
     await agent.get('/api/users').expect(403)
     expect(warning).toHaveBeenCalledWith(expect.stringMatching(/Last enabled admin.*RENPLAY_ADMINS/))
   })
@@ -61,9 +61,9 @@ describe('OIDC authorization code sign-in', () => {
   })
   it.each(['admins', { admins: true }, [1, null, {}], ['admins', 123]].map(groups => ({ groups })))('does not grant malformed groups $groups', async ({ groups }) => {
     provider.setClaims({ groups })
-    const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroup: 'adults' })
+    const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroups: { adults: 'shown' } })
     expect((await callback(agent)).status).toBe(302)
-    expect((await agent.get('/api/me')).body.user).toMatchObject({ role: 'player', adult_access: 0 })
+    expect((await agent.get('/api/me')).body.user).toMatchObject({ role: 'player', adult_ceiling: 'off' })
   })
   it('rejects a previously initiated callback with sign-in off', async () => {
     const agent = await start(), url = await authorize(agent)
@@ -97,7 +97,7 @@ describe('OIDC authorization code sign-in', () => {
     expect((await agent.get('/api/me')).body.user).toMatchObject({ role: verified ? 'admin' : 'player', id: verified ? 1 : 2 })
   })
   it('lets an admin who signed in before ownership was claimed bring both save sets to the owner', async () => {
-    const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroup: 'adults' })
+    const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroups: { adults: 'shown' } })
     expect((await callback(agent)).status).toBe(302)
     const id = (await agent.get('/api/me')).body.user.id
     expect(id).toBe(2)
@@ -106,7 +106,7 @@ describe('OIDC authorization code sign-in', () => {
     provider.setClaims({ groups: ['admins'] })
     expect((await callback(agent)).status).toBe(302)
     await agent.post('/api/me/claim-owner').set(site).send({}).expect(200)
-    expect((await agent.get('/api/me')).body).toMatchObject({ user: { id: 1, adult_access: 0 }, unclaimed: false })
+    expect((await agent.get('/api/me')).body).toMatchObject({ user: { id: 1, adult_ceiling: 'off' }, unclaimed: false })
     expect((await app.accounts.store(1).read('test', 'persistent')).toString()).toBe('owner save')
     expect((await app.accounts.store(1).read('test', '1-1.save')).toString()).toBe('personal save')
   })
@@ -126,7 +126,7 @@ describe('OIDC authorization code sign-in', () => {
   })
   it('unlinks explicitly, removes mapped grants rather than bypassing restrictions, and rejects someone else’s identity', async () => {
     provider.setClaims({ groups: ['admins', 'adults'] })
-    const owner = await start({ adminUsername: 'admin', adminPassword: 'local password', oidcAdminGroup: 'admins', oidcAdultGroup: 'adults', adultDefault: true })
+    const owner = await start({ adminUsername: 'admin', adminPassword: 'local password', oidcAdminGroup: 'admins', oidcAdultGroups: { adults: 'shown' }, adultDefault: 'shown' })
     await owner.post('/api/auth/login').set(site).send({ username: 'admin', password: 'local password' }).expect(200)
     await owner.post('/api/users').set(site).send({ username: 'player', password: 'player password' }).expect(201)
     const player = request.agent(app.app)
@@ -139,7 +139,7 @@ describe('OIDC authorization code sign-in', () => {
     await owner.get(otherUrl.pathname + otherUrl.search).expect(409)
     await player.delete('/api/me/identities').set(site).send({ provider: app.accounts.providers.oidcProvider, subject: 'not-mine' }).expect(404)
     await player.delete('/api/me/identities').set(site).send({ provider: app.accounts.providers.oidcProvider, subject: 'subject-1' }).expect(200)
-    expect((await player.get('/api/me')).body.user).toMatchObject({ role: 'player', adult_access: 0 })
+    expect((await player.get('/api/me')).body.user).toMatchObject({ role: 'player', adult_ceiling: 'off' })
     expect((await player.get('/api/me/identities')).body.identities).toHaveLength(1)
   })
   it('copies a provider picture locally without hotlinking, preserves an upload and tolerates invalid pictures', async () => {

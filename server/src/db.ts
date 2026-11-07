@@ -17,6 +17,17 @@ export interface BuildOptions {
   imageQuality?: number
 }
 
+export interface WalkthroughRow {
+  /** The file in the walkthroughs folder, named by Renplay. */
+  file: string
+  game: string
+  title: string
+  kind: 'pdf' | 'image' | 'text'
+  size: number
+  added_at: string
+  position: number
+}
+
 export interface GameRow {
   id: string
   title: string
@@ -49,6 +60,12 @@ export interface GameRow {
   favorite_at: string
   finished_at: string
   play_time: number
+  /** The person's status (user_games): playing, stalled, dropped, finished, or '' when not set. */
+  play_status?: string
+  /** The person's rating, 1 to 5, or 0 for none (user_games). */
+  rating?: number
+  /** When the person said Not now: the game leaves Up next until it is played again (user_games). */
+  not_now_at?: string
   /** 1 when the game's recipe is adult: the last thing the catalog said, kept for when it can no longer say (content.ts). */
   adult: number
   updated_at: string
@@ -180,7 +197,7 @@ export class Db {
         CREATE TABLE IF NOT EXISTS user_games (user_id INTEGER NOT NULL REFERENCES users(id), game TEXT NOT NULL, favorite_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', last_played_at TEXT NOT NULL DEFAULT '', play_time INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, game));
         CREATE TABLE IF NOT EXISTS safe_games (game TEXT PRIMARY KEY);
         INSERT OR IGNORE INTO users (id, username, name, role, adult_access, created_at) VALUES (1, 'owner', 'Owner', 'admin', 1, '${now()}');
-        INSERT OR IGNORE INTO user_games SELECT 1, id, favorite_at, finished_at, last_played_at, play_time FROM games;
+        INSERT OR IGNORE INTO user_games (user_id, game, favorite_at, finished_at, last_played_at, play_time) SELECT 1, id, favorite_at, finished_at, last_played_at, play_time FROM games;
         INSERT OR IGNORE INTO settings (key, value) VALUES ('auth_default', '${JSON.stringify(upgraded ? 'off' : 'on')}');
         PRAGMA user_version = 7; COMMIT;
       `)
@@ -206,6 +223,73 @@ export class Db {
       this.raw.exec(`CREATE TABLE IF NOT EXISTS identity_metadata (provider TEXT NOT NULL, subject TEXT NOT NULL, username TEXT NOT NULL, PRIMARY KEY(provider, subject));
         PRAGMA user_version = 10; COMMIT;`)
     }
+    // 4.0: three adult levels. The 3.x access becomes the ceiling. The choice keeps what the person
+    // saw: their 3.x picture preference (show, hide-pictures, hide-games), where hide-pictures was
+    // also the default. adult_access and prefs stay written (content.ts legacyMirror) so a
+    // downgrade to 3.2 reads the same levels.
+    if (v < 11) {
+      const columns = this.raw.prepare('PRAGMA table_info(users)').all().map(c => c.name)
+      this.raw.exec('BEGIN')
+      if (!columns.includes('adult_ceiling')) this.raw.exec("ALTER TABLE users ADD COLUMN adult_ceiling TEXT NOT NULL DEFAULT ''")
+      if (!columns.includes('adult_choice')) this.raw.exec("ALTER TABLE users ADD COLUMN adult_choice TEXT NOT NULL DEFAULT ''")
+      this.raw.exec(`UPDATE users SET
+        adult_ceiling = CASE adult_access WHEN 1 THEN 'shown' ELSE 'off' END,
+        adult_choice = CASE
+          WHEN adult_access != 1 THEN 'off'
+          WHEN (CASE WHEN json_valid(prefs) THEN json_extract(prefs, '$.adultPictures') END) = 'show' THEN 'shown'
+          WHEN (CASE WHEN json_valid(prefs) THEN json_extract(prefs, '$.adultPictures') END) = 'hide-games' THEN 'off'
+          ELSE 'blurred' END
+        WHERE adult_ceiling = ''`)
+      // A new database has only the owner, who starts at shown like any first admin.
+      if (v === 0) this.raw.exec("UPDATE users SET adult_choice = 'shown' WHERE id = 1 AND adult_ceiling = 'shown'")
+      this.raw.exec('PRAGMA user_version = 11; COMMIT')
+    }
+    // 4.0: the art cache (art.ts). Made pictures by the key of their source and method, the
+    // choices of each person (scope = user id) and of the admin for everyone (scope 0), uploads,
+    // and the sizes of catalog pictures the index gave none for. Choices and uploads outlive a
+    // removed game, like saves.
+    if (v < 12) this.raw.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS art_made (key TEXT PRIMARY KEY, file1x TEXT NOT NULL, file2x TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL, made TEXT NOT NULL DEFAULT '', adult INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS art_made_file1x ON art_made (file1x);
+      CREATE INDEX IF NOT EXISTS art_made_file2x ON art_made (file2x);
+      CREATE TABLE IF NOT EXISTS art_choices (game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, candidate TEXT NOT NULL, PRIMARY KEY (game, kind, scope));
+      CREATE TABLE IF NOT EXISTS art_uploads (id TEXT NOT NULL, game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, focal TEXT NOT NULL DEFAULT '', thumbhash TEXT NOT NULL, tint TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (id, game, kind, scope));
+      CREATE TABLE IF NOT EXISTS art_measured (id TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL);
+      PRAGMA user_version = 12; COMMIT;`)
+    // 4.0: a made logo knows whether it is dark lettering, so it is inverted on ink even when the
+    // catalog does not say so. Pictures made before are made again (art.ts ART_VERSION).
+    if (v < 13) {
+      const columns = this.raw.prepare('PRAGMA table_info(art_made)').all().map(c => c.name)
+      this.raw.exec('BEGIN')
+      if (!columns.includes('dark')) this.raw.exec('ALTER TABLE art_made ADD COLUMN dark INTEGER NOT NULL DEFAULT 0')
+      this.raw.exec('PRAGMA user_version = 13; COMMIT')
+    }
+    // 4.0: each person's status, rating and Not now for a game, and their play sessions for
+    // History. A finished game becomes the status Finished, and finished_at stays in step so a
+    // downgrade to 3.2 still shows it finished.
+    if (v < 14) {
+      const columns = this.raw.prepare('PRAGMA table_info(user_games)').all().map(c => c.name)
+      this.raw.exec('BEGIN')
+      if (!columns.includes('play_status')) this.raw.exec("ALTER TABLE user_games ADD COLUMN play_status TEXT NOT NULL DEFAULT ''")
+      if (!columns.includes('rating')) this.raw.exec('ALTER TABLE user_games ADD COLUMN rating INTEGER NOT NULL DEFAULT 0')
+      if (!columns.includes('not_now_at')) this.raw.exec("ALTER TABLE user_games ADD COLUMN not_now_at TEXT NOT NULL DEFAULT ''")
+      this.raw.exec(`UPDATE user_games SET play_status = 'finished' WHERE finished_at != '' AND play_status = '';
+        CREATE TABLE IF NOT EXISTS play_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, game TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, seconds INTEGER NOT NULL);
+        CREATE INDEX IF NOT EXISTS play_sessions_user ON play_sessions (user_id, ended_at);
+        PRAGMA user_version = 14; COMMIT;`)
+    }
+    // 4.0: several walkthrough files per game, each with a title and a place in the list. The 3.x
+    // walkthrough becomes the first, and games.walkthrough stays the first file so 3.2 finds it.
+    if (v < 15) this.raw.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS walkthroughs (file TEXT PRIMARY KEY, game TEXT NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, added_at TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0);
+      CREATE INDEX IF NOT EXISTS walkthroughs_game ON walkthroughs (game, position);
+      INSERT OR IGNORE INTO walkthroughs (file, game, title, kind, added_at, position) SELECT walkthrough, id, 'Walkthrough', 'pdf', COALESCE(NULLIF(installed_at, ''), '${now()}'), 0 FROM games WHERE walkthrough != '';
+      PRAGMA user_version = 15; COMMIT;`)
+    // 4.0: each person's name, note and pin for a save file. A pinned save keeps every version
+    // in its history (saves/store.ts). The file itself is untouched.
+    if (v < 16) this.raw.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS save_meta (user_id INTEGER NOT NULL, save_dir TEXT NOT NULL, file TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', pinned_at TEXT NOT NULL DEFAULT '', PRIMARY KEY (user_id, save_dir, file));
+      PRAGMA user_version = 16; COMMIT;`)
     } catch (error) { this.raw.close(); throw error }
   }
 
@@ -248,6 +332,16 @@ export class Db {
       .prepare(`UPDATE games SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`)
       .run(...entries.map(([, v]) => v as SQLInputValue), id)
     return Number(res.changes) > 0
+  }
+
+  /** A game's walkthrough files, in their order. */
+  walkthroughs(game: string): WalkthroughRow[] {
+    return this.raw.prepare('SELECT * FROM walkthroughs WHERE game = ? ORDER BY position, added_at').all(game) as unknown as WalkthroughRow[]
+  }
+
+  /** Keeps games.walkthrough the first file, which Renplay 3.x reads. */
+  syncFirstWalkthrough(game: string): void {
+    this.raw.prepare('UPDATE games SET walkthrough = ? WHERE id = ?').run(this.walkthroughs(game)[0]?.file ?? '', game)
   }
 
   deleteGame(id: string): boolean {
@@ -301,8 +395,15 @@ export class Db {
     this.raw.prepare(`UPDATE jobs SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...entries.map(([, v]) => v as SQLInputValue), id)
   }
 
-  deleteFinishedJobs(): void {
-    this.raw.exec("DELETE FROM jobs WHERE status IN ('done','failed','cancelled','interrupted')")
+  /** Deletes finished jobs: all of them, or those `keep` does not keep. */
+  deleteFinishedJobs(keep?: (job: JobRow) => boolean): void {
+    if (!keep) {
+      this.raw.exec("DELETE FROM jobs WHERE status IN ('done','failed','cancelled','interrupted')")
+      return
+    }
+    const rows = this.raw.prepare("SELECT * FROM jobs WHERE status IN ('done','failed','cancelled','interrupted')").all() as unknown as JobRow[]
+    const remove = this.raw.prepare('DELETE FROM jobs WHERE id = ?')
+    for (const j of rows) if (!keep(j)) remove.run(j.id)
   }
 
   // ---- archives ----------------------------------------------------------

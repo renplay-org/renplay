@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { accessSync, constants, readFileSync, statSync } from 'node:fs'
+import { parseAdultGroups, parseAdultLevel, type AdultLevel } from './content.js'
 import { fallbackOf } from './envvars.js'
 
 function env(name: string, fallback: string): string {
@@ -24,13 +25,39 @@ function envBool(name: string, fallback: boolean): boolean {
   return !['0', 'false', 'no', 'off'].includes(v)
 }
 
-/** Anything but allow or block is a mistake; the safe-for-work side is the safe reading of it. */
-function adultGames(): '' | 'allow' | 'block' {
-  const v = process.env['RENPLAY_ADULT_GAMES']?.trim().toLowerCase()
-  if (!v) return ''
-  if (v === 'allow' || v === 'block') return v
-  console.warn(`RENPLAY_ADULT_GAMES=${v} is not "allow" or "block"; blocking adult games`)
-  return 'block'
+/** Anything but a level is a mistake; the safe-for-work side is the safe reading of it. */
+function adultGames(): '' | AdultLevel {
+  const raw = process.env['RENPLAY_ADULT_GAMES']?.trim()
+  if (!raw) return ''
+  const level = parseAdultLevel(raw, true)
+  if (level) return level
+  console.warn(`RENPLAY_ADULT_GAMES=${raw} is not off, blurred or shown; adult games are off`)
+  return 'off'
+}
+
+function adultDefault(): AdultLevel {
+  const raw = process.env['RENPLAY_ADULT_DEFAULT']?.trim()
+  if (!raw) return 'off'
+  const level = parseAdultLevel(raw, true)
+  if (level) return level
+  console.warn(`RENPLAY_ADULT_DEFAULT=${raw} is not off, blurred or shown; new people start with adult games off`)
+  return 'off'
+}
+
+/** group=level lists from the sign-in providers. The 3.x single group stays as an alias. */
+function adultGroups(raw: string, variable: string, alias: string, aliasVariable: string): { map: Record<string, AdultLevel>; variable: string } | null {
+  if (raw) {
+    // A mapping with no valid entry still means the groups decide: nobody matches, so everyone is
+    // at Off until it is fixed. Reading a typo as no mapping would leave hand settings in force.
+    const map = parseAdultGroups(raw, variable) ?? {}
+    if (!Object.keys(map).length) console.error(`${variable} has no valid group=off, =blurred or =shown entry; everyone who signs in through it gets adult games off`)
+    return { map, variable }
+  }
+  if (alias) {
+    console.warn(`${aliasVariable} is a 3.x alias of ${variable}; it means ${alias}=shown and everyone else off`)
+    return { map: { [alias]: 'shown' }, variable: aliasVariable }
+  }
+  return null
 }
 
 /** Only select an existing writable downloads mount. Never create it or move files. */
@@ -56,7 +83,10 @@ export interface Config {
   oidcName: string
   oidcAutoCreate: boolean
   oidcAdminGroup: string
-  oidcAdultGroup: string
+  /** group=level ceilings matched on the groups claim exactly; null when no mapping is configured. */
+  oidcAdultGroups: Record<string, AdultLevel> | null
+  /** Which variable oidcAdultGroups came from: RENPLAY_OIDC_ADULT_GROUPS or its 3.x alias. */
+  oidcAdultGroupsVariable: string
   admins: string[]
   ldapUrl: string
   ldapBindDn: string
@@ -69,13 +99,16 @@ export interface Config {
   ldapPhotoAttribute: string
   ldapAdminFilter: string
   ldapAdultFilter: string
+  /** group=level ceilings from RENPLAY_LDAP_ADULT_GROUPS, matched on memberOf cn, case-insensitive. */
+  ldapAdultGroups: Record<string, AdultLevel> | null
   ldapStartTls: boolean
   ldapCaFile: string
   adminUsername: string
   adminPassword: string
   publicUrl: string
   trustedHops: number
-  adultDefault: boolean
+  /** Ceiling and starting choice for new people. */
+  adultDefault: AdultLevel
   port: number
   dataDir: string
   savesDir: string
@@ -98,8 +131,8 @@ export interface Config {
   uploadsDir: string
   enginesUrl: string
   catalogUrls: string[]
-  /** RENPLAY_ADULT_GAMES: allow or block locks the choice; empty leaves it to the admin (content.ts). */
-  adultGames: '' | 'allow' | 'block'
+  /** RENPLAY_ADULT_GAMES: a level fixes the installation; empty leaves it to the stored setting (content.ts). */
+  adultGames: '' | AdultLevel
   /** Pin every build to this engine version instead of the latest 8.x. */
   defaultEngine: string
   /** Optional URL that routes back to this pod through the scale-to-zero proxy. */
@@ -108,6 +141,11 @@ export interface Config {
   imageQuality: number
   imageConcurrency: number
   saveHistoryVersions: number
+  /** Where the daily save backup goes, or null when backups are off. */
+  backupDir: string | null
+  backupKeep: number
+  /** Ren'Py's sync server, for Sync codes. */
+  syncServer: string
 }
 
 export function loadConfig(): Config {
@@ -125,6 +163,10 @@ export function loadConfig(): Config {
     : legacyDownloads ? !envBool('RENPLAY_DELETE_ARCHIVES', false) : true
   const auth = env('RENPLAY_AUTH', '')
   if (auth && auth !== 'on' && auth !== 'off') throw new Error('RENPLAY_AUTH must be on or off')
+  if (process.env['RENPLAY_LDAP_ADULT_GROUPS']?.trim() && process.env['RENPLAY_LDAP_ADULT_FILTER']?.trim())
+    console.warn('RENPLAY_LDAP_ADULT_GROUPS is set; the RENPLAY_LDAP_ADULT_FILTER alias is ignored')
+  const oidcGroups = adultGroups(env('RENPLAY_OIDC_ADULT_GROUPS', ''), 'RENPLAY_OIDC_ADULT_GROUPS', env('RENPLAY_OIDC_ADULT_GROUP', ''), 'RENPLAY_OIDC_ADULT_GROUP')
+  const ldapGroups = adultGroups(env('RENPLAY_LDAP_ADULT_GROUPS', ''), 'RENPLAY_LDAP_ADULT_GROUPS', '', '')
   return {
     auth: auth as '' | 'on' | 'off',
     authUser: envInt('RENPLAY_AUTH_USER', 1),
@@ -135,7 +177,8 @@ export function loadConfig(): Config {
     oidcName: env('RENPLAY_OIDC_NAME', 'Single sign-on'),
     oidcAutoCreate: envBool('RENPLAY_OIDC_AUTO_CREATE', true),
     oidcAdminGroup: env('RENPLAY_OIDC_ADMIN_GROUP', ''),
-    oidcAdultGroup: env('RENPLAY_OIDC_ADULT_GROUP', ''),
+    oidcAdultGroups: oidcGroups?.map ?? null,
+    oidcAdultGroupsVariable: oidcGroups?.variable ?? '',
     admins: env('RENPLAY_ADMINS', '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
     ldapUrl: env('RENPLAY_LDAP_URL', ''),
     ldapBindDn: env('RENPLAY_LDAP_BIND_DN', ''),
@@ -148,13 +191,14 @@ export function loadConfig(): Config {
     ldapPhotoAttribute: env('RENPLAY_LDAP_PHOTO_ATTRIBUTE', 'jpegPhoto'),
     ldapAdminFilter: env('RENPLAY_LDAP_ADMIN_FILTER', ''),
     ldapAdultFilter: env('RENPLAY_LDAP_ADULT_FILTER', ''),
+    ldapAdultGroups: ldapGroups?.map ?? null,
     ldapStartTls: envBool('RENPLAY_LDAP_STARTTLS', false),
     ldapCaFile: env('RENPLAY_LDAP_CA_FILE', ''),
     adminUsername: env('RENPLAY_ADMIN_USERNAME', ''),
     adminPassword: secret('RENPLAY_ADMIN_PASSWORD'),
     publicUrl: env('RENPLAY_PUBLIC_URL', ''),
     trustedHops: Math.max(0, envInt('RENPLAY_TRUSTED_HOPS', 1)),
-    adultDefault: env('RENPLAY_ADULT_DEFAULT', 'block') === 'allow',
+    adultDefault: adultDefault(),
     port: envInt('PORT', fallbackOf('PORT')),
     dataDir,
     savesDir: env('SAVES_DIR', join(dataDir, 'saves')),
@@ -183,5 +227,12 @@ export function loadConfig(): Config {
     imageQuality: envInt('RENPLAY_IMAGE_QUALITY', fallbackOf('RENPLAY_IMAGE_QUALITY')),
     imageConcurrency: envInt('RENPLAY_IMAGE_CONCURRENCY', fallbackOf('RENPLAY_IMAGE_CONCURRENCY')),
     saveHistoryVersions: envInt('RENPLAY_SAVE_HISTORY', fallbackOf('RENPLAY_SAVE_HISTORY')),
+    backupDir: (() => {
+      const raw = env('RENPLAY_BACKUP_DIR', '').trim()
+      if (raw.toLowerCase() === 'off') return null
+      return raw || join(dataDir, 'backups', 'saves')
+    })(),
+    backupKeep: Math.max(1, envInt('RENPLAY_BACKUP_KEEP', fallbackOf('RENPLAY_BACKUP_KEEP'))),
+    syncServer: env('RENPLAY_SYNC_SERVER', fallbackOf('RENPLAY_SYNC_SERVER')).replace(/\/+$/, ''),
   }
 }

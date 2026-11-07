@@ -21,7 +21,7 @@ export function isZip(data: Buffer): boolean {
   return data.length > 4 && data[0] === 0x50 && data[1] === 0x4b && data[2] === 0x03 && data[3] === 0x04
 }
 
-export function readZipEntries(data: Buffer | string, want: (name: string) => boolean, limit = 64 << 20): Promise<Map<string, Buffer>> {
+export function readZipEntries(data: Buffer | string, want: (name: string) => boolean, limit = 64 << 20, times?: Map<string, number>): Promise<Map<string, Buffer>> {
   return new Promise((resolve, reject) => {
     const opened = (err: Error | null, zip?: yauzl.ZipFile) => {
       if (err || !zip) return reject(new HttpError(400, err?.message ?? 'Invalid zip'))
@@ -66,7 +66,11 @@ export function readZipEntries(data: Buffer | string, want: (name: string) => bo
               else chunks.push(chunk)
             })
             stream.on('error', fail)
-            stream.on('end', () => { out.set(entry.fileName, Buffer.concat(chunks)); next(i + 1) })
+            stream.on('end', () => {
+              out.set(entry.fileName, Buffer.concat(chunks))
+              times?.set(entry.fileName, entry.getLastModDate().getTime())
+              next(i + 1)
+            })
           })
         }
         next(0)

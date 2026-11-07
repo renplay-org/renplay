@@ -1,3 +1,5 @@
+import type { AdultLevel } from './adult'
+import { deviceLevel } from './device'
 export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
 export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
 
@@ -13,6 +15,29 @@ export interface JobsResponse {
   total: number
 }
 
+export type ArtKind = 'grid' | 'wide' | 'hero' | 'logo' | 'icon'
+/** Where a picture came from: a SteamGridDB author, a store, Renplay, the developer or an upload. */
+export type ArtCredit = { by: string; byUrl?: string; asset?: string } | { store: 'Steam' | 'itch.io' } | { renplay: true } | { developer: true } | { upload: true }
+/**
+ * One format, made by the server. Below Shown an adult game's formats carry only `thumbhash` and
+ * `tint`: no address. A format not made yet has its source's hash and no address for a moment.
+ */
+export interface ArtFormat {
+  url1x?: string | null
+  url2x?: string | null
+  width?: number
+  height?: number
+  thumbhash: string | null
+  tint: string | null
+  /** How it was made: null for real art in the shape. */
+  made?: null | 'crop' | 'composed' | 'glow' | 'whole'
+  source?: string
+  credit?: ArtCredit
+  /** A dark logo, inverted on ink. */
+  dark?: boolean
+}
+export type ArtSet = Partial<Record<ArtKind, ArtFormat>>
+
 export interface Game {
   id: string
   title: string
@@ -22,11 +47,13 @@ export interface Game {
   content: string[]
   state: GameState | null
   summary: string | null
-  /** Curated cover from the catalog (URL), or null. */
-  cover: string | null
+  /** The five formats, made by the server from the catalog's pictures and people's choices. */
+  art: ArtSet
   /** An adult game, per its recipe. */
   nsfw: boolean
   walkthrough: string | null
+  /** Walkthrough files, in order: PDFs, pictures and plain text. */
+  walkthroughs: Array<{ file: string; title: string; kind: 'pdf' | 'image' | 'text'; size: number; addedAt: string; url: string }>
   status: 'installed' | 'not_installed' | 'installing'
   build: string | null
   playUrl: string | null
@@ -39,8 +66,15 @@ export interface Game {
   favoriteAt: string | null
   finishedAt: string | null
   playTime: number
-  latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot'> | null
-  coverSfw?: boolean
+  /** The person's status. Stalled, Dropped and Finished leave Up next. */
+  playStatus: 'playing' | 'stalled' | 'dropped' | 'finished' | null
+  /** The person's rating, 1 to 5. */
+  rating: number | null
+  /** Not now: out of Up next until it is played again. */
+  notNowAt: string | null
+  /** How it plays on a phone, curated in the recipe. */
+  phone: 'great' | 'playable' | 'desktop' | null
+  latestSave: Pick<SaveSlot, 'file' | 'label' | 'name' | 'ctime' | 'runtime' | 'screenshot' | 'screenshotHash'> | null
   free?: boolean
   renpyVersion: string | null
   engine: string | null
@@ -75,13 +109,24 @@ export interface SaveSlot {
   gameVersion?: string
   runtime?: number
   screenshot: string | null
+  /** At the Blurred level, the picture as a thumbhash instead. */
+  screenshotHash?: string | null
   valid: boolean
+  /** This person's own name for the save, over the game's. */
+  title: string | null
+  note: string | null
+  /** Pinned: the save keeps every previous version. */
+  pinnedAt: string | null
 }
 
 export interface SavesResponse {
   saveDir: string | null
   slots: SaveSlot[]
   other: Array<{ name: string; size: number; mtime: number }>
+  /** Second versions the conflict rule kept in History during the last two weeks, newest first. */
+  conflicts?: Array<{ id: string; file: string; at: number }>
+  /** Sync codes are on and this is a Ren'Py game. */
+  sync?: boolean
 }
 
 export interface Job {
@@ -132,17 +177,20 @@ export interface Archive {
   sha256: string | null
   info: ArchiveInfo | null
   installedAs: string | null
-  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; cover: string | null; nsfw: boolean; coverSfw?: boolean } | null
+  recipe: { id: string; title: string; version: string | null; status: string; exact: boolean; art: ArtSet; nsfw: boolean } | null
   existingGame: string | null
   /** Why this download cannot be installed here (an adult game on a safe-for-work install). */
   blocked: string | null
 }
 
-/** Whether this Renplay shows adult games; locked when the server's configuration decides. */
+/** The installation's adult level, fixed when the server's variable sets it. Admins also get the starting level and the sign-in groups. */
 export interface ContentState {
-  adultGames: 'allow' | 'block'
-  locked: boolean
-  chosen: boolean
+  installation: { level: AdultLevel; fixed: boolean; chosen: boolean; variable: string }
+  starting?: { level: AdultLevel; variable: string }
+  groups?: {
+    oidc: { variable: string; map: Record<string, AdultLevel> } | null
+    ldap: { variable: string; map: Record<string, AdultLevel> | null } | null
+  }
 }
 
 export interface RecipeRelease {
@@ -166,8 +214,7 @@ export interface Recipe {
   summary?: string
   nsfw?: boolean
   free?: boolean
-  coverSfw?: boolean
-  cover?: string | null
+  art?: ArtSet
   links?: Record<string, string>
   saveDir?: string
   continuesFrom?: string[]
@@ -178,6 +225,8 @@ export interface Recipe {
 
 export interface SystemInfo {
   version: string
+  /** Ren'Py Sync codes: off until an admin turns them on. */
+  sync?: { on: boolean; server: string }
   engines: {
     installed: Array<{ version: string; bytes: number; usedBy: string[] }>
     available: Array<{ version: string; renpy: string; bytes: number }>
@@ -222,9 +271,11 @@ export class ApiError extends Error {
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init
+  // This device's adult games level: the server applies it to everything it answers. It can only narrow.
+  const device = deviceLevel()
   const res = await fetch(path, {
     ...rest,
-    headers: json !== undefined ? { 'content-type': 'application/json', ...(rest.headers ?? {}) } : rest.headers,
+    headers: { ...(device ? { 'x-renplay-adult': device } : {}), ...(json !== undefined ? { 'content-type': 'application/json' } : {}), ...(rest.headers as Record<string, string> | undefined ?? {}) },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   })
   if (!res.ok) {

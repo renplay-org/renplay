@@ -97,8 +97,9 @@ export class JobManager {
     return this.db.getJob(id)?.log || this.logs.read(id) || ''
   }
 
-  clearFinished(): void {
-    this.db.deleteFinishedJobs()
+  /** Clears finished jobs, except those `keep` keeps (jobs a person at Off cannot see). */
+  clearFinished(keep?: (job: JobRow) => boolean): void {
+    this.db.deleteFinishedJobs(keep)
     this.logs.clean((id) => !!this.db.getJob(id))
   }
 

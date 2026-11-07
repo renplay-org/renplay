@@ -1,15 +1,21 @@
-import { X, Loader2, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
+import { Loader2, Check, AlertTriangle, Info } from 'lucide-react'
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
+import Sheet from '../lantern/Sheet'
+import { Pill, IconBtn, TagPill, LanternSwitch } from '../lantern/controls'
+
+/** Form fields on plates: 46 px, radius 14. */
+export const accountInput = 'input'
 
 export function cx(...c: Array<string | false | null | undefined>): string {
   return c.filter(Boolean).join(' ')
@@ -17,20 +23,6 @@ export function cx(...c: Array<string | false | null | undefined>): string {
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'glass'
 type Size = 'sm' | 'md' | 'lg'
-
-const variants: Record<Variant, string> = {
-  primary:
-    'bg-gradient-to-b from-accent-500 to-accent-600 text-white shadow-[0_8px_24px_-8px_rgb(244_80_138/0.6)] hover:brightness-110 active:brightness-95',
-  secondary: 'bg-white/[0.07] text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/[0.11]',
-  ghost: 'text-zinc-300 hover:bg-white/[0.06] hover:text-white',
-  danger: 'bg-red-500/10 text-red-300 ring-1 ring-inset ring-red-500/25 hover:bg-red-500/20',
-  glass: 'glass text-white ring-1 ring-inset ring-white/15 hover:bg-white/15',
-}
-const sizes: Record<Size, string> = {
-  sm: 'h-8 px-3 text-[13px] gap-1.5 rounded-lg',
-  md: 'h-10 px-4 text-sm gap-2 rounded-xl',
-  lg: 'h-12 px-6 text-[15px] gap-2.5 rounded-2xl',
-}
 
 export function Button({
   variant = 'secondary',
@@ -40,22 +32,24 @@ export function Button({
   className,
   children,
   disabled,
+  href,
+  to,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; loading?: boolean; icon?: ReactNode }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; loading?: boolean; icon?: ReactNode; href?: string; to?: string; target?: string; rel?: string }) {
+  const v = variant === 'primary' ? 'p' : variant === 'ghost' ? 'q' : variant === 'danger' ? 'd' : 's'
   return (
-    <button
-      {...rest}
+    <Pill
+      variant={v}
+      size={size === 'md' ? undefined : size}
+      icon={loading ? <Loader2 className="animate-spin" /> : icon}
+      className={cx(variant === 'glass' && 'glass', className)}
       disabled={disabled || loading}
-      className={cx(
-        'inline-flex shrink-0 select-none items-center justify-center font-medium whitespace-nowrap transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400/70 disabled:pointer-events-none disabled:opacity-45',
-        variants[variant],
-        sizes[size],
-        className,
-      )}
+      href={href}
+      to={to}
+      {...rest}
     >
-      {loading ? <Loader2 className="size-4 animate-spin" /> : icon}
       {children}
-    </button>
+    </Pill>
   )
 }
 
@@ -67,33 +61,18 @@ export function IconButton({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; active?: boolean }) {
   return (
-    <button
-      {...rest}
-      aria-label={label}
-      title={label}
-      className={cx(
-        'inline-flex size-9 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400/70 disabled:opacity-40',
-        active && 'bg-white/10 text-white',
-        className,
-      )}
-    >
+    <IconBtn label={label} className={cx(active && 'on', className)} style={active ? { background: 'var(--plate-2)', color: 'var(--fg)' } : undefined} {...rest}>
       {children}
-    </button>
+    </IconBtn>
   )
 }
 
+/** Small label pill. */
 export function Badge({ tone = 'neutral', children, className }: { tone?: 'neutral' | 'accent' | 'green' | 'amber' | 'red' | 'violet'; children: ReactNode; className?: string }) {
-  const tones = {
-    neutral: 'bg-white/[0.07] text-zinc-300 ring-white/10',
-    accent: 'bg-accent-500/15 text-accent-300 ring-accent-500/25',
-    green: 'bg-emerald-500/12 text-emerald-300 ring-emerald-500/25',
-    amber: 'bg-amber-500/12 text-amber-300 ring-amber-500/25',
-    red: 'bg-red-500/12 text-red-300 ring-red-500/25',
-    violet: 'bg-violet-500/12 text-violet-300 ring-violet-500/25',
-  }
+  const t = className?.includes('glass') ? 'dark' : tone === 'accent' ? 'pink' : tone === 'violet' ? 'vio' : tone === 'neutral' ? undefined : tone
   return (
-    <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset', tones[tone], className)}>
-      {children}
+    <span className={className?.replace('glass', '').trim() || undefined}>
+      <TagPill tone={t as 'pink'}>{children}</TagPill>
     </span>
   )
 }
@@ -103,49 +82,42 @@ export function BetaBadge({ engine }: { engine?: string | null }) {
   if (!engine || engine === 'renpy') return null
   return (
     <span className="inline-flex shrink-0" title="Renplay plays games of engines other than Ren’Py as a beta: they work, with fewer features.">
-      <Badge tone="violet">Beta</Badge>
+      <TagPill tone="vio">Beta</TagPill>
     </span>
   )
 }
 
 export function Progress({ value, className, indeterminate }: { value: number; className?: string; indeterminate?: boolean }) {
+  if (indeterminate)
+    return (
+      <div className={cx('bar', className)}>
+        <div className="skeleton" style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} />
+      </div>
+    )
   return (
-    <div className={cx('h-1.5 overflow-hidden rounded-full bg-white/10', className)}>
-      <div
-        className={cx(
-          'h-full rounded-full bg-gradient-to-r from-accent-500 to-violet-400 transition-[width] duration-500',
-          indeterminate && 'skeleton w-full',
-        )}
-        style={indeterminate ? undefined : { width: `${Math.max(2, Math.min(100, value * 100))}%` }}
-      />
+    <div className={cx('bar', className)}>
+      <i style={{ width: `${Math.max(2, Math.min(100, value * 100))}%` }} />
     </div>
   )
 }
 
 export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cx('size-5 animate-spin text-zinc-400', className)} />
+  return <Loader2 className={cx('animate-spin', className)} style={{ width: 20, height: 20, color: 'var(--fg-3)' }} />
 }
 
+/** An empty state: a plate, never a ring. */
 export function Empty({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 px-6 py-16 text-center">
-      {icon && <div className="mb-4 text-zinc-500">{icon}</div>}
-      <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
-      {children && <div className="mt-1.5 max-w-md text-sm text-zinc-400">{children}</div>}
-      {action && <div className="mt-6">{action}</div>}
+    <div className="empty-filter">
+      {icon && <div className="muted" style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}>{icon}</div>}
+      <div className="h3">{title}</div>
+      {children && <div className="small muted" style={{ maxWidth: 460, margin: '6px auto 0' }}>{children}</div>}
+      {action && <div className="actions" style={{ justifyContent: 'center', marginTop: 16 }}>{action}</div>}
     </div>
   )
 }
 
-export function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  footer,
-  wide,
-  fullPhone,
-}: {
+export function Modal(props: {
   open: boolean
   onClose: () => void
   title?: ReactNode
@@ -154,45 +126,7 @@ export function Modal({
   wide?: boolean | 'xl'
   fullPhone?: boolean
 }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-    }
-  }, [open, onClose])
-  if (!open) return null
-  return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6">
-      <div className="absolute inset-0 animate-fade-in bg-black/65 backdrop-blur-sm" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={typeof title === 'string' ? title : undefined}
-        className={cx(
-          'relative flex max-h-[92vh] w-full animate-rise flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-ink-850 shadow-2xl sm:rounded-3xl',
-          wide === 'xl' ? 'sm:max-w-6xl' : wide ? 'sm:max-w-3xl' : 'sm:max-w-lg',
-          fullPhone && 'max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none',
-        )}
-      >
-        {title && (
-          <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] px-6 py-4">
-            <h2 className="truncate text-[15px] font-semibold text-white">{title}</h2>
-            <IconButton label="Close" onClick={onClose} className="-mr-2">
-              <X className="size-4" />
-            </IconButton>
-          </div>
-        )}
-        <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 border-t border-white/[0.06] px-6 py-4">{footer}</div>}
-      </div>
-    </div>,
-    document.body,
-  )
+  return <Sheet {...props} />
 }
 
 export function Confirm({
@@ -202,6 +136,7 @@ export function Confirm({
   title,
   children,
   confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   danger,
   busy,
 }: {
@@ -211,6 +146,7 @@ export function Confirm({
   title: string
   children?: ReactNode
   confirmLabel?: string
+  cancelLabel?: string
   danger?: boolean
   busy?: boolean
 }) {
@@ -222,7 +158,7 @@ export function Confirm({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {cancelLabel}
           </Button>
           <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy}>
             {confirmLabel}
@@ -230,23 +166,16 @@ export function Confirm({
         </>
       }
     >
-      <div className="text-sm leading-relaxed text-zinc-300">{children}</div>
+      <div className="small muted-2" style={{ lineHeight: 1.6, fontSize: 14 }}>{children}</div>
     </Modal>
   )
 }
 
 export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (v: T) => void; tabs: Array<{ id: T; label: ReactNode }> }) {
   return (
-    <div className="flex gap-1 overflow-x-auto rounded-2xl bg-white/[0.04] p-1 ring-1 ring-inset ring-white/[0.06]">
+    <div className="seg" role="group">
       {tabs.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => onChange(t.id)}
-          className={cx(
-            'flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all',
-            value === t.id ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200',
-          )}
-        >
+        <button key={t.id} type="button" aria-pressed={value === t.id} onClick={() => onChange(t.id)} className={value === t.id ? 'on' : ''}>
           {t.label}
         </button>
       ))}
@@ -256,21 +185,15 @@ export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; on
 
 export function Switch({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode; hint?: ReactNode }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 py-1">
-      <span>
-        <span className="block text-sm text-zinc-100">{label}</span>
-        {hint && <span className="mt-0.5 block text-xs text-zinc-500">{hint}</span>}
-      </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cx('relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors', checked ? 'bg-accent-500' : 'bg-white/15')}
-      >
-        <span className={cx('absolute top-0.5 size-5 rounded-full bg-white shadow transition-all', checked ? 'left-[18px]' : 'left-0.5')} />
-      </button>
-    </label>
+    <div className="setting inline">
+      <div className="l">
+        <div className="t">{label}</div>
+        {hint && <div className="d">{hint}</div>}
+      </div>
+      <div className="c">
+        <LanternSwitch checked={checked} onChange={onChange} label={typeof label === 'string' ? label : 'Switch'} />
+      </div>
+    </div>
   )
 }
 
@@ -280,13 +203,37 @@ export function Menu({ trigger, children, align = 'right' }: { trigger: (open: (
   const ref = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState({ top: 0, left: 0 })
+  const anchor = useRef<DOMRect | null>(null)
+  // Once the menu is drawn, its real size places it: below the button, or above it when the
+  // screen has no room below, and always inside the screen.
+  const place = useCallback(() => {
+    const box = ref.current?.getBoundingClientRect() ?? anchor.current
+    const menu = menuRef.current
+    if (!box || !menu) return
+    const h = menu.offsetHeight
+    const w = menu.offsetWidth
+    const below = box.bottom + 8
+    const top = below + h <= window.innerHeight - 8 ? below : Math.max(8, box.top - 8 - h)
+    const left = Math.max(8, Math.min(align === 'right' ? box.right - w : box.left, window.innerWidth - w - 8))
+    setPosition({ top, left })
+  }, [align])
+  useLayoutEffect(() => {
+    if (open) place()
+  }, [open, place])
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
-    const onScroll = (e: Event) => { if (!menuRef.current?.contains(e.target as Node)) setOpen(false) }
+    // Scrolling the page (a smooth or momentum scroll still running after the tap, too) moves the
+    // menu with its button. It closes only once the button has left the screen.
+    const onScroll = (e: Event) => {
+      if (menuRef.current?.contains(e.target as Node)) return
+      const box = ref.current?.getBoundingClientRect()
+      if (!box || box.bottom < 0 || box.top > window.innerHeight) setOpen(false)
+      else place()
+    }
     const onResize = () => setOpen(false)
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -298,38 +245,28 @@ export function Menu({ trigger, children, align = 'right' }: { trigger: (open: (
       document.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', onResize)
     }
-  }, [open])
+  }, [open, place])
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative" style={{ display: 'inline-flex' }}>
       {trigger(() => {
-        const box = ref.current?.getBoundingClientRect()
-        if (box) setPosition({
-          top: Math.min(box.bottom + 8, Math.max(8, window.innerHeight - 320)),
-          left: Math.max(8, Math.min(align === 'right' ? box.right - 240 : box.left, window.innerWidth - 248)),
-        })
+        anchor.current = ref.current?.getBoundingClientRect() ?? null
         setOpen((value) => !value)
       })}
-      {open && createPortal(
-        <div ref={menuRef} role="group" aria-label="Actions" data-actions-menu style={position} className="fixed z-[100] max-h-[calc(100dvh-16px)] w-60 animate-rise overflow-y-auto rounded-2xl border border-white/10 bg-ink-800/95 p-1.5 shadow-2xl backdrop-blur-xl">
-          {children(() => setOpen(false))}
-        </div>,
-        document.body,
-      )}
+      {open &&
+        createPortal(
+          <div ref={menuRef} role="group" aria-label="Actions" data-actions-menu style={position} className="pop menu-pop">
+            <div className="menu">{children(() => setOpen(false))}</div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
 
 export function MenuItem({ icon, children, onClick, danger, disabled }: { icon?: ReactNode; children: ReactNode; onClick: () => void; danger?: boolean; disabled?: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cx(
-        'flex min-h-11 w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] transition-colors disabled:opacity-40',
-        danger ? 'text-red-300 hover:bg-red-500/15' : 'text-zinc-200 hover:bg-white/[0.08]',
-      )}
-    >
-      {icon && <span className="text-zinc-400 [&>svg]:size-4">{icon}</span>}
+    <button type="button" onClick={onClick} disabled={disabled} className={danger ? 'd' : ''} style={disabled ? { opacity: 0.4 } : undefined}>
+      {icon}
       {children}
     </button>
   )
@@ -360,17 +297,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastCtx.Provider value={push}>
       {children}
       {createPortal(
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[200] flex flex-col items-center gap-2 px-4">
+        <div className="toasts">
           {items.map((t) => (
-            <div key={t.id} className="pointer-events-auto flex max-w-md animate-rise items-start gap-3 rounded-2xl border border-white/10 bg-ink-800/95 px-4 py-3 text-sm text-zinc-100 shadow-2xl backdrop-blur-xl">
+            <div key={t.id} className="toast" role="status">
               {t.tone === 'success' ? (
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+                <Check style={{ color: 'var(--green)' }} />
               ) : t.tone === 'error' ? (
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" />
+                <AlertTriangle style={{ color: 'var(--red)' }} />
               ) : (
-                <Info className="mt-0.5 size-4 shrink-0 text-violet-300" />
+                <Info style={{ color: 'var(--violet-2)' }} />
               )}
-              <div>{t.text}</div>
+              <span>{t.text}</span>
             </div>
           ))}
         </div>,

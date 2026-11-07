@@ -1,12 +1,46 @@
-import { ArrowUpCircle } from 'lucide-react'
+import { Check, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Game } from '../lib/api'
 import { recipeLinks } from '../lib/links'
 
-export default function UpdateCard({ game, compact = false }: { game: Game; compact?: boolean }) {
+export default function UpdateCard({ game }: { game: Game }) {
   const broken = game.recipe?.status === 'broken'
   const update = game.update
-  return <div id={compact ? undefined : 'update'} className={`rounded-2xl ring-1 ${broken ? 'bg-amber-400/5 ring-amber-400/15' : update ? 'bg-accent-500/[0.07] ring-accent-500/20' : 'bg-white/[0.03] ring-white/10'} ${compact ? 'px-4 py-3' : 'p-5'}`}>
-    {compact ? <Link to={`/game/${game.id}#update`} className="flex items-center gap-3 text-sm text-zinc-300"><ArrowUpCircle className="size-4 shrink-0 text-accent-300" /><span className="min-w-0 flex-1 truncate"><strong className="text-white">{game.title} {update?.version}</strong> is out. Get it from the developer and add the download; your saves carry over.</span></Link> : <><h2 className="mb-2 font-semibold text-white">{broken ? 'This version does not work in Renplay' : update ? 'Update available' : game.recipe ? 'Up to date' : 'Not in the catalog yet'}</h2><p className="text-sm leading-relaxed text-zinc-400">{update ? `${update.version} is out. Get it from the developer and add the download; your saves carry over.` : broken ? 'Check the developer’s downloads for a newer version. Your saves are kept.' : game.recipe ? 'You have the latest release in the catalog.' : 'Title and cover arrive when a recipe exists.'}</p>{update?.archives?.length ? <p className="mt-3 break-all text-xs text-zinc-500">Download: {update.archives.join(' or ')}</p> : null}{update && <div className="mt-4 flex flex-wrap gap-4 text-sm text-accent-300">{recipeLinks(game.recipe?.links).filter(([key]) => key !== 'walkthrough').slice(0, 2).map(([key, label, url]) => <a key={key} href={url} target="_blank" rel="noreferrer">Get it from {label} ↗</a>)}<Link to="/add">Add the download →</Link></div>}</>}
-  </div>
+  return (
+    <section id="update" className="panel">
+      <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}>
+        <span className={`ic-sq ${broken || update ? 'amber' : 'green'}`} style={{ borderRadius: 12, background: 'var(--plate-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, flex: 'none' }}>
+          {broken || update ? <Sparkles style={{ width: 20, height: 20 }} /> : <Check style={{ width: 20, height: 20 }} />}
+        </span>
+        <div className="grow">
+          <h2 className="h3">{broken ? 'This version does not work in Renplay' : update ? 'Update available' : game.recipe ? 'Up to date' : 'Not in the catalog yet'}</h2>
+          <p className="small muted" style={{ marginTop: 6, lineHeight: 1.55 }}>
+            {update
+              ? `${update.version} is out. Get it from the developer and add the download. Your saves carry over.`
+              : broken
+                ? 'Check the developer’s downloads for a newer version. Your saves are kept.'
+                : game.recipe
+                  ? `${game.version ?? 'Your version'} is the newest release the catalog has tested.`
+                  : 'Title and art arrive when a recipe exists.'}
+          </p>
+          {update?.archives?.length ? <p className="xs muted" style={{ marginTop: 8, overflowWrap: 'anywhere' }}>Download: {update.archives.join(' or ')}</p> : null}
+          {update && (
+            <div className="actions" style={{ marginTop: 12 }}>
+              {recipeLinks(game.recipe?.links)
+                .filter(([key]) => key !== 'walkthrough')
+                .slice(0, 2)
+                .map(([key, label, url]) => (
+                  <a key={key} href={url} target="_blank" rel="noreferrer" className="link small" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+                    Get it from {label} ↗
+                  </a>
+                ))}
+              <Link to="/add" className="link small" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+                Add the download
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
 }

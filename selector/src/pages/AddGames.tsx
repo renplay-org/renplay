@@ -1,15 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { CloudUpload, ExternalLink, FileArchive, MoreHorizontal, Pause, Play, RefreshCw, Trash2, X } from 'lucide-react'
+import { CloudUpload, FileArchive, MoreHorizontal, Pause, Play, RefreshCw, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import Sheet from '../components/Sheet'
 import DocsLink from '../components/DocsLink'
-import SegmentedControl from '../components/SegmentedControl'
-import { Cover } from '../components/GameCard'
-import TagFilters from '../components/TagFilters'
-import { gameTags, matchesSearch, tagChips } from '../lib/tags'
-import RecipeCard from '../components/RecipeCard'
-import { Badge, BetaBadge, Button, Confirm, Modal, Progress, Spinner, Switch, MenuItem, cx, errorText, useToast } from '../components/ui'
+import { Frame, tintOf } from '../lantern/art'
+import { Pill, Bar, TagPill } from '../lantern/controls'
+import { useRoom } from '../lantern/Room'
+import { BetaBadge, Button, Confirm, Modal, Progress, Spinner, Switch, MenuItem, cx, errorText, useToast } from '../components/ui'
 import { del, post, type Archive, type ArchiveInfo, type Job } from '../lib/api'
 import { ago, bytes, pct } from '../lib/format'
 import { useArchives, useCatalog, useGames, useJobs, useSystem } from '../lib/queries'
@@ -18,17 +16,16 @@ import { uploadArchive, type UploadHandle } from '../lib/upload'
 // A game in the catalog works; only a release marked broken is worth a word.
 const BROKEN = 'Does not work'
 
-const REQUEST_URL = 'https://renplay.org/catalog/request'
-
 export default function AddGames() {
+  useRoom({ game: null, quiet: true })
   return (
-    <div className="animate-fade-in">
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-white">Add games</h1>
-        <p className="mt-2 max-w-2xl text-sm text-zinc-400">Install a game from its PC download: a Ren’Py game, or an HTML game such as a Twine story. Renplay builds it for the browser on the server.</p>
-      </div>
+    <div>
+      <h1 className="h1">Add games</h1>
+      <p className="lead" style={{ marginTop: 6 }}>
+        Add the PC download of a Ren’Py game, or an HTML game. Renplay builds it for the browser on the server.
+      </p>
       <Downloads />
-      <section className="mt-12"><h2 className="mb-5 text-xl font-semibold text-white">Catalog</h2><CatalogTab /></section>
+      <CatalogTeaser />
     </div>
   )
 }
@@ -52,64 +49,75 @@ function Downloads() {
   const installed = archives.filter((a) => a.installedAs && !job(a))
   const others = archives.filter(other)
   const refresh = (
-    <Button size="sm" variant="ghost" icon={<RefreshCw className={cx('size-4', isFetching && 'animate-spin')} />} onClick={() => void refetch()}>
+    <Button size="sm" variant="ghost" icon={<RefreshCw className={cx(isFetching && 'animate-spin')} />} onClick={() => void refetch()}>
       Refresh
     </Button>
   )
   return (
-    <div className="space-y-8">
+    <div className="stack" style={{ gap: 32, marginTop: 24 }}>
       <UploadZone />
-      {jobs?.jobs.some((j) => j.type === 'import' && (j.status === 'failed' || j.status === 'interrupted')) && <p className="text-sm text-zinc-400">An install did not finish. <Link className="text-accent-300" to="/activity">Open Activity</Link> for its log, or read <DocsLink path="troubleshooting/">Troubleshooting</DocsLink>.</p>}
-      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold text-white">On the server</h2><code className="break-all text-xs text-zinc-500">{data?.dir ?? sys?.paths.archives}</code></div>
-      {!archives.length ? (
-        <div className="flex items-center justify-between gap-4 text-sm text-zinc-500">
-          <span>Downloads you add show up here.</span>
-          {refresh}
-        </div>
-      ) : (
-        <>
-          {ready.length > 0 && (
-            <Section title="Ready to install" action={refresh}>
-              {ready.map((a) => (
-                <ArchiveRow key={a.path} archive={a} job={job(a)} onInstall={() => setInstalling(a)} />
-              ))}
-            </Section>
-          )}
-          {installed.length > 0 && (
-            <Section title="Installed" action={ready.length ? undefined : refresh}>
-              {installed.map((a) => (
-                <ArchiveRow key={a.path} archive={a} onInstall={() => setInstalling(a)} />
-              ))}
-            </Section>
-          )}
-          {others.length > 0 && (
-            <details><summary className="min-h-11 cursor-pointer text-sm text-zinc-400">Other engines ({others.length})</summary><Section title="Other engines" action={ready.length || installed.length ? undefined : refresh}>
-              {others.map((a) => (
-                <ArchiveRow key={a.path} archive={a} onInstall={() => setInstalling(a)} />
-              ))}
-            </Section></details>
-          )}
-        </>
-      )}
-      {sys && (
-        <p className="text-xs text-zinc-500">
-          {sys.keepDownloads ? 'Downloads stay here after they install, so you can reinstall their games.' : 'Uploads through Renplay are deleted after a successful install. Files copied in stay here. Add a deleted download again to reinstall.'}
+      {jobs?.jobs.some((j) => j.type === 'import' && (j.status === 'failed' || j.status === 'interrupted')) && (
+        <p className="small muted">
+          An install did not finish. <Link className="link" to="/activity">Open Activity</Link> for its log, or read <DocsLink path="troubleshooting/">Troubleshooting</DocsLink>.
         </p>
       )}
+      <section className="sec" style={{ marginTop: 0 }}>
+        <div className="sec-h">
+          <h2 className="h2">
+            Downloads<span className="n">{archives.length}</span>
+          </h2>
+          <span className="row" style={{ gap: 12 }}>
+            {data?.dir && <code className="xs hide-phone">{data.dir}</code>}
+            {refresh}
+          </span>
+        </div>
+        {!archives.length ? (
+          <p className="small muted">Downloads you add show up here.</p>
+        ) : (
+          <>
+            {ready.length > 0 && <RowGroup title="Ready to install">{ready.map((a) => <ArchiveRow key={a.path} archive={a} job={job(a)} onInstall={() => setInstalling(a)} />)}</RowGroup>}
+            {installed.length > 0 && <RowGroup title="Installed">{installed.map((a) => <ArchiveRow key={a.path} archive={a} onInstall={() => setInstalling(a)} />)}</RowGroup>}
+            {others.length > 0 && (
+              <details>
+                <summary className="small muted" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                  Other engines ({others.length})
+                </summary>
+                <RowGroup title="Other engines">{others.map((a) => <ArchiveRow key={a.path} archive={a} onInstall={() => setInstalling(a)} />)}</RowGroup>
+              </details>
+            )}
+          </>
+        )}
+        {sys && (
+          <div className="notice" style={{ marginTop: 16 }}>
+            <FileArchive />
+            <div className="grow">
+              {sys.keepDownloads ? (
+                <>
+                  <b>Downloads are kept</b> after a game installs, so you can reinstall without downloading again. Files you copied into the folder yourself are never deleted by Renplay.
+                </>
+              ) : (
+                <>Uploads through Renplay are deleted after a successful install. Files copied in stay here. Add a deleted download again to reinstall.</>
+              )}
+            </div>
+            <Link className="link small" to="/settings" style={{ flex: 'none', alignSelf: 'center' }}>
+              Storage
+            </Link>
+          </div>
+        )}
+      </section>
       {installing && <InstallDialog archive={installing} deletes={sys ? !sys.keepDownloads : false} onClose={() => setInstalling(null)} />}
     </div>
   )
 }
 
-function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+function RowGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section>
-      <div className="mb-3 flex min-h-9 items-center justify-between gap-4">
-        <h2 className="text-sm font-semibold text-zinc-300">{title}</h2>
-        {action}
-      </div>
-      <div className="space-y-2.5">{children}</div>
-    </section>
+    <div style={{ marginTop: 14 }}>
+      <h3 className="small muted" style={{ fontWeight: 650, marginBottom: 4 }}>
+        {title}
+      </h3>
+      <div className="rows">{children}</div>
+    </div>
   )
 }
 
@@ -144,55 +152,58 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   const blocked = !!a.blocked || (!a.installedAs && engine?.installable === false)
   const madeWith = foreign ? foreign.label : renpy && `Ren’Py ${renpy}`
   const meta = [bytes(a.size), madeWith, `Added ${ago(a.mtime)}`, title !== a.name && a.name].filter(Boolean).join(' · ')
-  const actions = job ? (
-    <Link to="/activity" className="inline-flex h-9 items-center rounded-xl px-3 text-sm text-zinc-400 hover:bg-white/10 hover:text-white">
-      Show log
-    </Link>
-  ) : (
-    <>
-      <Sheet trigger={(open) => <Button size="sm" variant="ghost" icon={<MoreHorizontal className="size-4" />} onClick={open} aria-label={`Actions for ${a.name}`} />}>
-        {(close) => <MenuItem icon={<Trash2 />} danger onClick={() => { close(); setConfirmDelete(true) }}>Delete download… ({bytes(a.size)})</MenuItem>}
-      </Sheet>
-      {!blocked && (
-        <Button size="sm" variant={reinstall ? 'secondary' : 'primary'} onClick={onInstall}>
-          {reinstall ? 'Reinstall' : updates ? `Update ${updates}` : 'Install'}
-        </Button>
-      )}
-    </>
-  )
   return (
-    <div className="flex gap-3 rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.07] sm:items-center sm:gap-4">
-      {a.recipe?.cover ? (
-        <Cover game={{ title, cover: a.recipe.cover, nsfw: a.recipe.nsfw, coverSfw: a.recipe.coverSfw }} className="aspect-[63/50] w-20 shrink-0 self-start rounded-xl sm:w-24 sm:self-center" rounded={false} />
+    <div className="r stack-ph">
+      {a.recipe?.art.grid ? (
+        <div className="mini">
+          <Frame game={{ title, art: a.recipe.art, nsfw: a.recipe.nsfw }} kind="sq" />
+        </div>
       ) : (
-        <div className="flex aspect-[63/50] w-20 shrink-0 items-center justify-center self-start rounded-xl bg-white/[0.05] text-zinc-500 sm:w-24 sm:self-center">
-          <FileArchive className="size-6" />
+        <div className="ic">
+          <FileArchive />
         </div>
       )}
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 break-words font-medium text-zinc-100">{a.name}</span>
-          {version && <Badge className="shrink-0">{version}</Badge>}
+      <div className="grow">
+        <div className="row wrap" style={{ gap: 8 }}>
+          <span className="t">{a.name}</span>
+          {version && <TagPill>{version}</TagPill>}
+          {a.installedAs && <TagPill tone="green">Installed</TagPill>}
+          {updates && <TagPill tone="pink">Update for {updates}</TagPill>}
+          {broken && <TagPill tone="red">{BROKEN}</TagPill>}
+          {unknown && !job && <TagPill tone="amber">No game found</TagPill>}
+          {foreign && !blocked && <BetaBadge engine={foreign.family} />}
         </div>
-        <div className="mt-0.5 line-clamp-2 break-words text-xs text-zinc-500">{meta}</div>
-        {(broken || updates || unknown || (foreign && !blocked)) && !job && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {foreign && !blocked && <BetaBadge engine={foreign.family} />}
-            {broken && <Badge tone="red">{BROKEN}</Badge>}
-            {updates && <Badge tone="accent">New version of a game you have</Badge>}
-            {unknown && <Badge tone="amber">No game found</Badge>}
-          </div>
-        )}
-        {blocked && (a.blocked ?? engine?.reason) && <p className="mt-1.5 text-xs text-amber-200/80">{a.blocked ?? engine?.reason}</p>}
+        <div className="m">{meta}</div>
+        {blocked && (a.blocked ?? engine?.reason) && <p className="m amber">{a.blocked ?? engine?.reason}</p>}
         {!blocked && !job && engine?.warnings.map((w) => (
-          <p key={w} className="mt-1.5 text-xs text-amber-200/80">
+          <p key={w} className="m amber">
             {w}
           </p>
         ))}
         {job && <JobLine job={job} />}
-        <div className="-ml-2.5 mt-2 flex flex-wrap items-center gap-1 sm:hidden">{actions}</div>
       </div>
-      <div className="hidden shrink-0 items-center gap-1 sm:flex">{actions}</div>
+      <div className="end">
+        {job ? (
+          <Pill variant="q" size="sm" to="/activity">
+            Show log
+          </Pill>
+        ) : (
+          <>
+            {!blocked && (
+              <Pill variant={reinstall ? 's' : 'p'} size="sm" onClick={onInstall}>
+                {reinstall ? 'Reinstall' : updates ? 'Update' : 'Install'}
+              </Pill>
+            )}
+            <Sheet trigger={(open) => <Button size="sm" variant="ghost" icon={<MoreHorizontal />} onClick={open} aria-label={`Actions for ${a.name}`} />}>
+              {(close) => (
+                <MenuItem icon={<Trash2 />} danger onClick={() => { close(); setConfirmDelete(true) }}>
+                  Delete download ({bytes(a.size)})
+                </MenuItem>
+              )}
+            </Sheet>
+          </>
+        )}
+      </div>
       <Confirm
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
@@ -216,15 +227,15 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
 }
 
 function JobLine({ job }: { job: Job }) {
-  if (job.status === 'queued') return <div className="mt-2 text-xs text-zinc-400">Waiting for the install before it</div>
+  if (job.status === 'queued') return <div className="m">Waiting for the install before it</div>
   return (
-    <div className="mt-2.5">
-      <div className="mb-1.5 flex justify-between gap-3 text-xs text-zinc-400">
+    <div style={{ marginTop: 10, maxWidth: 420 }}>
+      <div className="row between xs muted" style={{ marginBottom: 6 }}>
         <span className="truncate">{job.stage || 'Installing'}</span>
-        <span className="shrink-0 tabular-nums">{pct(job.progress)}</span>
+        <span className="tnum" style={{ flex: 'none' }}>{pct(job.progress)}</span>
       </div>
-      <Progress value={job.progress} />
-      <p className="mt-1 text-xs text-zinc-500">You can leave this page.</p>
+      <Bar thin value={job.progress} />
+      <p className="xs muted" style={{ marginTop: 4 }}>You can leave this page.</p>
     </div>
   )
 }
@@ -276,19 +287,13 @@ function InstallDialog({ archive, deletes, onClose }: { archive: Archive; delete
         </>
       }
     >
-      <div className="space-y-5">
-        <p className="text-sm text-zinc-400">
-          From <span className="text-zinc-200">{archive.name}</span> ({bytes(archive.size)}). It installs on the server; big games take a few minutes, and you can leave this page.
+      <div className="stack" style={{ gap: 16 }}>
+        <p className="small muted">
+          From <span className="muted-2">{archive.name}</span> ({bytes(archive.size)}). It installs on the server; big games take a few minutes, and you can leave this page.
           {deletes ? ' If uploaded through Renplay, the download is deleted after a successful install. Files copied in are kept.' : ''}
         </p>
-        {target && (
-          <div className="rounded-xl bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-100 ring-1 ring-inset ring-amber-500/20">
-            Replaces the installed version. Saves stay where they are.
-          </div>
-        )}
-        {targetGame && targetGame.mods.files > 0 && (
-          <Switch checked={reapply} onChange={setReapply} label={`Re-apply my mods (${targetGame.mods.files} changes)`} hint="Mods made for the old version may not work with the new one. Off moves them aside." />
-        )}
+        {target && <div className="notice amber">Replaces the installed version. Saves stay where they are.</div>}
+        {targetGame && targetGame.mods.files > 0 && <Switch checked={reapply} onChange={setReapply} label={`Re-apply my mods (${targetGame.mods.files} changes)`} hint="Mods made for the old version may not work with the new one. Off moves them aside." />}
       </div>
     </Modal>
   )
@@ -329,115 +334,78 @@ function UploadZone() {
         const f = e.dataTransfer.files[0]
         if (f && !up) start(f)
       }}
-      className={cx('rounded-2xl border border-dashed p-4 transition-colors sm:p-5', drag ? 'border-accent-400 bg-accent-500/[0.06]' : 'border-white/15 bg-white/[0.02]')}
+      className="panel"
+      style={{ border: drag ? '1.5px dashed var(--pink)' : '1.5px dashed var(--plate-3-flat)', textAlign: 'center', padding: '28px 18px' }}
     >
       {up ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
-          <div className="min-w-0 flex-1">
-            <div className="flex justify-between gap-3 text-sm">
-              <span className="truncate font-medium text-zinc-100">{up.file.name}</span>
-              <span className="shrink-0 tabular-nums text-zinc-400">{pct(up.sent / up.file.size)}</span>
-            </div>
-            <Progress className="mt-2" value={up.sent / up.file.size} />
-            <div className="mt-1.5 text-xs text-zinc-500">
-              {bytes(up.sent)} of {bytes(up.file.size)}. If it stops, pick the same file again to continue.
-            </div>
+        <div className="stack" style={{ gap: 12, textAlign: 'left' }}>
+          <div className="row between small">
+            <span className="truncate" style={{ fontWeight: 650 }}>{up.file.name}</span>
+            <span className="tnum muted" style={{ flex: 'none' }}>{pct(up.sent / up.file.size)}</span>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <Progress value={up.sent / up.file.size} />
+          <div className="xs muted">
+            {bytes(up.sent)} of {bytes(up.file.size)}. If it stops, pick the same file again to continue.
+          </div>
+          <div className="actions" style={{ justifyContent: 'center' }}>
             {up.paused ? (
-              <Button size="sm" icon={<Play className="size-4" />} onClick={() => (up.handle.resume(), setUp({ ...up, paused: false }))}>
+              <Button size="sm" icon={<Play />} onClick={() => (up.handle.resume(), setUp({ ...up, paused: false }))}>
                 Resume
               </Button>
             ) : (
-              <Button size="sm" icon={<Pause className="size-4" />} onClick={() => (up.handle.pause(), setUp({ ...up, paused: true }))}>
+              <Button size="sm" icon={<Pause />} onClick={() => (up.handle.pause(), setUp({ ...up, paused: true }))}>
                 Pause
               </Button>
             )}
-            <Button size="sm" variant="ghost" icon={<X className="size-4" />} onClick={() => up.handle.cancel()}>
+            <Button size="sm" variant="ghost" icon={<X />} onClick={() => up.handle.cancel()}>
               Cancel
             </Button>
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
-          <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-zinc-300">
-              <CloudUpload className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="font-medium text-zinc-100">
-                Upload a game’s PC download<span className="hidden sm:inline">, or drop it here</span>
-              </div>
-              <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">
-                A .zip, .7z or .rar of any size. If the connection drops, pick the same file again and it continues.
-              </p>
-            </div>
+        <>
+          <div className="muted" style={{ display: 'flex', justifyContent: 'center' }}>
+            <CloudUpload style={{ width: 28, height: 28 }} />
           </div>
+          <div className="h3" style={{ marginTop: 8 }}>
+            Drop a download here, or choose a file
+          </div>
+          <p className="small muted" style={{ marginTop: 4 }}>
+            Zip, 7z or rar of any size. If the connection drops, pick the same file again and it continues.
+          </p>
           <input ref={inputRef} type="file" accept=".zip,.7z,.rar,.tar,.tgz" className="hidden" onChange={(e) => e.target.files?.[0] && start(e.target.files[0])} />
-          <Button className="shrink-0" variant="primary" icon={<CloudUpload className="size-4" />} onClick={() => inputRef.current?.click()}>
-            Choose file
-          </Button>
-        </div>
+          <div className="actions" style={{ justifyContent: 'center', marginTop: 14 }}>
+            <Button variant="primary" icon={<CloudUpload />} onClick={() => inputRef.current?.click()}>
+              Choose a file
+            </Button>
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-function CatalogTab() {
-  const { data, isLoading, refetch } = useCatalog()
-  const qc = useQueryClient()
-  const [refreshing, setRefreshing] = useState(false)
-  const [search, setSearch] = useState('')
-  const [tag, setTag] = useState<string | null>(null)
-  const [limit, setLimit] = useState(30)
-  const [filter, setFilter] = useState('all')
-  if (isLoading) return <Spinner />
-  const all = data?.games ?? []
-  const vocabulary = data?.vocabulary ?? {}
-  const games = all.filter((g) => matchesSearch(g, search, vocabulary) && (filter === 'all' || (filter === 'free' ? g.free === true || (g.free === undefined && g.nsfw === false) : g.state === 'completed')) && (!tag || gameTags(g, vocabulary).some((t) => t.id === tag)))
+function CatalogTeaser() {
+  const { data } = useCatalog()
+  const free = (data?.games ?? []).filter((r) => r.free === true && !r.local).slice(0, 6)
+  if (!free.length) return null
   return (
-    <div>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <p className="max-w-2xl text-sm text-zinc-400">Games tested in Renplay. Get one from its developer and add the download: Renplay recognizes it and uses the right settings.</p>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            loading={refreshing}
-            icon={<RefreshCw className="size-4" />}
-            onClick={async () => {
-              setRefreshing(true)
-              try {
-                await post('/api/catalog/refresh')
-                await refetch()
-                void qc.invalidateQueries({ queryKey: ['archives'] })
-              } finally {
-                setRefreshing(false)
-              }
-            }}
-          >
-            Refresh
-          </Button>
-          <a href={REQUEST_URL} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-sm text-zinc-300 hover:bg-white/10 hover:text-white">
-            Request a game <ExternalLink className="size-3.5" />
-          </a>
-        </div>
+    <section className="sec">
+      <div className="sec-h">
+        <h2 className="h2">Not sure what to add?</h2>
+        <Link to="/catalog">Browse the catalog</Link>
       </div>
-      {data?.status.errors.length ? <p className="mb-4 text-xs text-amber-300">Could not reach the catalog. Last updated {ago(data.status.fetchedAt)}.</p> : null}
-      <input aria-label="Search catalog" placeholder="Search catalog" value={search} onChange={(e) => { setSearch(e.target.value); setLimit(30) }} className="mb-4 h-11 w-full rounded-xl bg-white/5 px-4 text-sm text-white" />
-      <div className="mb-4"><SegmentedControl value={filter} onChange={(value) => { setFilter(value); setLimit(30) }} options={[{ value: 'all', label: 'All' }, { value: 'free', label: 'Free' }, { value: 'completed', label: 'Completed' }]} /></div>
-      <TagFilters tags={tagChips(all, vocabulary)} selected={tag} onSelect={(id) => { setTag(id); setLimit(30) }} />
-      <p className="mb-4 text-sm text-zinc-400">Showing {Math.min(limit, games.length)} of {games.length}</p>
-      {!games.length ? (
-        <p className="text-sm text-zinc-500">{all.length ? 'No games match. Try a different search or tag.' : 'No games in the catalog yet.'}</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-          {games.slice(0, limit).map((r) => (
-            <RecipeCard key={r.id} recipe={r} />
-          ))}
-        </div>
-      )}
-      {games.length > limit && <div className="mt-5 text-center"><Button onClick={() => setLimit(limit + 30)}>Show more</Button></div>}
-    </div>
+      <div className="shelf" data-row>
+        {free.map((r) => (
+          <Link key={r.id} to="/catalog" className="card" style={{ ['--tint' as string]: tintOf(r.art) }}>
+            <Frame game={r} kind="grid" />
+            <div className="ct">{r.title}</div>
+            <div className="cm">
+              <span className="truncate">{r.developer}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
   )
 }
