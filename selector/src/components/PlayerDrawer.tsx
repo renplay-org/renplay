@@ -84,7 +84,7 @@ export function PlayerDrawer({
         style={portrait ? { paddingBottom: 16 + insets.bottom, paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right } : { paddingTop: 16 + insets.top, paddingLeft: 16 + insets.left, paddingBottom: 16 + insets.bottom }}
       >
         <header className="pd-head">
-          <Frame game={game} kind="sq" style={{ width: 48, height: 48, flex: 'none' }} />
+          <Frame game={game} kind="sq" className="pd-icon" style={{ flex: 'none' }} />
           <div className="grow" style={{ minWidth: 0 }}>
             <div className="truncate" style={{ fontWeight: 700, fontSize: 17 }}>{game.title}</div>
             {game.version && <div className="xs muted truncate">{game.version}</div>}
@@ -106,7 +106,7 @@ export function PlayerDrawer({
               Save and exit
             </Pill>
           </div>
-          <p className="xs muted">
+          <p className={`xs muted pd-hint ${waiting ? 'waiting' : ''}`}>
             Leaving saves first.
             {waiting ? ` ${pending || 'Some'} ${pending === 1 ? 'save is' : 'saves are'} waiting on this device and sync when the connection is back.` : ''}
           </p>

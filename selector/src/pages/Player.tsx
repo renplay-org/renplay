@@ -8,6 +8,7 @@ import {
   Loader2,
   Menu,
   MonitorSmartphone,
+  Pin,
   RefreshCw,
   Save,
   Share,
@@ -24,7 +25,7 @@ import DocsLink from '../components/DocsLink'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatFor, hashUrl, TitleArt, useHidden } from '../lantern/art'
-import { Bar } from '../lantern/controls'
+import { Bar, Seg } from '../lantern/controls'
 import { flyGhost, takeTravel } from '../lantern/travel'
 import { Button, IconButton, Progress, Spinner, Switch, cx, useToast } from '../components/ui'
 import { useAuth } from '../lib/auth'
@@ -832,23 +833,49 @@ function SavesPanel({ gameId, onLoad }: { gameId: string; onLoad: (slot: string)
   useEffect(() => {
     void refetch()
   }, [refetch])
-  const slots = (data?.slots ?? []).filter((s) => s.kind !== 'internal' && s.valid)
+  const [filter, setFilter] = useState<'all' | 'pinned' | 'manual' | 'auto' | 'quick'>('all')
+  const all = (data?.slots ?? []).filter((s) => s.kind !== 'internal' && s.valid)
   if (isLoading) return <Spinner />
-  if (!slots.length) return <p className="text-sm text-zinc-400">No saves yet. Save from the game’s menu, they are stored on the server automatically.</p>
+  if (!all.length) return <p className="text-sm text-zinc-400">No saves yet. Saves you make in the game are stored on the server as you make them.</p>
+  const pinned = all.filter((s) => s.pinnedAt).length
+  const kinds = (['manual', 'auto', 'quick'] as const).filter((k) => all.some((s) => s.kind === k))
+  // Pinned saves first, then the newest.
+  const slots = all
+    .filter((s) => filter === 'all' || (filter === 'pinned' ? !!s.pinnedAt : s.kind === filter))
+    .sort((a, b) => Number(!!b.pinnedAt) - Number(!!a.pinnedAt) || b.ctime - a.ctime)
   return (
-    <div className="pd-saves">
-      {slots.map((s) => (
-        <button key={s.file} onClick={() => onLoad(slotName(s.file))} className="group overflow-hidden rounded-xl bg-white/[0.04] text-left ring-1 ring-white/10 transition hover:ring-accent-400/60">
-          {saveGame && <SceneCard game={saveGame} save={s} className="rounded-none" />}
-          <div className="p-2.5">
-            <div className="truncate text-xs font-medium text-zinc-100">{s.name || s.label}</div>
-            <div className="truncate text-[11px] text-zinc-400">
-              {s.name ? `${s.label} · ` : ''}
-              {ago(s.ctime)}
+    <div className="stack" style={{ gap: 12 }}>
+      {(pinned > 0 || kinds.length > 1) && (
+        <Seg
+          small
+          scroll
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all' as const, label: 'All' },
+            ...(pinned ? [{ value: 'pinned' as const, label: 'Pinned' }] : []),
+            ...kinds.map((k) => ({ value: k, label: `${k[0]!.toUpperCase()}${k.slice(1)}` })),
+          ]}
+        />
+      )}
+      <div className="pd-saves">
+        {slots.map((s) => (
+          <button key={s.file} onClick={() => onLoad(slotName(s.file))} className={cx('pd-save group flex flex-col justify-start overflow-hidden rounded-xl bg-white/[0.04] text-left ring-1 ring-white/10 transition hover:ring-accent-400/60', s.pinnedAt && 'pinned')}>
+            {saveGame && <SceneCard game={saveGame} save={s} className="rounded-none" />}
+            <div className="p-2.5">
+              <div className="row truncate text-xs font-medium text-zinc-100" style={{ gap: 4 }}>
+                {s.pinnedAt && <Pin className="size-3 shrink-0" style={{ color: 'var(--amber)' }} aria-label="Pinned" />}
+                <span className="truncate">{s.title || s.name || s.label}</span>
+              </div>
+              {s.note && <div className="pd-note text-[11px] text-zinc-300">{s.note}</div>}
+              <div className="truncate text-[11px] text-zinc-400">
+                {s.title || s.name ? `${s.label} · ` : ''}
+                {ago(s.ctime)}
+              </div>
             </div>
-          </div>
-        </button>
-      ))}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
