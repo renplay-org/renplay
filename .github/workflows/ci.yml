@@ -79,6 +79,9 @@ jobs:
         run: npm run build
         working-directory: selector
 
+      - name: Check the built library
+        run: node scripts/check-dist.mjs
+
   install-contract:
     name: Install contract (${{ matrix.arch }})
     strategy:

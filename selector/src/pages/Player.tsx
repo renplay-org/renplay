@@ -101,6 +101,8 @@ export default function Player() {
   const toast = useToast()
   const [panel, setPanel] = useState<Panel>(null)
   const [fullscreen, setFullscreen] = useState(false)
+  // The pill and the full screen button are lit for a few seconds after the game is ready, then quiet.
+  const [freshPill, setFreshPill] = useState(true)
   const [prefs, setPrefsState] = useState<DisplayPrefs>(loadPrefs)
   const [stage, setStage] = useState({ w: 0, h: 0 })
   const [coversNotch, setCoversNotch] = useState(false)
@@ -444,6 +446,12 @@ export default function Player() {
     send({ type: 'renplay:focus' })
   }, [send])
 
+  useEffect(() => {
+    if (!ready) return
+    const t = setTimeout(() => setFreshPill(false), 5000)
+    return () => clearTimeout(t)
+  }, [ready])
+
   // The drawer has the controller while it is open, and its Menu button closes it again.
   useEffect(() => {
     if (ready && !sandboxed) send({ type: 'renplay:pads', toGame: !drawer })
@@ -583,7 +591,8 @@ export default function Player() {
       }}>Continue</Button>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
       {legacySaves && <div role="status" className="fixed inset-x-4 top-4 z-[90] mx-auto max-w-md rounded-2xl bg-ink-950 p-4 text-sm shadow-xl"><p>Unowned browser saves are kept on this device. Their account is not known. Ask an admin to help recover them before clearing browser storage.</p><Button onClick={() => setLegacySaves(false)} className="mt-2">Dismiss</Button></div>}
       {/* Game stage */}
-      <div ref={stageRef} className={cx('rp-stage absolute inset-0', drawer && 'dim')}>
+      {/* A click in the bars around the game gives the keyboard back to the game. */}
+      <div ref={stageRef} className={cx('rp-stage absolute inset-0', drawer && 'dim')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
         <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
           <iframe
             ref={frameRef}
@@ -599,7 +608,7 @@ export default function Player() {
       </div>
 
       {/* The door: the stage's art grown to the viewport while the game loads. */}
-      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} homeTip={homeTip} onHomeTip={() => setPanel('fullscreen')} onDismissHomeTip={dismissHomeTip} />
+      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} muted={muted} onMute={toggleMute} fsMode={fsMode} fullscreen={fullscreen} onFullscreen={() => void toggleFullscreen()} onBack={() => (progress ? void exit('game') : navigate(`/game/${gameId}`))} insets={insets} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} homeTip={homeTip} onHomeTip={() => setPanel('fullscreen')} onDismissHomeTip={dismissHomeTip} />
 
       {/* Saving overlay */}
       {exiting && (
@@ -624,17 +633,21 @@ export default function Player() {
 
       {/* Two quiet things over the game: the Renplay pill (the drawer) and, while something waits, the sync pill. */}
       {ready && !drawer && (
-        <button
-          type="button"
-          className="rp-pill"
-          onClick={() => setDrawer(sandboxed ? 'options' : 'saves')}
-          aria-label="Open the player menu"
+        <div
+          className={cx('rp-pills', freshPill && 'fresh')}
           // HTML games often put their own menu in the top left (SugarCube's sidebar toggle).
           style={sandboxed ? { top: 10 + Math.max(insets.top, pad.top), right: 10 + insets.right } : { top: 10 + Math.max(insets.top, pad.top), left: 10 + insets.left }}
         >
-          <span className="mark" aria-hidden="true" />
-          Renplay
-        </button>
+          <button type="button" className="rp-pill" onClick={() => setDrawer(sandboxed ? 'options' : 'saves')} aria-label="Open the player menu">
+            <span className="mark" aria-hidden="true" />
+            Renplay
+          </button>
+          {fsMode !== 'none' && !fullscreen && (
+            <button type="button" className="rp-pill icon" onClick={() => void toggleFullscreen()} aria-label="Full screen">
+              <Expand aria-hidden="true" />
+            </button>
+          )}
+        </div>
       )}
       {ready && (sync.pending > 0 || !sync.online) && (
         <span className={cx('rp-sync', !sync.online && 'amber')} role="status" style={sandboxed ? { top: 14 + Math.max(insets.top, pad.top), left: 10 + insets.left } : { top: 14 + Math.max(insets.top, pad.top), right: 10 + insets.right }}>
@@ -696,6 +709,10 @@ export default function Player() {
           onSaveNow={saveNow}
           onExit={(to) => void exit(to)}
           onMainMenu={() => void mainMenu()}
+          muted={muted}
+          onMute={toggleMute}
+          fullscreen={fullscreen}
+          onFullscreen={fsMode !== 'none' ? () => void toggleFullscreen() : undefined}
           saves={
             <SavesPanel
               gameId={gameId}
@@ -824,7 +841,21 @@ function Door({
   homeTip,
   onHomeTip,
   onDismissHomeTip,
+  muted,
+  onMute,
+  fsMode,
+  fullscreen,
+  onFullscreen,
+  onBack,
+  insets,
 }: {
+  muted: boolean
+  onMute: () => void
+  fsMode: 'api' | 'home-screen' | 'none'
+  fullscreen: boolean
+  onFullscreen: () => void
+  onBack: () => void
+  insets: { top: number; right: number; bottom: number; left: number }
   game: Game
   ready: boolean
   resume: string | null
@@ -855,6 +886,22 @@ function Door({
     <div className={cx('door', ready ? 'pointer-events-none opacity-0' : 'opacity-100')} style={{ transition: 'opacity .7s', zIndex: 10, position: 'absolute' }}>
       <div className={cx('art', hero?.made === 'glow' && 'blur')} style={settling ? { opacity: 0 } : undefined}>
         {art && <img src={art} alt="" />}
+      </div>
+      {/* While it loads: leave, and the sound and full screen, set before the game starts. */}
+      <div className="door-bar" style={{ top: 12 + insets.top, left: 12 + insets.left, right: 12 + insets.right }}>
+        <button type="button" className="door-btn" onClick={onBack}>
+          <ArrowLeft aria-hidden="true" />
+          Game page
+        </button>
+        <span className="grow" />
+        <button type="button" className="door-btn icon" aria-pressed={!muted} aria-label={muted ? 'Sound is off. Turn it on' : 'Sound is on. Turn it off'} onClick={onMute}>
+          {muted ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+        </button>
+        {fsMode !== 'none' && (
+          <button type="button" className="door-btn icon" aria-label={fullscreen ? 'Leave full screen' : 'Full screen'} onClick={onFullscreen}>
+            {fullscreen ? <Shrink aria-hidden="true" /> : <Expand aria-hidden="true" />}
+          </button>
+        )}
       </div>
       <div className="tb">
         <TitleArt game={game} hidden={hidden} />
@@ -1094,8 +1141,8 @@ function DisplayPanel({
         <div className="pd-pair">
           {(
             [
-              ['fit', 'Fit', 'Whole game visible, bars where the shape differs'],
-              ['fill', 'Fill', 'Fill the screen, cropping the edges'],
+              ['fit', 'Fit', 'The whole game, with bars where the screen has another shape'],
+              ['fill', 'Fill', 'No bars at the sides. The edges are cropped, never the top or bottom'],
             ] as const
           ).map(([id, label, hint]) => (
             <button

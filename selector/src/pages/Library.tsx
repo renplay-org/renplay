@@ -60,29 +60,23 @@ function resumeUrl(g: Game): string {
   return `/play/${g.id}${g.latestSave ? `?resume=${encodeURIComponent(slotName(g.latestSave.file))}` : ''}`
 }
 
+/** The stage's line about where you are: one line on a wide screen, two short lines on a phone. */
 function stageMeta(g: Game) {
   const save = g.latestSave
+  const played = !!save || g.saves.count > 0 || !!g.lastPlayedAt
+  const rest = [playedTime(g.playTime, played), g.rating ? '★'.repeat(g.rating) : '', g.saves.count > 0 ? `${g.saves.count} ${g.saves.count === 1 ? 'save' : 'saves'}` : ''].filter(Boolean)
   return (
-    <>
-      <span>{save ? `${save.label} · ${ago(save.ctime)}` : 'Not played yet'}</span>
-      <span className="sep">·</span>
-      <span>{playedTime(g.playTime)}</span>
-      {g.rating && (
+    <span className="meta-lines">
+      {save && (
         <>
-          <span className="sep">·</span>
-          <span aria-label={`Rated ${g.rating} of 5`}>{'★'.repeat(g.rating)}</span>
-        </>
-      )}
-      {g.saves.count > 0 && (
-        <>
-          <span className="sep">·</span>
           <span>
-            {g.saves.count} {g.saves.count === 1 ? 'save' : 'saves'}
-            {navigator.onLine ? ' · Synced' : ''}
+            {save.label} · {ago(save.ctime)}
           </span>
+          <span className="sep">·</span>
         </>
       )}
-    </>
+      <span aria-label={g.rating ? `${rest.join(', ')}, rated ${g.rating} of 5` : undefined}>{rest.join(' · ')}</span>
+    </span>
   )
 }
 
@@ -115,7 +109,7 @@ function StageActions({ g }: { g: Game }) {
       <Pill variant="s" size="lg" to={`/game/${g.id}`}>
         Game page
       </Pill>
-      <Pill variant="q" size="lg" onClick={() => void notNow()}>
+      <Pill variant="q" size="lg" className="not-now" onClick={() => void notNow()}>
         Not now
       </Pill>
     </>
@@ -190,6 +184,24 @@ export default function Library() {
     .sort((a, b) => b.lastPlayedAt!.localeCompare(a.lastPlayedAt!))
   const favorites = all.filter((g) => g.favoriteAt).sort((a, b) => b.favoriteAt!.localeCompare(a.favoriteAt!))
   const added = all.filter((g) => !g.lastPlayedAt && g.status === 'installed' && !g.job && Date.now() - Date.parse(g.createdAt) < 7 * 86400000).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  // A shelf of new games says something only while most of the library is not new.
+  const addedShelf = added.length <= Math.max(4, all.length / 2) ? added : []
+  // A failed install a person dismissed stays out of the way on this device.
+  const [dismissed, setDismissed] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('renplay:dismissed-installs') ?? '[]')
+    } catch {
+      return []
+    }
+  })
+  const dismiss = (id: string) => {
+    const next = [...dismissed, id].slice(-100)
+    setDismissed(next)
+    try {
+      localStorage.setItem('renplay:dismissed-installs', JSON.stringify(next))
+    } catch {}
+  }
+  const failedShown = failed.filter((job) => !dismissed.includes(job.id))
   const updates = all.filter((g) => g.update)
   const home = !q && !tag && filter === 'all'
 
@@ -266,13 +278,13 @@ export default function Library() {
               <GameTile key={g.id} game={g} />
             ))}
           </Shelf>
-          <Shelf title={added.every((g) => new Date(g.createdAt).toDateString() === new Date().toDateString()) ? 'Added today' : 'Added this week'} count={added.length} href="/?filter=added&sort=added">
-            {added.slice(0, 12).map((g) => (
+          <Shelf title={addedShelf.every((g) => new Date(g.createdAt).toDateString() === new Date().toDateString()) ? 'Added today' : 'Added this week'} count={addedShelf.length} href="/?filter=added&sort=added">
+            {addedShelf.slice(0, 12).map((g) => (
               <GameTile key={g.id} game={g} />
             ))}
           </Shelf>
-          <Shelf title="Not finished installing" count={failed.length} href="/?filter=failed">
-            {failed.slice(0, 12).map((job) => (
+          <Shelf title="Not finished installing" count={failedShown.length} href="/?filter=failed">
+            {failedShown.slice(0, 12).map((job) => (
               <div key={job.id} className="panel" style={{ width: 'calc(var(--tile-w) * 2 + var(--gap))', flex: 'none' }}>
                 <p className="t" style={{ fontWeight: 650 }}>{all.find((g) => g.id === job.game)?.title || job.game || 'Install interrupted'}</p>
                 <p className="small muted" style={{ margin: '8px 0 12px' }}>{job.error || 'The install was interrupted. Your saves are kept.'}</p>
@@ -289,6 +301,9 @@ export default function Library() {
                   }}
                 >
                   Retry
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => dismiss(job.id)}>
+                  Dismiss
                 </Button>
               </div>
             ))}

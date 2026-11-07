@@ -1,10 +1,10 @@
 import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
 import { keptGames, removeKept, useOnline } from '../lib/offline'
 import ChooseArtwork from './ChooseArtwork'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { api, jobTitle } from '../lib/api'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { useAuth } from '../lib/auth'
 import AccountMenu from './AccountMenu'
 import SearchPalette from './SearchPalette'
@@ -61,7 +61,43 @@ function Footer() {
   )
 }
 
+/**
+ * A new page starts at its top. Back and forward return to where that page was left. The browser's
+ * own restoring is off: it ran before a page had its content, and a game page opened halfway down.
+ */
+function useScrollMemory() {
+  const location = useLocation()
+  const type = useNavigationType()
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+  }, [])
+  useLayoutEffect(() => {
+    const key = `renplay:scroll:${location.key}`
+    const saved = type === 'POP' ? Number(sessionStorage.getItem(key)) : 0
+    // Instant: the page's smooth scrolling is for scrolls a person asks for.
+    window.scrollTo({ top: saved || 0, behavior: 'instant' })
+    // A page that fills in a moment later is scrolled again once it is tall enough.
+    const again = saved ? requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' })) : 0
+    let t = 0
+    const onScroll = () => {
+      clearTimeout(t)
+      t = window.setTimeout(() => {
+        try {
+          sessionStorage.setItem(key, String(Math.round(window.scrollY)))
+        } catch {}
+      }, 120)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(again)
+      clearTimeout(t)
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [location.key, type])
+}
+
 function Shell() {
+  useScrollMemory()
   const { data } = useAuth()
   const admin = data?.user.role === 'admin'
   useArrowFocus()

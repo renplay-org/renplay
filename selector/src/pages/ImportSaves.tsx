@@ -188,7 +188,7 @@ export default function ImportSaves() {
   }
 
   return (
-    <div className="stack" style={{ gap: 24, maxWidth: 760 }}>
+    <div className="stack page-col" style={{ gap: 24 }}>
       <header>
         <Link to="/settings" className="link small row" style={{ gap: 6, minHeight: 'var(--hit)', width: 'fit-content' }}>
           <ArrowLeft className="size-4" /> Settings

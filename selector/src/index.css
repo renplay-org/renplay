@@ -242,7 +242,6 @@ code {
     0 0 0 2px var(--ink),
     0 0 0 4px #fff,
     0 0 28px 6px var(--tint-soft);
-  border-radius: 999px;
 }
 ::selection {
   background: rgb(244 80 138 / 0.35);
@@ -520,7 +519,6 @@ code {
   z-index: 40;
   background: var(--glass-deep);
   backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
   border-top: 1px solid var(--line);
   padding-bottom: var(--sab);
   display: grid;
@@ -552,6 +550,8 @@ main {
   max-width: var(--maxw);
   margin: 0 auto;
   padding: 6px var(--gutter) 120px;
+  /* The footer starts below the screen, so a page that fills in after loading never pushes it. */
+  min-height: 100dvh;
 }
 @media (min-width: 720px) {
   main {
@@ -563,6 +563,11 @@ main.narrow {
 }
 main.mid {
   max-width: 1080px;
+}
+/* Pages of settings and forms: one readable column, centred under the header like the rest. */
+.page-col {
+  max-width: 760px;
+  margin: 0 auto;
 }
 .foot {
   max-width: var(--maxw);
@@ -680,6 +685,13 @@ main.mid {
 .btn.p:hover {
   box-shadow: 0 16px 34px -12px rgba(244, 80, 138, 0.9);
 }
+/* The glow above outranks the focus ring: the lit pill keeps both. */
+.btn.p:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 0 0 4px #fff,
+    0 12px 30px -12px rgba(244, 80, 138, 0.7);
+}
 .btn.s {
   background: var(--plate-2);
   color: var(--fg);
@@ -701,7 +713,6 @@ main.mid {
 .btn.glass {
   background: rgba(8, 8, 12, 0.55);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   color: #fff;
 }
 .btn.sm {
@@ -842,7 +853,6 @@ main.mid {
   background: rgba(8, 8, 12, 0.6);
   color: #fff;
   backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .tag {
   display: inline-flex;
@@ -1454,14 +1464,21 @@ select.input option {
 .card:hover .frame,
 .card:focus-visible .frame,
 .card.focus .frame,
+/* The tile the stage shows: lifted and lit in its own colour. The white ring is keyboard focus only. */
 .card.on .frame {
   transform: scale(1.04);
+  box-shadow:
+    0 18px 40px -14px rgba(0, 0, 0, 0.9),
+    0 0 0 2px var(--tint-soft),
+    0 0 36px 6px var(--tint-soft);
+  z-index: 2;
+}
+.card.on:focus-visible .frame {
   box-shadow:
     0 18px 40px -14px rgba(0, 0, 0, 0.9),
     0 0 0 2px var(--ink),
     0 0 0 4px #fff,
     0 0 36px 6px var(--tint-soft);
-  z-index: 2;
 }
 .card:hover .frame {
   box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.9);
@@ -1629,9 +1646,13 @@ select.input option {
   line-height: 1.05;
   letter-spacing: -0.025em;
 }
+.logo-h {
+  display: flex;
+  margin: 0;
+}
 .stage .tb .logo-t {
-  height: auto;
-  max-height: 52px;
+  /* A fixed height (never above the logo's own) and its known shape: the box is right before it loads. */
+  height: min(52px, var(--logo-h, 52px));
   max-width: 100%;
   width: auto;
   object-fit: contain;
@@ -1712,7 +1733,7 @@ select.input option {
     font-size: 52px;
   }
   .stage .tb .logo-t {
-    max-height: 104px;
+    height: min(104px, var(--logo-h, 104px));
     max-width: min(480px, 100%);
   }
   .stage .tb .meta {
@@ -1738,6 +1759,72 @@ select.input option {
   .stage .tb .h1.xl {
     font-size: 60px;
     letter-spacing: -0.03em;
+  }
+}
+/* The library stage's line about where you are: inline on a wide screen, two lines on a phone, so
+   no separator is left at the end of a line. */
+.meta-lines {
+  display: contents;
+}
+@media (max-width: 719px) {
+  .meta-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .meta-lines > .sep {
+    display: none;
+  }
+  /* Not now is quiet text: on its own line under the two pills, it lines up with them. */
+  .stage .acts .not-now {
+    flex-basis: 100%;
+  }
+}
+/* Phones: Play or Resume comes right under the title, before the tags and the summary, so it is
+   on the first screen. */
+@media (max-width: 719px), (max-height: 500px) {
+  .stage .acts {
+    order: 1;
+  }
+  .stage .more {
+    order: 2;
+  }
+  .stage .acts {
+    margin-top: 12px;
+  }
+  .stage .more {
+    margin-top: 4px;
+  }
+}
+/* Phones held sideways: a short stage, so the poster, the title and Resume share one screen. */
+@media (min-width: 720px) and (max-height: 500px) {
+  :root {
+    --top-h: 52px;
+  }
+  .stage .art.hero-a {
+    height: 150px;
+  }
+  .stage .in {
+    grid-template-columns: 120px 1fr;
+    gap: 0 20px;
+  }
+  .stage .cover {
+    width: 120px;
+    margin-top: -100px;
+  }
+  .stage .tb {
+    margin-top: -44px;
+    min-height: 44px;
+  }
+  .stage .tb .h1.xl {
+    font-size: 32px;
+  }
+  .stage .tb .logo-t {
+    height: min(56px, var(--logo-h, 56px));
+  }
+  .stage .tb .meta {
+    font-size: 13px;
+    margin-top: 6px;
   }
 }
 .stage .tb .in-t {
@@ -1777,7 +1864,6 @@ select.input option {
   border-radius: 999px;
   background: rgba(8, 8, 12, 0.5);
   backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   font-size: 13px;
   font-weight: 600;
   color: var(--fg-2);
@@ -2026,7 +2112,6 @@ select.input option {
   z-index: 90;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   animation: fade var(--t-focus) both;
 }
 @keyframes fade {
@@ -2045,7 +2130,6 @@ select.input option {
   bottom: 0;
   background: var(--glass);
   backdrop-filter: blur(30px) saturate(140%);
-  -webkit-backdrop-filter: blur(30px) saturate(140%);
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   padding: 10px 20px calc(22px + var(--sab));
   max-height: calc(100dvh - 24px - var(--sat));
@@ -2180,7 +2264,6 @@ select.input option {
   width: min(390px, 100vw - 32px);
   background: var(--glass);
   backdrop-filter: blur(30px) saturate(140%);
-  -webkit-backdrop-filter: blur(30px) saturate(140%);
   border-radius: 18px;
   padding: 16px 18px;
   box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.9);
@@ -2384,7 +2467,6 @@ select.input option {
   padding: 12px 16px;
   background: var(--glass);
   backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-radius: 18px;
   font-size: 13.5px;
   line-height: 1.45;
@@ -2772,7 +2854,6 @@ input[type="range"] {
   padding: 0 14px 0 8px;
   border-radius: 999px;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   color: var(--fg);
   font-size: 13.5px;
@@ -2788,6 +2869,64 @@ input[type="range"] {
   content: "";
   position: absolute;
   inset: -2px;
+}
+/* The pill and the full screen button over the game: lit for a few seconds after it starts. */
+/* Sound, full screen and close, together at the drawer's top right. */
+.pd-tools {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.rp-pills {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+}
+.rp-pills .rp-pill {
+  position: relative;
+}
+.rp-pills.fresh .rp-pill {
+  opacity: 1;
+}
+.rp-pill.icon {
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+}
+.rp-pill.icon svg {
+  width: 18px;
+  height: 18px;
+}
+/* The loading screen's own controls: back to the game page, sound, full screen. */
+.door-bar {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.door-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 650;
+}
+.door-btn.icon {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.door-btn svg {
+  width: 18px;
+  height: 18px;
 }
 .rp-pill .mark {
   width: 24px;
@@ -2847,7 +2986,6 @@ input[type="range"] {
   gap: var(--s4);
   padding: 16px;
   background: var(--glass-deep);
-  -webkit-backdrop-filter: blur(30px) saturate(140%);
   backdrop-filter: blur(30px) saturate(140%);
   border-radius: 0 var(--r-sheet) var(--r-sheet) 0;
   animation: pd-in var(--t-pane) var(--out) both;
@@ -2918,16 +3056,24 @@ input[type="range"] {
   .pd-head > .grow {
     display: none;
   }
+  /* The game is right behind: its icon gives its room to the tabs and the controls. */
   .pd-icon {
-    grid-area: 1 / 1;
-    width: 36px;
-    height: 36px;
+    display: none;
   }
   .pd-tabs {
-    grid-area: 1 / 2;
+    grid-area: 1 / 1 / 2 / 3;
     justify-self: start;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
-  .pd-head > .ib {
+  .pd-tools {
+    gap: 0;
+  }
+  .pd-tools .ib {
+    width: 36px;
+  }
+  .pd-head > .pd-tools {
     grid-area: 1 / 3;
   }
   .pd-body {
@@ -3107,6 +3253,127 @@ input[type="range"] {
   width: 240px;
   max-width: calc(100vw - 16px);
   padding: 6px;
+}
+/* Tag chips, with All tags (and Clear tags) at the right end of the row. */
+.chip-bar {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.chip-bar > .chips:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.chip-bar > .chips + .chips {
+  flex: none;
+}
+/* On a phone these rows scroll sideways: their right edge fades, so a cut word reads as more to come. */
+@media (max-width: 719px) {
+  .chip-bar > .chips:first-child,
+  .toolbar {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+}
+
+/* Mods and files: a breadcrumb of folders and rows a finger can hit. */
+.files .crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.files .crumbs button {
+  min-height: 44px;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--fg-2);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.files .crumbs button[aria-current] {
+  color: var(--fg);
+}
+.files .crumbs button:hover {
+  background: var(--plate-2);
+}
+.files .crumbs .sep {
+  width: 14px;
+  height: 14px;
+  color: var(--fg-3);
+  flex: none;
+}
+.ib.plate {
+  background: var(--plate-2);
+  color: var(--fg);
+}
+.frows {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--plate);
+}
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 6px 4px 14px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--fg);
+  border-top: 1px solid var(--line);
+}
+.frow:first-child {
+  border-top: 0;
+}
+button.frow:hover {
+  background: var(--plate-2);
+}
+.frow > svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--fg-3);
+}
+.frow > svg.dir {
+  color: var(--pink-2);
+}
+.frow .n {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.frow .link-n {
+  text-align: left;
+  min-height: 40px;
+}
+.frow .link-n:hover {
+  text-decoration: underline;
+}
+.frow .m {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--fg-3);
+  padding-right: 8px;
+}
+.frow.gone .n {
+  text-decoration: line-through;
+  color: var(--fg-3);
+}
+
+/* The account menu's first row: who is signed in. */
+.menu-who {
+  gap: 10px;
+  padding: 8px 10px 10px;
+}
+.menu-who .t {
+  font-weight: 650;
 }
 
 /* A file path to copy, in a quiet chip. */

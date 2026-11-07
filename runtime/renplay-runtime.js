@@ -898,10 +898,11 @@
         var download = function (src, unzip) {
           return origFetch(src, { credentials: 'same-origin' }).then(function (res) {
             if (!res.ok || !res.body) throw new Error('HTTP ' + res.status + ' for ' + src)
+            var size = Number(res.headers.get('content-length')) || 0
             var counted = res.body.pipeThrough(
               new TransformStream({
                 transform: function (chunk, ctl) {
-                  onBytes(chunk.length, false)
+                  onBytes(chunk.length, false, name, size)
                   ctl.enqueue(chunk)
                 },
               }),
@@ -920,14 +921,55 @@
     })
   }
 
+  // ---------------------------------------------------------------- loading progress
+
+  /*
+   * One progress for the whole start, that only goes up. Each step reports on its own scale: the
+   * engine download and the game.zip download (both counted here as the bytes arrive), then Ren'Py
+   * unpacking the game and loading its scripts (window.progress). Each gets its share of the bar.
+   */
+  var loading = { pct: 0, zipDone: false, last: 0, engine: { total: 0, got: {} } }
+  var SHARES = { engine: [0, 0.25], zip: [0.25, 0.65], prepare: [0.65, 0.8], start: [0.8, 1] }
+
+  /** game.zip as it arrives, counted on the bar (renpy-pre.js keeps its own count to itself). */
+  function countedZip(res) {
+    if (!res || !res.body || typeof TransformStream !== 'function') return res
+    var got = 0
+    var body = res.body.pipeThrough(
+      new TransformStream({
+        transform: function (chunk, ctl) {
+          got += chunk.length
+          if (gameZipSize) loadingProgress('zip', got, gameZipSize)
+          ctl.enqueue(chunk)
+        },
+      }),
+    )
+    return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers })
+  }
+  function loadingProgress(phase, done, total) {
+    var share = SHARES[phase]
+    var f = total > 0 ? Math.max(0, Math.min(1, done / total)) : 0
+    var pct = share[0] + (share[1] - share[0]) * f
+    if (pct <= loading.pct && pct < 1) return
+    loading.pct = Math.max(loading.pct, pct)
+    var now = Date.now()
+    if (now - loading.last > 100 || loading.pct >= 1 || f >= 1) {
+      loading.last = now
+      post('progress', { done: Math.round(loading.pct * 1000), total: 1000, phase: phase })
+    }
+  }
+
   function loadEngine() {
-    var sizes = { 'renpy.wasm': 6.1e6, 'renpy.data': 5.5e6 }
     var got = 0
     var fromCache = 0
-    var onBytes = function (n, cached) {
+    // Sizes come from the responses; until both are known the larger file's share is a guess.
+    var onBytes = function (n, cached, name, size) {
       if (cached) fromCache++
       else got += n
-      if (typeof window.progress === 'function') window.progress(got, sizes['renpy.wasm'] + sizes['renpy.data'])
+      if (name && size) loading.engine.got[name] = size
+      var known = loading.engine.got
+      var total = (known['renpy.wasm'] || 6e6) + (known['renpy.data'] || 6e6)
+      loadingProgress('engine', got, total)
     }
     var wasm = cachedFile('renpy.wasm', 'application/wasm', onBytes)
     var data = cachedFile('renpy.data', 'application/octet-stream', onBytes).then(function (r) {
@@ -1007,6 +1049,9 @@
   /** Called as Ren'Py starts loading scripts, after game.zip is unpacked. */
   function restoreScripts() {
     scriptsLoadedAt = Date.now()
+    // game.zip is in, whatever its download reported: what follows is Ren'Py loading the game.
+    loading.zipDone = true
+    loadingProgress('start', 0, 1)
     var restored = 0
     Object.keys(pyCaches.files).forEach(function (n) {
       if (n.indexOf('rpyc/') !== 0) return
@@ -1195,7 +1240,7 @@
             if (hit) {
               log('game.zip from cache')
               gameZipSize = Number(hit.headers.get('content-length')) || 0
-              return hit
+              return countedZip(hit)
             }
             return downloadGameZip(abs, init).then(function (res) {
               gameZipSize = Number(res.headers.get('content-length')) || 0
@@ -1207,12 +1252,15 @@
                 })
                 cache.put(abs, res.clone()).catch(function () {})
               }
-              return res
+              return countedZip(res)
             })
           })
         })
         .catch(function () {
-          return downloadGameZip(abs, init)
+          return downloadGameZip(abs, init).then(function (res) {
+            gameZipSize = Number(res.headers.get('content-length')) || 0
+            return countedZip(res)
+          })
         })
     }
     return origFetch(input, init)
@@ -1653,15 +1701,11 @@
       setTimeout(uploadCaches, 10000)
     }
 
+    // Ren'Py's own reports, put on the one progress: unpacking the game, then loading its scripts.
     var origProgress = window.progress
-    var lastProgressPost = 0
     window.progress = function (done, total) {
       if (origProgress) origProgress(done, total)
-      var now = Date.now()
-      if (now - lastProgressPost > 100 || done >= total) {
-        lastProgressPost = now
-        post('progress', { done: done, total: total })
-      }
+      loadingProgress(loading.zipDone ? 'start' : 'prepare', done, total)
     }
 
     var origAtExit = window.atExit

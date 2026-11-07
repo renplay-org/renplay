@@ -59,7 +59,7 @@ export default function Settings() {
 
 function BrowserSettings() {
   return (
-    <div className="stack" style={{ gap: 18, maxWidth: 760 }}>
+    <div className="stack page-col" style={{ gap: 18 }}>
       <h1 className="h1">This browser</h1>
       <section className="panel stack">
         <DeviceAdultRow />
@@ -169,12 +169,12 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                 <div className="ladder">
                   <div className="lrow">
                     <div className="l">
-                      <div className="t">This installation</div>
+                      <div className="t">Highest level for everyone</div>
                       <div className="d">{installationHint[content.installation.level]}</div>
                       {content.installation.fixed ? <SourceLabel kind="server" label={content.installation.variable} /> : content.installation.chosen ? <SourceLabel kind="here" /> : <SourceLabel kind="def" />}
                     </div>
                     <LevelSeg
-                      label="This installation"
+                      label="Highest level for everyone"
                       value={content.installation.level}
                       onChange={
                         content.installation.fixed

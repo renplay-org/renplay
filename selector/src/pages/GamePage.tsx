@@ -46,6 +46,13 @@ export default function GamePage() {
     if (game && window.location.hash === '#update') document.getElementById('update')?.scrollIntoView({ block: 'center' })
   }, [game?.id])
   useRoom({ game: game ?? null, quiet: !game })
+  // The app's titles: Renplay, or the game's name with it.
+  useEffect(() => {
+    document.title = game ? `${game.title} · Renplay` : 'Renplay'
+    return () => {
+      document.title = 'Renplay'
+    }
+  }, [game?.title])
 
   if (isLoading)
     return (
@@ -142,14 +149,9 @@ export default function GamePage() {
     <>
       {installed ? (
         <>
-          <Pill variant="p" size="lg" icon={latest ? <Play /> : <Play />} onClick={() => resume(false)}>
+          <Pill variant="p" size="lg" icon={<Play />} onClick={() => resume(false)}>
             {latest ? 'Resume' : 'Play'}
           </Pill>
-          {latest && (
-            <Pill variant="s" size="lg" onClick={() => resume(true)}>
-              Main menu
-            </Pill>
-          )}
         </>
       ) : (
         <InstallButton game={game} />
@@ -188,7 +190,7 @@ export default function GamePage() {
             // Save slots and mods are Ren'Py's; other engines' games keep their saves themselves.
             ...(renpy ? [{ value: 'saves' as const, label: <><Save /> Saves</> }] : []),
             { value: 'walkthroughs' as const, label: <><BookOpen /> Walkthroughs</> },
-            ...(admin && renpy ? [{ value: 'files' as const, label: 'Mods and options' }] : []),
+            ...(admin && renpy ? [{ value: 'files' as const, label: 'Mods and files' }] : []),
             { value: 'details' as const, label: <><Info /> Details</> },
             ...(admin ? [{ value: 'manage' as const, label: 'Manage' }] : []),
           ]}
@@ -211,7 +213,6 @@ export default function GamePage() {
           {installed ? (
             <>
               <Pill variant="p" onClick={primary}>{latest ? 'Resume' : 'Play'}</Pill>
-              {latest && <Pill variant="s" onClick={() => navigate(`/play/${gameId}`)}>Main menu</Pill>}
             </>
           ) : (
             <InstallButton game={game} />
@@ -327,7 +328,7 @@ function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
                 {game.latestSave ? `${game.latestSave.label} · ${ago(game.latestSave.ctime)}` : game.lastPlayedAt ? `Last played ${ago(game.lastPlayedAt)}` : 'Not played yet'}
               </p>
               <p style={{ marginTop: 4 }}>
-                {playedTime(game.playTime)} · {game.saves.count} {game.saves.count === 1 ? 'save' : 'saves'}
+                {playedTime(game.playTime, game.saves.count > 0 || !!game.lastPlayedAt)} · {game.saves.count} {game.saves.count === 1 ? 'save' : 'saves'}
                 {game.saves.count > 0 && navigator.onLine ? ' · Synced' : ''}
               </p>
             </div>

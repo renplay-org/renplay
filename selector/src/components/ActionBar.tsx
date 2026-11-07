@@ -9,7 +9,8 @@ export default function ActionBar({ watch, children }: { watch?: RefObject<Eleme
       setShow(true)
       return
     }
-    const io = new IntersectionObserver(([entry]) => setShow(!entry.isIntersecting), { rootMargin: '-72px 0px 0px 0px' })
+    // Under the header and above the tab bar: a Resume behind either is not one a person can tap.
+    const io = new IntersectionObserver(([entry]) => setShow(!entry.isIntersecting), { rootMargin: '-72px 0px -96px 0px' })
     io.observe(el)
     return () => io.disconnect()
   }, [watch])
