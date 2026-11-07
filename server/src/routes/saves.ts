@@ -101,8 +101,11 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const body = req.body as Buffer
     if (!Buffer.isBuffer(body)) throw new HttpError(400, 'Expected a binary body')
     const mtime = Number(req.header('x-mtime')) || undefined
-    const f = await store.write(dir, name, body, { mtimeMs: mtime, reason: 'game' })
-    res.json({ ok: true, size: f.size, mtime: f.mtimeMs, sha1: sha1(body) })
+    // The version the device last saw, for the conflict rule. Older runtimes send none.
+    const rawBase = req.header('x-base')
+    const base = rawBase !== undefined && /^\d+$/.test(rawBase) ? Number(rawBase) : undefined
+    const f = await store.write(dir, name, body, { mtimeMs: mtime, reason: 'game', base })
+    res.json({ ok: true, size: f.size, mtime: f.mtimeMs, sha1: sha1(body), ...(f.conflict ? { conflict: f.conflict } : {}) })
   })
 
   router.delete('/:id/file', async (req, res) => {
@@ -138,7 +141,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
   router.get('/:id', async (req, res) => {
     const g = game(req)
     if (!g.save_dir) {
-      res.json({ saveDir: null, slots: [], other: [] })
+      res.json({ saveDir: null, slots: [], other: [], conflicts: [] })
       return
     }
     const files = await store.list(g.save_dir)
@@ -175,7 +178,9 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
       })
     }
     slots.sort((a, b) => b.ctime - a.ctime)
-    res.json({ saveDir: g.save_dir, slots, other })
+    // Second versions the conflict rule kept in History during the last two weeks.
+    const conflicts = await store.conflicts(g.save_dir, Date.now() - 14 * 24 * 3600_000)
+    res.json({ saveDir: g.save_dir, slots, other, conflicts })
   })
 
   /** A save's name, note and pin for this person. The save file itself is not touched. */

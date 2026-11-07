@@ -198,6 +198,15 @@ export default function Player() {
           setSavingNow(false)
           toast(d.saved ? (d.ok ? 'Saved' : 'Saved on this device. It syncs when the connection is back.') : 'Nothing to save in the main menu.', d.ok ? 'success' : 'info')
           break
+        case 'renplay:save-conflict':
+          toast(
+            d.kept === 'other'
+              ? 'Another device saved over this save more recently. Its copy is in the slot, and yours is kept in History.'
+              : 'Another device also saved this save. Yours is newer and is in the slot. The other copy is kept in History.',
+            'info',
+          )
+          void qc.invalidateQueries({ queryKey: ['saves', game?.id] })
+          break
         case 'renplay:accessibility':
           if (!d.ok) toast('This game does not offer Ren’Py’s accessibility menu.')
           break

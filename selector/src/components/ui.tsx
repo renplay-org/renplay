@@ -295,7 +295,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastCtx.Provider value={push}>
       {children}
       {createPortal(
-        <>
+        <div className="toasts">
           {items.map((t) => (
             <div key={t.id} className="toast" role="status">
               {t.tone === 'success' ? (
@@ -308,7 +308,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <span>{t.text}</span>
             </div>
           ))}
-        </>,
+        </div>,
         document.body,
       )}
     </ToastCtx.Provider>

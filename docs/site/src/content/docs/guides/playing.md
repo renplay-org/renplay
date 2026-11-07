@@ -66,6 +66,8 @@ Serve Renplay over HTTPS so the browser can cache the game and the home-screen a
 - **Every overwrite and delete keeps the earlier version.** `RENPLAY_SAVE_HISTORY` sets how many
   versions are kept per save file (20 by default). Look at them in the game’s saves view.
 - Uninstalling or reinstalling a game never deletes saves.
+- When two devices change the same save without seeing each other's copy, the copy saved later
+  stays in the slot and the other is kept in History. The player and the game's saves both say so.
 - Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every
   earlier version instead of the newest few. Only you see names, notes and pins, and the save file
   itself never changes.

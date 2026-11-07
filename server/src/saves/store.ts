@@ -110,22 +110,41 @@ export class SaveStore {
     }
   }
 
-  async write(saveDir: string, name: string, data: Buffer, opts: { mtimeMs?: number; reason?: string } = {}): Promise<SaveFile> {
+  /**
+   * Writes a file, keeping the copy it replaces in History. `base` is the server's version (mtime)
+   * the writer last saw, 0 for none. When a save has changed since (another device saved it), the
+   * conflict rule applies: the copy saved later stays in the slot and the other goes to History as
+   * a conflict. `conflict` says which: `kept` (the server's copy stayed) or `replaced`.
+   */
+  async write(saveDir: string, name: string, data: Buffer, opts: { mtimeMs?: number; reason?: string; base?: number } = {}): Promise<SaveFile & { conflict?: 'kept' | 'replaced' }> {
     const rel = cleanRelPath(name)
     if (isJunk(rel)) throw new HttpError(400, 'Refusing temporary file')
     if (data.length > MAX_FILE) throw new HttpError(413, 'Save file too large')
     const full = safeJoin(this.dir(saveDir), rel)
     return this.locked(full, async () => {
       let old: Buffer | null = null
+      let oldMtime = 0
       try {
         old = await readFile(full)
+        oldMtime = Math.floor((await stat(full)).mtimeMs)
       } catch {}
       if (old && old.equals(data)) {
         if (opts.mtimeMs) await utimes(full, new Date(), new Date(opts.mtimeMs)).catch(() => {})
         return { name: rel, size: data.length, mtimeMs: opts.mtimeMs ?? Date.now() }
       }
-      if (old) await this.snapshot(saveDir, rel, old, opts.reason ?? 'overwrite')
       const mtime = clampMtime(opts.mtimeMs)
+      // Only saves: Ren'Py merges its persistent data itself. A millisecond either way is the same
+      // version, because file times are stored in seconds as floating point.
+      if (old && opts.base !== undefined && rel.endsWith('.save') && Math.abs(oldMtime - opts.base) > 1) {
+        if (mtime < oldMtime) {
+          await this.snapshot(saveDir, rel, data, 'conflict')
+          return { name: rel, size: old.length, mtimeMs: oldMtime, conflict: 'kept' as const }
+        }
+        await this.snapshot(saveDir, rel, old, 'conflict')
+        await writeFileAtomic(full, data, new Date(mtime))
+        return { name: rel, size: data.length, mtimeMs: mtime, conflict: 'replaced' as const }
+      }
+      if (old) await this.snapshot(saveDir, rel, old, opts.reason ?? 'overwrite')
       await writeFileAtomic(full, data, new Date(mtime))
       return { name: rel, size: data.length, mtimeMs: mtime }
     })
@@ -190,6 +209,19 @@ export class SaveStore {
       }
     }
     return out.sort((a, b) => b.savedAt - a.savedAt)
+  }
+
+  /** Versions kept by the conflict rule since a time, newest first, read from History's names alone. */
+  async conflicts(saveDir: string, since: number): Promise<Array<{ id: string; file: string; at: number }>> {
+    const base = safeJoin(this.historyRoot, this.validated(saveDir))
+    const out: Array<{ id: string; file: string; at: number }> = []
+    for (const f of await readdir(base).catch(() => [] as string[])) {
+      for (const v of await readdir(join(base, f)).catch(() => [] as string[])) {
+        const [ts, reason] = v.split('__')
+        if (reason === 'conflict' && Number(ts) >= since) out.push({ id: `${f}/${v}`, file: f.replace(/__/g, '/'), at: Number(ts) })
+      }
+    }
+    return out.sort((a, b) => b.at - a.at)
   }
 
   async restoreVersion(saveDir: string, id: string): Promise<SaveFile> {

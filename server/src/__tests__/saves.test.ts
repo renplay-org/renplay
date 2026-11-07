@@ -55,6 +55,39 @@ describe('SaveStore', () => {
     expect(await store.history('Game-1', 'other.save')).toHaveLength(3)
   })
 
+  it('applies the conflict rule when another device saved the same slot in between', async () => {
+    const t = Date.now() - 60_000
+    const first = await store.write('G', '1-1-LT1.save', Buffer.from('desktop'), { mtimeMs: t, base: 0 })
+    expect(first.conflict).toBeUndefined()
+    // A phone that saw the desktop's copy just overwrites it, as before.
+    const phone = await store.write('G', '1-1-LT1.save', Buffer.from('phone'), { mtimeMs: t + 10_000, base: first.mtimeMs })
+    expect(phone.conflict).toBeUndefined()
+    // The desktop, still on its own copy, saves later: its copy is newer and takes the slot, the
+    // phone's goes to History as a conflict.
+    const later = await store.write('G', '1-1-LT1.save', Buffer.from('desktop later'), { mtimeMs: t + 20_000, base: first.mtimeMs })
+    expect(later.conflict).toBe('replaced')
+    expect((await store.read('G', '1-1-LT1.save')).toString()).toBe('desktop later')
+    // A device that played offline delivers an older copy: the slot keeps the newer one.
+    const offline = await store.write('G', '1-1-LT1.save', Buffer.from('offline'), { mtimeMs: t + 5_000, base: first.mtimeMs })
+    expect(offline).toMatchObject({ conflict: 'kept', mtimeMs: later.mtimeMs })
+    expect((await store.read('G', '1-1-LT1.save')).toString()).toBe('desktop later')
+    const conflicts = await store.conflicts('G', 0)
+    expect(conflicts.map((c) => c.file)).toEqual(['1-1-LT1.save', '1-1-LT1.save'])
+    const kept: string[] = []
+    for (const v of (await store.history('G', '1-1-LT1.save')).filter((v) => v.reason === 'conflict')) {
+      await store.restoreVersion('G', v.id)
+      kept.push((await store.read('G', '1-1-LT1.save')).toString())
+    }
+    expect(kept.sort()).toEqual(['offline', 'phone'])
+    // A device that knew no file, while another created it.
+    await store.write('G', '2-1-LT1.save', Buffer.from('one'), { base: 0 })
+    expect((await store.write('G', '2-1-LT1.save', Buffer.from('two'), { base: 0 })).conflict).toBe('replaced')
+    // No base (older runtimes, imports, restores) and the persistent file: the rule does not apply.
+    expect((await store.write('G', '2-1-LT1.save', Buffer.from('three'))).conflict).toBeUndefined()
+    await store.write('G', 'persistent', Buffer.from('p1'), { base: 0 })
+    expect((await store.write('G', 'persistent', Buffer.from('p2'), { base: 0 })).conflict).toBeUndefined()
+  })
+
   it('keeps a version when a save is deleted', async () => {
     await store.write('G', 'auto-1-LT1.save', Buffer.from('x'))
     expect(await store.remove('G', 'auto-1-LT1.save')).toBe(true)

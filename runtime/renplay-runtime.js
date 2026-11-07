@@ -152,7 +152,10 @@
     saveDir: cfg.saveDir || null,
     known: new Map(), // path -> { mtime, size, hash }
     lazy: new Map(), // path -> { size, mtime, loaded }
-    queue: new Map(), // path -> { data|null, mtime }
+    queue: new Map(), // path -> { data|null, mtime, base }
+    // The server's version of each file this device last saw (its mtime), sent with every upload so
+    // the server can tell when another device saved the same file in between.
+    base: new Map(),
     inflight: false,
     online: true,
     lastSync: 0,
@@ -295,9 +298,9 @@
 
   // ~/.renpy is shared by games, never by accounts (including unsent changes).
   function localKey(path) { return String(cfg.userId) + ':' + path }
-  function idbPut(path, data, mtime, synced) {
+  function idbPut(path, data, mtime, synced, base) {
     return idbTx('readwrite', function (s) {
-      s.put({ key: localKey(path), userId: cfg.userId, game: cfg.id, path: path, data: data, mtime: mtime, synced: synced ? 1 : 0 })
+      s.put({ key: localKey(path), userId: cfg.userId, game: cfg.id, path: path, data: data, mtime: mtime, synced: synced ? 1 : 0, base: base })
     }).catch(function () {})
   }
 
@@ -541,9 +544,35 @@
 
   function enqueue(path, bytes, mtime) {
     var data = bytes ? new Uint8Array(bytes) : null
+    // The base is read when the upload is sent, after any upload before it. Only the copy kept on
+    // this device records it now, for a later visit that delivers it.
     state.queue.set(path, { data: data, mtime: mtime })
-    idbPut(path, data, mtime, false)
+    idbPut(path, data, mtime, false, state.base.has(path) ? state.base.get(path) : 0)
     pump()
+  }
+
+  /**
+   * The conflict rule: another device saved this file since this one last saw it. The copy saved
+   * later stays in the slot and the other is kept in History, so nothing is lost. When the server
+   * kept its own copy, the game gets that copy too.
+   */
+  function onConflict(path, answer) {
+    post('save-conflict', { path: path, kept: answer.conflict === 'kept' ? 'other' : 'this' })
+    if (answer.conflict !== 'kept') return
+    fetch(API + '/raw?path=' + encodeURIComponent(path), { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status)
+        return r.arrayBuffer()
+      })
+      .then(function (buf) {
+        var bytes = new Uint8Array(buf)
+        writeLocal(path, bytes, answer.mtime)
+        state.known.set(path, { mtime: answer.mtime, size: bytes.length, hash: hash(bytes) })
+        idbPut(path, bytes, answer.mtime, true, answer.mtime)
+      })
+      .catch(function (e) {
+        console.warn('[renplay] could not fetch the kept copy of', path, e)
+      })
   }
 
   function pump() {
@@ -557,9 +586,12 @@
     state.inflight = true
     status()
     var url = API + '/file?path=' + encodeURIComponent(path)
-    var req = item.data
-      ? fetch(url, { method: 'PUT', body: item.data, headers: { 'content-type': 'application/octet-stream', 'x-mtime': String(item.mtime) } })
-      : fetch(url, { method: 'DELETE' })
+    var headers = { 'content-type': 'application/octet-stream', 'x-mtime': String(item.mtime) }
+    // A write kept from an earlier visit carries the base it was made on, one made now the newest.
+    // A write kept by an older Renplay has none and is delivered as before.
+    var base = item.base !== undefined ? item.base : state.base.has(path) ? state.base.get(path) : 0
+    if (base !== null) headers['x-base'] = String(base)
+    var req = item.data ? fetch(url, { method: 'PUT', body: item.data, headers: headers }) : fetch(url, { method: 'DELETE' })
     req
       .then(function (r) {
         if (!r.ok && !(r.status === 404 && !item.data)) throw new Error('HTTP ' + r.status)
@@ -567,6 +599,14 @@
         state.failures = 0
         state.lastSync = Date.now()
         idbMarkSynced(path, item.mtime)
+        if (!item.data) {
+          state.base.delete(path)
+          return
+        }
+        return r.json().then(function (answer) {
+          if (answer && answer.mtime) state.base.set(path, answer.mtime)
+          if (answer && answer.conflict) onConflict(path, answer)
+        }, function () {})
       })
       .catch(function (e) {
         console.warn('[renplay] upload failed for', path, e)
@@ -627,9 +667,11 @@
           var bytes = b64ToBytes(f.data)
           writeLocal(f.path, bytes, f.mtime)
           state.known.set(f.path, { mtime: f.mtime, size: bytes.length, hash: hash(bytes) })
+          state.base.set(f.path, f.mtime)
         })
         if (server && server.lazy) {
           server.lazy.forEach(function (f) {
+            state.base.set(f.path, f.mtime)
             if (!serverFiles.has(f.path)) createLazy(f.path, f.size, f.mtime)
           })
         }
@@ -639,15 +681,16 @@
           if (!server) {
             if (e.data) writeLocal(e.path, e.data, e.mtime)
             if (e.synced) state.known.set(e.path, { mtime: e.mtime, size: e.data ? e.data.length : 0, hash: e.data ? hash(e.data) : null })
-            else if (e.data) state.queue.set(e.path, { data: e.data, mtime: e.mtime })
+            else if (e.data) state.queue.set(e.path, { data: e.data, mtime: e.mtime, base: e.base === undefined ? null : e.base })
             return
           }
           if (e.synced) return
-          // Always deliver an unsent write. Server history preserves any newer server copy.
+          // Always deliver an unsent write, with the base it was made on: the server applies the
+          // conflict rule when another device saved the same file meanwhile.
           if (e.data) {
             writeLocal(e.path, e.data, e.mtime)
             state.known.set(e.path, { mtime: e.mtime, size: e.data.length, hash: hash(e.data) })
-            state.queue.set(e.path, { data: e.data, mtime: e.mtime })
+            state.queue.set(e.path, { data: e.data, mtime: e.mtime, base: e.base === undefined ? null : e.base })
           } else {
             try {
               FS.unlink(HOME + '/' + e.path)

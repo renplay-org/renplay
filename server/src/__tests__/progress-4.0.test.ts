@@ -144,4 +144,21 @@ describe('names, notes and pins of saves', () => {
     await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ title: '', note: '' }).expect(200)
     expect((app.db.raw.prepare('SELECT COUNT(*) n FROM save_meta').get() as { n: number }).n).toBe(0)
   })
+
+  it('tells a device about a conflict and lists it with the saves', async () => {
+    const put = (body: string, mtime: number, base?: number) => {
+      const r = request(app.app).put('/api/saves/story/file?path=Story-1/3-1-LT1.save').set('content-type', 'application/octet-stream').set('x-mtime', String(mtime))
+      return (base === undefined ? r : r.set('x-base', String(base))).send(Buffer.from(body)).expect(200)
+    }
+    const now = Date.now()
+    const a = (await put('a', now - 30_000, 0)).body
+    expect(a.conflict).toBeUndefined()
+    await put('b', now - 20_000, a.mtime)
+    expect((await put('older', now - 25_000, a.mtime)).body).toMatchObject({ conflict: 'kept' })
+    expect((await app.saves.read('Story-1', '3-1-LT1.save')).toString()).toBe('b')
+    // Without the header (a runtime from 3.x) the write is delivered as before.
+    expect((await put('c', now - 10_000)).body.conflict).toBeUndefined()
+    const listed = (await request(app.app).get('/api/saves/story').expect(200)).body.conflicts
+    expect(listed).toEqual([expect.objectContaining({ file: '3-1-LT1.save' })])
+  })
 })

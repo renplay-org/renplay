@@ -30,6 +30,8 @@ release notes say what).
 - The player has no toolbar any more. The game fills the screen with a quiet **Renplay** pill at the top left, which opens one menu with Saves, Guide and Options, **Save now** and **Save and exit**. **Esc** or a swipe from the left edge opens it too, and the game dims behind it. A sync pill appears only while saves wait.
 - Walkthroughs open in a window beside the game that you can move, resize and see through, with a tab per file, or in a reading sheet on a phone held upright.
 - **Options** opens Ren'Py's own accessibility menu (text size, fonts, self-voicing) where the game offers it.
+- When two devices change the same save, the copy saved later stays in the slot and the other is kept in History. Before, the last upload always won. The player and the game's saves tell you when this happens.
+- Several messages at once now stack instead of covering each other.
 - Renplay backs up everyone's saves once a day as a zip, keeping the newest 14, in `/data/backups/saves` or the folder set by `RENPLAY_BACKUP_DIR`. **Settings** lists them for download and has **Back up now**.
 - Saves can have your own name and a note, and a **pinned** save keeps every previous version in its history. Only you see them, and the save file itself never changes.
 - A game can keep several walkthroughs, as PDFs, pictures or text files, each with a title and a place in the list. The 3.x walkthrough becomes the first one.

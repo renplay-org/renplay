@@ -121,6 +121,8 @@ export interface SavesResponse {
   saveDir: string | null
   slots: SaveSlot[]
   other: Array<{ name: string; size: number; mtime: number }>
+  /** Second versions the conflict rule kept in History during the last two weeks, newest first. */
+  conflicts?: Array<{ id: string; file: string; at: number }>
 }
 
 export interface Job {

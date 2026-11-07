@@ -34,6 +34,9 @@ export default function SaveGallery({ game }: { game: Game }) {
   const [confirmDelete, setConfirmDelete] = useState<SaveSlot | null>(null)
   const [copying, setCopying] = useState<SaveSlot | null>(null)
   const [history, setHistory] = useState<SaveSlot | 'all' | null>(null)
+  // Conflicts this browser was already told about.
+  const seenKey = `renplay:conflicts-seen:${game.id}`
+  const [conflictsSeen, setConflictsSeen] = useState(() => Number(localStorage.getItem(seenKey)) || 0)
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['saves', game.id] })
@@ -66,15 +69,47 @@ export default function SaveGallery({ game }: { game: Game }) {
   if (!game.saveDir)
     return (
       <Empty title="Save folder not known yet">
-        Start the game once; Renplay learns where it saves from Ren’Py itself. You can also set it in the Details tab.
+        Start the game once. Renplay learns where it saves from Ren’Py itself. You can also set it in the Details tab.
       </Empty>
     )
 
   const slots = (data?.slots ?? []).filter((s) => s.kind !== 'internal' && (kind === 'all' || s.kind === kind))
   const counts = (data?.slots ?? []).reduce<Record<string, number>>((m, s) => ((m[s.kind] = (m[s.kind] ?? 0) + 1), m), {})
+  const conflicts = (data?.conflicts ?? []).filter((c) => c.at > conflictsSeen)
+  const conflictFiles = new Set(conflicts.map((c) => c.file)).size
+  const conflictSlot = conflicts.length ? data?.slots.find((s) => s.file === conflicts[0]!.file) : undefined
+  const conflictName = conflictSlot ? conflictSlot.title || conflictSlot.name || conflictSlot.label : conflicts[0]?.file
+  const seeConflicts = () => {
+    const at = conflicts[0]!.at
+    localStorage.setItem(seenKey, String(at))
+    setConflictsSeen(at)
+  }
 
   return (
     <div>
+      {conflicts.length > 0 && (
+        <div className="notice amber row wrap" style={{ marginBottom: 16, gap: 12 }}>
+          <div className="grow" style={{ minWidth: 220 }}>
+            {conflictFiles === 1 ? (
+              <>
+                <b>Two versions of {conflictName}.</b> Another device saved it too. The copy saved later is in the slot and the other is kept in History.
+              </>
+            ) : (
+              <>
+                <b>{conflictFiles} saves changed on two devices.</b> The copy saved later is in each slot and the other is kept in History.
+              </>
+            )}
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Button size="sm" variant="ghost" onClick={() => (seeConflicts(), setHistory(conflictFiles === 1 && conflictSlot ? conflictSlot : 'all'))}>
+              Show in History
+            </Button>
+            <Button size="sm" variant="ghost" onClick={seeConflicts}>
+              OK
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="toolbar" style={{ position: 'static', margin: 0, padding: '0 0 14px' }}>
         <Seg<Kind>
           small
@@ -268,7 +303,7 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
     queryFn: () => api<{ versions: Array<{ id: string; name: string; size: number; savedAt: number; reason: string }> }>(`/api/saves/${game.id}/history${file ? `?file=${encodeURIComponent(file)}` : ''}`),
   })
   const reason = (r: string) =>
-    ({ overwrite: 'Replaced in game', game: 'Replaced in game', 'game-delete': 'Deleted in game', 'user-delete': 'Deleted here', import: 'Replaced by import', restore: 'Before a restore', copy: 'Replaced by a copy' })[r] ?? r
+    ({ overwrite: 'Replaced in game', game: 'Replaced in game', 'game-delete': 'Deleted in game', 'user-delete': 'Deleted here', import: 'Replaced by import', restore: 'Before a restore', copy: 'Replaced by a copy', conflict: 'Older of two versions' })[r] ?? r
   return (
     <Modal open onClose={onClose} title={file ? `Previous versions of ${file}` : 'Save history'} wide fullPhone>
       {isLoading ? (
