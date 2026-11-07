@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLighterBackground } from '../lib/backdrop'
 import type { ArtSet } from '../lib/api'
 import { formatFor, hashUrl, tintOf, useHidden, type ArtGame } from './art'
 
@@ -40,6 +41,7 @@ function roomArt(game: ArtGame, hidden: boolean): { src: string | null; tint: st
 export function RoomProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<RoomTarget>({ game: null, quiet: true })
   const hidden = useHidden(target.game ?? { title: '' })
+  const lighter = useLighterBackground().on
   const [layers, setLayers] = useState<Array<{ key: number; src: string | null }>>([])
   const nextKey = useRef(0)
   const art = useMemo(() => (target.game && !target.brand ? roomArt(target.game, hidden) : null), [target, hidden])
@@ -61,11 +63,13 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   return (
     <RoomCtx.Provider value={setTarget}>
       <div className={`bd ${target.brand ? 'brand' : ''} ${target.quiet ? 'quiet' : ''}`.replace(/\s+/g, ' ').trim()} aria-hidden="true">
-        {layers.map((l, i) => (
-          <div key={l.key} className={`l ${i === layers.length - 1 ? 'on' : ''}`}>
-            {l.src && <img src={l.src} alt="" />}
-          </div>
-        ))}
+        {/* Lighter background: only the game's tint, and no picture is loaded for it. */}
+        {!lighter &&
+          layers.map((l, i) => (
+            <div key={l.key} className={`l ${i === layers.length - 1 ? 'on' : ''}`}>
+              {l.src && <img src={l.src} alt="" />}
+            </div>
+          ))}
         <div className="glow" />
       </div>
       {children}

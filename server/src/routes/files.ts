@@ -118,7 +118,9 @@ export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jo
     // inside the handler: as route middleware it would lose the request's context (who is asking).
     const g = game(req)
     await new Promise<void>((resolve, reject) => upload.array('files')(req, res, (error) => (error ? reject(error) : resolve())))
-    const dir = Overlays.editablePath(req.body?.dir || 'game')
+    // The folder the files go into: game itself or one inside it. Each file's path is checked again below.
+    const dir = cleanRelPath(req.body?.dir || 'game')
+    if (dir !== 'game') Overlays.editablePath(dir)
     const relPaths: string[] = (() => {
       try {
         return JSON.parse(req.body?.paths ?? '[]')

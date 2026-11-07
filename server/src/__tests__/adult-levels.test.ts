@@ -422,6 +422,14 @@ describe('the levels on every route', () => {
     const adult = (await request(app.app).get('/api/games/adult')).body.game
     expect(adult.art.grid).toMatchObject({ url1x: adultPic, width: 600, height: 900, made: null, credit: { store: 'Steam' } })
     expect((await request(app.app).get('/api/games/adult/art?kind=grid').expect(200)).body.candidates).toHaveLength(1)
+    // A mod upload is checked at the level of the person asking, including this device's: multer
+    // runs inside the handler, where the request still knows who is asking.
+    const upload = (device?: string) => {
+      const r = request(app.app).post('/api/games/adult/files/upload').field('dir', 'game').attach('files', Buffer.from('init python:\n    pass\n'), 'zz_mod.rpy')
+      return device ? r.set('X-Renplay-Adult', device) : r
+    }
+    await upload('off').expect(404)
+    expect((await upload().expect(200)).body.written).toEqual(['game/zz_mod.rpy'])
     // The save's real picture, and no hash.
     const pictured = (await request(app.app).get('/api/saves/adult').expect(200)).body.slots.find((s: { file: string }) => s.file === '2-1.save')
     expect(pictured.screenshot).toContain('/api/saves/adult/screenshot?')

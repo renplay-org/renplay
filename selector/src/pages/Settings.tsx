@@ -9,6 +9,7 @@ import { LevelSeg, DeviceAdultRow } from '../components/AdultLadder'
 import { SourceLabel, LanternSwitch } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { api, post, put } from '../lib/api'
+import { setLighterBackground, useLighterBackground } from '../lib/backdrop'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
 import { adultLabels, adultLevels, type AdultLevel } from '../lib/adult'
@@ -61,9 +62,24 @@ function BrowserSettings() {
       <h1 className="h1">This browser</h1>
       <section className="panel stack">
         <DeviceAdultRow />
+        <LighterBackground />
         <KeepCache />
       </section>
     </div>
+  )
+}
+
+function LighterBackground() {
+  const { on, chosen } = useLighterBackground()
+  return (
+    <Setting
+      title="Lighter background"
+      hint="A plain background instead of the game’s art behind each screen. It uses less data and battery. Until you choose, it follows this device’s reduced motion and data saver settings."
+      inline
+      source={<SourceLabel kind={chosen ? 'here' : 'def'} />}
+    >
+      <LanternSwitch checked={on} label="Lighter background" onChange={setLighterBackground} />
+    </Setting>
   )
 }
 
@@ -318,6 +334,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
           </div>
           <section className={`${section === 'browser' ? '' : 'hidden'} panel stack`} style={{ gap: 14 }}>
             <h2 className="h3">This browser</h2>
+            <LighterBackground />
             <KeepCache />
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
               <DeviceAdultRow />

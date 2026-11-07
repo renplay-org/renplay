@@ -23,7 +23,7 @@ import { recipeLinks } from '../lib/links'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
 import { useAuth } from '../lib/auth'
-import { stateLabel } from '../lib/tags'
+import { phoneLabel, stateLabel } from '../lib/tags'
 
 type Tab = 'play' | 'saves' | 'walkthroughs' | 'files' | 'details' | 'manage'
 
@@ -83,6 +83,12 @@ export default function GamePage() {
         <>
           <span className="sep">·</span>
           <span>Free</span>
+        </>
+      )}
+      {game.phone && (
+        <>
+          <span className="sep">·</span>
+          <span>{phoneLabel[game.phone]}</span>
         </>
       )}
       {game.family !== 'renpy' && (
@@ -543,6 +549,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
             {game.screen && <Row label="Resolution">{`${game.screen[0]} × ${game.screen[1]}`}</Row>}
             {game.engineLabel ? <Row label="Made with">{game.engineLabel}</Row> : game.renpyVersion && <Row label="Made with">{`Ren’Py ${game.renpyVersion}`}</Row>}
             {game.engine && <Row label="Plays on">{`Ren’Py ${game.engine} web`}</Row>}
+            {game.phone && <Row label="Phones">{phoneLabel[game.phone]}</Row>}
             {game.family === 'renpy' && game.saveDir && (
               <Row label="Save folder">
                 <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13 }}>{game.saveDir}</span>
