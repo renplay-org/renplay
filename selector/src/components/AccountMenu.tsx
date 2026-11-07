@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeftRight, Clock, LogOut, Settings, User, Users } from 'lucide-react'
+import { ArrowLeftRight, Clock, Eye, EyeOff, LogOut, Settings, User, Users } from 'lucide-react'
+import { useAdultState, useDeviceLevel } from '../lib/adult'
 import { useAuth } from '../lib/auth'
 import { post } from '../lib/api'
 import Avatar from './Avatar'
@@ -12,6 +13,8 @@ export default function AccountMenu() {
   const { data } = useAuth()
   const [error, setError] = useState('')
   const [switching, setSwitching] = useState(false)
+  const { data: adult } = useAdultState()
+  const [device, setDevice] = useDeviceLevel()
   if (!data) return null
   const admin = data.user.role === 'admin'
   return (
@@ -35,6 +38,31 @@ export default function AccountMenu() {
             <Link to="/account" onClick={close}>
               <User /> Account
             </Link>
+            {/* A shared screen: hide adult games in this browser in one tap, and back. */}
+            {device ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setDevice(null)
+                  close()
+                }}
+              >
+                <Eye /> Show adult games here again
+              </button>
+            ) : (
+              adult &&
+              adult.effective !== 'off' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDevice('off')
+                    close()
+                  }}
+                >
+                  <EyeOff /> Hide adult games here
+                </button>
+              )
+            )}
             {!admin && (
               <Link to="/settings" onClick={close}>
                 <Settings /> This browser

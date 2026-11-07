@@ -19,6 +19,8 @@ release notes say what).
 - A game's page opens at its top, at once and without a spinner, and its picture flies from the tile to the poster. **Back** returns to where you were in the library. On a phone the page rises in without the flight.
 - On phones, **Resume** and **Play** come right under a game's title, before its tags and summary, so they are on the first screen in portrait and landscape. Held sideways, the stage is shorter. The bar with **Resume** at the bottom appears as soon as the button is behind the tab bar.
 - The library's stage on a phone shows where you are in two short lines, and **Not now** sits centred under the two buttons.
+- **Adult games** on your account is one choice: Off, Blurred or Shown. Levels above your limit cannot be chosen, and one line says who sets that limit: the installation, an admin or a sign-in group. The admin's limit for everyone is **Highest level for everyone** in **Settings**, and each person's in **Users**.
+- Showing less in one browser, for a shared screen, is in **Settings → This browser**, and **Hide adult games here** in the account menu does it in one tap. Your account page says when this browser shows less, with **Follow my choice here**.
 - **Fit** shows the game in its own shape with the player's bars around it, and **Fill** crops only the sides, never the top or bottom where games keep their dialogue.
 
 ### Fixed

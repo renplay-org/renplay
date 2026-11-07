@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import Avatar from '../components/Avatar'
 import AvatarUpload from '../components/AvatarUpload'
 import LinkedSignIns from '../components/LinkedSignIns'
-import AdultLadder from '../components/AdultLadder'
+import AdultChoice from '../components/AdultLadder'
 import WhoIsPlaying from '../components/WhoIsPlaying'
 import { Button, Confirm, Modal, Spinner, accountInput, errorText, useToast } from '../components/ui'
 import { useRoom } from '../lantern/Room'
@@ -88,8 +88,8 @@ export default function Account() {
       )}
       <div className="grid2" style={{ marginTop: 22, alignItems: 'start' }}>
         <AccountSection title="Adult games">
-          <p className="small muted">The one place for what you see. Each row can only narrow the one above it. Off, Blurred and Shown mean the same everywhere.</p>
-          <AdultLadder />
+          <p className="small muted">What you see of adult games, on every device. Games that are not adult are never affected.</p>
+          <AdultChoice />
         </AccountSection>
         <AccountSection title="Profile">
           <form onSubmit={(e) => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(() => put('/api/me', { name: form.get('name') }), 'Display name saved') }} className="stack">

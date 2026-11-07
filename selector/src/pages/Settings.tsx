@@ -113,7 +113,8 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
   const { data: catalog } = useCatalog()
   const { data: games } = useGames()
   const installed = (games ?? []).filter((g) => g.status === 'installed')
-  const [section, setSection] = useState('general')
+  // ?section=browser opens This browser (the account page links there).
+  const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') ?? 'general')
   const [recipeFor, setRecipeFor] = useState('')
   const recipeGame = installed.find((g) => g.id === recipeFor)
   const [recipeOpen, setRecipeOpen] = useState(false)
@@ -169,12 +170,12 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                 <div className="ladder">
                   <div className="lrow">
                     <div className="l">
-                      <div className="t">This installation</div>
+                      <div className="t">Highest level for everyone</div>
                       <div className="d">{installationHint[content.installation.level]}</div>
                       {content.installation.fixed ? <SourceLabel kind="server" label={content.installation.variable} /> : content.installation.chosen ? <SourceLabel kind="here" /> : <SourceLabel kind="def" />}
                     </div>
                     <LevelSeg
-                      label="This installation"
+                      label="Highest level for everyone"
                       value={content.installation.level}
                       onChange={
                         content.installation.fixed
