@@ -93,6 +93,26 @@ describe('SaveStore', () => {
     expect((await store.write('G', 'persistent', Buffer.from('p2'), { base: 0 })).conflict).toBeUndefined()
   })
 
+  it('keeps the only copy of something for 30 days, however many versions follow', async () => {
+    await store.write('G', 'auto-1-LT1.save', Buffer.from('desktop'), { mtimeMs: Date.now() - 60_000, base: 0 })
+    await store.write('G', 'auto-1-LT1.save', Buffer.from('phone'), { mtimeMs: Date.now() - 30_000, base: 0 })
+    for (let i = 0; i < 10; i++) await store.write('G', 'auto-1-LT1.save', Buffer.from(`turn ${i}`))
+    const reasons = (await store.history('G', 'auto-1-LT1.save')).map((v) => v.reason)
+    expect(reasons.filter((r) => r === 'conflict')).toHaveLength(1)
+    expect(reasons.filter((r) => r === 'game' || r === 'overwrite')).toHaveLength(2)
+  })
+
+  it('never moves a save’s time into the future, and leaves a save another device changed when deleting', async () => {
+    await store.write('G', '5-1-LT1.save', Buffer.from('same'))
+    await store.write('G', '5-1-LT1.save', Buffer.from('same'), { mtimeMs: Date.UTC(2107, 0, 1) })
+    expect((await store.stat('G', '5-1-LT1.save'))!.mtimeMs).toBeLessThanOrEqual(Date.now() + 60_000)
+    const seen = (await store.stat('G', '5-1-LT1.save'))!.mtimeMs
+    await store.write('G', '5-1-LT1.save', Buffer.from('another device'), { mtimeMs: seen + 5000 })
+    expect(await store.remove('G', '5-1-LT1.save', 'game-delete', seen)).toBe('changed')
+    expect((await store.read('G', '5-1-LT1.save')).toString()).toBe('another device')
+    expect(await store.remove('G', '5-1-LT1.save', 'game-delete', seen + 5000)).toBe(true)
+  })
+
   it('keeps a version when a save is deleted', async () => {
     await store.write('G', 'auto-1-LT1.save', Buffer.from('x'))
     expect(await store.remove('G', 'auto-1-LT1.save')).toBe(true)

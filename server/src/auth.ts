@@ -302,6 +302,7 @@ export class Accounts {
     for (const dir of dirs) for (const file of await source.list(dir)) {
       const data = await source.read(dir, file.name)
       if (dir === 'tokens' && file.name === 'security_keys.txt') await target.mergeSecurityKeys(data.toString('utf-8'))
+      // A copy lands as copied. What it replaces stays in History for at least 30 days.
       else await target.write(dir, file.name, data, { reason: 'user-copy', mtimeMs: file.mtimeMs })
       copied++
     }

@@ -201,9 +201,11 @@ export default function Player() {
           break
         case 'renplay:save-conflict':
           toast(
-            d.kept === 'other'
-              ? 'Another device saved over this save more recently. Its copy is in the slot, and yours is kept in History.'
-              : 'Another device also saved this save. Yours is newer and is in the slot. The other copy is kept in History.',
+            d.deleted
+              ? 'Another device saved this save after you deleted it here, so it is back.'
+              : d.kept === 'other'
+                ? 'Another device saved over this save more recently. Its copy is in the slot, and yours is kept in History.'
+                : 'Another device also saved this save. Yours is newer and is in the slot. The other copy is kept in History.',
             'info',
           )
           void qc.invalidateQueries({ queryKey: ['saves', game?.id] })

@@ -439,6 +439,10 @@ describe('the levels on every route', () => {
 
   it('at off hides adult games from lists and refuses every route addressed to one with 404', async () => {
     await setLevel('off')
+    // Import from a computer skips an adult game's save folder at Off.
+    const hiddenSave = await zipBuffer({ log: 'x', json: JSON.stringify({ _save_name: 'x', _ctime: 1700000000 }) })
+    const imported = await request(app.app).post('/api/saves-import').field('meta', JSON.stringify([{ path: 'adult-1/9-9-LT1.save', mtime: Date.now() }])).attach('files', hiddenSave, '9-9-LT1.save').expect(200)
+    expect(imported.body).toMatchObject({ added: 0, same: 0, skipped: ['adult-1/9-9-LT1.save'] })
     // The blurred test deleted the download of the recipe-less adult game. Put it back: at Off it
     // must stay hidden because a hidden game was installed from it, though no recipe names it.
     writeFileSync(join(archivesDir, 'adult2.zip'), '1234')

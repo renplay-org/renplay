@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
@@ -67,5 +67,21 @@ describe('save backups', () => {
     expect((await app.saves.read('Story-1', '1-1-LT1.save')).toString()).toBe('owner save')
     await request(app.app).get('/api/system/backups/../../etc/passwd').expect(404)
     await request(app.app).get('/api/system/backups/saves-1999-01-01-0000.zip').expect(404)
+  })
+
+  it('reports a backup it cannot write, without bringing the server down', async () => {
+    // The part file for the next seconds cannot be created (a folder is in its place), as on a full disk.
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const blocked: string[] = []
+    for (let s = 0; s < 4; s++) {
+      const d = new Date(Date.now() + s * 1000)
+      const name = `.saves-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.zip.part`
+      mkdirSync(join(backupDir, name), { recursive: true })
+      blocked.push(name)
+    }
+    await expect(app.backups.run()).rejects.toThrow()
+    expect((await app.backups.info()).error).toBeTruthy()
+    await new Promise((r) => setTimeout(r, 200))
+    for (const name of blocked) rmSync(join(backupDir, name), { recursive: true, force: true })
   })
 })

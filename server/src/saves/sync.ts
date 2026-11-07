@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import yazl from 'yazl'
 import { HttpError } from '../util/paths.js'
 import { secretboxDecrypt, secretboxEncrypt } from './hydrogen.js'
-import { readZipEntries } from './savefile.js'
+import { readSaveMeta, readZipEntries } from './savefile.js'
 import type { SaveStore } from './store.js'
 
 /*
@@ -69,6 +69,19 @@ function zip(entries: Array<{ name: string; data: Buffer; mtime: number }>): Pro
   })
 }
 
+/** Reads a response body up to a limit, never more. */
+async function readCapped(res: Response, limit: number): Promise<Buffer> {
+  if (Number(res.headers.get('content-length')) > limit) throw new HttpError(413, 'That sync is too large.')
+  const chunks: Buffer[] = []
+  let total = 0
+  for await (const chunk of res.body ?? []) {
+    total += chunk.length
+    if (total > limit) throw new HttpError(413, 'That sync is too large.')
+    chunks.push(Buffer.from(chunk))
+  }
+  return Buffer.concat(chunks)
+}
+
 async function call(url: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, { ...init, signal: AbortSignal.timeout(15_000) })
@@ -114,13 +127,12 @@ export async function downloadSync(server: string, store: SaveStore, saveDir: st
   const res = await call(`${server}/api/sync/v1/${hash}`, { method: 'GET' })
   if (res.status === 404) throw new HttpError(404, 'No saves for this game with that code. Codes work for an hour.')
   if (!res.ok) throw new HttpError(502, `Ren’Py’s sync server did not send the saves (${res.status}).`)
-  const box = Buffer.from(await res.arrayBuffer())
-  if (box.length > SIZE_LIMIT * 2) throw new HttpError(413, 'That sync is too large.')
+  const box = await readCapped(res, SIZE_LIMIT * 2)
   let plain: Buffer
   try {
     plain = secretboxDecrypt(box, key)
   } catch {
-    throw new HttpError(409, 'The sync could not be decrypted.')
+    throw new HttpError(409, 'That code did not work for this game.')
   }
   const times = new Map<string, number>()
   const entries = await readZipEntries(plain, (n) => n === 'save_directory' || n === 'persistent' || syncable(n), SIZE_LIMIT * 2, times)
@@ -133,8 +145,12 @@ export async function downloadSync(server: string, store: SaveStore, saveDir: st
       await store.write(saveDir, 'sync/persistent', data, { mtimeMs: mtime, reason: 'sync' })
       continue
     }
+    // The zip's times are the other device's local time, so the save's own time decides which copy
+    // is newer. A broken or empty file never takes a save's place.
+    const meta = await readSaveMeta(data)
+    if (!meta) continue
     const before = await store.stat(saveDir, name)
-    const written = await store.write(saveDir, name, data, { mtimeMs: mtime, reason: 'sync', base: 0 })
+    const written = await store.write(saveDir, name, data, { mtimeMs: meta.ctime ? meta.ctime * 1000 : mtime, reason: 'sync', base: 0 })
     if (written.conflict === 'kept') report.kept++
     else if (written.conflict === 'replaced') report.replaced++
     else if (before) report.same++

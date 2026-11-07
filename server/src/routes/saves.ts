@@ -69,6 +69,11 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     // Restricted users may not discover an unclassified folder through another game's runtime.
     return games.length ? games.some((g) => !content.hides(g)) : !content.hides({ adult: 0, recipe_id: '' })
   }
+  /** A deleted save's name, note and pin go with it, so a new save in the slot starts clean. */
+  const forgetMeta = (dir: string, file: string) => {
+    db.raw.prepare('DELETE FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').run(viewer()?.user.id ?? 1, dir, file)
+  }
+
   const requireSaveDir = (g: GameRow): string => {
     if (!g.save_dir) throw new HttpError(409, 'The save folder of this game is not known yet. Start the game once, or set it in the game settings.')
     return g.save_dir
@@ -124,6 +129,8 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     if (!allowedDir(rel.slice(0, slash))) throw new HttpError(404, 'Save folder not found')
     const data = await store.read(rel.slice(0, slash), rel.slice(slash + 1))
     res.setHeader('Cache-Control', 'no-store')
+    // The version sent, so a device that loads it knows what it saw.
+    res.setHeader('X-Renplay-Mtime', String((await store.stat(rel.slice(0, slash), rel.slice(slash + 1)))?.mtimeMs ?? 0))
     res.type('application/octet-stream').send(data)
   })
 
@@ -143,7 +150,15 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
   router.delete('/:id/file', async (req, res) => {
     const g = game(req)
     const { dir, name } = resolvePath(g, req.query['path'])
-    await store.remove(dir, name, 'game-delete')
+    const rawBase = req.header('x-base')
+    const base = rawBase !== undefined && /^\d+$/.test(rawBase) ? Number(rawBase) : undefined
+    const removed = await store.remove(dir, name, 'game-delete', base)
+    // Another device saved it since this one last saw it: the save stays, and the device loads it.
+    if (removed === 'changed') {
+      res.status(409).json({ conflict: 'kept', mtime: (await store.stat(dir, name))?.mtimeMs ?? 0 })
+      return
+    }
+    if (removed && name.endsWith('.save') && !name.includes('/')) forgetMeta(dir, name)
     res.json({ ok: true })
   })
 
@@ -279,8 +294,10 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
 
   router.delete('/:id/slot', async (req, res) => {
     const g = game(req)
-    const ok = await store.remove(requireSaveDir(g), cleanRelPath(req.query['file']), 'user-delete')
+    const file = cleanRelPath(req.query['file'])
+    const ok = await store.remove(requireSaveDir(g), file, 'user-delete')
     if (!ok) throw new HttpError(404, 'Save not found')
+    forgetMeta(requireSaveDir(g), file)
     res.json({ ok: true })
   })
 

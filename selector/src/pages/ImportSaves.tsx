@@ -161,8 +161,8 @@ export default function ImportSaves() {
         form.append('meta', JSON.stringify(batch.map((f) => ({ path: f.rel, mtime: f.mtime }))))
         for (const f of batch) form.append('files', await f.read(), f.rel.split('/').pop()!)
         const res = await fetch('/api/saves-import', { method: 'POST', body: form })
-        const r = await res.json()
-        if (!res.ok) throw new Error(r.error || 'Import failed')
+        const r = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(r.error || (res.status === 413 ? 'Those files are too large to send at once.' : 'The import failed. Try again.'))
         for (const k of Object.keys(total) as Array<keyof typeof total>) total[k] += r[k] ?? 0
         sent += batch.length
         setProgress(sent / send.length)

@@ -4,6 +4,22 @@ import { join } from 'node:path'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp, type App } from '../app.js'
+import yazl from 'yazl'
+import { readZipEntries } from '../saves/savefile.js'
+
+/** A minimal Ren'Py save holding a text, and the text back from one. */
+const renpySave = (text: string) =>
+  new Promise<Buffer>((resolve) => {
+    const z = new yazl.ZipFile()
+    z.addBuffer(Buffer.from('pickled-log'), 'log')
+    z.addBuffer(Buffer.from(JSON.stringify({ _save_name: text, _ctime: 1700000000 })), 'json')
+    z.addBuffer(Buffer.from('8.5.3'), 'renpy_version')
+    z.end()
+    const chunks: Buffer[] = []
+    z.outputStream.on('data', (c: Buffer) => chunks.push(c))
+    z.outputStream.on('end', () => resolve(Buffer.concat(chunks)))
+  })
+const saveText = async (data: Buffer) => JSON.parse((await readZipEntries(data, (n) => n === 'json')).get('json')!.toString())._save_name as string
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
 
@@ -145,6 +161,21 @@ describe('names, notes and pins of saves', () => {
     expect((app.db.raw.prepare('SELECT COUNT(*) n FROM save_meta').get() as { n: number }).n).toBe(0)
   })
 
+  it('keeps a save another device changed when an old delete arrives, and a deleted save forgets its name', async () => {
+    await app.saves.write('Story-1', '6-1-LT1.save', Buffer.from('first'))
+    const seen = (await app.saves.stat('Story-1', '6-1-LT1.save'))!.mtimeMs
+    await app.saves.write('Story-1', '6-1-LT1.save', Buffer.from('another device'), { mtimeMs: seen + 5000 })
+    const kept = await request(app.app).delete('/api/saves/story/file?path=Story-1/6-1-LT1.save').set('x-base', String(seen)).expect(409)
+    expect(kept.body).toMatchObject({ conflict: 'kept', mtime: seen + 5000 })
+    expect((await app.saves.read('Story-1', '6-1-LT1.save')).toString()).toBe('another device')
+    await request(app.app).put('/api/saves/story/meta?file=6-1-LT1.save').send({ title: 'Before the finale', pinned: true }).expect(200)
+    await request(app.app).delete('/api/saves/story/slot?file=6-1-LT1.save').expect(200)
+    expect(app.db.raw.prepare("SELECT COUNT(*) n FROM save_meta WHERE file = '6-1-LT1.save'").get()).toEqual({ n: 0 })
+    // The raw read says which version it sent.
+    await app.saves.write('Story-1', '7-1-LT1.save', Buffer.from('x'), { mtimeMs: seen })
+    expect((await request(app.app).get('/api/saves/story/raw?path=Story-1/7-1-LT1.save').expect(200)).headers['x-renplay-mtime']).toBe(String(seen))
+  })
+
   it('tells a device about a conflict and lists it with the saves', async () => {
     const put = (body: string, mtime: number, base?: number) => {
       const r = request(app.app).put('/api/saves/story/file?path=Story-1/3-1-LT1.save').set('content-type', 'application/octet-stream').set('x-mtime', String(mtime))
@@ -178,20 +209,29 @@ describe('names, notes and pins of saves', () => {
       ['Story-1/sync/1-1-LT1.save', 'a sync copy', Date.now() - 5000],
       ['tokens/security_keys.txt', 'signing-key ' + 'ab'.repeat(32), Date.now()],
     ]
+    // Saves are Ren'Py save files (zips with a log), the persistent data and keys are plain.
+    const bodyOf = async (path: string, body: string) => (path.endsWith('.save') ? renpySave(body) : Buffer.from(body))
     let r = request(app.app).post('/api/saves-import').field('meta', JSON.stringify(files.map(([path, , mtime]) => ({ path, mtime }))))
-    for (const [path, body] of files) r = r.attach('files', Buffer.from(body), path.split('/').pop()!)
+    for (const [path, body] of files) r = r.attach('files', await bodyOf(path, body), path.split('/').pop()!)
     const report = (await r.expect(200)).body
     expect(report).toMatchObject({ added: 2, replaced: 1, kept: 2, same: 0, skipped: ['Story-1/sync/1-1-LT1.save'] })
     expect((await app.saves.read('Story-1', '1-1-LT1.save')).toString()).toBe('a save')
-    expect((await app.saves.read('Story-1', '3-1-LT1.save')).toString()).toBe('newer on the computer')
+    expect(await saveText(await app.saves.read('Story-1', '3-1-LT1.save'))).toBe('newer on the computer')
     expect((await app.saves.read('Story-1', 'persistent')).toString()).toBe('web persistent')
-    expect((await app.saves.read('Later-7', '1-1-LT1.save')).toString()).toBe('a game added later')
+    expect(await saveText(await app.saves.read('Later-7', '1-1-LT1.save'))).toBe('a game added later')
     const kept = (await app.saves.history('Story-1')).filter((v) => v.reason === 'conflict').map((v) => v.name)
     expect(kept).toEqual(expect.arrayContaining(['1-1-LT1.save', 'persistent', '3-1-LT1.save']))
     // The same folder again changes nothing.
     let again = request(app.app).post('/api/saves-import').field('meta', JSON.stringify([{ path: 'Story-1/3-1-LT1.save', mtime: 1 }]))
-    again = again.attach('files', Buffer.from('newer on the computer'), '3-1-LT1.save')
+    again = again.attach('files', await app.saves.read('Story-1', '3-1-LT1.save'), '3-1-LT1.save')
     expect((await again.expect(200)).body).toMatchObject({ added: 0, replaced: 0, kept: 0, same: 1 })
+    // A broken or empty file never takes a save's place, and a bad entry in the list writes nothing.
+    let broken = request(app.app).post('/api/saves-import').field('meta', JSON.stringify([{ path: 'Story-1/3-1-LT1.save', mtime: Date.now() }]))
+    broken = broken.attach('files', Buffer.alloc(0), '3-1-LT1.save')
+    expect((await broken.expect(200)).body).toMatchObject({ added: 0, replaced: 0, skipped: ['Story-1/3-1-LT1.save'] })
+    expect(await saveText(await app.saves.read('Story-1', '3-1-LT1.save'))).toBe('newer on the computer')
+    await request(app.app).post('/api/saves-import').field('meta', JSON.stringify([{ path: 'Story-1/8-1-LT1.save', mtime: 1 }, null])).attach('files', await renpySave('x'), '8-1-LT1.save').attach('files', Buffer.from('y'), 'y.save').expect(400)
+    expect(await app.saves.stat('Story-1', '8-1-LT1.save')).toBeNull()
     // A path out of the save folders, and a list that does not match the files.
     await request(app.app).post('/api/saves-import').field('meta', JSON.stringify([{ path: '../escape.save', mtime: 1 }])).attach('files', Buffer.from('x'), 'escape.save').expect(400)
     await request(app.app).post('/api/saves-import').field('meta', '[]').attach('files', Buffer.from('x'), 'x.save').expect(400)

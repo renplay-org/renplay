@@ -103,7 +103,7 @@ describe('runtime account isolation', () => {
   it('treats 401 as signed out, keeps the failed upload under that user, and stops retries rather than uploading into another account', async () => {
     const post = vi.fn(), fetch = vi.fn(async (_input: unknown, _init: any) => new Response('{}', { status: 401 })), put = vi.fn(), mark = vi.fn()
     const state = { inflight: false, queue: new Map([['Game/persistent', { data: new Uint8Array([1]), mtime: 1 }]]), base: new Map(), online: true, failures: 0 }
-    const fn = new Function('window', 'cfg', 'post', 'state', 'status', 'idbPut', 'idbMarkSynced', 'Headers', 'Response', 'URL', 'location', `
+    const fn = new Function('window', 'cfg', 'post', 'state', 'status', 'idbPut', 'idbMarkSynced', 'Headers', 'Response', 'URL', 'location', 'currentBase', 'hash', `
       var API = '/api/saves/game';
       ${section('  var signedOut = false', "  var HOME = ")}
       ${section('  var nativeFetch = window.fetch.bind(window)', '  /**')}
@@ -111,7 +111,7 @@ describe('runtime account isolation', () => {
       ${section('  function pump()', '  function flush(')}
       return { pump: pump, signedOut: function () { return signedOut } };
     `)
-    const runtime = fn({ fetch }, { id: 'game', userId: 1 }, post, state, () => {}, put, mark, Headers, Response, URL, { href: 'http://renplay.test/g/game/b1/' })
+    const runtime = fn({ fetch }, { id: 'game', userId: 1 }, post, state, () => {}, put, mark, Headers, Response, URL, { href: 'http://renplay.test/g/game/b1/' }, () => null, () => 'h')
     runtime.pump()
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(runtime.signedOut()).toBe(true)

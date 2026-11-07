@@ -132,8 +132,8 @@ export class SaveStore {
         // The same bytes from a writer that tracks versions (a device, an import) never move the
         // server's time back: an older copy of the same save is still the same save.
         if (opts.base !== undefined && opts.mtimeMs && opts.mtimeMs < oldMtime) return { name: rel, size: data.length, mtimeMs: oldMtime }
-        if (opts.mtimeMs) await utimes(full, new Date(), new Date(opts.mtimeMs)).catch(() => {})
-        return { name: rel, size: data.length, mtimeMs: opts.mtimeMs ?? Date.now() }
+        if (opts.mtimeMs) await utimes(full, new Date(), new Date(clampMtime(opts.mtimeMs))).catch(() => {})
+        return { name: rel, size: data.length, mtimeMs: opts.mtimeMs ? clampMtime(opts.mtimeMs) : Date.now() }
       }
       const mtime = clampMtime(opts.mtimeMs)
       // Only saves, unless asked (an import): Ren'Py merges its persistent data itself while it runs.
@@ -154,7 +154,11 @@ export class SaveStore {
     })
   }
 
-  async remove(saveDir: string, name: string, reason = 'delete'): Promise<boolean> {
+  /**
+   * Deletes a file, keeping it in History. With `base` (the version the deleting device last saw),
+   * a save another device has changed since is left alone: the answer is `changed`.
+   */
+  async remove(saveDir: string, name: string, reason = 'delete', base?: number): Promise<boolean | 'changed'> {
     const rel = cleanRelPath(name)
     const full = safeJoin(this.dir(saveDir), rel)
     return this.locked(full, async () => {
@@ -164,6 +168,7 @@ export class SaveStore {
       } catch {
         return false
       }
+      if (base !== undefined && rel.endsWith('.save') && Math.abs(Math.floor((await stat(full)).mtimeMs) - base) > 1) return 'changed' as const
       await this.snapshot(saveDir, rel, old, reason)
       await unlink(full)
       return true
@@ -180,10 +185,19 @@ export class SaveStore {
     await mkdir(dir, { recursive: true })
     const id = `${Date.now()}__${reason.replace(/[^a-z-]/g, '')}__${sha1(data).slice(0, 10)}`
     await writeFileAtomic(join(dir, id), data)
-    // Prune old versions, except of a pinned save.
+    // Prune old versions, except of a pinned save. A version that is the only copy of something (the
+    // older of two, a deleted save, what an import or restore replaced) stays at least 30 days
+    // however many versions follow it.
     if (this.pinned(saveDir, rel)) return
     const versions = (await readdir(dir)).filter((n) => !n.startsWith('.')).sort()
-    for (const v of versions.slice(0, Math.max(0, versions.length - this.keepVersions))) await unlink(join(dir, v)).catch(() => {})
+    const excess = versions.length - this.keepVersions
+    if (excess <= 0) return
+    const recent = Date.now() - KEEP_ONLY_COPIES
+    const prunable = versions.filter((v) => {
+      const [ts, why] = v.split('__')
+      return !(ONLY_COPIES.has(why ?? '') && Number(ts) > recent)
+    })
+    for (const v of prunable.slice(0, excess)) await unlink(join(dir, v)).catch(() => {})
   }
 
   async history(saveDir: string, name?: string): Promise<HistoryVersion[]> {
@@ -421,6 +435,10 @@ export interface ImportReport {
   skipped: Array<{ name: string; reason: string }>
   trustedKeys: number
 }
+
+/** History reasons whose version is the only copy of something. */
+const ONLY_COPIES = new Set(['conflict', 'delete', 'game-delete', 'user-delete', 'import', 'restore', 'sync', 'copy', 'user-copy'])
+const KEEP_ONLY_COPIES = 30 * 24 * 3600_000
 
 function clampMtime(ms?: number): number {
   const now = Date.now()

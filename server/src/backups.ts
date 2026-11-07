@@ -95,17 +95,22 @@ export class SaveBackups {
 
   private async write(): Promise<string> {
     const dir = this.dir!
+    const name = `saves-${stamp(new Date())}.zip`
+    const temp = join(dir, `.${name}.part`)
+    let out: ReturnType<typeof createWriteStream> | null = null
     try {
       await mkdir(dir, { recursive: true })
-      const name = `saves-${stamp(new Date())}.zip`
-      const temp = join(dir, `.${name}.part`)
       const zip = new yazl.ZipFile()
+      // A full disk or an unwritable folder rejects this while files are still being added: it is
+      // awaited below, and handled now so it never goes unhandled.
       const done = new Promise<void>((resolve, reject) => {
-        const out = createWriteStream(temp)
+        out = createWriteStream(temp)
         out.on('close', resolve)
         out.on('error', reject)
+        zip.outputStream.on('error', reject)
         zip.outputStream.pipe(out)
       })
+      done.catch(() => {})
       const users = this.db.raw.prepare('SELECT id, username FROM users ORDER BY id').all() as Array<{ id: number; username: string }>
       let count = 0
       for (const u of users) {
@@ -126,6 +131,8 @@ export class SaveBackups {
       this.error = null
       return name
     } catch (e) {
+      ;(out as ReturnType<typeof createWriteStream> | null)?.destroy()
+      await rm(temp, { force: true }).catch(() => {})
       this.error = (e as Error).message
       throw e
     }

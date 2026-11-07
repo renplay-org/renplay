@@ -50,7 +50,7 @@ describe('Sync codes', () => {
   let app: App
   let server: Server
   const kept = new Map<string, Buffer>()
-  const zipOf = (entries: Record<string, [string, number]>) =>
+  const zipOf = (entries: Record<string, [string | Buffer, number]>) =>
     new Promise<Buffer>((resolve) => {
       const z = new yazl.ZipFile()
       for (const [name, [body, mtime]] of Object.entries(entries)) z.addBuffer(Buffer.from(body), name, { mtime: new Date(mtime), compress: false })
@@ -123,18 +123,23 @@ describe('Sync codes', () => {
 
   it('brings saves from a code made elsewhere: newer ones take the slot, the persistent data waits in the sync folder', async () => {
     const now = Date.now()
+    // A save's own time decides, not the zip's (the other device's local time): here the zip times
+    // say the opposite of the saves.
+    const save = (text: string, at: number) => zipOf({ log: ['x', at], json: [JSON.stringify({ _save_name: text, _ctime: at / 1000 }), at] })
     const plain = await zipOf({
       save_directory: ['Story-1', now],
       persistent: ['desktop persistent', now - 1000],
-      '1-1-LT1.save': ['desktop newer', now - 2000],
-      'quick-1-LT1.save': ['desktop older', now - 3_600_000],
-      '3-1-LT1.save': ['desktop only', now - 2000],
+      '1-1-LT1.save': [await save('desktop newer', now - 2000), now - 9 * 3600_000],
+      'quick-1-LT1.save': [await save('desktop older', now - 3_600_000), now],
+      '3-1-LT1.save': [await save('desktop only', now - 2000), now],
+      '4-1-LT1.save': ['not a save', now],
     })
     const { key, hash } = keyAndHash('QWERT-67890', 'Story-1')
     kept.set(`/api/sync/v1/${hash}`, secretboxEncrypt(plain, key))
     const report = (await request(app.app).post('/api/saves/story/sync/download').send({ code: 'qwert67890' }).expect(200)).body
     expect(report).toEqual({ added: 1, replaced: 1, kept: 1, same: 0 })
-    expect((await app.saves.read('Story-1', '1-1-LT1.save')).toString()).toBe('desktop newer')
+    expect((await readZipEntries(await app.saves.read('Story-1', '1-1-LT1.save'), (n) => n === 'json')).get('json')!.toString()).toContain('desktop newer')
+    expect(await app.saves.stat('Story-1', '4-1-LT1.save')).toBeNull()
     expect((await app.saves.read('Story-1', 'quick-1-LT1.save')).toString()).toBe('web quick-1-LT1.save')
     expect((await app.saves.read('Story-1', 'persistent')).toString()).toBe('web persistent')
     expect((await app.saves.read('Story-1', 'sync/persistent')).toString()).toBe('desktop persistent')
@@ -147,7 +152,7 @@ describe('Sync codes', () => {
     // Sealed for another save folder under this game's address.
     const { hash } = keyAndHash('ASDFG-11111', 'Story-1')
     kept.set(`/api/sync/v1/${hash}`, secretboxEncrypt(await zipOf({ save_directory: ['Other-2', Date.now()] }), keyAndHash('ASDFG-11111', 'Other-2').key))
-    expect((await request(app.app).post('/api/saves/story/sync/download').send({ code: 'ASDFG-11111' }).expect(409)).body.error).toContain('could not be decrypted')
+    expect((await request(app.app).post('/api/saves/story/sync/download').send({ code: 'ASDFG-11111' }).expect(409)).body.error).toContain('did not work for this game')
     await request(app.app).put('/api/system/sync').send({ on: false }).expect(200)
     await request(app.app).post('/api/saves/story/sync/download').send({ code: 'QWERT-67890' }).expect(409)
   })

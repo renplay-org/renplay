@@ -4,6 +4,7 @@ import type { Catalog } from '../catalog.js'
 import type { ContentMode } from '../content.js'
 import type { Db } from '../db.js'
 import { saveImport } from '../saves/import-upload.js'
+import { isRenpySave } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
 import { HttpError, cleanRelPath, isSaveDirName } from '../util/paths.js'
 
@@ -42,17 +43,23 @@ export function createSavesImportRouter(store: () => SaveStore, db: Db, content:
   router.post('/', saveImport('files', async (req, res) => {
     const saves = store()
     const files = (req.files as Express.Multer.File[] | undefined) ?? []
-    let meta: Array<{ path: string; mtime: number }>
+    let meta: unknown
     try {
       meta = JSON.parse(String(req.body?.meta ?? '[]'))
     } catch {
       throw new HttpError(400, 'Invalid file list')
     }
     if (!Array.isArray(meta) || meta.length !== files.length) throw new HttpError(400, 'Invalid file list')
+    // Every path is checked before anything is written.
+    const plan = meta.map((m: unknown) => {
+      const { path, mtime } = (m && typeof m === 'object' ? m : {}) as { path?: unknown; mtime?: unknown }
+      const rel = cleanRelPath(path)
+      return { rel, mtime: Number(mtime) || undefined }
+    })
+    const visible = new Set(content.visibleSaveDirs(plan.map((p) => p.rel.split('/')[0]!)))
     const report = { added: 0, replaced: 0, kept: 0, same: 0, keys: 0, skipped: [] as string[] }
     for (const [i, file] of files.entries()) {
-      const { path, mtime } = meta[i]!
-      const rel = typeof path === 'string' ? cleanRelPath(path) : ''
+      const { rel, mtime } = plan[i]!
       const data = await readFile(file.path)
       if (rel === 'tokens/security_keys.txt') {
         report.keys += await saves.mergeSecurityKeys(data.toString('utf8'))
@@ -61,13 +68,19 @@ export function createSavesImportRouter(store: () => SaveStore, db: Db, content:
       const slash = rel.indexOf('/')
       const dir = rel.slice(0, slash)
       const name = rel.slice(slash + 1)
-      if (slash < 1 || !isSaveDirName(dir) || !importable(name)) {
-        report.skipped.push(rel || String(path))
+      // A folder this person cannot see (an adult game at Off) is skipped like any other.
+      if (slash < 1 || !isSaveDirName(dir) || !importable(name) || !visible.has(dir)) {
+        report.skipped.push(rel)
+        continue
+      }
+      // A broken or empty file never takes a save's place.
+      if (name.endsWith('.save') && !(await isRenpySave(data))) {
+        report.skipped.push(rel)
         continue
       }
       const before = await saves.stat(dir, name)
       // base 0: this computer never saw the server's copy, so the newer of the two stays.
-      const written = await saves.write(dir, name, data, { mtimeMs: Number(mtime) || undefined, reason: 'import', base: 0, everyKind: true })
+      const written = await saves.write(dir, name, data, { mtimeMs: mtime, reason: 'import', base: 0, everyKind: true })
       if (written.conflict === 'kept') report.kept++
       else if (written.conflict === 'replaced') report.replaced++
       else if (before) report.same++

@@ -156,6 +156,8 @@
     // The server's version of each file this device last saw (its mtime), sent with every upload so
     // the server can tell when another device saved the same file in between.
     base: new Map(),
+    // True once the server's list arrived: without it (an offline start) no base is known.
+    baseKnown: false,
     inflight: false,
     online: true,
     lastSync: 0,
@@ -337,12 +339,20 @@
     })
   }
 
-  function idbMarkSynced(path, mtime) {
+  function idbMarkSynced(path, mtime, base) {
     return idbTx('readwrite', function (s) {
       var r = s.get(localKey(path))
       r.onsuccess = function () {
         var v = r.result
-        if (!v || v.mtime !== mtime) return
+        if (!v) return
+        if (v.mtime !== mtime) {
+          // A newer write waits here: it now builds on the version the server just took.
+          if (base !== undefined && !v.synced) {
+            v.base = base
+            s.put(v)
+          }
+          return
+        }
         if (v.data === null) s.delete(localKey(path))
         else {
           v.synced = 1
@@ -542,13 +552,27 @@
     })
   }
 
+  /** The server version this device last saw, 0 for none, or null when that is not known. */
+  function currentBase(path) {
+    if (!state.baseKnown) return null
+    return state.base.has(path) ? state.base.get(path) : 0
+  }
+
   function enqueue(path, bytes, mtime) {
     var data = bytes ? new Uint8Array(bytes) : null
     // The base is read when the upload is sent, after any upload before it. Only the copy kept on
     // this device records it now, for a later visit that delivers it.
     state.queue.set(path, { data: data, mtime: mtime })
-    idbPut(path, data, mtime, false, state.base.has(path) ? state.base.get(path) : 0)
+    idbPut(path, data, mtime, false, currentBase(path))
     pump()
+  }
+
+  function readLocal(path) {
+    try {
+      return FS.readFile(HOME + '/' + path)
+    } catch (e) {
+      return null
+    }
   }
 
   /**
@@ -556,19 +580,26 @@
    * later stays in the slot and the other is kept in History, so nothing is lost. When the server
    * kept its own copy, the game gets that copy too.
    */
-  function onConflict(path, answer) {
-    post('save-conflict', { path: path, kept: answer.conflict === 'kept' ? 'other' : 'this' })
+  function onConflict(path, answer, sentHash) {
+    post('save-conflict', { path: path, kept: answer.conflict === 'kept' ? 'other' : 'this', deleted: sentHash === null })
     if (answer.conflict !== 'kept') return
+    var mtime = answer.mtime
     fetch(API + '/raw?path=' + encodeURIComponent(path), { cache: 'no-store' })
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status)
+        mtime = Number(r.headers.get('x-renplay-mtime')) || mtime
         return r.arrayBuffer()
       })
       .then(function (buf) {
+        // Only while the game still holds what it sent (or, after a delete, nothing): a save made
+        // since then is newer and goes up as usual.
+        var local = readLocal(path)
+        if (sentHash === null ? local : !local || hash(local) !== sentHash) return
         var bytes = new Uint8Array(buf)
-        writeLocal(path, bytes, answer.mtime)
-        state.known.set(path, { mtime: answer.mtime, size: bytes.length, hash: hash(bytes) })
-        idbPut(path, bytes, answer.mtime, true, answer.mtime)
+        writeLocal(path, bytes, mtime)
+        state.known.set(path, { mtime: mtime, size: bytes.length, hash: hash(bytes) })
+        state.base.set(path, mtime)
+        idbPut(path, bytes, mtime, true, mtime)
       })
       .catch(function (e) {
         console.warn('[renplay] could not fetch the kept copy of', path, e)
@@ -589,24 +620,33 @@
     var headers = { 'content-type': 'application/octet-stream', 'x-mtime': String(item.mtime) }
     // A write kept from an earlier visit carries the base it was made on, one made now the newest.
     // A write kept by an older Renplay has none and is delivered as before.
-    var base = item.base !== undefined ? item.base : state.base.has(path) ? state.base.get(path) : 0
+    var base = item.base !== undefined ? item.base : currentBase(path)
     if (base !== null) headers['x-base'] = String(base)
-    var req = item.data ? fetch(url, { method: 'PUT', body: item.data, headers: headers }) : fetch(url, { method: 'DELETE' })
+    var req = item.data
+      ? fetch(url, { method: 'PUT', body: item.data, headers: headers })
+      : fetch(url, { method: 'DELETE', headers: base !== null ? { 'x-base': String(base) } : {} })
+    var sentHash = item.data ? hash(item.data) : null
     req
       .then(function (r) {
-        if (!r.ok && !(r.status === 404 && !item.data)) throw new Error('HTTP ' + r.status)
+        // 409 on a delete: another device saved the file since, so it stays and comes back here.
+        var deleteKept = !item.data && r.status === 409
+        if (!r.ok && !deleteKept && !(r.status === 404 && !item.data)) throw new Error('HTTP ' + r.status)
         state.online = true
         state.failures = 0
         state.lastSync = Date.now()
-        idbMarkSynced(path, item.mtime)
         if (!item.data) {
+          idbMarkSynced(path, item.mtime)
           state.base.delete(path)
+          if (deleteKept) return r.json().then(function (answer) { onConflict(path, answer, null) }, function () {})
           return
         }
         return r.json().then(function (answer) {
           if (answer && answer.mtime) state.base.set(path, answer.mtime)
-          if (answer && answer.conflict) onConflict(path, answer)
-        }, function () {})
+          idbMarkSynced(path, item.mtime, answer && answer.mtime)
+          if (answer && answer.conflict) onConflict(path, answer, sentHash)
+        }, function () {
+          idbMarkSynced(path, item.mtime)
+        })
       })
       .catch(function (e) {
         console.warn('[renplay] upload failed for', path, e)
@@ -646,6 +686,7 @@
     return fetchJSON(API + '/boot', { cache: 'no-store' }, 3)
       .then(function (b) {
         server = b
+        state.baseKnown = true
       })
       .catch(function (e) {
         console.warn('[renplay] save server unreachable, using the local copy', e)
@@ -696,7 +737,7 @@
               FS.unlink(HOME + '/' + e.path)
             } catch (er) {}
             state.known.delete(e.path)
-            state.queue.set(e.path, { data: null, mtime: e.mtime })
+            state.queue.set(e.path, { data: null, mtime: e.mtime, base: e.base === undefined ? null : e.base })
           }
         })
         state.ready = true
