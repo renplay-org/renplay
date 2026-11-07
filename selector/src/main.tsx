@@ -9,6 +9,7 @@ import SignIn from './pages/SignIn'
 import Setup from './pages/Setup'
 import { AuthGuard } from './lib/auth'
 import './index.css'
+import { installGamepad } from './lib/gamepad'
 
 const GamePage = lazy(() => import('./pages/GamePage'))
 const Player = lazy(() => import('./pages/Player'))
@@ -26,8 +27,13 @@ const queryClient = new QueryClient({
 })
 
 // renplay 1.x let Ren'Py register service workers (and their caches) under
-// /play/<game>/. They are no longer used; remove them.
-navigator.serviceWorker?.getRegistrations?.().then((regs) => regs.forEach((r) => void r.unregister())).catch(() => {})
+// /play/<game>/. They are no longer used; remove them. Renplay's own (/sw.js) opens the library and
+// kept games offline.
+navigator.serviceWorker
+  ?.getRegistrations?.()
+  .then((regs) => regs.filter((r) => !r.active?.scriptURL.endsWith('/sw.js') && !r.installing && !r.waiting).forEach((r) => void r.unregister()))
+  .then(() => navigator.serviceWorker.register('/sw.js', { scope: '/' }))
+  .catch(() => {})
 globalThis.caches
   ?.keys()
   .then((keys) => keys.filter((k) => !k.startsWith('renplay-')).forEach((k) => void caches.delete(k)))
@@ -38,6 +44,8 @@ const fallback = (
     <Spinner />
   </div>
 )
+
+installGamepad()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
 import type { Accounts } from '../auth.js'
@@ -67,6 +67,43 @@ export function createPlayRouter(
     })
     res.setHeader('Cache-Control', 'private, no-store')
     res.type('html').send(html)
+  })
+
+  /**
+   * What a browser keeps to play a Ren'Py game offline: the page, the runtime, the engine, the build's
+   * files and every streamed file, with their sizes. Pictures of the game are not in it: the browser
+   * keeps the ones it was sent, so Blurred keeps none. The presplash follows the page's rule.
+   */
+  router.get('/api/games/:id/offline', async (req, res) => {
+    const id = assertSlug(req.params.id)
+    const game = db.getGame(id)
+    if (!game || game.status !== 'installed' || !game.build || content.hides(game)) throw new HttpError(404, 'Game not installed')
+    if (isWebGame(game) || !game.engine) throw new HttpError(409, 'Only Ren’Py games can be kept offline for now')
+    const base = baseOf(game.build), page = playPath(game)
+    const size = async (...paths: string[]) => {
+      for (const p of paths) {
+        const st = await stat(p).catch(() => null)
+        if (st?.isFile()) return st.size
+      }
+      return 0
+    }
+    const at = (b: string, name: string) => join(builds.dir(id, b), name)
+    const engine = engines.dir(game.engine)
+    const files: Array<{ url: string; bytes: number }> = [
+      { url: page, bytes: 0 },
+      { url: `/renplay/runtime.js?v=${runtimeVersion}`, bytes: 0 },
+      ...(await Promise.all(['renpy-pre.js', 'renpy.js', 'renpy.wasm.gz', 'renpy.data.gz'].map(async (n) => ({ url: `/engine/${game.engine}/${n}`, bytes: await size(join(engine, n)) })))),
+    ]
+    const presplash = content.blurs(game) ? null : await findPresplash(builds.dir(id, base))
+    files.push(presplash ? { url: `${page}${presplash}`, bytes: await size(at(base, presplash)) } : { url: `/engine/${game.engine}/web-presplash.jpg`, bytes: await size(join(engine, 'web-presplash.jpg')) })
+    files.push({ url: `${page}game.zip`, bytes: await size(at(game.build, 'game.zip'), at(base, 'game.zip')) })
+    for (const c of await builds.caches(id, game.build)) {
+      files.push({ url: `${page}cache/${c.name.split('/').map(encodeURIComponent).join('/')}?v=${encodeURIComponent(c.v)}`, bytes: await size(at(game.build, `cache/${c.name}`), at(base, `cache/${c.name}`)) })
+    }
+    const streamed = JSON.parse(await readFile(at(base, 'assets.json'), 'utf-8').catch(() => '{}')) as Record<string, [number, number]>
+    for (const [name, [, bytes]] of Object.entries(streamed)) files.push({ url: `${page}game/${name.split('/').map(encodeURIComponent).join('/')}`, bytes })
+    res.setHeader('Cache-Control', 'private, no-store')
+    res.json({ id, build: game.build, page, bytes: files.reduce((n, f) => n + f.bytes, 0), files })
   })
 
   /**

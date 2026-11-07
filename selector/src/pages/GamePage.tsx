@@ -6,6 +6,7 @@ import FileBrowser from '../components/FileBrowser'
 import ActionBar from '../components/ActionBar'
 import SceneCard from '../components/SceneCard'
 import UpdateCard from '../components/UpdateCard'
+import OfflineCard from '../components/OfflineCard'
 import { Seg, Pill, Stars, TagPill } from '../lantern/controls'
 import Stage, { travelToDoor } from '../lantern/Stage'
 import { useRoom } from '../lantern/Room'
@@ -327,7 +328,7 @@ function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
               </p>
               <p style={{ marginTop: 4 }}>
                 {playedTime(game.playTime)} · {game.saves.count} {game.saves.count === 1 ? 'save' : 'saves'}
-                {game.saves.count > 0 ? ' · Synced' : ''}
+                {game.saves.count > 0 && navigator.onLine ? ' · Synced' : ''}
               </p>
             </div>
           </div>
@@ -353,6 +354,7 @@ function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
       </div>
       <div className="stack">
         <UpdateCard game={game} />
+        <OfflineCard game={game} />
         <section className="panel">
           <div className="row between" style={{ marginBottom: 10 }}>
             <h2 className="h3">History</h2>

@@ -1,8 +1,10 @@
-import { Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
+import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
+import { keptGames, removeKept, useOnline } from '../lib/offline'
 import ChooseArtwork from './ChooseArtwork'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { api, jobTitle } from '../lib/api'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { useAuth } from '../lib/auth'
 import AccountMenu from './AccountMenu'
 import SearchPalette from './SearchPalette'
@@ -69,6 +71,15 @@ function Shell() {
     ...(admin ? [{ to: '/add', label: 'Add games', icon: Plus, end: false }] : []),
     { to: '/account', label: 'You', icon: User, end: false },
   ]
+  const online = useOnline()
+  const { data: games } = useGames()
+  // A kept copy of an uninstalled game goes too. A copy belongs to the browser, so a game this person
+  // does not see (another person kept it) stays.
+  useEffect(() => {
+    if (!online || !games) return
+    const uninstalled = new Set(games.filter((g) => g.status !== 'installed').map((g) => g.id))
+    for (const id of Object.keys(keptGames())) if (uninstalled.has(id)) void removeKept(id)
+  }, [online, games])
   return (
     <>
       <header className="top">
@@ -101,6 +112,12 @@ function Shell() {
         </div>
       </header>
       <main className="rise">
+        {!online && (
+          <p className="notice amber" role="status" style={{ margin: '12px 16px 0' }}>
+            <CloudOff aria-hidden />
+            Offline. Games kept in this browser still play, and their saves are sent when you are back online.
+          </p>
+        )}
         <Outlet />
       </main>
       <Footer />

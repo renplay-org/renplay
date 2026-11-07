@@ -46,6 +46,8 @@ import {
 import { ago } from '../lib/format'
 import { useDefaults, useGame, useSaves, type Defaults } from '../lib/queries'
 import { queueHtmlSave, uploadHtmlSave, replayHtmlSaves } from '../lib/html-save-queue'
+import { keptGame, useOnline } from '../lib/offline'
+import { setGameHasPad } from '../lib/gamepad'
 
 type Panel = null | 'fullscreen'
 
@@ -77,6 +79,7 @@ export default function Player() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: game, isLoading } = useGame(gameId)
+  const online = useOnline()
 
   useEffect(() => {
     document.title = game ? `${game.title} · Renplay` : 'Renplay'
@@ -260,6 +263,10 @@ export default function Player() {
         case 'renplay:escape':
           setEscHeld(!!d.down)
           break
+        case 'renplay:menu':
+          // The controller's Menu button in the game.
+          setDrawer((tab) => tab ?? (sandboxed ? 'options' : 'saves'))
+          break
       }
     }
     window.addEventListener('message', onMessage)
@@ -437,6 +444,16 @@ export default function Player() {
     send({ type: 'renplay:focus' })
   }, [send])
 
+  // The drawer has the controller while it is open, and its Menu button closes it again.
+  useEffect(() => {
+    if (ready && !sandboxed) send({ type: 'renplay:pads', toGame: !drawer })
+    setGameHasPad(ready && !sandboxed && !drawer)
+    if (!drawer) return () => setGameHasPad(false)
+    const onMenu = () => closeDrawer()
+    window.addEventListener('renplay:pad-menu', onMenu)
+    return () => window.removeEventListener('renplay:pad-menu', onMenu)
+  }, [drawer, ready, sandboxed, send, closeDrawer])
+
   /**
    * Saves (an autosave, or a quick save in a game without autosave), then waits until every save
    * reached the server. Longer than the runtime's own limits, so its answer always arrives first.
@@ -540,6 +557,13 @@ export default function Player() {
     return (
       <div className="flex h-dvh items-center justify-center bg-black">
         <Spinner />
+      </div>
+    )
+  if (!online && !keptGame(gameId))
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-black p-6 text-center text-zinc-300">
+        <p>You are offline, and this game is not kept in this browser. Keep it offline from its page next time you have a network.</p>
+        <Button onClick={() => navigate('/')}>Go back</Button>
       </div>
     )
   if (!game || !game.playUrl)

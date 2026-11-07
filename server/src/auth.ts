@@ -88,7 +88,7 @@ function name(value: unknown): string {
 export function playerRoute(method: string, path: string): boolean {
   if (/^\/api\/me(?:\/|$)/.test(path) || /^\/api\/avatars\/[a-f0-9]{64}\.webp$/.test(path) && ['GET', 'HEAD'].includes(method)) return true
   if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export' || path === '/api/saves-import') return true
-  if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art)?$/.test(path))) return true
+  if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art|\/offline)?$/.test(path))) return true
   // A player chooses and uploads art for their own view (the route refuses everyone).
   if ((method === 'GET' || method === 'HEAD') && (path === '/api/history' || path === '/api/widget' || path === '/api/defaults')) return true
   return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)

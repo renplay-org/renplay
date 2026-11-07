@@ -77,7 +77,8 @@ function stageMeta(g: Game) {
         <>
           <span className="sep">·</span>
           <span>
-            {g.saves.count} {g.saves.count === 1 ? 'save' : 'saves'} · Synced
+            {g.saves.count} {g.saves.count === 1 ? 'save' : 'saves'}
+            {navigator.onLine ? ' · Synced' : ''}
           </span>
         </>
       )}

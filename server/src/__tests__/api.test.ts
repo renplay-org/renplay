@@ -245,6 +245,18 @@ describe('HTTP API', () => {
     await request(app.app).get('/g/fixture-game/old/').expect(302)
   })
 
+  it('lists what a browser keeps to play a game offline', async () => {
+    const m = (await request(app.app).get('/api/games/fixture-game/offline').expect(200)).body
+    expect(m).toMatchObject({ id: 'fixture-game', build: 'b1', page: '/g/fixture-game/b1/' })
+    const urls = m.files.map((f: { url: string }) => f.url)
+    for (const url of ['/g/fixture-game/b1/', '/engine/8.5.3/renpy-pre.js', '/engine/8.5.3/renpy.wasm.gz', '/engine/8.5.3/web-presplash.jpg', '/g/fixture-game/b1/game.zip', '/g/fixture-game/b1/game/images/a%20b.png', '/g/fixture-game/b1/game/movies/m.webm']) expect(urls).toContain(url)
+    expect(urls.some((u: string) => u.startsWith('/renplay/runtime.js?v='))).toBe(true)
+    expect(m.files.find((f: { url: string }) => f.url.endsWith('m.webm')).bytes).toBe(10)
+    expect(m.bytes).toBe(m.files.reduce((n: number, f: { bytes: number }) => n + f.bytes, 0))
+    expect(m.bytes).toBeGreaterThan(13)
+    await request(app.app).get('/api/games/missing-game/offline').expect(404)
+  })
+
   it('serves mod builds with fallback to the base build', async () => {
     const mod = join(root, 'games', 'fixture-game', 'b1.mabc')
     mkdirSync(mod, { recursive: true })
