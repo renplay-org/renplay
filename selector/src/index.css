@@ -2741,3 +2741,14 @@ input[type="range"] {
   flex: 1 1 100%;
   margin-top: 0;
 }
+
+/* A walkthrough row: title and meta above its actions on a phone, beside them from 720 px. */
+.walk-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3) var(--s4);
+}
+.walk-row > .grow {
+  flex: 1 1 220px;
+}

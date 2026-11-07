@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import express, { Router, type Request } from 'express'
@@ -18,6 +19,17 @@ import { cachedSaveMeta } from './saves.js'
 import { slotInfo } from '../saves/savefile.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, safeJoin } from '../util/paths.js'
+
+/** What a walkthrough file is, from its first bytes (and its name for text), or null. */
+export function walkthroughKind(data: Buffer, name = ''): { kind: 'pdf' | 'image' | 'text'; ext: string } | null {
+  const head = data.subarray(0, 12).toString('latin1')
+  if (head.startsWith('%PDF-')) return { kind: 'pdf', ext: 'pdf' }
+  if (head.startsWith('\x89PNG')) return { kind: 'image', ext: 'png' }
+  if (data[0] === 0xff && data[1] === 0xd8) return { kind: 'image', ext: 'jpg' }
+  if (head.startsWith('RIFF') && head.slice(8) === 'WEBP') return { kind: 'image', ext: 'webp' }
+  if (/\.(txt|md|markdown)$/i.test(name) && !data.includes(0) && !/^\s*<(!doctype|html|script|svg)/i.test(data.subarray(0, 200).toString('utf8'))) return { kind: 'text', ext: 'txt' }
+  return null
+}
 
 const pdfs = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 << 20, files: 1 } })
 const CACHE_RE = /^(bytecode-\d+|py3analysis|screens)\.rpyb$/
@@ -96,6 +108,8 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     // The five formats. Below Shown an adult game's formats are hashes and tints, no address.
     art: deps.catalog.gameArt(row),
     walkthrough: row.walkthrough || null,
+    /** The walkthrough files, in order: PDFs, pictures and plain text. */
+    walkthroughs: deps.db.walkthroughs(row.id).map((w) => ({ file: w.file, title: w.title, kind: w.kind, size: w.size, addedAt: w.added_at, url: `/api/walkthroughs/${encodeURIComponent(w.file)}` })),
     status: row.status,
     build: row.build || null,
     // The game page is an iframe, which sends no header: this device's level rides along as a query.
@@ -313,7 +327,8 @@ export function createGamesRouter(deps: GameDeps): Router {
     if (jobs.activeFor(g.id)) throw new HttpError(409, 'A job is running for this game')
     await builds.remove(g.id)
     if (req.query['forget'] === '1') {
-      if (g.walkthrough) await unlink(join(cfg.walkthroughsDir, g.walkthrough)).catch(() => {})
+      for (const w of db.walkthroughs(g.id)) await unlink(join(cfg.walkthroughsDir, w.file)).catch(() => {})
+      db.raw.prepare('DELETE FROM walkthroughs WHERE game = ?').run(g.id)
       // Its finished jobs go with it: without the game, nothing tells whether they were about an
       // adult game. Saves stay, as always.
       jobs.clearFinished((j) => j.game !== g.id && parseJson<{ game?: unknown }>(j.result, {}).game !== g.id)
@@ -414,24 +429,61 @@ export function createGamesRouter(deps: GameDeps): Router {
 
   // ---- walkthroughs --------------------------------------------------------
 
-  router.post('/:id/walkthrough', pdfs.single('walkthrough'), async (req, res) => {
+  /** A game's walkthrough file, or 404. */
+  const walkthroughOf = (g: GameRow, file: string) => {
+    const w = db.walkthroughs(g.id).find((x) => x.file === file)
+    if (!w) throw new HttpError(404, 'Walkthrough not found')
+    return w
+  }
+
+  // Several walkthrough files per game: PDFs, pictures and plain text. Not HTML: it would run as
+  // part of Renplay's own page.
+  router.post('/:id/walkthroughs', async (req, res) => {
     const g = get(req)
+    // multer runs inside the handler and is awaited: as route middleware its stream callbacks would
+    // lose the request's context, and with it who is asking (accounts-context.ts).
+    await new Promise<void>((resolve, reject) => pdfs.single('file')(req, res, (error) => (error ? reject(error) : resolve())))
     const f = req.file
     if (!f) throw new HttpError(400, 'No file uploaded')
-    if (f.buffer.subarray(0, 5).toString('latin1') !== '%PDF-') throw new HttpError(400, 'Only PDF files are supported')
+    const kind = walkthroughKind(f.buffer, f.originalname)
+    if (!kind) throw new HttpError(400, 'Add a PDF, a picture (PNG, JPEG or WebP) or a plain text file')
     await mkdir(cfg.walkthroughsDir, { recursive: true })
-    const name = `${g.id}-${Date.now().toString(36)}.pdf`
+    const name = `${g.id}-${Date.now().toString(36)}${randomBytes(3).toString('hex')}.${kind.ext}`
     await writeFile(join(cfg.walkthroughsDir, name), f.buffer)
-    if (g.walkthrough) await unlink(join(cfg.walkthroughsDir, g.walkthrough)).catch(() => {})
-    db.updateGame(g.id, { walkthrough: name })
-    res.json({ ok: true, walkthrough: name })
+    const fallback = (f.originalname || 'Walkthrough').replace(/\.[a-z0-9]{1,5}$/i, '').trim().slice(0, 100) || 'Walkthrough'
+    const title = typeof req.body?.title === 'string' && req.body.title.trim() ? req.body.title.trim().slice(0, 100) : fallback
+    const position = (db.walkthroughs(g.id).at(-1)?.position ?? -1) + 1
+    db.raw.prepare('INSERT INTO walkthroughs (file, game, title, kind, size, added_at, position) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, g.id, title, kind.kind, f.size, new Date().toISOString(), position)
+    db.syncFirstWalkthrough(g.id)
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
-  router.delete('/:id/walkthrough', async (req, res) => {
+  /** Renames a walkthrough, or moves it to another place in the list. */
+  router.put('/:id/walkthroughs/:file', async (req, res) => {
     const g = get(req)
-    if (g.walkthrough) await unlink(join(cfg.walkthroughsDir, g.walkthrough)).catch(() => {})
-    db.updateGame(g.id, { walkthrough: '' })
-    res.json({ ok: true })
+    const w = walkthroughOf(g, req.params.file)
+    if (req.body?.title !== undefined) {
+      if (typeof req.body.title !== 'string' || !req.body.title.trim()) throw new HttpError(400, 'A walkthrough needs a title')
+      db.raw.prepare('UPDATE walkthroughs SET title = ? WHERE file = ?').run(req.body.title.trim().slice(0, 100), w.file)
+    }
+    if (req.body?.position !== undefined) {
+      const list = db.walkthroughs(g.id).filter((x) => x.file !== w.file)
+      const at = Number(req.body.position)
+      if (!Number.isInteger(at) || at < 0) throw new HttpError(400, 'Position must be a whole number from 0')
+      list.splice(Math.min(at, list.length), 0, w)
+      list.forEach((x, i) => db.raw.prepare('UPDATE walkthroughs SET position = ? WHERE file = ?').run(i, x.file))
+      db.syncFirstWalkthrough(g.id)
+    }
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
+  })
+
+  router.delete('/:id/walkthroughs/:file', async (req, res) => {
+    const g = get(req)
+    const w = walkthroughOf(g, req.params.file)
+    db.raw.prepare('DELETE FROM walkthroughs WHERE file = ?').run(w.file)
+    await unlink(join(cfg.walkthroughsDir, w.file)).catch(() => {})
+    db.syncFirstWalkthrough(g.id)
+    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
   return router

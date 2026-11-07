@@ -165,7 +165,7 @@ describe('migration from 3.x, and back', () => {
     expect(user('nogames')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'off' })
     expect(user('broken')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
     expect(user('no')).toMatchObject({ adult_ceiling: 'off', adult_choice: 'off' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(15)
     // Downgrading to 3.2 reads the columns 4.0 keeps in step: access, the picture
     // preference and the allow/block install setting (covered by legacyMirror in content.test).
     const cols = db.raw.prepare('PRAGMA table_info(users)').all().map((c) => c.name)
@@ -242,6 +242,7 @@ describe('the levels on every route', () => {
     db.setSetting('catalog_cache', fullCatalog)
     db.insertGame({ id: 'adult', title: 'Adult', recipe_id: 'adult', adult: 1, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'adult-1', walkthrough: 'adult.pdf' })
     db.insertGame({ id: 'safe', title: 'Safe', recipe_id: 'safe', status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'safe-1', walkthrough: 'safe.pdf' })
+    for (const id of ['adult', 'safe']) db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at) VALUES (?, ?, 'Walkthrough', 'pdf', '2026-01-01')").run(`${id}.pdf`, id)
     db.insertGame({ id: 'adult-two', title: 'Adult Two', recipe_id: '', adult: 1, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'adult-two-1', source: JSON.stringify({ archive: 'adult2.zip' }) })
     db.insertJob({ id: 'j-adult-failed', type: 'import', game: 'adult', params: '{}' })
     db.insertJob({ id: 'j-adult-queued', type: 'import', game: 'adult', params: '{}' })
@@ -306,7 +307,7 @@ describe('the levels on every route', () => {
     ['POST /:id/files/revert', 'game'], ['POST /:id/files/upload', 'game'], ['POST /:id/files/apply', 'game'], ['POST /:id/files/reset', 'game'],
     ['GET /', 'list'], ['GET /:id', 'game'], ['PUT /:id/favorite', 'game'], ['PUT /:id/finished', 'game'], ['POST /:id/play-time', 'game'],
     ['POST /:id/played', 'game'], ['DELETE /:id', 'game'], ['DELETE /:id/download', 'game'], ['POST /:id/reinstall', 'game'],
-    ['PUT /:id/cache', 'game'], ['GET /:id/recipe', 'game'], ['POST /:id/walkthrough', 'game'], ['DELETE /:id/walkthrough', 'game'],
+    ['PUT /:id/cache', 'game'], ['GET /:id/recipe', 'game'], ['POST /:id/walkthroughs', 'game'], ['PUT /:id/walkthroughs/:file', 'game'], ['DELETE /:id/walkthroughs/:file', 'game'],
     ['GET /archives', 'list'], ['POST /archives/inspect', 'tool'], ['POST /archives/hash', 'tool'], ['DELETE /archives', 'tool'],
     ['POST /imports', 'tool'], ['POST /uploads', 'person'], ['GET /uploads/:id', 'person'], ['PUT /uploads/:id', 'person'],
     ['POST /uploads/:id/complete', 'person'], ['DELETE /uploads/:id', 'person'], ['GET /catalog', 'list'], ['POST /catalog/refresh', 'list'],
@@ -437,7 +438,7 @@ describe('the levels on every route', () => {
       ['post', '/api/games/adult/played'], ['post', '/api/games/adult/play-time', { seconds: 5 }],
       ['put', '/api/games/adult/cache?name=bytecode-8.rpyb&build=b1'], ['delete', '/api/games/adult'],
       ['delete', '/api/games/adult/download'], ['post', '/api/games/adult/reinstall'],
-      ['post', '/api/games/adult/walkthrough'], ['delete', '/api/games/adult/walkthrough'],
+      ['post', '/api/games/adult/walkthroughs'], ['put', '/api/games/adult/walkthroughs/adult.pdf', { title: 'x' }], ['delete', '/api/games/adult/walkthroughs/adult.pdf'],
       ['get', '/api/games/adult/files'], ['get', '/api/games/adult/files/raw?path=game/script.rpyc'],
       ['put', '/api/games/adult/files/raw?path=game/mod.txt'], ['delete', '/api/games/adult/files/raw?path=game/mod.txt'],
       ['post', '/api/games/adult/files/revert', { path: 'game/script.rpyc' }], ['post', '/api/games/adult/files/upload'],

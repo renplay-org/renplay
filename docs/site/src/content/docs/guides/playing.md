@@ -71,6 +71,8 @@ into Renplay.
 
 ## Walkthroughs and play time
 
-A game can have a walkthrough PDF next to it in the player. Renplay counts the time a game is open
-and visible, and shows it with your latest save. Time is counted from the moment you upgraded to
-a version that counts it.
+A game can keep several walkthroughs: PDFs, pictures and text files. Admins add them under
+**Walkthroughs** on the game's page, and rename, reorder or remove them from each one's **More**
+menu. Everyone who plays the game can open them. Renplay counts the time a game is open and
+visible, and shows it with your latest save. Time is counted from the moment you upgraded to a
+version that counts it.

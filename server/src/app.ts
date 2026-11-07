@@ -134,7 +134,11 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     const picture = path.match(/^\/api\/art\/([^/]+)$/)?.[1]
     if (picture && !art.canRead(picture)) throw new HttpError(404, 'Not found')
     const walkthrough = path.match(/^\/api\/walkthroughs\/([^/]+)$/)?.[1]
-    if (walkthrough && !db.allGames().some((g) => g.walkthrough === walkthrough && !content.hides(g))) throw new HttpError(404, 'Walkthrough not found')
+    if (walkthrough) {
+      const owner = db.raw.prepare('SELECT game FROM walkthroughs WHERE file = ?').get(walkthrough) as { game: string } | undefined
+      const g = owner ? db.getGame(owner.game) : null
+      if (!g || content.hides(g)) throw new HttpError(404, 'Walkthrough not found')
+    }
     return !!(game || picture || walkthrough)
   }
   app.get('/api/auth/check', (req, res) => {
@@ -194,7 +198,11 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     if (!art.canRead(req.params.file)) return next(new HttpError(404, 'Not found'))
     res.sendFile(art.file(req.params.file), { headers: { 'Cache-Control': 'private, max-age=31536000, immutable', 'Content-Type': 'image/webp', 'X-Content-Type-Options': 'nosniff' } }, (err) => err && next(new HttpError(404, 'Not found')))
   })
-  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false }))
+  // Text walkthroughs are served as plain text, never sniffed as anything else.
+  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false, setHeaders: (res, path) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    if (path.endsWith('.txt')) res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  } }))
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found')))
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {

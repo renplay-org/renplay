@@ -113,8 +113,11 @@ export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jo
    * Adds files to the overlay. Plain files go into `dir`; zip files are
    * unpacked there (a top-level "game/" folder in the zip is honoured).
    */
-  router.post('/:id/files/upload', upload.array('files'), async (req, res) => {
+  router.post('/:id/files/upload', async (req, res) => {
+    // The game is checked before the upload is read, with the person's level. multer then runs
+    // inside the handler: as route middleware it would lose the request's context (who is asking).
     const g = game(req)
+    await new Promise<void>((resolve, reject) => upload.array('files')(req, res, (error) => (error ? reject(error) : resolve())))
     const dir = Overlays.editablePath(req.body?.dir || 'game')
     const relPaths: string[] = (() => {
       try {

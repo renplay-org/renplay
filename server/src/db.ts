@@ -17,6 +17,17 @@ export interface BuildOptions {
   imageQuality?: number
 }
 
+export interface WalkthroughRow {
+  /** The file in the walkthroughs folder, named by Renplay. */
+  file: string
+  game: string
+  title: string
+  kind: 'pdf' | 'image' | 'text'
+  size: number
+  added_at: string
+  position: number
+}
+
 export interface GameRow {
   id: string
   title: string
@@ -267,6 +278,13 @@ export class Db {
         CREATE INDEX IF NOT EXISTS play_sessions_user ON play_sessions (user_id, ended_at);
         PRAGMA user_version = 14; COMMIT;`)
     }
+    // 4.0: several walkthrough files per game, each with a title and a place in the list. The 3.x
+    // walkthrough becomes the first, and games.walkthrough stays the first file so 3.2 finds it.
+    if (v < 15) this.raw.exec(`BEGIN;
+      CREATE TABLE IF NOT EXISTS walkthroughs (file TEXT PRIMARY KEY, game TEXT NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, added_at TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0);
+      CREATE INDEX IF NOT EXISTS walkthroughs_game ON walkthroughs (game, position);
+      INSERT OR IGNORE INTO walkthroughs (file, game, title, kind, added_at, position) SELECT walkthrough, id, 'Walkthrough', 'pdf', COALESCE(NULLIF(installed_at, ''), '${now()}'), 0 FROM games WHERE walkthrough != '';
+      PRAGMA user_version = 15; COMMIT;`)
     } catch (error) { this.raw.close(); throw error }
   }
 
@@ -309,6 +327,16 @@ export class Db {
       .prepare(`UPDATE games SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`)
       .run(...entries.map(([, v]) => v as SQLInputValue), id)
     return Number(res.changes) > 0
+  }
+
+  /** A game's walkthrough files, in their order. */
+  walkthroughs(game: string): WalkthroughRow[] {
+    return this.raw.prepare('SELECT * FROM walkthroughs WHERE game = ? ORDER BY position, added_at').all(game) as unknown as WalkthroughRow[]
+  }
+
+  /** Keeps games.walkthrough the first file, which Renplay 3.x reads. */
+  syncFirstWalkthrough(game: string): void {
+    this.raw.prepare('UPDATE games SET walkthrough = ? WHERE id = ?').run(this.walkthroughs(game)[0]?.file ?? '', game)
   }
 
   deleteGame(id: string): boolean {

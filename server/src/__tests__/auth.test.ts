@@ -9,7 +9,7 @@ import sharp from 'sharp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
-import { Db } from '../db.js'
+import { Db, type GameRow } from '../db.js'
 import { keepaliveToken, playerRoute } from '../auth.js'
 import { viewer, viewers } from '../accounts-context.js'
 import yazl from 'yazl'
@@ -45,7 +45,10 @@ async function login(a: App, username = 'admin', password = 'correct password') 
 async function add(a: App, cookie: string, username = 'player') {
   return (await request(a.app).post('/api/users').set(site).set('Cookie', cookie).send({ username, password: 'player password' }).expect(201)).body.user.id as number
 }
-function game(a: App, id = 'safe', extras = {}) { a.db.insertGame({ id, title: id, recipe_id: `recipe-${id}`, status: 'installed', build: 'b1', save_dir: id, ...extras }) }
+function game(a: App, id = 'safe', extras: Partial<GameRow> = {}) {
+  a.db.insertGame({ id, title: id, recipe_id: `recipe-${id}`, status: 'installed', build: 'b1', save_dir: id, ...extras })
+  if (extras.walkthrough) a.db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at) VALUES (?, ?, 'Walkthrough', 'pdf', '2026-01-01')").run(extras.walkthrough, id)
+}
 
 describe('accounts authentication and security', () => {
   it('restricts download retention and explicit deletion to admins without touching installed games or saves', async () => {
@@ -230,7 +233,7 @@ describe('accounts authentication and security', () => {
   })
   it('maps all management route families to admins and keeps the last admin', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password'); game(a)
-    const routes: [string, string][] = [['get', '/api/archives'], ['post', '/api/archives/inspect'], ['post', '/api/archives/hash'], ['delete', '/api/archives'], ['post', '/api/imports'], ['post', '/api/uploads'], ['get', '/api/uploads/u1'], ['put', '/api/uploads/u1'], ['post', '/api/uploads/u1/complete'], ['delete', '/api/uploads/u1'], ['get', '/api/games/safe/files'], ['put', '/api/games/safe/files/raw'], ['delete', '/api/games/safe/files/raw'], ['get', '/api/games/safe/files/raw'], ['post', '/api/games/safe/files/upload'], ['post', '/api/games/safe/files/revert'], ['post', '/api/games/safe/files/apply'], ['post', '/api/games/safe/files/reset'], ['delete', '/api/games/safe'], ['post', '/api/games/safe/reinstall'], ['post', '/api/games/safe/walkthrough'], ['delete', '/api/games/safe/walkthrough'], ['put', '/api/games/safe/cache'], ['get', '/api/games/safe/recipe'], ['get', '/api/system'], ['post', '/api/system/prune'], ['post', '/api/system/engines/refresh'], ['get', '/api/jobs'], ['get', '/api/jobs/j1/log'], ['post', '/api/jobs/j1/cancel'], ['post', '/api/jobs/j1/retry'], ['delete', '/api/jobs'], ['post', '/api/catalog/refresh'], ['put', '/api/content'], ['get', '/api/users'], ['post', '/api/users'], ['put', `/api/users/${id}`], ['delete', `/api/users/${id}`], ['post', `/api/users/${id}/password`], ['post', `/api/users/${id}/merge`], ['post', `/api/users/${id}/saves/copy`], ['get', `/api/users/${id}/saves/export`], ['post', `/api/users/${id}/saves/import`], ['post', '/api/games/safe/safe']]
+    const routes: [string, string][] = [['get', '/api/archives'], ['post', '/api/archives/inspect'], ['post', '/api/archives/hash'], ['delete', '/api/archives'], ['post', '/api/imports'], ['post', '/api/uploads'], ['get', '/api/uploads/u1'], ['put', '/api/uploads/u1'], ['post', '/api/uploads/u1/complete'], ['delete', '/api/uploads/u1'], ['get', '/api/games/safe/files'], ['put', '/api/games/safe/files/raw'], ['delete', '/api/games/safe/files/raw'], ['get', '/api/games/safe/files/raw'], ['post', '/api/games/safe/files/upload'], ['post', '/api/games/safe/files/revert'], ['post', '/api/games/safe/files/apply'], ['post', '/api/games/safe/files/reset'], ['delete', '/api/games/safe'], ['post', '/api/games/safe/reinstall'], ['post', '/api/games/safe/walkthroughs'], ['delete', '/api/games/safe/walkthroughs/safe.pdf'], ['put', '/api/games/safe/cache'], ['get', '/api/games/safe/recipe'], ['get', '/api/system'], ['post', '/api/system/prune'], ['post', '/api/system/engines/refresh'], ['get', '/api/jobs'], ['get', '/api/jobs/j1/log'], ['post', '/api/jobs/j1/cancel'], ['post', '/api/jobs/j1/retry'], ['delete', '/api/jobs'], ['post', '/api/catalog/refresh'], ['put', '/api/content'], ['get', '/api/users'], ['post', '/api/users'], ['put', `/api/users/${id}`], ['delete', `/api/users/${id}`], ['post', `/api/users/${id}/password`], ['post', `/api/users/${id}/merge`], ['post', `/api/users/${id}/saves/copy`], ['get', `/api/users/${id}/saves/export`], ['post', `/api/users/${id}/saves/import`], ['post', '/api/games/safe/safe']]
     for (const [method, path] of routes) {
       expect(playerRoute(method.toUpperCase(), path), path).toBe(false)
       await (request(a.app) as any)[method](path).set(site).set('Cookie', player).expect(403)

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, Download, ExternalLink, Info, Play, RefreshCw, Save } from 'lucide-react'
+import { BookOpen, Download, ExternalLink, Info, MoreHorizontal, Play, RefreshCw, Save } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import FileBrowser from '../components/FileBrowser'
@@ -15,7 +15,7 @@ import { useAdultView } from '../lib/adult'
 import FavoriteButton from '../components/FavoriteButton'
 import GameTags from '../components/GameTags'
 import SaveGallery from '../components/SaveGallery'
-import { BetaBadge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
+import { BetaBadge, Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { api, del, post, slotName, type ArtKind, type Game } from '../lib/api'
 import ArtPicker from '../components/ArtPicker'
 import { ago, bytes, capitalize, duration, pct } from '../lib/format'
@@ -147,7 +147,16 @@ export default function GamePage() {
       ) : (
         <InstallButton game={game} />
       )}
-      {game.walkthrough && <Pill variant="q" size="lg" icon={<BookOpen />} href={`/api/walkthroughs/${encodeURIComponent(game.walkthrough)}`} target="_blank" rel="noreferrer">Walkthrough</Pill>}
+      {game.walkthroughs.length === 1 && (
+        <Pill variant="q" size="lg" icon={<BookOpen />} href={game.walkthroughs[0]!.url} target="_blank" rel="noreferrer">
+          Walkthrough
+        </Pill>
+      )}
+      {game.walkthroughs.length > 1 && (
+        <Pill variant="q" size="lg" icon={<BookOpen />} onClick={() => setTab('walkthroughs')}>
+          Walkthroughs
+        </Pill>
+      )}
       {game.recipe?.links.walkthrough && (
         <Pill variant="q" size="lg" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
           Guide
@@ -386,14 +395,12 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
       toast(errorText(e), 'error')
     }
   }
-  const uploadPdf = async (file: File | undefined) => {
+  const [rename, setRename] = useState<{ file: string; title: string } | null>(null)
+  const uploadWalkthrough = async (file: File | undefined) => {
     if (!file) return
     const fd = new FormData()
-    fd.append('walkthrough', file)
-    await act(async () => {
-      const r = await fetch(`/api/games/${game.id}/walkthrough`, { method: 'POST', body: fd })
-      if (!r.ok) throw new Error((await r.json()).error)
-    }, 'Walkthrough added')
+    fd.append('file', file)
+    await act(() => api(`/api/games/${game.id}/walkthroughs`, { method: 'POST', body: fd }), 'Walkthrough added')
   }
   const links = recipeLinks(game.recipe?.links)
   const recipeStatus = !game.recipe
@@ -440,49 +447,73 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
 
       {section === 'walkthroughs' && (
         <div className="stack">
-          {game.walkthrough ? (
-            <div className="panel row between wrap" style={{ gap: 12 }}>
-              <div className="grow">
-                <p style={{ fontWeight: 650 }}>{game.walkthrough}</p>
-                <p className="small muted">A PDF kept with the game</p>
+          {game.walkthroughs.length ? (
+            game.walkthroughs.map((w, i) => (
+              <div key={w.file} className="panel walk-row">
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <p className="truncate" style={{ fontWeight: 650 }}>{w.title}</p>
+                  <p className="small muted">
+                    {{ pdf: 'PDF', image: 'Picture', text: 'Text' }[w.kind]} · {bytes(w.size)} · Added {ago(w.addedAt)}
+                  </p>
+                </div>
+                <div className="actions">
+                  <Pill variant={i === 0 ? 'p' : 's'} size="sm" icon={<BookOpen />} href={w.url} target="_blank" rel="noreferrer">
+                    Open
+                  </Pill>
+                  {admin && (
+                    <Menu trigger={(open) => <button className="ib" aria-label={`More for ${w.title}`} onClick={open}><MoreHorizontal /></button>}>
+                      {(close) => (
+                        <>
+                          <MenuItem onClick={() => { close(); setRename({ file: w.file, title: w.title }) }}>Rename</MenuItem>
+                          {i > 0 && <MenuItem onClick={() => { close(); void act(() => api(`/api/games/${game.id}/walkthroughs/${encodeURIComponent(w.file)}`, { method: 'PUT', json: { position: i - 1 } }), 'Moved up') }}>Move up</MenuItem>}
+                          <MenuItem danger onClick={() => { close(); void act(() => del(`/api/games/${game.id}/walkthroughs/${encodeURIComponent(w.file)}`), 'Walkthrough removed') }}>Remove</MenuItem>
+                        </>
+                      )}
+                    </Menu>
+                  )}
+                </div>
               </div>
-              <Pill variant="p" icon={<BookOpen />} href={`/api/walkthroughs/${encodeURIComponent(game.walkthrough)}`} target="_blank" rel="noreferrer">
-                Open
-              </Pill>
-            </div>
+            ))
           ) : (
-            <p className="small muted">{admin ? 'No walkthrough yet. Add a PDF below.' : 'No walkthrough yet.'}</p>
+            <p className="small muted">{admin ? 'No walkthrough yet. Add a PDF, a picture or a text file.' : 'No walkthrough yet.'}</p>
           )}
           {game.recipe?.links.walkthrough && (
-            <div className="panel row between wrap" style={{ gap: 12 }}>
+            <div className="panel walk-row">
               <div className="grow">
                 <p style={{ fontWeight: 650 }}>The guide the catalog links</p>
                 <p className="small muted">On the web</p>
               </div>
-              <Pill variant="s" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
+              <Pill variant="s" size="sm" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
                 Open
               </Pill>
             </div>
           )}
+          {admin && (
+            <div>
+              <input ref={pdfRef} type="file" accept="application/pdf,image/png,image/jpeg,image/webp,.txt,.md,text/plain,text/markdown" className="hidden" onChange={(e) => { void uploadWalkthrough(e.target.files?.[0]); e.target.value = '' }} />
+              <Button size="sm" icon={<BookOpen />} onClick={() => pdfRef.current?.click()}>
+                Add a walkthrough
+              </Button>
+              <p className="xs muted" style={{ marginTop: 8 }}>A PDF, a picture or a text file, kept with the game for everyone who plays it.</p>
+            </div>
+          )}
+          <Modal
+            open={!!rename}
+            onClose={() => setRename(null)}
+            title="Rename walkthrough"
+            footer={
+              <Button variant="primary" onClick={() => { const r = rename!; setRename(null); void act(() => api(`/api/games/${game.id}/walkthroughs/${encodeURIComponent(r.file)}`, { method: 'PUT', json: { title: r.title } }), 'Renamed') }}>
+                Save
+              </Button>
+            }
+          >
+            <label className="block small muted-2">
+              Title
+              <input className="input" style={{ marginTop: 8, width: '100%' }} value={rename?.title ?? ''} maxLength={100} onChange={(e) => setRename((r) => (r ? { ...r, title: e.target.value } : r))} />
+            </label>
+          </Modal>
         </div>
       )}
-
-      {section === 'walkthroughs' && admin && (
-          <Card title="Your walkthrough">
-            <p className="small muted" style={{ marginBottom: 12 }}>A PDF you keep with the game. It opens from the game page.</p>
-            <input ref={pdfRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => void uploadPdf(e.target.files?.[0])} />
-            <div className="actions">
-              <Button size="sm" icon={<BookOpen />} onClick={() => pdfRef.current?.click()}>
-                {game.walkthrough ? 'Replace PDF' : 'Add a PDF'}
-              </Button>
-              {game.walkthrough && (
-                <Button size="sm" variant="ghost" onClick={() => act(() => del(`/api/games/${game.id}/walkthrough`), 'Walkthrough removed')}>
-                  Remove
-                </Button>
-              )}
-            </div>
-          </Card>
-        )}
 
       {section === 'details' && <div className="stack">
         <Card title="Art">
