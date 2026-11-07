@@ -11,6 +11,7 @@ import type { JobManager } from '../jobs.js'
 import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
 import { exists, newId } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
+import { viewer } from '../accounts-context.js'
 
 const ARCHIVE_RE = /\.(zip|7z|rar|tar|tgz|tar\.(gz|bz2|xz|zst))$/i
 const CHUNK = 32 << 20
@@ -162,6 +163,8 @@ export function createLibraryRouter(deps: LibraryDeps): Router {
       recipeId: typeof b.recipeId === 'string' ? b.recipeId : undefined,
       engine: typeof b.engine === 'string' && b.engine ? b.engine : undefined,
       reapplyMods: !!b.reapplyMods,
+      // Who started it: Choose artwork opens for them alone.
+      by: viewer()?.user.id,
     })
     res.json({ jobId: id })
   })

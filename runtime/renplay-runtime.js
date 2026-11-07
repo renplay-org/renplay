@@ -158,6 +158,9 @@
     base: new Map(),
     // True once the server's list arrived: without it (an offline start) no base is known.
     baseKnown: false,
+    // The hash of an upload whose answer never came, by path: it may have reached the server, and
+    // then the server's copy is this device's own, not another device's.
+    unanswered: new Map(),
     inflight: false,
     online: true,
     lastSync: 0,
@@ -622,6 +625,7 @@
     // A write kept by an older Renplay has none and is delivered as before.
     var base = item.base !== undefined ? item.base : currentBase(path)
     if (base !== null) headers['x-base'] = String(base)
+    if (state.unanswered.has(path)) headers['x-unanswered'] = state.unanswered.get(path)
     var req = item.data
       ? fetch(url, { method: 'PUT', body: item.data, headers: headers })
       : fetch(url, { method: 'DELETE', headers: base !== null ? { 'x-base': String(base) } : {} })
@@ -634,6 +638,7 @@
         state.online = true
         state.failures = 0
         state.lastSync = Date.now()
+        state.unanswered.delete(path)
         if (!item.data) {
           idbMarkSynced(path, item.mtime)
           state.base.delete(path)
@@ -650,6 +655,7 @@
       })
       .catch(function (e) {
         console.warn('[renplay] upload failed for', path, e)
+        if (sentHash) state.unanswered.set(path, sentHash)
         // Keep the newest version queued.
         if (!state.queue.has(path)) state.queue.set(path, item)
         state.online = false

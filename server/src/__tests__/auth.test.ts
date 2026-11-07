@@ -259,7 +259,7 @@ describe('personal data and save moves', () => {
     const section = (from: string, to: string) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)))
     const runtime = (userId: number, cookie: string) => new Function('window', 'indexedDB', 'cfg', 'fetchJSON', 'fetch', 'setTimeout', `
       var API = '/api/saves/safe', signedOut = false, HOME = '/home';
-      var state = { queue: new Map(), known: new Map(), lazy: new Map(), base: new Map(), online: true, inflight: false, failures: 0 };
+      var state = { queue: new Map(), known: new Map(), lazy: new Map(), base: new Map(), unanswered: new Map(), online: true, inflight: false, failures: 0 };
       function post() {} function status() {} function log() {} function writeLocal() {} function createLazy() {}
       function hash(bytes) { return String(bytes) } function b64ToBytes(data) { return new Uint8Array() }
       ${section('  var dbPromise = null', '  // ---------------------------------------------------------------- helpers')}

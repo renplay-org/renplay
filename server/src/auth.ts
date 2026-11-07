@@ -59,7 +59,7 @@ export function playerRoute(method: string, path: string): boolean {
   if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art)?$/.test(path))) return true
   // A player chooses and uploads art for their own view (the route refuses everyone).
   if ((method === 'GET' || method === 'HEAD') && path === '/api/history') return true
-  return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now))$/.test(`${method} ${path}`)
+  return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
 }
 
 export class Accounts {
@@ -322,10 +322,15 @@ export class Accounts {
     // other person has none for the same file.
     this.db.raw.prepare('UPDATE play_sessions SET user_id = ? WHERE user_id = ?').run(to, from)
     this.db.raw.prepare('INSERT OR IGNORE INTO save_meta (user_id, save_dir, file, title, note, pinned_at) SELECT ?, save_dir, file, title, note, pinned_at FROM save_meta WHERE user_id = ?').run(to, from)
+    // Their art choices and uploads too, where the other person has none for the same game and format.
+    this.db.raw.prepare('INSERT OR IGNORE INTO art_uploads (id, game, kind, scope, width, height, focal, thumbhash, tint, created_at) SELECT id, game, kind, ?, width, height, focal, thumbhash, tint, created_at FROM art_uploads WHERE scope = ?').run(to, from)
+    this.db.raw.prepare('INSERT OR IGNORE INTO art_choices (game, kind, scope, candidate) SELECT game, kind, ?, candidate FROM art_choices WHERE scope = ?').run(to, from)
   }
 
-  /** Records played seconds as a session: one that ended in the last ten minutes goes on, else a new one starts. */
-  /** Adds reported play time to the person's session and returns the seconds counted. */
+  /**
+   * Records played seconds as a session (one that ended in the last ten minutes goes on, else a new
+   * one starts) and returns the seconds counted.
+   */
   addPlayTime(game: string, seconds: number, now = Date.now()): number {
     const id = this.current().id
     const last = this.db.raw.prepare('SELECT id, ended_at FROM play_sessions WHERE user_id = ? AND game = ? AND ended_at >= ? ORDER BY ended_at DESC LIMIT 1').get(id, game, now - 10 * 60_000) as { id: number; ended_at: number } | undefined
@@ -655,6 +660,8 @@ export class Accounts {
         try {
           this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
           for (const table of ['sessions', 'tokens', 'identities', 'user_games', 'play_sessions', 'save_meta']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
+          // Their own art choices and uploads. Choices for everyone stay.
+          for (const table of ['art_choices', 'art_uploads']) this.db.raw.prepare(`DELETE FROM ${table} WHERE scope = ?`).run(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
           this.db.raw.exec('COMMIT')
         } catch (error) {

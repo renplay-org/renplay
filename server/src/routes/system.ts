@@ -204,5 +204,5 @@ function safeJson(s: string): unknown {
 function safeParams(s: string): unknown {
   const p = safeJson(s) as Record<string, any> | null
   if (!p) return null
-  return { source: p.source, game: p.game, path: p.path }
+  return { source: p.source, game: p.game, path: p.path, by: typeof p.by === 'number' ? p.by : undefined }
 }

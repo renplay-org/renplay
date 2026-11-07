@@ -10,6 +10,7 @@ import { parseJson, type Db, type GameRow, type GameSource, type JobRow } from '
 import type { JobContext } from './jobs.js'
 import { cleanRelPath } from './util/paths.js'
 import { log } from './util/log.js'
+import { catalogHosts, fetchPublic } from './util/net.js'
 
 export interface RecipeArchive {
   name: string
@@ -539,7 +540,7 @@ export class Catalog {
       const rel = cleanRelPath(p.path)
       if (!rel.startsWith('game/')) throw new Error(`Recipe patch outside game/: ${rel}`)
       const url = new URL(p.url, recipe._base ?? this.cfg.catalogUrls[0]).toString()
-      const res = await fetch(url, { signal: ctx.signal })
+      const res = await fetchPublic(url, { signal: ctx.signal, allowHosts: catalogHosts(this.cfg.catalogUrls) })
       if (!res.ok) throw new Error(`Recipe patch download failed: ${url} (${res.status})`)
       const data = Buffer.from(await res.arrayBuffer())
       if (createHash('sha256').update(data).digest('hex') !== p.sha256.toLowerCase()) throw new Error(`Recipe patch checksum mismatch: ${rel}`)

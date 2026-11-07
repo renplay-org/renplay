@@ -138,7 +138,8 @@ export interface Job {
   progress: number
   message: string
   error: string | null
-  params: { source?: { kind: string; path?: string }; game?: string; path?: string } | null
+  /** `by`: who started it, for installs since 4.0.2. */
+  params: { source?: { kind: string; path?: string }; game?: string; path?: string; by?: number } | null
   result: any
   createdAt: string
   startedAt: string | null
