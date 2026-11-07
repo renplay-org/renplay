@@ -136,7 +136,7 @@ export function PlayerDrawer({
           <div className="pd-links">
             {renpy && ready && (
               <button type="button" className="link small" onClick={onMainMenu}>
-                Main menu
+                Save and go to the main menu
               </button>
             )}
             <button type="button" className="link small" onClick={() => onExit('game')}>

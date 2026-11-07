@@ -95,11 +95,15 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange, exclud
   }
   return (
     <>
-      <div className="chips wrap" style={{ marginBottom: 16 }}>
-        {chosen.map((id) => chip(id, counts.get(id)?.count ?? 0))}
-        {common.slice(0, Math.max(0, 8 - chosen.length)).map((t) => chip(t.id, t.count))}
-        <Chip onClick={() => setAll(true)}>All tags</Chip>
-        {chosen.length > 0 && <Chip onClick={() => onChange({ include: [], exclude: [] })}>Clear tags</Chip>}
+      <div className="chip-bar" style={{ marginBottom: 16 }}>
+        <div className="chips wrap">
+          {chosen.map((id) => chip(id, counts.get(id)?.count ?? 0))}
+          {common.slice(0, Math.max(0, 8 - chosen.length)).map((t) => chip(t.id, t.count))}
+        </div>
+        <div className="chips">
+          {chosen.length > 0 && <Chip onClick={() => onChange({ include: [], exclude: [] })}>Clear tags</Chip>}
+          <Chip onClick={() => setAll(true)}>All tags</Chip>
+        </div>
       </div>
       {all && (
         <Sheet open onClose={() => setAll(false)} title="Tags" wide fullPhone>

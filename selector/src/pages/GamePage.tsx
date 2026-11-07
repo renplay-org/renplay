@@ -46,6 +46,13 @@ export default function GamePage() {
     if (game && window.location.hash === '#update') document.getElementById('update')?.scrollIntoView({ block: 'center' })
   }, [game?.id])
   useRoom({ game: game ?? null, quiet: !game })
+  // The app's titles: Renplay, or the game's name with it.
+  useEffect(() => {
+    document.title = game ? `${game.title} · Renplay` : 'Renplay'
+    return () => {
+      document.title = 'Renplay'
+    }
+  }, [game?.title])
 
   if (isLoading)
     return (
@@ -142,14 +149,9 @@ export default function GamePage() {
     <>
       {installed ? (
         <>
-          <Pill variant="p" size="lg" icon={latest ? <Play /> : <Play />} onClick={() => resume(false)}>
+          <Pill variant="p" size="lg" icon={<Play />} onClick={() => resume(false)}>
             {latest ? 'Resume' : 'Play'}
           </Pill>
-          {latest && (
-            <Pill variant="s" size="lg" onClick={() => resume(true)}>
-              Main menu
-            </Pill>
-          )}
         </>
       ) : (
         <InstallButton game={game} />
@@ -211,7 +213,6 @@ export default function GamePage() {
           {installed ? (
             <>
               <Pill variant="p" onClick={primary}>{latest ? 'Resume' : 'Play'}</Pill>
-              {latest && <Pill variant="s" onClick={() => navigate(`/play/${gameId}`)}>Main menu</Pill>}
             </>
           ) : (
             <InstallButton game={game} />

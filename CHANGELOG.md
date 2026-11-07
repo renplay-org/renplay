@@ -7,6 +7,20 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- The account menu is a small menu under your picture instead of a window in the middle of the screen, with the admin's pages apart from your own.
+- **Main menu** is gone from the game page: **Resume** or **Play** starts the game, and its own menu is a tap away. In the player's drawer it is now **Save and go to the main menu**.
+- **All tags** (and **Clear tags**) sit at the right end of the tag row in the library and the catalog. On a phone, rows that scroll sideways fade at their right edge.
+- Activity uses the page's whole width, and Settings and Import saves sit in a centred column.
+- The game page's title in the browser tab is the game's name.
+
+### Fixed
+
+- Menus, sheets and the tab bar had no blur behind them in Chrome, Edge and other Chromium browsers, so text behind them showed through. The build dropped the property those browsers read.
+- Pages no longer jump while they load: the footer, a game's logo and the Add games page held their place.
+- **Resume** and **Play** show the focus ring when reached with the keyboard.
+
 ## [4.2.0] - 2026-11-07
 
 Renplay 4.2 plays Ren’Py games with no network and with a controller. Keep a game offline from its

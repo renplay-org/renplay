@@ -59,7 +59,7 @@ export default function Settings() {
 
 function BrowserSettings() {
   return (
-    <div className="stack" style={{ gap: 18, maxWidth: 760 }}>
+    <div className="stack page-col" style={{ gap: 18 }}>
       <h1 className="h1">This browser</h1>
       <section className="panel stack">
         <DeviceAdultRow />

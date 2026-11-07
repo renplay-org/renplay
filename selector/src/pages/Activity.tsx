@@ -92,7 +92,7 @@ export default function Activity() {
     }
   }
   return (
-    <div style={{ maxWidth: 1080 }}>
+    <div>
       <div className="row between wrap" style={{ gap: 12 }}>
         <div>
           <h1 className="h1">Activity</h1>
