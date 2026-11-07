@@ -103,16 +103,27 @@ export function fullscreenCoversNotch(): boolean {
   return Math.abs(window.innerHeight - screen.height) <= 2
 }
 
-/** Size and offset of the game frame for a given container and mode. */
+/**
+ * Size and offset of the game frame for a given container and mode, in whole pixels.
+ *
+ * Fit: the frame has the game's own shape, centred, so Ren'Py fills it edge to edge and the bars
+ * are the player's, never a second set drawn inside the game. Fill: on a screen narrower than the
+ * game the sides are cropped. It never crops the top or bottom, where games keep their dialogue
+ * and buttons: on a wider screen it fits instead.
+ */
 export function frameRect(
   cw: number,
   ch: number,
   screenSize: [number, number] | null,
   mode: FitMode,
 ): { width: number; height: number; left: number; top: number } {
-  if (mode !== 'fill' || !screenSize || !cw || !ch) return { width: cw, height: ch, left: 0, top: 0 }
+  if (!screenSize || !cw || !ch) return { width: cw, height: ch, left: 0, top: 0 }
   const ar = screenSize[0] / screenSize[1]
-  const width = Math.max(cw, ch * ar)
-  const height = Math.max(ch, cw / ar)
-  return { width, height, left: (cw - width) / 2, top: (ch - height) / 2 }
+  if (mode === 'fill' && cw / ch < ar) {
+    const width = Math.round(ch * ar)
+    return { width, height: ch, left: Math.round((cw - width) / 2), top: 0 }
+  }
+  const width = Math.min(cw, Math.round(ch * ar))
+  const height = Math.min(ch, Math.round(width / ar))
+  return { width, height, left: Math.round((cw - width) / 2), top: Math.round((ch - height) / 2) }
 }

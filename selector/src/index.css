@@ -2797,6 +2797,64 @@ input[type="range"] {
   position: absolute;
   inset: -2px;
 }
+/* The pill and the full screen button over the game: lit for a few seconds after it starts. */
+/* Sound, full screen and close, together at the drawer's top right. */
+.pd-tools {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.rp-pills {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+}
+.rp-pills .rp-pill {
+  position: relative;
+}
+.rp-pills.fresh .rp-pill {
+  opacity: 1;
+}
+.rp-pill.icon {
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+}
+.rp-pill.icon svg {
+  width: 18px;
+  height: 18px;
+}
+/* The loading screen's own controls: back to the game page, sound, full screen. */
+.door-bar {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.door-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 650;
+}
+.door-btn.icon {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.door-btn svg {
+  width: 18px;
+  height: 18px;
+}
 .rp-pill .mark {
   width: 24px;
   height: 24px;
@@ -2925,16 +2983,24 @@ input[type="range"] {
   .pd-head > .grow {
     display: none;
   }
+  /* The game is right behind: its icon gives its room to the tabs and the controls. */
   .pd-icon {
-    grid-area: 1 / 1;
-    width: 36px;
-    height: 36px;
+    display: none;
   }
   .pd-tabs {
-    grid-area: 1 / 2;
+    grid-area: 1 / 1 / 2 / 3;
     justify-self: start;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
-  .pd-head > .ib {
+  .pd-tools {
+    gap: 0;
+  }
+  .pd-tools .ib {
+    width: 36px;
+  }
+  .pd-head > .pd-tools {
     grid-area: 1 / 3;
   }
   .pd-body {

@@ -14,6 +14,9 @@ release notes say what).
 - **All tags** (and **Clear tags**) sit at the right end of the tag row in the library and the catalog. On a phone, rows that scroll sideways fade at their right edge.
 - Activity uses the page's whole width, and Settings and Import saves sit in a centred column.
 - The game page's title in the browser tab is the game's name.
+- The loading screen has **Game page**, **Sound** and **Full screen**, so you can leave, mute or go full screen before the game starts. Its progress is one bar that only goes up, from the engine to the game's first screen.
+- **Full screen** sits beside the **Renplay** pill over the game, and the drawer has **Sound** and **Full screen** at its top. The pill is lit for the first seconds of a game, then quiet.
+- **Fit** shows the game in its own shape with the player's bars around it, and **Fill** crops only the sides, never the top or bottom where games keep their dialogue.
 
 ### Fixed
 
