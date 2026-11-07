@@ -1,4 +1,5 @@
 import { Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
+import ChooseArtwork from './ChooseArtwork'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { api, jobTitle } from '../lib/api'
 import { useQuery } from '@tanstack/react-query'
@@ -103,6 +104,7 @@ function Shell() {
         <Outlet />
       </main>
       <Footer />
+      {admin && <ChooseArtwork />}
       <nav className="tabbar" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }} aria-label="Sections">
         {tabs.map((t) => (
           <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => (isActive ? 'on' : '')}>

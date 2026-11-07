@@ -100,12 +100,13 @@ function Placement({ game, kind, format, ring }: { game: Game; kind: ArtKind; fo
  * sees, an admin can choose for everyone. Uploads of another size are placed with a crop at the
  * point the uploader taps.
  */
-export default function ArtPicker({ game, open, onClose, initialKind = 'grid' }: { game: Game; open: boolean; onClose: () => void; initialKind?: ArtKind }) {
+export default function ArtPicker({ game, open, onClose, initialKind = 'grid', step = false }: { game: Game; open: boolean; onClose: () => void; initialKind?: ArtKind; step?: boolean }) {
   const admin = useAuth().data?.user.role === 'admin'
   const qc = useQueryClient()
   const toast = useToast()
   const [kind, setKind] = useState<ArtKind>(initialKind)
-  const [scope, setScope] = useState<'me' | 'everyone'>('me')
+  // After an install (the Choose artwork step) an admin chooses for everyone (DESIGN 0.8).
+  const [scope, setScope] = useState<'me' | 'everyone'>(step && admin ? 'everyone' : 'me')
   const [previewing, setPreviewing] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [file, setFile] = useState<{ blob: File; url: string } | null>(null)
@@ -155,7 +156,26 @@ export default function ArtPicker({ game, open, onClose, initialKind = 'grid' }:
   const shown = candidates.find((c) => c.id === previewing) ?? current
 
   return (
-    <Sheet open={open} onClose={onClose} title={`Art for ${game.title}`} wide="xl" fullPhone>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={step ? `Choose artwork for ${game.title}` : `Art for ${game.title}`}
+      wide="xl"
+      fullPhone
+      footer={
+        step ? (
+          <div className="pk-foot">
+            <p className="hint small muted">{game.recipe ? 'The catalog’s pictures are picked already.' : 'This game is not in the catalog yet, so it starts with its title. Pick or upload a picture.'} You can change it later on the game’s page, under Details.</p>
+            <Pill variant="p" onClick={onClose}>
+              Keep this art
+            </Pill>
+            <Pill variant="q" onClick={onClose}>
+              Skip for now
+            </Pill>
+          </div>
+        ) : undefined
+      }
+    >
       <div className="pk-head">
         <Seg small scroll label="Format" value={kind} onChange={(k) => { setKind(k); setPreviewing(null); setFile(null) }} options={KINDS} />
       </div>
@@ -274,6 +294,28 @@ export default function ArtPicker({ game, open, onClose, initialKind = 'grid' }:
               setFile({ blob: f, url: URL.createObjectURL(f) })
             }}
           />
+
+          {step && (
+            <>
+              <div className="grp-h">The other formats</div>
+              <div className="list tight">
+                {KINDS.filter((k) => k.value !== kind).map((k) => {
+                  const f = game.art[k.value]
+                  return (
+                    <div key={k.value} className="row between" style={{ gap: 12, minHeight: 'var(--hit)' }}>
+                      <span className="grow">
+                        <span style={{ display: 'block', fontWeight: 600 }}>{k.label}</span>
+                        <span className="xs muted">{f ? <>{creditText(f.credit)}{f.made ? ', fitted by Renplay' : ''}</> : k.value === 'logo' ? 'The title in text' : 'Not available yet'}</span>
+                      </span>
+                      <Pill variant="s" size="sm" onClick={() => { setKind(k.value); setPreviewing(null); setFile(null) }}>
+                        Change
+                      </Pill>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
 
           <div className="who">
             {admin ? (

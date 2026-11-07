@@ -2736,3 +2736,8 @@ input[type="range"] {
     background: var(--glass-deep);
   }
 }
+/* The Choose artwork footer spans the sheet: its sentence, then the lit pill and Skip. */
+.sheet .sheet-f .pk-foot {
+  flex: 1 1 100%;
+  margin-top: 0;
+}
