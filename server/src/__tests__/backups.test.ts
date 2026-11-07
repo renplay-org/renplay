@@ -91,8 +91,12 @@ describe('save backups', () => {
     writeFileSync(join(cfg.archivesDir, 'Big-1.0-pc.zip'), Buffer.alloc(7000))
     mkdirSync(join(cfg.gamesDir, 'stray'), { recursive: true })
     writeFileSync(join(cfg.gamesDir, 'stray', 'x'), Buffer.alloc(100))
+    // A download name that cannot be a path in the downloads folder does not break the view.
+    app.db.insertGame({ id: 'odd', title: 'Odd', status: 'installed', save_dir: 'Odd-1', build: 'b1', source: JSON.stringify({ archive: '../outside.zip' }) })
     await request(app.app).post('/api/system/storage/refresh').expect(200)
-    const s = (await request(app.app).get('/api/system/storage').expect(200)).body
+    const [s, again] = (await Promise.all([request(app.app).get('/api/system/storage').expect(200), request(app.app).get('/api/system/storage').expect(200)])).map((r) => r.body)
+    expect(again).toEqual(s)
+    expect(s.games.find((g: { id: string }) => g.id === 'odd')).toMatchObject({ download: null })
     expect(s.games[0]).toMatchObject({ id: 'big', bytes: 10500, download: { name: 'Big-1.0-pc.zip', bytes: 7000 } })
     expect(s.games[0].builds).toEqual(expect.arrayContaining([{ name: 'b2', current: true, bytes: 3000 }, { name: 'b2.mabc', current: false, bytes: 500 }]))
     expect(s.orphans).toEqual([{ name: 'stray', bytes: 100 }])
