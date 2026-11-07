@@ -1241,6 +1241,39 @@
             post('flushed', { ok: ok, id: d.id })
           })
         break
+      case 'renplay:save-now':
+        // A save into Ren'Py's own quick-save slots, rotated as the game's Quick Save does, with a
+        // screenshot. Not in the main menu, where there is nothing to save.
+        exec(
+          'result = False\n' +
+            'if not renpy.context()._main_menu:\n' +
+            '    import renpy.loadsave as _rl\n' +
+            '    renpy.take_screenshot()\n' +
+            '    _rl.cycle_saves("quick-", config.quicksave_slots)\n' +
+            '    renpy.save("quick-1", extra_info=save_name)\n' +
+            '    result = True\n',
+          8000,
+        )
+          .then(function (saved) {
+            return flush(8000).then(function (ok) {
+              post('saved-now', { ok: !!saved && ok, saved: !!saved, id: d.id })
+            })
+          })
+          .catch(function () {
+            post('saved-now', { ok: false, saved: false, id: d.id })
+          })
+        break
+      case 'renplay:accessibility':
+        // Ren'Py's own accessibility menu (shift+A), where the game offers it.
+        exec('renpy.run(ToggleScreen("_accessibility"))\nrenpy.restart_interaction()\nresult = True', 4000).then(
+          function () {
+            post('accessibility', { ok: true })
+          },
+          function () {
+            post('accessibility', { ok: false })
+          },
+        )
+        break
       case 'renplay:load':
         loadSlot(d.slot).catch(function (er) {
           console.warn('[renplay] load failed', er)
