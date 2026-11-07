@@ -262,6 +262,10 @@ export default function Player() {
         case 'renplay:escape':
           setEscHeld(!!d.down)
           break
+        case 'renplay:menu':
+          // The controller's Menu button in the game.
+          setDrawer((tab) => tab ?? (sandboxed ? 'options' : 'saves'))
+          break
       }
     }
     window.addEventListener('message', onMessage)
@@ -438,6 +442,15 @@ export default function Player() {
     setDrawer(null)
     send({ type: 'renplay:focus' })
   }, [send])
+
+  // The drawer has the controller while it is open, and its Menu button closes it again.
+  useEffect(() => {
+    if (ready && !sandboxed) send({ type: 'renplay:pads', toGame: !drawer })
+    if (!drawer) return
+    const onMenu = () => closeDrawer()
+    window.addEventListener('renplay:pad-menu', onMenu)
+    return () => window.removeEventListener('renplay:pad-menu', onMenu)
+  }, [drawer, ready, sandboxed, send, closeDrawer])
 
   /**
    * Saves (an autosave, or a quick save in a game without autosave), then waits until every save

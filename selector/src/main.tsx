@@ -9,6 +9,7 @@ import SignIn from './pages/SignIn'
 import Setup from './pages/Setup'
 import { AuthGuard } from './lib/auth'
 import './index.css'
+import { installGamepad } from './lib/gamepad'
 
 const GamePage = lazy(() => import('./pages/GamePage'))
 const Player = lazy(() => import('./pages/Player'))
@@ -43,6 +44,8 @@ const fallback = (
     <Spinner />
   </div>
 )
+
+installGamepad()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

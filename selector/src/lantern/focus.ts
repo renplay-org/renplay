@@ -16,8 +16,11 @@ export function useArrowFocus(): void {
       const items = [...document.querySelectorAll<HTMLElement>('[data-focus]')].filter((el) => el.offsetParent !== null)
       if (!items.length) return
       const cur = document.activeElement?.closest<HTMLElement>('[data-focus]') ?? null
-      e.preventDefault()
+      // Only a key that moves is taken: at an edge it scrolls the page, and a controller moves on.
       if (!cur) {
+        // From outside the tiles, down and right enter them. Up and left are left to the page.
+        if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') return
+        e.preventDefault()
         items[0]!.focus()
         return
       }
@@ -29,6 +32,7 @@ export function useArrowFocus(): void {
         const j = same.indexOf(cur) + (e.key === 'ArrowRight' ? 1 : -1)
         const next = same[j]
         if (next) {
+          e.preventDefault()
           next.focus()
           next.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: beh })
         }
@@ -47,6 +51,7 @@ export function useArrowFocus(): void {
         }
       }
       if (best) {
+        e.preventDefault()
         best.focus()
         best.scrollIntoView({ block: 'center', behavior: beh })
       }
