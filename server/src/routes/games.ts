@@ -279,7 +279,10 @@ export function createGamesRouter(deps: GameDeps): Router {
   router.put('/:id/finished', async (req, res) => {
     const g = get(req)
     if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
-    setStatus(g, req.body.on ? 'finished' : '')
+    // Not finished (from 3.x) clears Finished only: Stalled or Dropped stay.
+    const current = deps.accounts ? deps.accounts.progress(g).play_status : ''
+    if (req.body.on) setStatus(g, 'finished')
+    else if (!current || current === 'finished') setStatus(g, '')
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
@@ -320,8 +323,8 @@ export function createGamesRouter(deps: GameDeps): Router {
     const seconds = req.body?.seconds
     if (!Number.isInteger(seconds) || seconds < 1 || seconds > 60) throw new HttpError(400, 'Seconds must be an integer from 1 to 60')
     if (deps.accounts) {
-      deps.accounts.setProgress(g.id, { play_time: deps.accounts.progress(g).play_time + seconds })
-      deps.accounts.addPlayTime(g.id, seconds)
+      const counted = deps.accounts.addPlayTime(g.id, seconds)
+      if (counted) deps.accounts.setProgress(g.id, { play_time: deps.accounts.progress(g).play_time + counted })
     } else db.raw.prepare('UPDATE games SET play_time = play_time + ? WHERE id = ?').run(seconds, g.id)
     res.json({ ok: true })
   })

@@ -126,6 +126,8 @@ describe('HTTP API', () => {
     for (const seconds of [-1, 0, 61, 1.5, '10', null]) await request(app.app).post(`${path}/play-time`).send({ seconds }).expect(400)
     await request(app.app).post('/api/games/missing/play-time').send({ seconds: 10 }).expect(404)
     await request(app.app).post(`${path}/play-time`).send({ seconds: 15 }).expect(200)
+    // The next report comes ten seconds later, as the player sends them.
+    app.db.raw.prepare('UPDATE play_sessions SET started_at = started_at - 10000, ended_at = ended_at - 10000').run()
     await request(app.app).post(`${path}/play-time`).send({ seconds: 10 }).expect(200)
     expect((await request(app.app).delete(path).expect(200)).body.game).toMatchObject({ playTime: 25, finishedAt: timestamp })
     expect((await request(app.app).put(`${path}/finished`).send({ on: false })).body.game.finishedAt).toBeNull()

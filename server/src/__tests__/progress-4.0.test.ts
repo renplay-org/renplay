@@ -84,7 +84,11 @@ describe('status, rating, Not now and play history', () => {
   })
 
   it('turns play time into sessions and shows them by day, per game and in totals', async () => {
-    for (let i = 0; i < 3; i++) await request(app.app).post('/api/games/story/play-time').send({ seconds: 30 }).expect(200)
+    // Reports 30 seconds apart, as the player sends them.
+    for (let i = 0; i < 3; i++) {
+      await request(app.app).post('/api/games/story/play-time').send({ seconds: 30 }).expect(200)
+      app.db.raw.prepare("UPDATE play_sessions SET started_at = started_at - 30000, ended_at = ended_at - 30000 WHERE game = 'story'").run()
+    }
     await request(app.app).post('/api/games/adult/play-time').send({ seconds: 20 }).expect(200)
     // A report more than ten minutes after the last one starts a new session.
     app.db.raw.prepare("UPDATE play_sessions SET started_at = started_at - 3600000, ended_at = ended_at - 3600000 WHERE game = 'story'").run()
@@ -109,6 +113,31 @@ describe('status, rating, Not now and play history', () => {
     await request(app.app).put('/api/content').send({ level: 'shown' }).expect(200)
   })
 
+  it('never counts more play time than passed: two windows, repeated reports', async () => {
+    app.db.raw.prepare("DELETE FROM play_sessions WHERE game = 'third'").run()
+    app.db.insertGame({ id: 'third', title: 'Third', status: 'installed', save_dir: 'Third-1' })
+    const before = (await request(app.app).get('/api/games/third').expect(200)).body.game.playTime ?? 0
+    for (let i = 0; i < 4; i++) await request(app.app).post('/api/games/third/play-time').send({ seconds: 60 }).expect(200)
+    const session = app.db.raw.prepare("SELECT seconds FROM play_sessions WHERE game = 'third'").get() as { seconds: number }
+    expect(session.seconds).toBeLessThanOrEqual(60 + 3 * 6)
+    expect((await request(app.app).get('/api/games/third').expect(200)).body.game.playTime - before).toBe(session.seconds)
+  })
+
+  it('groups play by the person’s own days', async () => {
+    app.db.raw.prepare("INSERT INTO play_sessions (user_id, game, started_at, ended_at, seconds) VALUES (1, 'third', ?, ?, 600)").run(Date.UTC(2026, 0, 1, 23, 30), Date.UTC(2026, 0, 1, 23, 40))
+    const days = async (tz: string) => (await request(app.app).get(`/api/history?game=third&days=90&tz=${encodeURIComponent(tz)}`).expect(200)).body.days.map((d: { day: string }) => d.day)
+    expect(await days('Asia/Tokyo')).toContain('2026-01-02')
+    expect(await days('UTC')).toContain('2026-01-01')
+    expect(await days('Not/AZone')).toBeTruthy()
+    app.db.raw.prepare("DELETE FROM play_sessions WHERE game = 'third'").run()
+  })
+
+  it('clears only Finished when a 3.x client marks a game not finished', async () => {
+    await request(app.app).put('/api/games/third/status').send({ status: 'dropped' }).expect(200)
+    await request(app.app).put('/api/games/third/finished').send({ on: false }).expect(200)
+    expect((await request(app.app).get('/api/games/third').expect(200)).body.game.playStatus).toBe('dropped')
+  })
+
   it('moves the play history along when one person is merged into another', async () => {
     const other = (await request(app.app).post('/api/users').send({ username: 'second', name: 'Second', password: 'second-password-1' }).expect(201)).body.user
     app.db.raw.prepare("INSERT INTO play_sessions (user_id, game, started_at, ended_at, seconds) VALUES (?, 'story', 1000, 2000, 60)").run(other.id)
@@ -117,6 +146,14 @@ describe('status, rating, Not now and play history', () => {
     expect((app.db.raw.prepare('SELECT COUNT(*) n FROM play_sessions WHERE user_id = ?').get(other.id) as { n: number }).n).toBe(0)
     expect((await request(app.app).get('/api/history').expect(200)).body.totals.seconds).toBe(180)
     expect(await game()).toMatchObject({ rating: 5, playStatus: 'dropped' })
+  })
+
+  it('keeps Finished in step with finished_at when people are merged', async () => {
+    await request(app.app).put('/api/games/third/status').send({ status: 'playing' }).expect(200)
+    const other = (await request(app.app).post('/api/users').send({ username: 'third-person', name: 'Third', password: 'third-password-1' }).expect(201)).body.user
+    app.db.raw.prepare("INSERT INTO user_games (user_id, game, play_status, finished_at) VALUES (?, 'third', 'finished', '2026-01-01T00:00:00.000Z')").run(other.id)
+    await request(app.app).post(`/api/users/${other.id}/merge`).send({ target: 1 }).expect(200)
+    expect((await request(app.app).get('/api/games/third').expect(200)).body.game).toMatchObject({ playStatus: 'finished', finishedAt: '2026-01-01T00:00:00.000Z' })
   })
 })
 

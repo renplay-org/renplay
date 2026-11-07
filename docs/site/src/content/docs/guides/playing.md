@@ -32,7 +32,8 @@ up to five stars. The library can sort by **Rating** and **Time played**.
 
 **Account → Play history** shows how long you played, day by day, and the time per game with your
 ratings and statuses. A game's page shows its last sessions. Renplay counts the time a game is open
-and in front of you. Each person has their own history.
+and in front of you, and stops after 15 minutes without a tap, click or key. Each person has their
+own history.
 
 ## On a phone
 

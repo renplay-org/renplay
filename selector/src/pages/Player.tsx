@@ -27,7 +27,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatFor, hashUrl, TitleArt, useHidden } from '../lantern/art'
 import { Bar, Seg } from '../lantern/controls'
 import { flyGhost, takeTravel } from '../lantern/travel'
-import { Button, IconButton, Progress, Spinner, Switch, cx, useToast } from '../components/ui'
+import { Button, Confirm, IconButton, Progress, Spinner, Switch, cx, useToast } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { api, slotName, type Game } from '../lib/api'
 import {
@@ -103,6 +103,9 @@ export default function Player() {
   const [coversNotch, setCoversNotch] = useState(false)
   const [screenSize, setScreenSize] = useState<[number, number] | null>(null)
   const [exiting, setExiting] = useState(false)
+  // Save and exit could not get every save to the server: where the person meant to go.
+  const [unsent, setUnsent] = useState<'library' | 'game' | null>(null)
+  const savingId = useRef<string | null>(null)
   const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === '1')
   // Esc is locked (a tap reaches the game), shown as a hint for a few seconds,
   // and currently held down.
@@ -116,7 +119,7 @@ export default function Player() {
   const [portraitOk, setPortraitOk] = useState(false)
   const [homeTip, setHomeTip] = useState(() => fsMode === 'home-screen' && !localStorage.getItem(HOME_TIP_KEY))
   const resumed = useRef(false)
-  const waiters = useRef(new Map<string, () => void>())
+  const waiters = useRef(new Map<string, (ok: boolean) => void>())
   // Other engines run their own JavaScript, so they play in a sandboxed frame
   // (opaque origin, no access to Renplay) and their storage comes through here.
   const sandboxed = !!game && game.family !== 'renpy'
@@ -193,9 +196,11 @@ export default function Player() {
           break
         case 'renplay:flushed':
           // After the storage that came before it is stored.
-          void storageWrite.current.finally(() => waiters.current.get(d.id)?.())
+          void storageWrite.current.finally(() => waiters.current.get(d.id)?.(d.ok !== false))
           break
         case 'renplay:saved-now':
+          if (d.id !== savingId.current) break
+          savingId.current = null
           setSavingNow(false)
           toast(d.saved ? (d.ok ? 'Saved' : 'Saved on this device. It syncs when the connection is back.') : 'Nothing to save in the main menu.', d.ok ? 'success' : 'info')
           break
@@ -214,7 +219,8 @@ export default function Player() {
           if (!d.ok) toast('This game does not offer Ren’Py’s accessibility menu.')
           break
         case 'renplay:storage':
-          if (sandboxed && typeof d.data === 'string' && game?.saveDir) {
+          // A game's whole storage, kept within the size a save file may have on the server.
+          if (sandboxed && typeof d.data === 'string' && d.data.length <= 32 << 20 && game?.saveDir) {
             const path = `${game.saveDir}/${d.kind === 'idb' ? 'indexedDB.json' : 'localStorage.json'}`
             storageWrite.current = storageWrite.current
               .catch(() => {})
@@ -258,9 +264,23 @@ export default function Player() {
       seconds -= whole
       void fetch(`/api/games/${gameId}/play-time`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-renplay-user': String(userId) }, body: JSON.stringify({ seconds: whole }), keepalive: true }).then((response) => { if (response.status === 401) setSignedOut(true) }).catch(() => {})
     }
+    // A Ren'Py game left alone stops counting after 15 minutes without a tap, click or key, in the
+    // game or on the player. A sandboxed game's input cannot be seen, so it counts while visible.
+    let lastInput = performance.now()
+    const onInput = () => {
+      lastInput = performance.now()
+    }
+    const inputs = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
+    const targets: Window[] = [window]
+    try {
+      const inner = !sandboxed ? frameRef.current?.contentWindow : null
+      if (inner) targets.push(inner)
+    } catch {}
+    for (const t of targets) for (const type of inputs) t.addEventListener(type, onInput, { capture: true, passive: true })
     const sample = () => {
       const now = performance.now()
-      if (document.visibilityState === 'visible') seconds += Math.min(2, (now - previous) / 1000)
+      const active = sandboxed || now - lastInput < 15 * 60_000
+      if (document.visibilityState === 'visible' && active) seconds += Math.min(2, (now - previous) / 1000)
       previous = now
       if (seconds >= 15) report()
     }
@@ -269,6 +289,7 @@ export default function Player() {
     document.addEventListener('visibilitychange', visibility)
     window.addEventListener('pagehide', report)
     return () => {
+      for (const t of targets) for (const type of inputs) { try { t.removeEventListener(type, onInput, { capture: true }) } catch {} }
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', visibility)
       window.removeEventListener('pagehide', report)
@@ -276,7 +297,7 @@ export default function Player() {
       void qc.invalidateQueries({ queryKey: ['games'] })
       void qc.invalidateQueries({ queryKey: ['game', gameId] })
     }
-  }, [ready, exiting, failed, gameId, qc])
+  }, [ready, exiting, failed, gameId, qc, sandboxed])
 
   useEffect(() => {
     if (game?.screen && !screenSize) setScreenSize(game.screen)
@@ -398,42 +419,66 @@ export default function Player() {
     send({ type: 'renplay:mute', value: next })
   }
 
-  const exit = useCallback(async (to: 'library' | 'game' = 'game') => {
+  const closeDrawer = useCallback(() => {
+    setDrawer(null)
+    send({ type: 'renplay:focus' })
+  }, [send])
+
+  /**
+   * Saves (an autosave, or a quick save in a game without autosave), then waits until every save
+   * reached the server. Longer than the runtime's own limits, so its answer always arrives first.
+   */
+  const saveAndFlush = useCallback(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const id = Math.random().toString(36).slice(2)
+        const t = setTimeout(() => (waiters.current.delete(id), resolve(false)), 20_000)
+        waiters.current.set(id, (ok) => {
+          clearTimeout(t)
+          waiters.current.delete(id)
+          resolve(ok)
+        })
+        send({ type: ready ? 'renplay:save-and-exit' : 'renplay:flush', id })
+      }),
+    [ready, send],
+  )
+
+  const exit = useCallback(async (to: 'library' | 'game' = 'game', anyway = false) => {
     setExiting(true)
-    const id = Math.random().toString(36).slice(2)
-    await new Promise<void>((resolve) => {
-      const t = setTimeout(resolve, 10_000)
-      waiters.current.set(id, () => {
-        clearTimeout(t)
-        resolve()
-      })
-      send({ type: ready ? 'renplay:save-and-exit' : 'renplay:flush', id })
-    })
+    // Saves that did not reach the server stay on this device and go up the next time the game
+    // opens here. The person decides whether to leave now.
+    if (!anyway && !(await saveAndFlush())) {
+      setExiting(false)
+      setUnsent(to)
+      return
+    }
+    setUnsent(null)
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
     void qc.invalidateQueries({ queryKey: ['saves', gameId] })
     void qc.invalidateQueries({ queryKey: ['games'] })
     navigate(to === 'library' ? '/' : `/game/${gameId}`)
-  }, [navigate, qc, ready, send, gameId])
+  }, [navigate, qc, send, gameId, saveAndFlush])
 
   /** Save now: a quick save, synced to the server. */
   const saveNow = () => {
     if (savingNow) return
+    const id = Math.random().toString(36).slice(2)
+    savingId.current = id
     setSavingNow(true)
-    send({ type: 'renplay:save-now', id: Math.random().toString(36).slice(2) })
+    send({ type: 'renplay:save-now', id })
+    // A game that never answers does not leave the button saying Saving.
+    window.setTimeout(() => {
+      if (savingId.current !== id) return
+      savingId.current = null
+      setSavingNow(false)
+      toast('The game did not answer. Try again, or save from its own menu.')
+    }, 20_000)
   }
 
-  /** Main menu: saves go to the server first, then the game starts again at its main menu. */
+  /** Main menu: the game saves first (saves that cannot reach the server wait on this device), then starts again at its main menu. */
   const mainMenu = async () => {
     setDrawer(null)
-    const id = Math.random().toString(36).slice(2)
-    await new Promise<void>((resolve) => {
-      const t = setTimeout(resolve, 8000)
-      waiters.current.set(id, () => {
-        clearTimeout(t)
-        resolve()
-      })
-      send({ type: 'renplay:flush', id })
-    })
+    await saveAndFlush()
     setReady(false)
     setProgress(null)
     navigate(`/play/${gameId}`, { replace: true })
@@ -444,7 +489,8 @@ export default function Player() {
   useEffect(() => {
     if (!ready) return
     const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.repeat || escLocked || drawer || guide) return
+      // A key the drawer already used (to close itself) does not open it again.
+      if (e.key !== 'Escape' || e.repeat || e.defaultPrevented || escLocked || drawer || guide) return
       setDrawer(sandboxed ? 'options' : 'saves')
     }
     window.addEventListener('keydown', key)
@@ -545,7 +591,6 @@ export default function Player() {
         >
           <span className="mark" aria-hidden="true" />
           Renplay
-          {!touch && <kbd>Esc</kbd>}
         </button>
       )}
       {ready && (sync.pending > 0 || !sync.online) && (
@@ -560,26 +605,44 @@ export default function Player() {
           className="absolute inset-y-0 left-0 z-20 w-4"
           onTouchStart={(e) => {
             const x0 = e.touches[0]!.clientX
-            const end = (ev: TouchEvent) => {
-              if ((ev.changedTouches[0]?.clientX ?? x0) - x0 > 40) setDrawer(sandboxed ? 'options' : 'saves')
+            const y0 = e.touches[0]!.clientY
+            const done = () => {
               window.removeEventListener('touchend', end)
+              window.removeEventListener('touchcancel', done)
+            }
+            // A swipe mostly to the right opens it. A cancelled touch (the system's own back
+            // gesture) does nothing.
+            const end = (ev: TouchEvent) => {
+              const t = ev.changedTouches[0]
+              const dx = (t?.clientX ?? x0) - x0
+              const dy = Math.abs((t?.clientY ?? y0) - y0)
+              if (dx > 40 && dx > dy * 2) setDrawer(sandboxed ? 'options' : 'saves')
+              done()
             }
             window.addEventListener('touchend', end)
+            window.addEventListener('touchcancel', done)
           }}
         />
       )}
 
       {fullscreen && escLocked && (escHeld || escHint) && <EscapeHint held={escHeld} top={Math.max(insets.top, pad.top) + 60} />}
 
+      <Confirm
+        open={unsent !== null}
+        onClose={() => setUnsent(null)}
+        onConfirm={() => void exit(unsent ?? 'library', true)}
+        title="Some saves have not reached the server"
+        confirmLabel="Leave anyway"
+        cancelLabel="Stay"
+      >
+        They are kept on this device and go to the server the next time you open this game here. Stay and try Save and exit again, or leave now.
+      </Confirm>
       {drawer && (
         <PlayerDrawer
           game={game}
           tab={drawer}
           onTab={setDrawer}
-          onClose={() => {
-            setDrawer(null)
-            send({ type: 'renplay:focus' })
-          }}
+          onClose={closeDrawer}
           portrait={stage.h > stage.w}
           insets={insets}
           renpy={!sandboxed}

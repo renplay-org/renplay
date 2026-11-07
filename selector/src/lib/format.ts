@@ -53,3 +53,12 @@ export function playedTime(seconds: number): string {
 export function pct(f: number): string {
   return `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%`
 }
+
+/** This browser's time zone, so the server groups play by the person's own days. */
+export function timeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+  } catch {
+    return ''
+  }
+}

@@ -51,13 +51,32 @@ export function PlayerDrawer({
   options: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  // The newest onClose, without running the effect below again: the player re-renders often (each
+  // sync report), and focus must stay where the person is.
+  const close = useRef(onClose)
+  close.current = onClose
   useEffect(() => {
     const opener = document.activeElement
     ref.current?.querySelector<HTMLElement>('[data-initial]')?.focus({ preventScroll: true })
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        close.current()
+        return
+      }
+      // Tab stays in the drawer while it is open.
+      if (e.key !== 'Tab' || !ref.current) return
+      const items = [...ref.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => el.offsetParent !== null)
+      if (!items.length) return
+      const first = items[0]!
+      const last = items[items.length - 1]!
+      const inside = ref.current.contains(document.activeElement)
+      if (e.shiftKey && (document.activeElement === first || !inside)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+        e.preventDefault()
+        first.focus()
       }
     }
     document.addEventListener('keydown', key)
@@ -65,7 +84,7 @@ export function PlayerDrawer({
       document.removeEventListener('keydown', key)
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true })
     }
-  }, [onClose])
+  }, [])
   const tabs = [
     ...(renpy ? [{ value: 'saves' as const, label: 'Saves' }] : []),
     { value: 'guide' as const, label: 'Guide' },
@@ -108,7 +127,11 @@ export function PlayerDrawer({
           </div>
           <p className={`xs muted pd-hint ${waiting ? 'waiting' : ''}`}>
             Leaving saves first.
-            {waiting ? ` ${pending || 'Some'} ${pending === 1 ? 'save is' : 'saves are'} waiting on this device and sync when the connection is back.` : ''}
+            {pending > 0
+              ? ` ${pending} ${pending === 1 ? 'save is' : 'saves are'} waiting on this device and ${pending === 1 ? 'syncs' : 'sync'} when the connection is back.`
+              : !online
+                ? ' You are offline. New saves wait on this device until the connection is back.'
+                : ''}
           </p>
           <div className="pd-links">
             {renpy && ready && (
@@ -159,6 +182,16 @@ function Reader({ w }: { w: Walkthrough }) {
     return (
       <div className="gw-img">
         <img src={w.url} alt={w.title} />
+      </div>
+    )
+  // iPhone and iPad Safari draw only a PDF's first page in a frame: there it opens in its own tab.
+  if (w.kind === 'pdf' && /iPhone|iPad|iPod/.test(navigator.userAgent + (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent) ? ' iPad' : '')))
+    return (
+      <div className="gw-img stack" style={{ gap: 12, alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+        <p className="small muted">This browser shows only the first page of a PDF here.</p>
+        <Pill variant="p" href={w.url} target="_blank" rel="noopener">
+          Open the PDF
+        </Pill>
       </div>
     )
   return <iframe src={w.url} title={w.title} className="gw-frame" />

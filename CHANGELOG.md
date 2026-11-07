@@ -28,6 +28,9 @@ release notes say what).
 - **Play history** shows your time day by day and per game, and a game's page shows its last sessions.
 - The library sorts by Rating and Time played.
 - The player has no toolbar any more. The game fills the screen with a quiet **Renplay** pill at the top left, which opens one menu with Saves, Guide and Options, **Save now** and **Save and exit**. **Esc** or a swipe from the left edge opens it too, and the game dims behind it. A sync pill appears only while saves wait.
+- **Save and exit** makes an autosave first, or a quick save in games without autosave, and waits until it reaches the server. When saves cannot get there it asks before leaving: they stay on the device and go up the next time the game opens there. **Main menu** saves first too.
+- On iPhone and iPad a PDF walkthrough opens in its own tab, because Safari shows only its first page inside the player.
+- Play time stops counting after 15 minutes without a tap, click or key, two open windows of a game no longer count twice, and History groups your play by your own days rather than the server's.
 - Walkthroughs open in a window beside the game that you can move, resize and see through, with a tab per file, or in a reading sheet on a phone held upright.
 - **Options** opens Ren'Py's own accessibility menu (text size, fonts, self-voicing) where the game offers it.
 - **Lighter background** under This browser in **Settings** shows a plain background instead of the game's art behind each screen. Until you choose, it follows the device's reduced motion and data saver settings.

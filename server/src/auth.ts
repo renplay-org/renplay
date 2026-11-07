@@ -313,6 +313,9 @@ export class Accounts {
       SELECT ?, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ?
       ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time),
         play_status = CASE WHEN user_games.play_status = '' THEN excluded.play_status ELSE user_games.play_status END, rating = MAX(user_games.rating, excluded.rating), not_now_at = MAX(user_games.not_now_at, excluded.not_now_at)`).run(to, from)
+    // Finished stays in step with finished_at: a game either account finished is finished.
+    this.db.raw.prepare("UPDATE user_games SET play_status = 'finished' WHERE user_id = ? AND finished_at IS NOT NULL AND finished_at != '' AND play_status != 'finished'").run(to)
+    this.db.raw.prepare("UPDATE user_games SET finished_at = ? WHERE user_id = ? AND play_status = 'finished' AND (finished_at IS NULL OR finished_at = '')").run(new Date().toISOString(), to)
     // The play history moves with the person, and their names, notes and pins of saves where the
     // other person has none for the same file.
     this.db.raw.prepare('UPDATE play_sessions SET user_id = ? WHERE user_id = ?').run(to, from)
@@ -320,11 +323,19 @@ export class Accounts {
   }
 
   /** Records played seconds as a session: one that ended in the last ten minutes goes on, else a new one starts. */
-  addPlayTime(game: string, seconds: number, now = Date.now()): void {
+  /** Adds reported play time to the person's session and returns the seconds counted. */
+  addPlayTime(game: string, seconds: number, now = Date.now()): number {
     const id = this.current().id
-    const last = this.db.raw.prepare('SELECT id FROM play_sessions WHERE user_id = ? AND game = ? AND ended_at >= ? ORDER BY ended_at DESC LIMIT 1').get(id, game, now - 10 * 60_000) as { id: number } | undefined
-    if (last) this.db.raw.prepare('UPDATE play_sessions SET ended_at = ?, seconds = seconds + ? WHERE id = ?').run(now, seconds, last.id)
-    else this.db.raw.prepare('INSERT INTO play_sessions (user_id, game, started_at, ended_at, seconds) VALUES (?, ?, ?, ?, ?)').run(id, game, now - seconds * 1000, now, seconds)
+    const last = this.db.raw.prepare('SELECT id, ended_at FROM play_sessions WHERE user_id = ? AND game = ? AND ended_at >= ? ORDER BY ended_at DESC LIMIT 1').get(id, game, now - 10 * 60_000) as { id: number; ended_at: number } | undefined
+    // A session grows by at most the time that passed since its last report (and a little slack), so
+    // two open windows or a repeated report never count more time than there was.
+    if (last) {
+      const counted = Math.max(0, Math.min(seconds, Math.ceil((now - last.ended_at) / 1000) + 5))
+      this.db.raw.prepare('UPDATE play_sessions SET ended_at = ?, seconds = seconds + ? WHERE id = ?').run(now, counted, last.id)
+      return counted
+    }
+    this.db.raw.prepare('INSERT INTO play_sessions (user_id, game, started_at, ended_at, seconds) VALUES (?, ?, ?, ?, ?)').run(id, game, now - seconds * 1000, now, seconds)
+    return seconds
   }
   private managed(id: number) {
     const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)

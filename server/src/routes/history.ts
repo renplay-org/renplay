@@ -11,9 +11,19 @@ interface SessionRow {
 }
 
 /** The local calendar day of a moment, as YYYY-MM-DD (the server's time zone, TZ). */
-function dayOf(ms: number): string {
-  const d = new Date(ms)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/** The day of a time, in the person's own time zone when the browser sends it (else the server's). */
+function dayFormat(tz: unknown): (ms: number) => string {
+  let format: Intl.DateTimeFormat | null = null
+  if (typeof tz === 'string' && tz.length <= 64) {
+    try {
+      format = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+    } catch {}
+  }
+  return (ms) => {
+    if (format) return format.format(ms)
+    const d = new Date(ms)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
 }
 
 /**
@@ -26,6 +36,7 @@ export function createHistoryRouter(db: Db, catalog: Catalog, accounts: Accounts
 
   router.get('/', (req, res) => {
     const user = accounts.current().id
+    const dayOf = dayFormat(req.query['tz'])
     const days = Math.max(1, Math.min(90, Number.parseInt(String(req.query['days'] ?? '14'), 10) || 14))
     const before = Number.parseInt(String(req.query['before'] ?? ''), 10)
     const visible = new Map<string, GameRow>()

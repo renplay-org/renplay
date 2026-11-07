@@ -4,7 +4,7 @@ import { Frame } from '../lantern/art'
 import { useRoom } from '../lantern/Room'
 import { Empty, Spinner, Button, errorText } from '../components/ui'
 import { api, type ArtFormat } from '../lib/api'
-import { duration } from '../lib/format'
+import { duration, timeZone } from '../lib/format'
 
 /** A length of time in seconds: "45m", "1h 20m". */
 const length = (seconds: number) => (seconds < 60 ? 'Under a minute' : duration(seconds))
@@ -61,7 +61,7 @@ export default function History() {
   const pages = useInfiniteQuery({
     queryKey: ['history'],
     initialPageParam: null as number | null,
-    queryFn: ({ pageParam }) => api<HistoryPage>(`/api/history?days=14${pageParam ? `&before=${pageParam}` : ''}`),
+    queryFn: ({ pageParam }) => api<HistoryPage>(`/api/history?days=14&tz=${encodeURIComponent(timeZone())}${pageParam ? `&before=${pageParam}` : ''}`),
     getNextPageParam: (last) => last.next,
   })
   if (pages.isPending) return <Spinner />
@@ -71,7 +71,7 @@ export default function History() {
   if (!first.totals.sessions)
     return (
       <Empty title="Nothing played yet" action={<Link to="/" className="btn">Library</Link>}>
-        Your play history fills in as you play. It counts the time a game is open and in front of you.
+        Your play history fills in as you play. It counts the time a game is open and in front of you, and stops after 15 minutes without a tap, click or key.
       </Empty>
     )
   return (

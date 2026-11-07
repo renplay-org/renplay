@@ -136,6 +136,7 @@ export function Confirm({
   title,
   children,
   confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   danger,
   busy,
 }: {
@@ -145,6 +146,7 @@ export function Confirm({
   title: string
   children?: ReactNode
   confirmLabel?: string
+  cancelLabel?: string
   danger?: boolean
   busy?: boolean
 }) {
@@ -156,7 +158,7 @@ export function Confirm({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {cancelLabel}
           </Button>
           <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy}>
             {confirmLabel}

@@ -18,7 +18,7 @@ import SaveGallery from '../components/SaveGallery'
 import { BetaBadge, Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
 import { api, del, post, slotName, type ArtKind, type Game } from '../lib/api'
 import ArtPicker from '../components/ArtPicker'
-import { ago, bytes, capitalize, duration, pct } from '../lib/format'
+import { ago, bytes, capitalize, duration, pct, timeZone } from '../lib/format'
 import { recipeLinks } from '../lib/links'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
@@ -296,7 +296,7 @@ interface GameHistory {
 function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
   const qc = useQueryClient()
   const toast = useToast()
-  const history = useQuery({ queryKey: ['history', game.id], queryFn: () => api<GameHistory>(`/api/history?game=${encodeURIComponent(game.id)}&days=30`) })
+  const history = useQuery({ queryKey: ['history', game.id], queryFn: () => api<GameHistory>(`/api/history?game=${encodeURIComponent(game.id)}&days=30&tz=${encodeURIComponent(timeZone())}`) })
   const sessions = (history.data?.days ?? []).flatMap((d) => d.sessions).slice(0, 4)
   const save = async (path: string, json: unknown) => {
     try {
@@ -368,7 +368,7 @@ function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
               ))}
             </div>
           ) : (
-            <p className="small muted">{history.isPending ? 'Loading' : 'Nothing played in the last 30 days.'}</p>
+            <p className="small muted">{history.isPending ? 'Loading' : 'Nothing played yet.'}</p>
           )}
         </section>
       </div>

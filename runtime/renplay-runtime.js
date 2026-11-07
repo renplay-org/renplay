@@ -1292,13 +1292,20 @@
     return exec(py, 30000)
   }
 
+  /** Saves where the person is: an autosave, or in a game without autosave a quick save. */
   function autosave() {
     return exec(
       'result = False\n' +
-        'if not renpy.context()._main_menu and config.has_autosave:\n' +
-        '    renpy.force_autosave(take_screenshot=True, block=True)\n' +
+        'if not renpy.context()._main_menu:\n' +
+        '    if config.has_autosave:\n' +
+        '        renpy.force_autosave(take_screenshot=True, block=True)\n' +
+        '    else:\n' +
+        '        import renpy.loadsave as _rl\n' +
+        '        renpy.take_screenshot()\n' +
+        '        _rl.cycle_saves("quick-", config.quicksave_slots)\n' +
+        '        renpy.save("quick-1", extra_info=save_name)\n' +
         '    result = True\n',
-      6000,
+      8000,
     ).catch(function () {
       return false
     })
@@ -1318,11 +1325,10 @@
         break
       case 'renplay:save-and-exit':
         autosave()
-          .then(function () {
-            return flush(8000)
-          })
-          .then(function (ok) {
-            post('flushed', { ok: ok, id: d.id })
+          .then(function (saved) {
+            return flush(10000).then(function (ok) {
+              post('flushed', { ok: ok, saved: !!saved, id: d.id })
+            })
           })
         break
       case 'renplay:save-now':
