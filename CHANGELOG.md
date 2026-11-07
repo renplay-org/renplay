@@ -27,6 +27,9 @@ release notes say what).
 - **Not now** on the library home takes a game out of Up next until you play it again, with Undo.
 - **Play history** shows your time day by day and per game, and a game's page shows its last sessions.
 - The library sorts by Rating and Time played.
+- The player has no toolbar any more. The game fills the screen with a quiet **Renplay** pill at the top left, which opens one menu with Saves, Guide and Options, **Save now** and **Save and exit**. **Esc** or a swipe from the left edge opens it too, and the game dims behind it. A sync pill appears only while saves wait.
+- Walkthroughs open in a window beside the game that you can move, resize and see through, with a tab per file, or in a reading sheet on a phone held upright.
+- **Options** opens Ren'Py's own accessibility menu (text size, fonts, self-voicing) where the game offers it.
 - A game can keep several walkthroughs, as PDFs, pictures or text files, each with a title and a place in the list. The 3.x walkthrough becomes the first one.
 - A game's page has its sections in one row: Play, Saves, Walkthroughs, Mods and options, Details and Manage.
 

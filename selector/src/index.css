@@ -2752,3 +2752,262 @@ input[type="range"] {
 .walk-row > .grow {
   flex: 1 1 220px;
 }
+
+/* The player (DESIGN 2.4): two quiet pills over the game, one drawer, the walkthrough beside it. */
+.rp-pill {
+  position: absolute;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px 0 8px;
+  border-radius: 999px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 650;
+  opacity: 0.5;
+  transition: opacity var(--t-focus);
+}
+.rp-pill:hover,
+.rp-pill:focus-visible {
+  opacity: 1;
+}
+.rp-pill::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+}
+.rp-pill .mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #d62a68, #7556f0);
+}
+.rp-pill kbd {
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--fg-3);
+}
+.rp-sync {
+  position: absolute;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--glass-deep);
+  font-size: 12.5px;
+  color: var(--fg-2);
+}
+.rp-sync.amber {
+  color: var(--amber);
+}
+.rp-sync svg {
+  width: 15px;
+  height: 15px;
+}
+.rp-stage {
+  transition:
+    transform var(--t-pane) var(--out),
+    filter var(--t-pane);
+}
+/* The game dims and shrinks a little while the drawer is open. */
+.rp-stage.dim {
+  transform: scale(0.985);
+  filter: brightness(0.55);
+}
+.pd-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 44;
+}
+.pdrawer {
+  position: absolute;
+  z-index: 45;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(380px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: 16px;
+  background: var(--glass-deep);
+  -webkit-backdrop-filter: blur(30px) saturate(140%);
+  backdrop-filter: blur(30px) saturate(140%);
+  border-radius: 0 var(--r-sheet) var(--r-sheet) 0;
+  animation: pd-in var(--t-pane) var(--out) both;
+}
+.pdrawer.bottom {
+  top: auto;
+  right: 0;
+  width: auto;
+  max-height: 82dvh;
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  animation-name: pd-up;
+}
+@keyframes pd-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+@keyframes pd-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.pd-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+.pd-tabs {
+  align-self: flex-start;
+}
+.pd-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.pd-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.pd-links {
+  display: flex;
+  gap: var(--s4);
+}
+.pd-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: var(--hit);
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--plate);
+  text-align: left;
+  color: var(--fg);
+}
+.pd-row:hover {
+  background: var(--plate-2);
+}
+.pd-row svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--fg-3);
+}
+.gw {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--glass-deep);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
+}
+.gw-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 6px 6px 6px 14px;
+  cursor: grab;
+  touch-action: none;
+}
+.gw-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 0 8px 6px;
+  scrollbar-width: none;
+}
+.gw-tabs button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-3);
+  position: relative;
+}
+.gw-tabs button::before {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+.gw-tabs button.on {
+  background: var(--plate-2);
+  color: var(--fg);
+}
+.gw-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+.gw-img {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: #111;
+}
+.gw-img img {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.gw-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--hit);
+  height: var(--hit);
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 58%, rgba(255, 255, 255, 0.35) 60%, transparent 62%, transparent 70%, rgba(255, 255, 255, 0.35) 72%, transparent 74%);
+}
+.gw-sheet {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 58dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-deep);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+}
+.gw-sheet .gw-bar {
+  cursor: default;
+  padding: 10px 10px 8px 14px;
+}
+
+/* The drawer's saves: two scenes a row, each with its name and when. */
+.pd-saves {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+}
+
+.pd-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
+}
