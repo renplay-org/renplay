@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ArtStore, catalogPictures, keeps, planFormat, type CatalogImage, type Picture } from '../art.js'
 import type { Config } from '../config.js'
 import { Db } from '../db.js'
+import { isPrivateAddress, resolver } from '../util/net.js'
 
 const png = (width: number, height: number, background = '#3a6ea5', alpha = false) =>
   sharp({ create: { width, height, channels: alpha ? 4 : 3, background: alpha ? { r: 200, g: 80, b: 60, alpha: 0.6 } : background } }).png().toBuffer()
@@ -80,6 +81,8 @@ describe('the art cache', () => {
     level = 'shown'
     fetched = []
     files = {}
+    // Every test host is on the public internet.
+    vi.spyOn(resolver, 'lookup').mockResolvedValue(['93.184.216.34'])
     vi.stubGlobal('fetch', async (url: URL | string) => {
       const u = String(url)
       fetched.push(u)
@@ -89,6 +92,7 @@ describe('the art cache', () => {
     })
   })
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
     db.close()
     rmSync(root, { recursive: true, force: true })
@@ -175,6 +179,32 @@ describe('the art cache', () => {
     expect(sent).toBeLessThan(20 << 20)
   })
 
+  it('downloads only from the public internet, redirects included, unless from the catalog’s own host', async () => {
+    const lan = await catalog([{ kind: 'grid', url: 'http://192.168.1.10/grid.png', source: 'steam', data: await png(600, 900, '#010203') }])
+    await expect(store().ensure(planFormat('grid', { grid: lan[0]! })!, false)).rejects.toThrow(/not on the public internet/)
+    expect(fetched).toEqual([])
+    vi.spyOn(resolver, 'lookup').mockImplementation(async (host) => (host === 'inside.example' ? ['10.0.0.5'] : ['93.184.216.34']))
+    const named = await catalog([{ kind: 'grid', url: 'https://inside.example/grid.png', source: 'steam', data: await png(600, 900, '#020304') }])
+    await expect(store().ensure(planFormat('grid', { grid: named[0]! })!, false)).rejects.toThrow(/inside.example is not on the public internet/)
+    // A public address that redirects inside.
+    const moved = await catalog([{ kind: 'grid', url: 'https://art.example/moved.png', source: 'steam', data: await png(600, 900, '#030405') }])
+    vi.stubGlobal('fetch', async (url: URL | string) => {
+      fetched.push(String(url))
+      return new Response(null, { status: 302, headers: { location: 'http://127.0.0.1:9/grid.png' } })
+    })
+    await expect(store().ensure(planFormat('grid', { grid: moved[0]! })!, false)).rejects.toThrow(/127.0.0.1 is not on the public internet/)
+    expect(fetched).toEqual(['https://art.example/moved.png'])
+    expect(['::1', '::ffff:10.1.2.3', 'fd00::1', '169.254.169.254', '100.64.0.1'].every(isPrivateAddress)).toBe(true)
+    expect(['93.184.216.34', '2606:2800:220:1::1'].some(isPrivateAddress)).toBe(false)
+    // The catalog's own host may be on the local network.
+    const files2 = { 'http://catalog.lan/art/grid.png': await png(600, 900, '#040506') }
+    vi.stubGlobal('fetch', async (url: URL | string) => new Response(files2[String(url) as keyof typeof files2] ?? null, { status: files2[String(url) as keyof typeof files2] ? 200 : 404 }))
+    vi.spyOn(resolver, 'lookup').mockResolvedValue(['192.168.1.20'])
+    const local = await catalog([{ kind: 'grid', url: 'http://catalog.lan/art/grid.png', source: 'steam', data: files2['http://catalog.lan/art/grid.png'] }])
+    const own = new ArtStore({ dataDir: join(root, 'data'), imageConcurrency: 2, catalogUrls: ['http://catalog.lan/index.json'] } as Config, db, { get level() { return level }, viewerLevel: () => level } as never)
+    expect(await own.ensure(planFormat('grid', { grid: local[0]! })!, false)).toBeTruthy()
+  })
+
   it('refuses a picture that changed since the catalog checked it', async () => {
     const pictures = await catalog([{ kind: 'grid', url: 'https://art.example/grid.png', source: 'steam', data: await png(600, 900) }])
     files['https://art.example/grid.png'] = await png(600, 900, '#ff0000')
@@ -249,6 +279,33 @@ describe('the art cache', () => {
     await expect(art.upload('g', 'logo', await png(400, 200), null, 7)).rejects.toThrow(/transparent/)
     await expect(art.upload('g', 'grid', Buffer.from('not a picture'), null, 7)).rejects.toThrow(/WebP, PNG or JPEG/)
     expect(fetched).toEqual([])
+  })
+
+  it('keeps ten uploads per person, game and format, deletes one with its choice, and forgets games and people', async () => {
+    const art = store()
+    const ids: string[] = []
+    for (let i = 0; i < 10; i++) ids.push((await art.upload('g', 'grid', await png(600, 900, `#0${i}1122`), null, 7)).id)
+    await expect(art.upload('g', 'grid', await png(600, 900, '#ffeedd'), null, 7)).rejects.toThrow(/keep 10 pictures/)
+    // The same picture again, another format, or another person: not counted against these ten.
+    expect((await art.upload('g', 'grid', await png(600, 900, '#001122'), null, 7)).id).toBe(ids[0])
+    await art.upload('g', 'wide', await png(920, 430, '#ffeedd'), null, 7)
+    await art.upload('g', 'grid', await png(600, 900, '#ffeedd'), null, 8)
+    art.choose('g', 'grid', ids[3]!, 7)
+    expect(art.removeUpload('g', 'grid', ids[3]!, 8)).toBe(false)
+    expect(art.removeUpload('g', 'grid', ids[3]!, 7)).toBe(true)
+    expect(db.raw.prepare("SELECT COUNT(*) n FROM art_choices WHERE scope = 7").get()).toEqual({ n: 0 })
+    expect(art.uploads('g', 7).filter((u) => u.kind === 'grid')).toHaveLength(9)
+    // A picture uploaded for everyone may be anyone's choice: deleting it clears them all.
+    const shared = (await art.upload('g', 'icon', await png(512, 512, '#123123'), null, 0)).id
+    art.choose('g', 'icon', shared, 0)
+    art.choose('g', 'icon', shared, 8)
+    art.removeUpload('g', 'icon', shared, 0)
+    expect(db.raw.prepare("SELECT COUNT(*) n FROM art_choices WHERE candidate = ?").get(shared)).toEqual({ n: 0 })
+    art.forgetPerson(8)
+    expect(art.uploads('g', 8)).toHaveLength(0)
+    expect(art.uploads('g', 7).length).toBeGreaterThan(0)
+    art.forgetGame('g')
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM art_uploads').get()).toEqual({ n: 0 })
   })
 
   it('stands a phone photo upright and scales a camera picture down to what the making allows', async () => {

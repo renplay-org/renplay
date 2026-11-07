@@ -7,6 +7,21 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- The art picker lists your uploads with **Delete**. Each person keeps up to ten pictures of each kind per game.
+
+### Changed
+
+- **Choose artwork** opens only for the person who started the install.
+- Sync codes write save times in your own time zone, so desktop Ren’Py sorts the saves correctly.
+- Art and recipe patches are downloaded only from the public internet, or from the catalog's own server, so a catalog cannot make Renplay reach into your local network.
+
+### Fixed
+
+- After an upload's answer was lost on a bad connection, the next save could show that another device had saved too.
+- Removing a person or forgetting a game left their art choices and uploads behind.
+
 ## [4.0.1] - 2026-11-07
 
 The server log is easier to read, and `RENPLAY_LOG_LEVEL` chooses how much it says.
