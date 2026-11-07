@@ -23,6 +23,9 @@ async function disk(path: string) {
   }
 }
 
+/** Variables whose effect Settings shows, so it can say whether the server sets them. */
+const PROVENANCE = ['RENPLAY_AUTH', 'GAMES_DIR', 'ARCHIVES_DIR', 'DATA_DIR', 'RENPLAY_BACKUP_DIR', 'RENPLAY_CATALOG_URLS', 'RENPLAY_RECIPES_DIR', 'RENPLAY_LOG_LEVEL', 'RENPLAY_SYNC_SERVER', 'RENPLAY_ENGINES_URL']
+
 export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode, catalog: Catalog, backups: SaveBackups): Router {
   const router = Router({ caseSensitive: true, strict: true })
 
@@ -86,7 +89,10 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
     const { orphans } = await builds.verify()
     res.json({
       version,
-      sync: { on: syncCodesOn(db), server: cfg.syncServer },
+      sync: { on: syncCodesOn(db), server: cfg.syncServer, chosen: db.getSetting<unknown>(SYNC_SETTING, null) !== null },
+      // Where each value comes from: a variable on the server, or the default. No values of secrets.
+      setBy: Object.fromEntries(PROVENANCE.map((name) => [name, process.env[name]?.trim() ? 'server' : 'default'])),
+      keepDownloadsChosen: db.getSetting<unknown>('keep_downloads', null) !== null,
       engines: {
         installed: installed.map((e) => ({ ...e, usedBy: used.get(e.version) ?? [] })),
         available: available.map((e) => ({ version: e.version, renpy: e.renpy, bytes: Object.values(e.files).reduce((n, f) => n + f.size, 0) })),

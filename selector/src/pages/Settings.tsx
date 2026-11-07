@@ -8,7 +8,7 @@ import { Button, Confirm, Progress, Spinner, errorText, useToast } from '../comp
 import { LevelSeg, DeviceAdultRow } from '../components/AdultLadder'
 import { SourceLabel, LanternSwitch } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
-import { api, post, put, type CatalogSource } from '../lib/api'
+import { api, post, put, type CatalogSource, type SystemInfo } from '../lib/api'
 import { setLighterBackground, useLighterBackground } from '../lib/backdrop'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
@@ -150,7 +150,11 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
           <div className={section === 'general' ? 'stack' : 'hidden'} style={{ gap: 18 }}>
             {!auth && (
               <section className="panel">
-                <Setting title="Sign-in is off" hint={`Everyone who opens this address plays as ${userName}. That is fine on a private network. Turn it on when more people or the internet can reach it.`}>
+                <Setting
+                  title="Sign-in is off"
+                  hint={`Everyone who opens this address plays as ${userName}. That is fine on a private network. Turn it on when more people or the internet can reach it.`}
+                  source={sys?.setBy?.['RENPLAY_AUTH'] === 'server' ? <SourceLabel kind="server" label="RENPLAY_AUTH" /> : <SourceLabel kind="def" />}
+                >
                   <Button size="sm" onClick={() => window.open('https://renplay.org/docs/accounts/', '_blank', 'noreferrer')}>
                     How to turn it on
                   </Button>
@@ -218,16 +222,27 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                     {sys.library.installed} of {sys.library.games} games installed, {bytes(sys.library.bytes)} in total.
                   </p>
                   <div className="stack xs muted" style={{ gap: 4, overflowWrap: 'anywhere' }}>
-                    <div>Games <code>{sys.paths.games}</code></div>
-                    <div>Downloads <code>{sys.paths.archives}</code></div>
-                    <div>Data <code>{sys.paths.data}</code></div>
+                    {(
+                      [
+                        ['Games', sys.paths.games, 'GAMES_DIR'],
+                        ['Downloads', sys.paths.archives, 'ARCHIVES_DIR'],
+                        ['Data', sys.paths.data, 'DATA_DIR'],
+                      ] as const
+                    ).map(([name, path, variable]) => (
+                      <div key={name} className="row wrap" style={{ gap: 8 }}>
+                        <span>
+                          {name} <code>{path}</code>
+                        </span>
+                        {setBy(sys, variable)}
+                      </div>
+                    ))}
                   </div>
                 </div>
                 <Setting
                   title="Keep downloads"
                   hint="Keep downloads so games can be reinstalled. Off deletes only uploads through Renplay after a successful install. Files copied in are never deleted automatically."
                   inline
-                  source={sys.keepDownloadsLocked ? <SourceLabel kind="server" /> : <SourceLabel kind="here" />}
+                  source={sys.keepDownloadsLocked ? <SourceLabel kind="server" label="RENPLAY_KEEP_DOWNLOADS" /> : <SourceLabel kind={sys.keepDownloadsChosen ? 'here' : 'def'} />}
                 >
                   {!sys.keepDownloadsLocked ? (
                     <LanternSwitch checked={sys.keepDownloads} label="Keep downloads" onChange={(on) => void run(() => put('/api/system/downloads', { keepDownloads: on }), 'Download preference saved')} />
@@ -288,7 +303,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                     title="Sync codes"
                     hint="Let people move a game’s saves to and from desktop or Android Ren’Py with a code, as Ren’Py’s own Upload Sync and Download Sync do. Saves leave this server only when someone asks for a code, encrypted, to Ren’Py’s sync server, which keeps them for an hour."
                     inline
-                    source={<SourceLabel kind="here" />}
+                    source={<SourceLabel kind={sys.sync.chosen ? 'here' : 'def'} />}
                   >
                     <LanternSwitch checked={sys.sync.on} label="Sync codes" onChange={(on) => void run(() => put('/api/system/sync', { on }), on ? 'Sync codes are on' : 'Sync codes are off')} />
                   </Setting>
@@ -302,7 +317,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
               <p className="small muted">
                 Titles, art and install settings come from {catalog?.status.count ?? 0} recipes in the catalog{catalog?.status.fetchedAt ? `, updated ${ago(catalog.status.fetchedAt, true)}` : ''}.
               </p>
-              {catalog?.status.sources && <CatalogSources sources={catalog.status.sources} />}
+              {catalog?.status.sources && <CatalogSources sources={catalog.status.sources} label={(s) => setBy(sys, s.kind === 'folder' ? 'RENPLAY_RECIPES_DIR' : 'RENPLAY_CATALOG_URLS')} />}
               <div className="actions" style={{ marginTop: 12 }}>
                 <Button size="sm" icon={<RefreshCw />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>
                   Refresh catalog
@@ -372,12 +387,18 @@ interface BackupInfo {
   error: string | null
 }
 
+/** Where a server setting comes from: its variable on the server, or the default. */
+function setBy(sys: SystemInfo | undefined, variable: string) {
+  return sys?.setBy?.[variable] === 'server' ? <SourceLabel kind="server" label={variable} /> : <SourceLabel kind="def" />
+}
+
 /** Save backups: a daily zip of everyone's saves, the last few kept, and Back up now. */
 function SaveBackups() {
   const qc = useQueryClient()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const { data } = useQuery({ queryKey: ['backups'], queryFn: () => api<BackupInfo>('/api/system/backups') })
+  const { data: sys } = useSystem()
   if (!data) return null
   const now = async () => {
     setBusy(true)
@@ -394,6 +415,7 @@ function SaveBackups() {
   return (
     <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' }} className="stack">
       <h3 style={{ fontWeight: 650 }}>Daily backups</h3>
+      {setBy(sys, 'RENPLAY_BACKUP_DIR')}
       {data.dir ? (
         <>
           <p className="small muted">
@@ -430,7 +452,7 @@ function SaveBackups() {
 }
 
 /** Where recipes come from: each catalog, then Your recipes, with what each gives this person. */
-function CatalogSources({ sources }: { sources: CatalogSource[] }) {
+function CatalogSources({ sources, label }: { sources: CatalogSource[]; label: (s: CatalogSource) => ReactNode }) {
   const name = (s: CatalogSource) => {
     if (s.kind === 'folder') return 'Your recipes'
     try {
@@ -450,6 +472,7 @@ function CatalogSources({ sources }: { sources: CatalogSource[] }) {
               {s.recipes} {s.recipes === 1 ? 'recipe' : 'recipes'}, {s.pictures} {s.pictures === 1 ? 'picture' : 'pictures'}
             </span>
           </div>
+          {label(s)}
           {s.kind === 'folder' ? (
             <p className="xs muted">
               Recipe files in <code>{s.location}</code>, in the catalog’s format. A recipe there takes the place of the catalog’s recipe with the same id, so you can fix a game or add one without waiting for the catalog.

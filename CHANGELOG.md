@@ -15,6 +15,7 @@ release notes say what).
 
 ### Changed
 
+- **Settings** says where each value comes from: the default, a choice made here, or a variable set on the server (the folders, sign-in, backups, the catalog and Your recipes, Keep downloads, Sync codes).
 - **Choose artwork** opens only for the person who started the install.
 - Sync codes write save times in your own time zone, so desktop Ren’Py sorts the saves correctly.
 - Art and recipe patches are downloaded only from the public internet, or from the catalog's own server, so a catalog cannot make Renplay reach into your local network.

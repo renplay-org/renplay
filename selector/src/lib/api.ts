@@ -238,7 +238,11 @@ export interface Recipe {
 export interface SystemInfo {
   version: string
   /** Ren'Py Sync codes: off until an admin turns them on. */
-  sync?: { on: boolean; server: string }
+  sync?: { on: boolean; server: string; chosen?: boolean }
+  /** For each variable Settings shows: set on the server, or the default. */
+  setBy?: Record<string, 'server' | 'default'>
+  /** An admin chose whether downloads are kept (else the default). */
+  keepDownloadsChosen?: boolean
   engines: {
     installed: Array<{ version: string; bytes: number; usedBy: string[] }>
     available: Array<{ version: string; renpy: string; bytes: number }>

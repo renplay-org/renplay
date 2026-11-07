@@ -69,6 +69,14 @@ describe('save backups', () => {
     await request(app.app).get('/api/system/backups/saves-1999-01-01-0000.zip').expect(404)
   })
 
+  it('says where each server setting comes from, and never a secret', async () => {
+    const sys = (await request(app.app).get('/api/system').expect(200)).body
+    expect(sys.setBy).toMatchObject({ RENPLAY_AUTH: 'server', RENPLAY_BACKUP_DIR: 'server', RENPLAY_LOG_LEVEL: 'default' })
+    expect(Object.keys(sys.setBy).some((k) => /SECRET|PASSWORD|TOKEN/.test(k))).toBe(false)
+    expect(sys.keepDownloadsChosen).toBe(false)
+    expect(sys.sync.chosen).toBe(false)
+  })
+
   it('reports a backup it cannot write, without bringing the server down', async () => {
     // The part file for the next seconds cannot be created (a folder is in its place), as on a full disk.
     const pad = (n: number) => String(n).padStart(2, '0')
