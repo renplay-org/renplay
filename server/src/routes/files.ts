@@ -14,6 +14,9 @@ const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|c
 
 type BaseIndex = Map<string, { size: number; where: 'zip' | 'pack' }>
 
+/** Pictures and videos of a game, which the file browser does not send below Shown. */
+const PICTURE_EXT = /\.(?:jpe?g|png|webp|gif|avif|bmp|tga|svg|mp4|webm|ogv|mkv|avi|mov|m4v)$/i
+
 export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jobs: JobManager, content: ContentMode): Router {
   const router = Router({ caseSensitive: true, strict: true })
   const cache = new Map<string, { key: string; files: BaseIndex }>()
@@ -75,6 +78,8 @@ export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jo
   router.get('/:id/files/raw', async (req, res) => {
     const g = game(req)
     const path = Overlays.editablePath(req.query['path'])
+    // Blurred: the game plays, but its pictures and videos are not sent on their own.
+    if (content.blurs(g) && PICTURE_EXT.test(path)) throw new HttpError(404, 'File not found')
     const data = (await overlays.read(g.id, path)) ?? (await readBaseFile(builds, g.id, g.build, path))
     if (!data) throw new HttpError(404, 'File not found')
     if (req.query['download'] === '1') res.attachment(path.split('/').pop()!)
@@ -108,9 +113,14 @@ export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jo
    * Adds files to the overlay. Plain files go into `dir`; zip files are
    * unpacked there (a top-level "game/" folder in the zip is honoured).
    */
-  router.post('/:id/files/upload', upload.array('files'), async (req, res) => {
+  router.post('/:id/files/upload', async (req, res) => {
+    // The game is checked before the upload is read, with the person's level. multer then runs
+    // inside the handler: as route middleware it would lose the request's context (who is asking).
     const g = game(req)
-    const dir = Overlays.editablePath(req.body?.dir || 'game')
+    await new Promise<void>((resolve, reject) => upload.array('files')(req, res, (error) => (error ? reject(error) : resolve())))
+    // The folder the files go into: game itself or one inside it. Each file's path is checked again below.
+    const dir = cleanRelPath(req.body?.dir || 'game')
+    if (dir !== 'game') Overlays.editablePath(dir)
     const relPaths: string[] = (() => {
       try {
         return JSON.parse(req.body?.paths ?? '[]')

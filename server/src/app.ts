@@ -1,3 +1,5 @@
+import { ArtStore } from './art.js'
+import { SaveBackups } from './backups.js'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, stat } from 'node:fs/promises'
@@ -19,10 +21,12 @@ import { applyMods } from './pipeline/applymods.js'
 import { runImport } from './pipeline/import.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
+import { createHistoryRouter } from './routes/history.js'
 import { createContentRouter } from './routes/content.js'
 import { createLibraryRouter } from './routes/library.js'
 import { createPlayRouter } from './routes/play.js'
 import { createSavesExportAll, createSavesRouter } from './routes/saves.js'
+import { createSavesImportRouter } from './routes/saves-import.js'
 import { createSystemRouter } from './routes/system.js'
 import { SaveStore } from './saves/store.js'
 import { sha256File } from './util/fsx.js'
@@ -57,16 +61,21 @@ export interface App {
   accounts: Accounts
   catalog: Catalog
   purger: Purger
+  backups: SaveBackups
   close(): void
 }
 
+/** A build's presplash, at its top level: /g/<game>/<build>/web-presplash.jpg. */
+const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
+
 export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
   const db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir })
-  for (const d of [cfg.dataDir, cfg.coversDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
+  for (const d of [cfg.dataDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
   for (const d of [cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
 
   const version = packageVersion()
-  const accounts = new Accounts(db, cfg)
+  const content = new ContentMode(cfg, db)
+  const accounts = new Accounts(db, cfg, content)
   try { await accounts.init() } catch (error) { db.close(); throw error }
   const purger = new Purger(cfg.purgeDir)
   const saves = accounts.store(1)
@@ -74,8 +83,11 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const builds = new Builds(cfg, db, purger)
   const engines = new EngineStore(cfg, db, purger)
   const overlays = new Overlays(cfg)
-  const content = new ContentMode(cfg, db)
   const catalog = new Catalog(cfg, db, content)
+  const art = new ArtStore(cfg, db, content)
+  catalog.art = art
+  // The 3.2 columns follow the levels, so a downgrade never shows more (the variable can change between starts).
+  content.refreshLegacyMirrors()
   await catalog.init()
 
   const deps = { cfg, db, builds, engines, overlays, catalog, get saves() { return accounts.store() }, accounts, jobs, version }
@@ -120,11 +132,17 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const checkStatic = (path: string) => {
     const game = path.match(/^\/g\/([^/]+)\//)?.[1]
     if (game && (!db.getGame(game) || content.hides(db.getGame(game)))) throw new HttpError(404, 'Game not found')
-    const cover = path.match(/^\/api\/covers\/([^/]+)$/)?.[1]
-    if (cover && !catalog.canReadCover(cover)) throw new HttpError(404, 'Cover not found')
+    // The presplash is a picture of the game, not part of playing it: withheld below Shown.
+    if (game && PRESPLASH.test(path) && content.blurs(db.getGame(game))) throw new HttpError(404, 'Not found')
+    const picture = path.match(/^\/api\/art\/([^/]+)$/)?.[1]
+    if (picture && !art.canRead(picture)) throw new HttpError(404, 'Not found')
     const walkthrough = path.match(/^\/api\/walkthroughs\/([^/]+)$/)?.[1]
-    if (walkthrough && !db.allGames().some((g) => g.walkthrough === walkthrough && !content.hides(g))) throw new HttpError(404, 'Walkthrough not found')
-    return !!(game || cover || walkthrough)
+    if (walkthrough) {
+      const owner = db.raw.prepare('SELECT game FROM walkthroughs WHERE file = ?').get(walkthrough) as { game: string } | undefined
+      const g = owner ? db.getGame(owner.game) : null
+      if (!g || content.hides(g)) throw new HttpError(404, 'Walkthrough not found')
+    }
+    return !!(game || picture || walkthrough)
   }
   app.get('/api/auth/check', (req, res) => {
     let path: string
@@ -133,7 +151,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
       path = req.get('x-original-uri') ?? ''
       if (!path.startsWith('/') || /[%?#]/.test(path) || path.includes('\\') || path.includes('//') || /(?:^|\/)\.{1,2}(?:\/|$)/.test(path)) throw new Error('Invalid path')
     } catch { throw new HttpError(403, 'Invalid static path') }
-    if (!/^\/g\/[a-z0-9][a-z0-9._-]*\/[a-z0-9]+(?:\.m[a-z0-9]+)?\/.+$/.test(path) && !/^\/api\/(?:covers|walkthroughs)\/[^/]+$/.test(path)) throw new HttpError(403, 'Not a static game file')
+    if (!/^\/g\/[a-z0-9][a-z0-9._-]*\/[a-z0-9]+(?:\.m[a-z0-9]+)?\/.+$/.test(path) && !/^\/api\/(?:art|walkthroughs)\/[^/]+$/.test(path)) throw new HttpError(403, 'Not a static game file')
     if (viewer()?.user.role !== 'admin' && !playerRoute('GET', path)) throw new HttpError(403, 'Only an admin can do this')
     // auth_request accepts only 2xx, 401 or 403; a hidden file must not become a 500.
     try { if (!checkStatic(path)) throw new HttpError(403, 'Not a recognized static resource') } catch (error) {
@@ -162,6 +180,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     const [game, base, mod, asset] = [req.params[0], req.params[1], req.params[2], req.params[3]] as string[]
     if (asset.includes('..')) return next()
     if (content.hides(db.getGame(game))) return next(new HttpError(404, 'Game not found'))
+    if (PRESPLASH.test(`/${asset}`) && content.blurs(db.getGame(game))) return next(new HttpError(404, 'Not found'))
     const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
     const tryNext = (i: number): void => {
       if (i >= candidates.length) return next()
@@ -169,15 +188,27 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     }
     tryNext(0)
   })
-  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content))
-  app.use('/api/content', createContentRouter(content, catalog))
+  const backups = new SaveBackups(cfg, db)
+  if (opts.startJobs !== false) backups.start()
+  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content, catalog, backups))
+  app.use('/api/content', createContentRouter(cfg, content, catalog))
   app.get('/api/saves-export', (req, res, next) => { void createSavesExportAll(accounts.store(), db, content)(req, res).catch(next) })
-  app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content)(req, res, next))
+  app.use('/api/saves-import', createSavesImportRouter(() => accounts.store(), db, content, catalog))
+  app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content, cfg.syncServer)(req, res, next))
   app.use('/api/games', createFilesRouter(db, builds, overlays, jobs, content))
   app.use('/api/games', createGamesRouter(deps))
+  app.use('/api/history', createHistoryRouter(db, catalog, accounts))
   app.use('/api', createLibraryRouter(deps))
-  app.use('/api/covers', express.static(cfg.coversDir, { cacheControl: false, fallthrough: false }))
-  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false }))
+  // Made pictures are named by their content, so they never change: browsers keep them.
+  app.get('/api/art/:file', (req, res, next) => {
+    if (!art.canRead(req.params.file)) return next(new HttpError(404, 'Not found'))
+    res.sendFile(art.file(req.params.file), { headers: { 'Cache-Control': 'private, max-age=31536000, immutable', 'Content-Type': 'image/webp', 'X-Content-Type-Options': 'nosniff' } }, (err) => err && next(new HttpError(404, 'Not found')))
+  })
+  // Text walkthroughs are served as plain text, never sniffed as anything else.
+  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false, setHeaders: (res, path) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    if (path.endsWith('.txt')) res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  } }))
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found')))
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
@@ -206,7 +237,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   if (check.orphans.length) console.log(`folders in ${cfg.gamesDir} that belong to no game: ${check.orphans.join(', ')}`)
   if (opts.startJobs !== false) jobs.start()
 
-  return { app, db, jobs, builds, engines, saves, accounts, catalog, purger, close: () => (catalog.stop(), db.close()) }
+  return { app, db, jobs, builds, engines, saves, accounts, catalog, purger, backups, close: () => (catalog.stop(), backups.stop(), db.close()) }
 }
 
 /** Development server: serve *.gz engine files with their encoding, like nginx does. */

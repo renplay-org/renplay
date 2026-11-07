@@ -45,6 +45,74 @@ describe('SaveStore', () => {
     expect((await store.history('G', 'persistent')).length).toBe(3)
   })
 
+  it('keeps every version of a pinned save', async () => {
+    store.pinned = (dir, rel) => dir === 'Game-1' && rel === 'pinned.save'
+    for (let i = 0; i < 6; i++) {
+      await store.write('Game-1', 'pinned.save', Buffer.from(`v${i}`))
+      await store.write('Game-1', 'other.save', Buffer.from(`v${i}`))
+    }
+    expect(await store.history('Game-1', 'pinned.save')).toHaveLength(5)
+    expect(await store.history('Game-1', 'other.save')).toHaveLength(3)
+  })
+
+  it('applies the conflict rule when another device saved the same slot in between', async () => {
+    const t = Date.now() - 60_000
+    const first = await store.write('G', '1-1-LT1.save', Buffer.from('desktop'), { mtimeMs: t, base: 0 })
+    expect(first.conflict).toBeUndefined()
+    // A phone that saw the desktop's copy just overwrites it, as before.
+    const phone = await store.write('G', '1-1-LT1.save', Buffer.from('phone'), { mtimeMs: t + 10_000, base: first.mtimeMs })
+    expect(phone.conflict).toBeUndefined()
+    // The desktop, still on its own copy, saves later: its copy is newer and takes the slot, the
+    // phone's goes to History as a conflict.
+    const later = await store.write('G', '1-1-LT1.save', Buffer.from('desktop later'), { mtimeMs: t + 20_000, base: first.mtimeMs })
+    expect(later.conflict).toBe('replaced')
+    expect((await store.read('G', '1-1-LT1.save')).toString()).toBe('desktop later')
+    // A device that played offline delivers an older copy: the slot keeps the newer one.
+    const offline = await store.write('G', '1-1-LT1.save', Buffer.from('offline'), { mtimeMs: t + 5_000, base: first.mtimeMs })
+    expect(offline).toMatchObject({ conflict: 'kept', mtimeMs: later.mtimeMs })
+    expect((await store.read('G', '1-1-LT1.save')).toString()).toBe('desktop later')
+    const conflicts = await store.conflicts('G', 0)
+    expect(conflicts.map((c) => c.file)).toEqual(['1-1-LT1.save', '1-1-LT1.save'])
+    const kept: string[] = []
+    for (const v of (await store.history('G', '1-1-LT1.save')).filter((v) => v.reason === 'conflict')) {
+      await store.restoreVersion('G', v.id)
+      kept.push((await store.read('G', '1-1-LT1.save')).toString())
+    }
+    expect(kept.sort()).toEqual(['offline', 'phone'])
+    // A device that knew no file, while another created it.
+    await store.write('G', '2-1-LT1.save', Buffer.from('one'), { base: 0 })
+    expect((await store.write('G', '2-1-LT1.save', Buffer.from('two'), { base: 0 })).conflict).toBe('replaced')
+    // The same bytes with an older time leave the server's time alone.
+    const slotTime = (await store.stat('G', '1-1-LT1.save'))!.mtimeMs
+    const slotNow = (await store.read('G', '1-1-LT1.save')).toString()
+    expect((await store.write('G', '1-1-LT1.save', Buffer.from(slotNow), { mtimeMs: slotTime - 50_000, base: 0 })).mtimeMs).toBe(slotTime)
+    expect((await store.stat('G', '1-1-LT1.save'))!.mtimeMs).toBe(slotTime)
+    // No base (older runtimes, imports, restores) and the persistent file: the rule does not apply.
+    expect((await store.write('G', '2-1-LT1.save', Buffer.from('three'))).conflict).toBeUndefined()
+    await store.write('G', 'persistent', Buffer.from('p1'), { base: 0 })
+    expect((await store.write('G', 'persistent', Buffer.from('p2'), { base: 0 })).conflict).toBeUndefined()
+  })
+
+  it('keeps the only copy of something for 30 days, however many versions follow', async () => {
+    await store.write('G', 'auto-1-LT1.save', Buffer.from('desktop'), { mtimeMs: Date.now() - 60_000, base: 0 })
+    await store.write('G', 'auto-1-LT1.save', Buffer.from('phone'), { mtimeMs: Date.now() - 30_000, base: 0 })
+    for (let i = 0; i < 10; i++) await store.write('G', 'auto-1-LT1.save', Buffer.from(`turn ${i}`))
+    const reasons = (await store.history('G', 'auto-1-LT1.save')).map((v) => v.reason)
+    expect(reasons.filter((r) => r === 'conflict')).toHaveLength(1)
+    expect(reasons.filter((r) => r === 'game' || r === 'overwrite')).toHaveLength(2)
+  })
+
+  it('never moves a save’s time into the future, and leaves a save another device changed when deleting', async () => {
+    await store.write('G', '5-1-LT1.save', Buffer.from('same'))
+    await store.write('G', '5-1-LT1.save', Buffer.from('same'), { mtimeMs: Date.UTC(2107, 0, 1) })
+    expect((await store.stat('G', '5-1-LT1.save'))!.mtimeMs).toBeLessThanOrEqual(Date.now() + 60_000)
+    const seen = (await store.stat('G', '5-1-LT1.save'))!.mtimeMs
+    await store.write('G', '5-1-LT1.save', Buffer.from('another device'), { mtimeMs: seen + 5000 })
+    expect(await store.remove('G', '5-1-LT1.save', 'game-delete', seen)).toBe('changed')
+    expect((await store.read('G', '5-1-LT1.save')).toString()).toBe('another device')
+    expect(await store.remove('G', '5-1-LT1.save', 'game-delete', seen + 5000)).toBe(true)
+  })
+
   it('keeps a version when a save is deleted', async () => {
     await store.write('G', 'auto-1-LT1.save', Buffer.from('x'))
     expect(await store.remove('G', 'auto-1-LT1.save')).toBe(true)

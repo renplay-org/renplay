@@ -2,13 +2,14 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, lstatSync,
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { scryptSync } from 'node:crypto'
+import { createHash, scryptSync } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import request from 'supertest'
+import sharp from 'sharp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
-import { Db } from '../db.js'
+import { Db, type GameRow } from '../db.js'
 import { keepaliveToken, playerRoute } from '../auth.js'
 import { viewer, viewers } from '../accounts-context.js'
 import yazl from 'yazl'
@@ -29,7 +30,7 @@ function config(): Config {
   const root = mkdtempSync(join(tmpdir(), 'renplay-auth-')); roots.push(root)
   const cfg = loadConfig()
   const dataDir = join(root, 'data'), gamesDir = join(root, 'games'), internalDir = join(gamesDir, '_renplay')
-  return { ...cfg, dataDir, gamesDir, internalDir, savesDir: join(dataDir, 'saves'), saveHistoryDir: join(dataDir, 'save-history'), coversDir: join(dataDir, 'covers'), walkthroughsDir: join(dataDir, 'walkthroughs'), overlaysDir: join(dataDir, 'overlays'), workDir: join(internalDir, 'work'), purgeDir: join(internalDir, 'purge'), archivesDir: join(gamesDir, '_archives'), uploadsDir: join(internalDir, 'uploads'), enginesDir: join(internalDir, 'engines'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', auth: 'on', authLocal: true, authUser: 1, adultGames: 'allow', adminUsername: '', adminPassword: '', adultDefault: false }
+  return { ...cfg, dataDir, gamesDir, internalDir, savesDir: join(dataDir, 'saves'), saveHistoryDir: join(dataDir, 'save-history'), coversDir: join(dataDir, 'covers'), walkthroughsDir: join(dataDir, 'walkthroughs'), overlaysDir: join(dataDir, 'overlays'), workDir: join(internalDir, 'work'), purgeDir: join(internalDir, 'purge'), archivesDir: join(gamesDir, '_archives'), uploadsDir: join(internalDir, 'uploads'), enginesDir: join(internalDir, 'engines'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', auth: 'on', authLocal: true, authUser: 1, adultGames: 'shown', adminUsername: '', adminPassword: '', adultDefault: 'off' }
 }
 async function start(cfg = config(), seeded = true) {
   if (seeded) { cfg.adminUsername = 'admin'; cfg.adminPassword = 'correct password' }
@@ -44,7 +45,10 @@ async function login(a: App, username = 'admin', password = 'correct password') 
 async function add(a: App, cookie: string, username = 'player') {
   return (await request(a.app).post('/api/users').set(site).set('Cookie', cookie).send({ username, password: 'player password' }).expect(201)).body.user.id as number
 }
-function game(a: App, id = 'safe', extras = {}) { a.db.insertGame({ id, title: id, recipe_id: `recipe-${id}`, status: 'installed', build: 'b1', save_dir: id, ...extras }) }
+function game(a: App, id = 'safe', extras: Partial<GameRow> = {}) {
+  a.db.insertGame({ id, title: id, recipe_id: `recipe-${id}`, status: 'installed', build: 'b1', save_dir: id, ...extras })
+  if (extras.walkthrough) a.db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at) VALUES (?, ?, 'Walkthrough', 'pdf', '2026-01-01')").run(extras.walkthrough, id)
+}
 
 describe('accounts authentication and security', () => {
   it('restricts download retention and explicit deletion to admins without touching installed games or saves', async () => {
@@ -86,15 +90,15 @@ describe('accounts authentication and security', () => {
     await a.accounts.store(id).write('one-game', 'persistent', Buffer.from('persistent'))
     await a.accounts.store(id).write('tokens', 'security_keys.txt', Buffer.from('keys'))
     const response = await request(a.app).get('/api/users').set('Cookie', admin).expect(200)
-    expect(response.body.adultDefault).toBe(false)
+    expect(response.body.adultDefault).toBe('off')
     expect(response.body.users.find((u: { id: number }) => u.id === id)).toMatchObject({ games: 1, saves: 2, protected: false })
     expect(response.body.users.find((u: { id: number }) => u.id === 1)).toMatchObject({ games: 0, saves: 0, protected: true })
     const player = await login(a, 'player', 'player password')
     await request(a.app).get('/api/users').set('Cookie', player).expect(403)
-    const cfg = config(); cfg.auth = 'off'; cfg.adultDefault = true
+    const cfg = config(); cfg.auth = 'off'; cfg.adultDefault = 'shown'
     const off = await start(cfg, false)
     expect((await request(off.app).get('/api/me').expect(200)).body.hasPassword).toBe(false)
-    expect((await request(off.app).get('/api/users').expect(200)).body.adultDefault).toBe(true)
+    expect((await request(off.app).get('/api/users').expect(200)).body.adultDefault).toBe('shown')
   })
   it('rejects noncanonical routing before authentication, roles or CSRF can disagree', async () => {
     const a = await start(), admin = await login(a)
@@ -229,7 +233,7 @@ describe('accounts authentication and security', () => {
   })
   it('maps all management route families to admins and keeps the last admin', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password'); game(a)
-    const routes: [string, string][] = [['get', '/api/archives'], ['post', '/api/archives/inspect'], ['post', '/api/archives/hash'], ['delete', '/api/archives'], ['post', '/api/imports'], ['post', '/api/uploads'], ['get', '/api/uploads/u1'], ['put', '/api/uploads/u1'], ['post', '/api/uploads/u1/complete'], ['delete', '/api/uploads/u1'], ['get', '/api/games/safe/files'], ['put', '/api/games/safe/files/raw'], ['delete', '/api/games/safe/files/raw'], ['get', '/api/games/safe/files/raw'], ['post', '/api/games/safe/files/upload'], ['post', '/api/games/safe/files/revert'], ['post', '/api/games/safe/files/apply'], ['post', '/api/games/safe/files/reset'], ['delete', '/api/games/safe'], ['post', '/api/games/safe/reinstall'], ['post', '/api/games/safe/walkthrough'], ['delete', '/api/games/safe/walkthrough'], ['put', '/api/games/safe/cache'], ['get', '/api/games/safe/recipe'], ['get', '/api/system'], ['post', '/api/system/prune'], ['post', '/api/system/engines/refresh'], ['get', '/api/jobs'], ['get', '/api/jobs/j1/log'], ['post', '/api/jobs/j1/cancel'], ['post', '/api/jobs/j1/retry'], ['delete', '/api/jobs'], ['post', '/api/catalog/refresh'], ['put', '/api/content'], ['get', '/api/users'], ['post', '/api/users'], ['put', `/api/users/${id}`], ['delete', `/api/users/${id}`], ['post', `/api/users/${id}/password`], ['post', `/api/users/${id}/merge`], ['post', `/api/users/${id}/saves/copy`], ['get', `/api/users/${id}/saves/export`], ['post', `/api/users/${id}/saves/import`], ['post', '/api/games/safe/safe']]
+    const routes: [string, string][] = [['get', '/api/archives'], ['post', '/api/archives/inspect'], ['post', '/api/archives/hash'], ['delete', '/api/archives'], ['post', '/api/imports'], ['post', '/api/uploads'], ['get', '/api/uploads/u1'], ['put', '/api/uploads/u1'], ['post', '/api/uploads/u1/complete'], ['delete', '/api/uploads/u1'], ['get', '/api/games/safe/files'], ['put', '/api/games/safe/files/raw'], ['delete', '/api/games/safe/files/raw'], ['get', '/api/games/safe/files/raw'], ['post', '/api/games/safe/files/upload'], ['post', '/api/games/safe/files/revert'], ['post', '/api/games/safe/files/apply'], ['post', '/api/games/safe/files/reset'], ['delete', '/api/games/safe'], ['post', '/api/games/safe/reinstall'], ['post', '/api/games/safe/walkthroughs'], ['delete', '/api/games/safe/walkthroughs/safe.pdf'], ['put', '/api/games/safe/cache'], ['get', '/api/games/safe/recipe'], ['get', '/api/system'], ['post', '/api/system/prune'], ['post', '/api/system/engines/refresh'], ['get', '/api/jobs'], ['get', '/api/jobs/j1/log'], ['post', '/api/jobs/j1/cancel'], ['post', '/api/jobs/j1/retry'], ['delete', '/api/jobs'], ['post', '/api/catalog/refresh'], ['put', '/api/content'], ['get', '/api/users'], ['post', '/api/users'], ['put', `/api/users/${id}`], ['delete', `/api/users/${id}`], ['post', `/api/users/${id}/password`], ['post', `/api/users/${id}/merge`], ['post', `/api/users/${id}/saves/copy`], ['get', `/api/users/${id}/saves/export`], ['post', `/api/users/${id}/saves/import`], ['post', '/api/games/safe/safe'], ['get', '/api/system/backups'], ['post', '/api/system/backups'], ['get', '/api/system/backups/saves-2026-01-01-000000.zip'], ['put', '/api/system/sync']]
     for (const [method, path] of routes) {
       expect(playerRoute(method.toUpperCase(), path), path).toBe(false)
       await (request(a.app) as any)[method](path).set(site).set('Cookie', player).expect(403)
@@ -238,6 +242,9 @@ describe('accounts authentication and security', () => {
     await request(a.app).put('/api/users/1').set(site).set('Cookie', admin).send({ disabled: true }).expect(409)
     await request(a.app).delete('/api/users/1').set(site).set('Cookie', admin).expect(409)
     await request(a.app).get('/api/games').set('Cookie', player).expect(200)
+    // A player imports their own saves from a computer.
+    expect(playerRoute('GET', '/api/saves-import') && playerRoute('POST', '/api/saves-import')).toBe(true)
+    expect((await request(a.app).get('/api/saves-import').set('Cookie', player).expect(200)).body).toHaveProperty('dirs')
     await request(a.app).put('/api/games/safe/favorite').set(site).set('Cookie', player).send({ on: true }).expect(200)
   })
 })
@@ -252,7 +259,7 @@ describe('personal data and save moves', () => {
     const section = (from: string, to: string) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)))
     const runtime = (userId: number, cookie: string) => new Function('window', 'indexedDB', 'cfg', 'fetchJSON', 'fetch', 'setTimeout', `
       var API = '/api/saves/safe', signedOut = false, HOME = '/home';
-      var state = { queue: new Map(), known: new Map(), lazy: new Map(), online: true, inflight: false, failures: 0 };
+      var state = { queue: new Map(), known: new Map(), lazy: new Map(), base: new Map(), online: true, inflight: false, failures: 0 };
       function post() {} function status() {} function log() {} function writeLocal() {} function createLazy() {}
       function hash(bytes) { return String(bytes) } function b64ToBytes(data) { return new Uint8Array() }
       ${section('  var dbPromise = null', '  // ---------------------------------------------------------------- helpers')}
@@ -426,24 +433,39 @@ describe('adult access and signed game URLs', () => {
     await request(a.app).get('/api/auth/check').set('Cookie', player).set('X-Original-URI', '/g/safe/b1/%2e%2e/%2e%2e/adult/b1/game.zip').expect(403)
     await request(a.app).post('/api/games/unknown/safe').set(site).set('Cookie', admin).send({ safe: true }).expect(200)
     expect((await request(a.app).get('/api/games/unknown').set('Cookie', player)).body.game.id).toBe('unknown')
-    await request(a.app).put(`/api/users/${id}`).set(site).set('Cookie', admin).send({ adultAccess: true }).expect(200)
+    await request(a.app).put(`/api/users/${id}`).set(site).set('Cookie', admin).send({ adultCeiling: 'shown' }).expect(200)
+    // The ceiling is only the maximum: the person's own choice still starts where it was.
+    await request(a.app).get('/api/games/adult').set('Cookie', player).expect(404)
+    await request(a.app).put('/api/me/adult').set(site).set('Cookie', player).send({ level: 'shown' }).expect(200)
     await request(a.app).get('/api/games/adult').set('Cookie', player).expect(200)
-    await request(a.app).put('/api/me/prefs').set(site).set('Cookie', player).send({ adultPictures: 'hide-games' }).expect(200)
+    await request(a.app).put('/api/me/adult').set(site).set('Cookie', player).send({ level: 'off' }).expect(200)
     await request(a.app).get('/api/games/adult').set('Cookie', player).expect(404)
   })
-  it('filters catalog recipes and their static covers and walkthroughs by adult access, including nginx checks', async () => {
+  it('filters catalog recipes and their pictures and walkthroughs by adult access, including nginx checks', async () => {
     const cfg = config(), db = Db.open(cfg.dataDir)
-    db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'safe', title: 'Safe', releases: [] }, { id: 'adult', title: 'Adult', nsfw: true, releases: [] }] })
-    db.setSetting('catalog_covers', { safe: { file: 'safe.webp' }, adult: { file: 'adult.webp' } }); db.close()
+    // Each recipe's grid is in the art cache's originals already, so it is made without a download.
+    const art = async (id: string) => {
+      const data = await sharp({ create: { width: 600, height: 900, channels: 3, background: id === 'adult' ? '#a33' : '#3a3' } }).png().toBuffer()
+      const sha256 = createHash('sha256').update(data).digest('hex')
+      mkdirSync(join(cfg.dataDir, 'art', 'src'), { recursive: true })
+      writeFileSync(join(cfg.dataDir, 'art', 'src', sha256), data)
+      return [{ kind: 'grid', url: `https://art.example/${id}.png`, source: 'steam', sha256, width: 600, height: 900 }]
+    }
+    db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'safe', title: 'Safe', art: await art('safe'), releases: [] }, { id: 'adult', title: 'Adult', nsfw: true, art: await art('adult'), releases: [] }] })
+    db.close()
     const a = await start(cfg), admin = await login(a); await add(a, admin); const player = await login(a, 'player', 'player password')
-    for (const id of ['safe', 'adult']) { game(a, id, { recipe_id: id, adult: id === 'adult' ? 1 : 0, walkthrough: `${id}.pdf` }); writeFileSync(join(cfg.coversDir, `${id}.webp`), 'cover'); writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), 'pdf') }
+    for (const id of ['safe', 'adult']) { game(a, id, { recipe_id: id, adult: id === 'adult' ? 1 : 0, walkthrough: `${id}.pdf` }); writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), 'pdf') }
+    await a.catalog.syncArt()
+    const picture = (id: string) => (a.catalog.recipeArt(a.catalog.recipe(id)!) as Record<string, { url1x: string }>)['grid']!.url1x
+    const adultPic = picture('adult'), safePic = picture('safe')
     expect((await request(a.app).get('/api/catalog').set('Cookie', player)).body.games.map((g: any) => g.id)).toEqual(['safe'])
-    for (const file of ['/api/covers/adult.webp', '/api/walkthroughs/adult.pdf']) {
+    for (const file of [adultPic, '/api/walkthroughs/adult.pdf']) {
       await request(a.app).get(file).set('Cookie', player).expect(404)
       await request(a.app).get('/api/auth/check').set('Cookie', player).set('X-Original-URI', file).expect(403)
       await request(a.app).get(file).set('Cookie', admin).expect(200)
     }
-    await request(a.app).get('/api/covers/safe.webp').set('Cookie', player).expect(200)
+    await request(a.app).get(safePic).set('Cookie', player).expect(200)
+    await request(a.app).get('/api/auth/check').set('Cookie', player).set('X-Original-URI', safePic).expect(204)
   })
   it('sandboxes every HTML pack response regardless of filename or MIME and permits encoded filenames', async () => {
     const a = await start(), cookie = await login(a)

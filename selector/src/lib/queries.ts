@@ -1,14 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useAuth } from './auth'
-import { useAdultPictures } from './prefs'
+import type { AdultLevel } from './adult'
 import { api, put, type CatalogResponse, type ContentState, type Archive, type FilesResponse, type Game, type Job, type SavesResponse, type SystemInfo } from './api'
 
 export function useGames() {
-  const [mode] = useAdultPictures()
+  // The server leaves out what the person's level and this device's hide.
   return useQuery({
     queryKey: ['games'],
-    select: (games) => mode === 'hide-games' ? games.filter((g) => !g.nsfw) : games,
     queryFn: () => api<{ games: Game[] }>('/api/games').then((r) => r.games),
     refetchInterval: (q) => (q.state.data?.some((g) => g.job) ? 2000 : false),
   })
@@ -59,14 +58,15 @@ export function useJobs() {
 }
 
 export function useArchives() {
-  return useQuery({ queryKey: ['archives'], queryFn: () => api<{ dir: string; archives: Archive[] }>('/api/archives') })
+  return useQuery({
+    queryKey: ['archives'],
+    queryFn: () => api<{ dir: string; archives: Archive[] }>('/api/archives'),
+  })
 }
 
 export function useCatalog() {
-  const [mode] = useAdultPictures()
   return useQuery({
     queryKey: ['catalog'],
-    select: (catalog) => mode === 'hide-games' ? { ...catalog, games: catalog.games.filter((g) => !g.nsfw) } : catalog,
     queryFn: () => api<CatalogResponse>('/api/catalog'),
   })
 }
@@ -75,11 +75,11 @@ export function useContent() {
   return useQuery({ queryKey: ['content'], queryFn: () => api<ContentState>('/api/content') })
 }
 
-/** Saves the choice, then reloads everything that depends on it. */
-export function useSetAdultGames() {
+/** Saves the installation's adult level, then reloads everything that depends on it. */
+export function useSetInstallationLevel() {
   const qc = useQueryClient()
-  return async (adultGames: ContentState['adultGames']) => {
-    await put('/api/content', { adultGames })
+  return async (level: AdultLevel) => {
+    await put('/api/content', { level })
     await qc.invalidateQueries()
   }
 }

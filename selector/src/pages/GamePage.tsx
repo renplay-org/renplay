@@ -1,56 +1,50 @@
-import { useQueryClient } from '@tanstack/react-query'
-import {
-  ArrowLeft,
-  BookOpen,
-  Download,
-  ExternalLink,
-  Info,
-  Play,
-  RefreshCw,
-  RotateCcw,
-  Save,
-  Trash2,
-} from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { BookOpen, Download, ExternalLink, Info, MoreHorizontal, Play, RefreshCw, Save } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import FileBrowser from '../components/FileBrowser'
 import ActionBar from '../components/ActionBar'
 import SceneCard from '../components/SceneCard'
 import UpdateCard from '../components/UpdateCard'
-import SegmentedControl from '../components/SegmentedControl'
-import { playedTime } from '../components/UpNext'
-import { useBlurAdultCovers } from '../lib/prefs'
+import { Seg, Pill, Stars, TagPill } from '../lantern/controls'
+import Stage, { travelToDoor } from '../lantern/Stage'
+import { useRoom } from '../lantern/Room'
+import { creditText, useHidden } from '../lantern/art'
+import { playedTime } from '../lib/format'
+import { useAdultView } from '../lib/adult'
 import FavoriteButton from '../components/FavoriteButton'
 import GameTags from '../components/GameTags'
-import { Cover } from '../components/GameCard'
 import SaveGallery from '../components/SaveGallery'
-import { BetaBadge, Button, Confirm, Empty, Modal, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
-import { api, del, post, slotName, type Game } from '../lib/api'
-import { ago, bytes, capitalize, pct } from '../lib/format'
+import { BetaBadge, Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
+import { api, del, post, slotName, type ArtKind, type Game } from '../lib/api'
+import ArtPicker from '../components/ArtPicker'
+import { ago, bytes, capitalize, duration, pct, timeZone } from '../lib/format'
 import { recipeLinks } from '../lib/links'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
 import { useAuth } from '../lib/auth'
-import { stateLabel } from '../lib/tags'
+import { phoneLabel, stateLabel } from '../lib/tags'
 
-type Tab = 'saves' | 'files' | 'details'
+type Tab = 'play' | 'saves' | 'walkthroughs' | 'files' | 'details' | 'manage'
 
 export default function GamePage() {
   const admin = useAuth().data?.user.role === 'admin'
   const { id: gameId = '' } = useParams()
   const { data: game, isLoading, error } = useGame(gameId)
   const { data: catalog } = useCatalog()
-  const [tab, setTab] = useState<Tab>('saves')
+  const [tab, setTab] = useState<Tab>('play')
+  const [picker, setPicker] = useState<ArtKind | null>(null)
   const navigate = useNavigate()
   const qc = useQueryClient()
   const toast = useToast()
-  const [hide] = useBlurAdultCovers()
-  const [expanded, setExpanded] = useState(false)
+  const view = useAdultView()
+  const actsRef = useRef<HTMLDivElement>(null)
   const { data: saves } = useSaves(gameId, !!game?.saveDir)
   const latest = saves?.slots.find((s) => s.kind !== 'internal' && s.valid)
   useEffect(() => {
     if (game && window.location.hash === '#update') document.getElementById('update')?.scrollIntoView({ block: 'center' })
   }, [game?.id])
+  useRoom({ game: game ?? null, quiet: !game })
 
   if (isLoading)
     return (
@@ -62,116 +56,167 @@ export default function GamePage() {
 
   const installed = game.status === 'installed'
   const renpy = game.family === 'renpy'
-  const backdrop = hide && game.nsfw && !game.coverSfw ? null : game.cover
+  const hidden = game.nsfw && view !== 'shown'
+  const credits = hidden ? [] : (['grid', 'hero'] as const).map((kind) => ({ kind, credit: game.art[kind]?.credit, made: game.art[kind]?.made })).filter((c, i, all) => c.credit && all.findIndex((o) => JSON.stringify(o.credit) === JSON.stringify(c.credit)) === i)
   const primary = () => navigate(`/play/${gameId}${latest ? `?resume=${encodeURIComponent(slotName(latest.file))}` : ''}`)
+  const resume = (menu: boolean) => {
+    travelToDoor(game, hidden)
+    navigate(`/play/${gameId}${!menu && latest ? `?resume=${encodeURIComponent(slotName(latest.file))}` : ''}`)
+  }
+
+  const meta = (
+    <>
+      {game.developer && <span>By {game.developer}</span>}
+      {game.state && (
+        <>
+          <span className="sep">·</span>
+          <span>{stateLabel[game.state]}</span>
+        </>
+      )}
+      {game.version && (
+        <>
+          <span className="sep">·</span>
+          <span>{game.version}</span>
+        </>
+      )}
+      {game.free && (
+        <>
+          <span className="sep">·</span>
+          <span>Free</span>
+        </>
+      )}
+      {game.phone && (
+        <>
+          <span className="sep">·</span>
+          <span>{phoneLabel[game.phone]}</span>
+        </>
+      )}
+      {game.family !== 'renpy' && (
+        <>
+          <span className="sep">·</span>
+          <BetaBadge engine={game.family} />
+        </>
+      )}
+    </>
+  )
+
+  const body = (
+    <>
+      <GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} />
+      {game.summary && <p className="sum">{game.summary}</p>}
+      {game.recipe?.continuesFrom.length ? <p className="small muted" style={{ marginTop: 10 }}>Continues from {game.recipe.continuesFrom.join(', ')}. The game finds those saves itself.</p> : null}
+      {(credits.length > 0 || !hidden) && (
+        <p className="xs muted" style={{ marginTop: 10, lineHeight: 1.6 }}>
+          {credits.map((c) => (
+            <span key={c.kind} style={{ display: 'block' }}>
+              {credits.length > 1 ? `${c.kind === 'grid' ? 'Poster' : 'Background'} ` : 'Art '}
+              {creditText(c.credit)}
+              {c.made ? ', fitted by Renplay' : ''}
+            </span>
+          ))}
+          {!hidden && (
+            <button className="link" onClick={() => setPicker('grid')}>
+              Change art
+            </button>
+          )}
+        </p>
+      )}
+    </>
+  )
+
+  const actions = game.job ? (
+    <div className="panel" style={{ maxWidth: 440, width: '100%' }}>
+      <div className="row between small" style={{ marginBottom: 8 }}>
+        <span className="muted-2">{game.job.status === 'queued' ? 'Queued' : game.job.stage || 'Working'}</span>
+        <span className="tnum muted">{game.job.status === 'running' ? pct(game.job.progress) : ''}</span>
+      </div>
+      <Progress value={game.job.progress} indeterminate={game.job.status === 'queued'} />
+      {admin && (
+        <Link to="/activity" className="link-q xs" style={{ marginTop: 8, display: 'inline-block' }}>
+          Details in Activity
+        </Link>
+      )}
+    </div>
+  ) : (
+    <>
+      {installed ? (
+        <>
+          <Pill variant="p" size="lg" icon={latest ? <Play /> : <Play />} onClick={() => resume(false)}>
+            {latest ? 'Resume' : 'Play'}
+          </Pill>
+          {latest && (
+            <Pill variant="s" size="lg" onClick={() => resume(true)}>
+              Main menu
+            </Pill>
+          )}
+        </>
+      ) : (
+        <InstallButton game={game} />
+      )}
+      {game.walkthroughs.length === 1 && (
+        <Pill variant="q" size="lg" icon={<BookOpen />} href={game.walkthroughs[0]!.url} target="_blank" rel="noreferrer">
+          Walkthrough
+        </Pill>
+      )}
+      {game.walkthroughs.length > 1 && (
+        <Pill variant="q" size="lg" icon={<BookOpen />} onClick={() => setTab('walkthroughs')}>
+          Walkthroughs
+        </Pill>
+      )}
+      {game.recipe?.links.walkthrough && (
+        <Pill variant="q" size="lg" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
+          Guide
+        </Pill>
+      )}
+      <FavoriteButton game={game} />
+    </>
+  )
 
   return (
-    <div className="animate-fade-in pb-20 sm:pb-0">
-      <section className="relative -mx-4 -mt-5 mb-6 overflow-hidden sm:-mx-8 sm:-mt-6 sm:mb-8">
-        <div className="absolute inset-0">
-          {backdrop && <img src={backdrop} alt="" className="size-full scale-110 object-cover opacity-50 blur-3xl" />}
-          <div className="absolute inset-0 bg-gradient-to-b from-ink-950/30 via-ink-950/70 to-ink-950" />
-        </div>
-        <div className="relative mx-auto max-w-[1600px] px-4 pb-6 pt-4 sm:px-8 sm:pb-8 sm:pt-6">
-          <Link to="/" className="mb-4 inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200">
-            <ArrowLeft className="size-4" /> Library
-          </Link>
-          <div className="grid grid-cols-[132px_minmax(0,1fr)] gap-4 sm:grid-cols-[340px_minmax(0,1fr)] sm:gap-8 lg:items-start">
-          <Cover game={game} className="aspect-[63/50] w-full shrink-0 shadow-2xl ring-1 ring-white/10" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-3">
-              <h1 className="min-w-0 flex-1 font-display text-2xl font-bold tracking-tight text-white sm:text-4xl">{game.title}</h1>
-              <FavoriteButton game={game} />
-            </div>
-            {game.developer && <p className="mt-1 text-sm text-zinc-400">By {game.developer}</p>}
-            <p className="mt-2 text-sm text-zinc-400">{game.state && `${stateLabel[game.state]} · `}{game.version}</p>
-            <BetaBadge engine={game.family} />
-            <div className="hidden sm:block"><GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} />{game.summary && <><p className={`mt-3 text-sm leading-relaxed text-zinc-300 ${expanded ? '' : 'line-clamp-3'}`}>{game.summary}</p><button className="min-h-11 text-sm text-accent-300" onClick={() => setExpanded(!expanded)}>{expanded ? 'Less' : 'More'}</button></>}</div>
-            {game.recipe?.continuesFrom.length ? (
-              <p className="mt-1 text-sm text-zinc-400">Continues from {game.recipe.continuesFrom.join(', ')}. The game finds those saves itself.</p>
-            ) : null}
+    <div style={{ paddingBottom: 20 }}>
+      <Stage game={game} eyebrow={installed ? 'In your library' : game.status === 'installing' ? 'Installing' : 'Not installed'} back={{ to: '/', label: 'Library' }} meta={meta} body={body} actions={actions} actsRef={actsRef} />
 
-            {game.job ? (
-              <div className="mt-6 max-w-md rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className="text-zinc-200">{game.job.status === 'queued' ? 'Queued' : game.job.stage || 'Working'}</span>
-                  <span className="tabular-nums text-zinc-400">{game.job.status === 'running' ? pct(game.job.progress) : ''}</span>
-                </div>
-                <Progress value={game.job.progress} indeterminate={game.job.status === 'queued'} />
-                {admin && <Link to="/activity" className="mt-2 inline-block text-xs text-zinc-400 hover:text-zinc-200">
-                  Details in Activity →
-                </Link>}
-              </div>
-            ) : (
-              <div className="mt-6 hidden flex-wrap gap-3 sm:flex">
-                {installed ? (
-                  <>
-                    {latest && (
-                      <Button variant="primary" size="lg" icon={<RotateCcw className="size-5" />} onClick={() => navigate(`/play/${gameId}?resume=${encodeURIComponent(slotName(latest.file))}`)}>
-                        Resume
-                      </Button>
-                    )}
-                    <Button variant={latest ? 'secondary' : 'primary'} size="lg" icon={<Play className="size-5" />} onClick={() => navigate(`/play/${gameId}`)}>
-                      {latest ? 'Main menu' : 'Play'}
-                    </Button>
-                  </>
-                ) : (
-                  <InstallButton game={game} />
-                )}
-                {game.walkthrough && (
-                  <a href={`/api/walkthroughs/${encodeURIComponent(game.walkthrough)}`} target="_blank" rel="noreferrer">
-                    <Button size="lg" variant="ghost" icon={<BookOpen className="size-5" />}>
-                      Walkthrough
-                    </Button>
-                  </a>
-                )}
-                {game.recipe?.links.walkthrough && (
-                  <a href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
-                    <Button size="lg" variant="ghost" icon={<ExternalLink className="size-5" />}>
-                      Guide
-                    </Button>
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="col-span-2 space-y-3 sm:hidden">
-            <GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} />
-            {game.summary && <div><p className={`text-sm leading-relaxed text-zinc-300 ${expanded ? '' : 'line-clamp-3'}`}>{game.summary}</p><button className="min-h-11 text-sm text-accent-300" onClick={() => setExpanded(!expanded)}>{expanded ? 'Less' : 'More'}</button></div>}
-          </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="mb-8 grid gap-4 sm:grid-cols-[2fr_1fr]">
-        <section className="rounded-2xl bg-white/[0.03] p-5 ring-1 ring-white/10">
-          <h2 className="mb-4 font-semibold text-white">Your progress</h2>
-          <div className="flex items-center gap-4"><SceneCard game={game} save={game.latestSave} className="w-28 shrink-0" /><div className="min-w-0 text-sm text-zinc-400"><p className="text-zinc-200">{game.latestSave ? `${game.latestSave.label} · ${ago(game.latestSave.ctime)}` : game.lastPlayedAt ? `Last played ${ago(game.lastPlayedAt)}` : 'Not played yet'}</p><p className="mt-1">{playedTime(game.playTime)} · {game.saves.count} saves{game.saves.count > 0 ? ' · Synced' : ''}</p></div></div>
-          <div className="mt-4"><Switch checked={!!game.finishedAt} label="Finished" hint="Finished stories leave Up next. Your saves are kept." onChange={async (on) => { try { await api(`/api/games/${game.id}/finished`, { method: 'PUT', json: { on } }); void qc.invalidateQueries({ queryKey: ['game', game.id] }); void qc.invalidateQueries({ queryKey: ['games'] }) } catch (error) { toast(errorText(error), 'error') } }} /></div>
-        </section>
-        <UpdateCard game={game} />
-      </div>
-
-      <div className="mb-6">
-        <SegmentedControl<Tab>
+      <div style={{ marginTop: 32, marginBottom: 24 }}>
+        <Seg<Tab>
+          scroll
+          label="Game page sections"
           value={tab}
           onChange={setTab}
           options={[
+            { value: 'play' as const, label: <><Play /> Play</> },
             // Save slots and mods are Ren'Py's; other engines' games keep their saves themselves.
-            ...(renpy
-              ? [
-                  { value: 'saves' as const, label: <><Save className="size-4" /> Saves</> },
-                  ...(admin ? [{ value: 'files' as const, label: 'Mods' }] : []),
-                ]
-              : []),
-            { value: 'details' as const, label: <><Info className="size-4" /> Details</> },
+            ...(renpy ? [{ value: 'saves' as const, label: <><Save /> Saves</> }] : []),
+            { value: 'walkthroughs' as const, label: <><BookOpen /> Walkthroughs</> },
+            ...(admin && renpy ? [{ value: 'files' as const, label: 'Mods and options' }] : []),
+            { value: 'details' as const, label: <><Info /> Details</> },
+            ...(admin ? [{ value: 'manage' as const, label: 'Manage' }] : []),
           ]}
         />
       </div>
-      {renpy && tab === 'saves' && <>{!installed && <p className="mb-4 text-sm text-zinc-400">Install the game to load your saves.</p>}<SaveGallery game={game} /></>}
+      {tab === 'play' && <PlayPane game={game} onSaves={renpy ? () => setTab('saves') : undefined} />}
+      {renpy && tab === 'saves' && (
+        <>
+          {!installed && <p className="small muted" style={{ marginBottom: 16 }}>Install the game to load your saves.</p>}
+          <SaveGallery game={game} />
+        </>
+      )}
       {admin && renpy && tab === 'files' && <FileBrowser game={game} />}
-      {(tab === 'details' || !renpy) && <Details game={game} />}
-      {!game.job && <ActionBar>{installed ? <><Button variant="primary" onClick={primary}>{latest ? 'Resume' : 'Play'}</Button>{latest && <Button onClick={() => navigate(`/play/${gameId}`)}>Main menu</Button>}</> : <InstallButton game={game} />}</ActionBar>}
+      {tab === 'walkthroughs' && <Details game={game} section="walkthroughs" />}
+      {tab === 'details' && <Details game={game} section="details" onChangeArt={hidden ? undefined : setPicker} />}
+      {!hidden && <ArtPicker game={game} open={!!picker} initialKind={picker ?? 'grid'} onClose={() => setPicker(null)} />}
+      {admin && tab === 'manage' && <Details game={game} section="manage" />}
+      {!game.job && (
+        <ActionBar watch={actsRef}>
+          {installed ? (
+            <>
+              <Pill variant="p" onClick={primary}>{latest ? 'Resume' : 'Play'}</Pill>
+              {latest && <Pill variant="s" onClick={() => navigate(`/play/${gameId}`)}>Main menu</Pill>}
+            </>
+          ) : (
+            <InstallButton game={game} />
+          )}
+        </ActionBar>
+      )}
     </div>
   )
 }
@@ -181,26 +226,24 @@ function InstallButton({ game }: { game: Game }) {
   const qc = useQueryClient()
   const [busy, setBusy] = useState(false)
   const admin = useAuth().data?.user.role === 'admin'
-  if (!admin) return <span className="text-sm text-zinc-400">Ask an admin to install this game.</span>
+  if (!admin) return <span className="small muted">Ask an admin to install this game.</span>
   if (!game.canReinstall)
     return (
-      <Link to="/add">
-        <Button variant="primary" size="lg" icon={<Download className="size-5" />}>
-          Add an archive to install
-        </Button>
-      </Link>
+      <Pill variant="p" size="lg" icon={<Download />} to="/add">
+        Add an archive to install
+      </Pill>
     )
   return (
-    <Button
-      variant="primary"
+    <Pill
+      variant="p"
       size="lg"
-      loading={busy}
-      icon={<Download className="size-5" />}
+      disabled={busy}
+      icon={<Download />}
       onClick={async () => {
         setBusy(true)
         try {
           await post(`/api/games/${game.id}/reinstall`, { reapplyMods: true })
-          toast('Installing…', 'info')
+          toast('Installing', 'info')
           void qc.invalidateQueries({ queryKey: ['game', game.id] })
           void qc.invalidateQueries({ queryKey: ['jobs'] })
         } catch (e) {
@@ -211,15 +254,15 @@ function InstallButton({ game }: { game: Game }) {
       }}
     >
       Install
-    </Button>
+    </Pill>
   )
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-6 py-3 text-sm">
-      <span className="shrink-0 text-zinc-400">{label}</span>
-      <span className="min-w-0 break-words text-right text-zinc-100">{children}</span>
+    <div className="row between" style={{ alignItems: 'flex-start', gap: 24 }}>
+      <span className="muted small" style={{ flex: 'none' }}>{label}</span>
+      <span className="small" style={{ minWidth: 0, overflowWrap: 'anywhere', textAlign: 'right' }}>{children}</span>
     </div>
   )
 }
@@ -228,14 +271,113 @@ const STATUS: Record<Game['status'], string> = { installed: 'Installed', not_ins
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-3xl bg-white/[0.03] p-5 ring-1 ring-white/[0.07] sm:p-6">
-      <h3 className="mb-2 font-semibold text-white">{title}</h3>
+    <section className="panel">
+      <h3 className="h3" style={{ marginBottom: 8 }}>{title}</h3>
       {children}
+    </section>
+  )
+}
+
+const ART_ROWS: Array<[ArtKind, string]> = [['grid', 'Grid'], ['wide', 'Wide'], ['hero', 'Hero'], ['logo', 'Logo'], ['icon', 'Icon']]
+
+const STATUS_OPTIONS = [
+  { value: 'playing', label: 'Playing' },
+  { value: 'stalled', label: 'Stalled' },
+  { value: 'dropped', label: 'Dropped' },
+  { value: 'finished', label: 'Finished' },
+] as const
+
+interface GameHistory {
+  totals: { seconds: number; sessions: number }
+  days: Array<{ day: string; sessions: Array<{ startedAt: number; seconds: number }> }>
+}
+
+/** Play: your progress, your status and rating, updates, and the last sessions of this game. */
+function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const history = useQuery({ queryKey: ['history', game.id], queryFn: () => api<GameHistory>(`/api/history?game=${encodeURIComponent(game.id)}&days=30&tz=${encodeURIComponent(timeZone())}`) })
+  const sessions = (history.data?.days ?? []).flatMap((d) => d.sessions).slice(0, 4)
+  const save = async (path: string, json: unknown) => {
+    try {
+      await api(`/api/games/${game.id}/${path}`, { method: 'PUT', json })
+      void qc.invalidateQueries({ queryKey: ['game', game.id] })
+      void qc.invalidateQueries({ queryKey: ['games'] })
+    } catch (error) {
+      toast(errorText(error), 'error')
+    }
+  }
+  return (
+    <div className="grid2">
+      <div className="stack">
+        <section className="panel">
+          <div className="row between" style={{ marginBottom: 14 }}>
+            <h2 className="h3">Your progress</h2>
+            {onSaves && (
+              <button className="link small" onClick={onSaves} style={{ alignSelf: 'start' }}>
+                All saves
+              </button>
+            )}
+          </div>
+          <div className="row" style={{ alignItems: 'center', gap: 16 }}>
+            <SceneCard game={game} save={game.latestSave} style={{ width: 112, flex: 'none' }} />
+            <div className="grow small muted">
+              <p className="muted-2" style={{ fontSize: 15, fontWeight: 650 }}>
+                {game.latestSave ? `${game.latestSave.label} · ${ago(game.latestSave.ctime)}` : game.lastPlayedAt ? `Last played ${ago(game.lastPlayedAt)}` : 'Not played yet'}
+              </p>
+              <p style={{ marginTop: 4 }}>
+                {playedTime(game.playTime)} · {game.saves.count} {game.saves.count === 1 ? 'save' : 'saves'}
+                {game.saves.count > 0 ? ' · Synced' : ''}
+              </p>
+            </div>
+          </div>
+          <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }} className="stack">
+            <div>
+              <h3 className="small muted-2" style={{ fontWeight: 650, marginBottom: 8 }}>Status</h3>
+              <Seg
+                small
+                scroll
+                label="Status"
+                value={(game.playStatus ?? '') as string}
+                onChange={(value) => void save('status', { status: value === game.playStatus ? '' : value })}
+                options={STATUS_OPTIONS.map((o) => ({ value: o.value as string, label: o.label }))}
+              />
+              <p className="xs muted" style={{ marginTop: 8 }}>Stalled, Dropped and Finished leave Up next. Your saves are kept.</p>
+            </div>
+            <div>
+              <h3 className="small muted-2" style={{ fontWeight: 650, marginBottom: 4 }}>Your rating</h3>
+              <Stars value={game.rating ?? 0} onChange={(rating) => void save('rating', { rating })} />
+            </div>
+          </div>
+        </section>
+      </div>
+      <div className="stack">
+        <UpdateCard game={game} />
+        <section className="panel">
+          <div className="row between" style={{ marginBottom: 10 }}>
+            <h2 className="h3">History</h2>
+            <Link to="/history" className="link small">All history</Link>
+          </div>
+          {sessions.length ? (
+            <div className="list tight">
+              {sessions.map((s) => (
+                <div key={s.startedAt} className="row between small">
+                  <span className="muted-2">{capitalize(ago(s.startedAt))}</span>
+                  <span className="muted tnum">{s.seconds < 60 ? 'Under a minute' : duration(s.seconds)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="small muted">{history.isPending ? 'Loading' : 'Nothing played yet.'}</p>
+          )}
+        </section>
+      </div>
     </div>
   )
 }
 
-function Details({ game }: { game: Game }) {
+/** The Details, Walkthroughs and Manage panes: one component, so the shared actions and dialogs stay in one place. */
+function Details({ game, section, onChangeArt }: { game: Game; section: 'details' | 'walkthroughs' | 'manage'; onChangeArt?: (kind: ArtKind) => void }) {
   const admin = useAuth().data?.user.role === 'admin'
   const { data: catalog } = useCatalog()
   const toast = useToast()
@@ -259,111 +401,191 @@ function Details({ game }: { game: Game }) {
       toast(errorText(e), 'error')
     }
   }
-  const uploadPdf = async (file: File | undefined) => {
+  const [rename, setRename] = useState<{ file: string; title: string } | null>(null)
+  const uploadWalkthrough = async (file: File | undefined) => {
     if (!file) return
     const fd = new FormData()
-    fd.append('walkthrough', file)
-    await act(async () => {
-      const r = await fetch(`/api/games/${game.id}/walkthrough`, { method: 'POST', body: fd })
-      if (!r.ok) throw new Error((await r.json()).error)
-    }, 'Walkthrough added')
+    fd.append('file', file)
+    await act(() => api(`/api/games/${game.id}/walkthroughs`, { method: 'POST', body: fd }), 'Walkthrough added')
   }
   const links = recipeLinks(game.recipe?.links)
   const recipeStatus = !game.recipe
-    ? 'Not in the catalog yet. Title and cover come from the catalog once it has a recipe for this game.'
+    ? 'Not in the catalog yet. Title and art come from the catalog once it has a recipe for this game.'
     : game.recipe.status === 'broken'
       ? 'This version does not work in Renplay.'
-      : !game.recipe.status ? 'This version is not in the catalog yet.' : ''
+      : !game.recipe.status
+        ? 'This version is not in the catalog yet.'
+        : ''
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
-      <div className="space-y-5 lg:space-y-6">
+    <div className={section === 'details' ? 'grid2' : 'stack'}>
+      {section === 'details' && <div className="stack">
         <Card title="About">
-          {game.summary && <p className="mb-3 text-sm leading-relaxed text-zinc-300">{game.summary}</p>}
-          <div className="divide-y divide-white/[0.06]">
+          {game.summary && <p className="small muted-2" style={{ marginBottom: 12, lineHeight: 1.6 }}>{game.summary}</p>}
+          <div className="list tight">
             {game.developer && <Row label="Developer">{game.developer}</Row>}
             {game.state && <Row label="State">{stateLabel[game.state]}</Row>}
-            {game.detectedVersion && game.detectedVersion !== game.version && <Row label="Detected version"><span className="text-zinc-500">{game.detectedVersion}</span></Row>}
+            {game.detectedVersion && game.detectedVersion !== game.version && <Row label="Detected version"><span className="muted">{game.detectedVersion}</span></Row>}
             {game.update && (
               <Row label="Update">
-                <span className="text-accent-300">
+                <span className="pink">
                   Version {game.update.version} ({game.update.status})
                 </span>
               </Row>
             )}
           </div>
-          <p className="mt-3 text-sm text-zinc-400">
+          <p className="small muted" style={{ marginTop: 10 }}>
             {recipeStatus}
-            {game.update ? ' Download the new version from the developer and add it to update; saves carry over.' : ''}
+            {game.update ? ' Download the new version from the developer and add it to update. Saves carry over.' : ''}
           </p>
           <GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} showContent />
           {links.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="actions" style={{ marginTop: 12 }}>
               {links.map(([k, label, url]) => (
-                <a key={k} href={url} target="_blank" rel="noreferrer">
-                  <Button size="sm" variant="secondary" icon={<ExternalLink className="size-4" />}>
-                    {label}
-                  </Button>
-                </a>
+                <Pill key={k} variant="s" size="sm" href={url} target="_blank" rel="noreferrer" icon={<ExternalLink />}>
+                  {label}
+                </Pill>
               ))}
             </div>
           )}
         </Card>
+      </div>}
 
-        {admin && <Card title="Your walkthrough">
-          <p className="mb-4 text-sm text-zinc-400">A PDF you keep with the game. It opens from the game page.</p>
-          <input ref={pdfRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => void uploadPdf(e.target.files?.[0])} />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" icon={<BookOpen className="size-4" />} onClick={() => pdfRef.current?.click()}>
-              {game.walkthrough ? 'Replace PDF' : 'Add a PDF'}
-            </Button>
-            {game.walkthrough && (
-              <Button size="sm" variant="ghost" onClick={() => act(() => del(`/api/games/${game.id}/walkthrough`), 'Walkthrough removed')}>
-                Remove
+      {section === 'walkthroughs' && (
+        <div className="stack">
+          {game.walkthroughs.length ? (
+            game.walkthroughs.map((w, i) => (
+              <div key={w.file} className="panel walk-row">
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <p className="truncate" style={{ fontWeight: 650 }}>{w.title}</p>
+                  <p className="small muted">
+                    {{ pdf: 'PDF', image: 'Picture', text: 'Text' }[w.kind]} · {bytes(w.size)} · Added {ago(w.addedAt)}
+                  </p>
+                </div>
+                <div className="actions">
+                  <Pill variant={i === 0 ? 'p' : 's'} size="sm" icon={<BookOpen />} href={w.url} target="_blank" rel="noreferrer">
+                    Open
+                  </Pill>
+                  {admin && (
+                    <Menu trigger={(open) => <button className="ib" aria-label={`More for ${w.title}`} onClick={open}><MoreHorizontal /></button>}>
+                      {(close) => (
+                        <>
+                          <MenuItem onClick={() => { close(); setRename({ file: w.file, title: w.title }) }}>Rename</MenuItem>
+                          {i > 0 && <MenuItem onClick={() => { close(); void act(() => api(`/api/games/${game.id}/walkthroughs/${encodeURIComponent(w.file)}`, { method: 'PUT', json: { position: i - 1 } }), 'Moved up') }}>Move up</MenuItem>}
+                          <MenuItem danger onClick={() => { close(); void act(() => del(`/api/games/${game.id}/walkthroughs/${encodeURIComponent(w.file)}`), 'Walkthrough removed') }}>Remove</MenuItem>
+                        </>
+                      )}
+                    </Menu>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="small muted">{admin ? 'No walkthrough yet. Add a PDF, a picture or a text file.' : 'No walkthrough yet.'}</p>
+          )}
+          {game.recipe?.links.walkthrough && (
+            <div className="panel walk-row">
+              <div className="grow">
+                <p style={{ fontWeight: 650 }}>The guide the catalog links</p>
+                <p className="small muted">On the web</p>
+              </div>
+              <Pill variant="s" size="sm" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
+                Open
+              </Pill>
+            </div>
+          )}
+          {admin && (
+            <div>
+              <input ref={pdfRef} type="file" accept="application/pdf,image/png,image/jpeg,image/webp,.txt,.md,text/plain,text/markdown" className="hidden" onChange={(e) => { void uploadWalkthrough(e.target.files?.[0]); e.target.value = '' }} />
+              <Button size="sm" icon={<BookOpen />} onClick={() => pdfRef.current?.click()}>
+                Add a walkthrough
               </Button>
-            )}
-          </div>
-        </Card>}
-      </div>
+              <p className="xs muted" style={{ marginTop: 8 }}>A PDF, a picture or a text file, kept with the game for everyone who plays it.</p>
+            </div>
+          )}
+          <Modal
+            open={!!rename}
+            onClose={() => setRename(null)}
+            title="Rename walkthrough"
+            footer={
+              <Button variant="primary" onClick={() => { const r = rename!; setRename(null); void act(() => api(`/api/games/${game.id}/walkthroughs/${encodeURIComponent(r.file)}`, { method: 'PUT', json: { title: r.title } }), 'Renamed') }}>
+                Save
+              </Button>
+            }
+          >
+            <label className="block small muted-2">
+              Title
+              <input className="input" style={{ marginTop: 8, width: '100%' }} value={rename?.title ?? ''} maxLength={100} onChange={(e) => setRename((r) => (r ? { ...r, title: e.target.value } : r))} />
+            </label>
+          </Modal>
+        </div>
+      )}
 
-      <Card title="Installation">
-        <div className="divide-y divide-white/[0.06]">
-          <Row label="Status">{STATUS[game.status]}</Row>
-          {game.status === 'installed' && (
-            <Row label="Size">{bytes(game.sizeBytes)}</Row>
+      {section === 'details' && <div className="stack">
+        <Card title="Art">
+          {onChangeArt ? (
+            <div className="list tight">
+              {ART_ROWS.map(([kind, label]) => {
+                const f = game.art[kind]
+                return (
+                  <div key={kind} className="row between" style={{ gap: 12, minHeight: 'var(--hit)' }}>
+                    <span className="grow">
+                      <span style={{ display: 'block', fontWeight: 600 }}>{label}</span>
+                      <span className="xs muted">{f ? <>{creditText(f.credit)}{f.made ? ', fitted by Renplay' : ''}</> : kind === 'logo' ? 'The title in text' : 'Not available yet'}</span>
+                    </span>
+                    <Pill variant="s" size="sm" onClick={() => onChangeArt(kind)}>Change</Pill>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="small muted">Pictures of this game are blurred at your adult games level, so its art cannot be chosen here.</p>
           )}
-          {game.screen && <Row label="Resolution">{`${game.screen[0]} × ${game.screen[1]}`}</Row>}
-          {game.engineLabel ? <Row label="Made with">{game.engineLabel}</Row> : game.renpyVersion && <Row label="Made with">{`Ren’Py ${game.renpyVersion}`}</Row>}
-          {game.engine && <Row label="Plays on">{`Ren’Py ${game.engine} web`}</Row>}
-          {game.family === 'renpy' && game.saveDir && (
-            <Row label="Save folder">
-              <span className="font-mono text-[13px]">{game.saveDir}</span>
-            </Row>
-          )}
-          {game.source.archive && <Row label="Source">{game.source.archive}</Row>}
-          <Row label="Download">{game.canReinstall ? 'Kept for reinstalling' : 'Not kept. Add the download again to reinstall.'}</Row>
-          {game.installedAt && <Row label="Installed">{capitalize(ago(game.installedAt))}</Row>}
-        </div>
-      </Card>
-      {admin && <Card title="Danger zone">
-        <p className="mb-4 text-sm text-zinc-400">Reinstall and uninstall keep your saves, mods and walkthrough. Removing a game from the library keeps its saves.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {game.canReinstall && (
-            <Button size="sm" icon={<RefreshCw className="size-4" />} onClick={() => setReinstall(true)}>
-              {game.status === 'installed' ? 'Reinstall' : 'Install'}
-            </Button>
-          )}
-          {game.canReinstall && <Button size="sm" variant="ghost" onClick={() => setConfirm('download')}>Delete download</Button>}
-          {game.status === 'installed' && (
-            <Button size="sm" variant="danger" icon={<Trash2 className="size-4" />} onClick={() => setConfirm('uninstall')}>
-              Uninstall
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" onClick={() => setConfirm('forget')}>
-            Remove from library
-          </Button>
-        </div>
-      </Card>}
+        </Card>
+        <Card title="Installation">
+          <div className="list tight">
+            <Row label="Status">{STATUS[game.status]}</Row>
+            {game.status === 'installed' && <Row label="Size">{bytes(game.sizeBytes)}</Row>}
+            {game.screen && <Row label="Resolution">{`${game.screen[0]} × ${game.screen[1]}`}</Row>}
+            {game.engineLabel ? <Row label="Made with">{game.engineLabel}</Row> : game.renpyVersion && <Row label="Made with">{`Ren’Py ${game.renpyVersion}`}</Row>}
+            {game.engine && <Row label="Plays on">{`Ren’Py ${game.engine} web`}</Row>}
+            {game.phone && <Row label="Phones">{phoneLabel[game.phone]}</Row>}
+            {game.family === 'renpy' && game.saveDir && (
+              <Row label="Save folder">
+                <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13 }}>{game.saveDir}</span>
+              </Row>
+            )}
+            {game.source.archive && <Row label="Source">{game.source.archive}</Row>}
+            <Row label="Download">{game.canReinstall ? 'Kept for reinstalling' : 'Not kept. Add the download again to reinstall.'}</Row>
+            {game.installedAt && <Row label="Installed">{capitalize(ago(game.installedAt))}</Row>}
+          </div>
+        </Card>
+      </div>}
+        {section === 'manage' && admin && (
+          <Card title="Install and remove">
+            <p className="small muted" style={{ marginBottom: 12 }}>Reinstall and uninstall keep your saves, mods and walkthrough. Removing a game from the library keeps its saves.</p>
+            <div className="actions">
+              {game.canReinstall && (
+                <Button size="sm" icon={<RefreshCw />} onClick={() => setReinstall(true)}>
+                  {game.status === 'installed' ? 'Reinstall' : 'Install'}
+                </Button>
+              )}
+              {game.canReinstall && (
+                <Button size="sm" variant="ghost" onClick={() => setConfirm('download')}>
+                  Delete download
+                </Button>
+              )}
+              {game.status === 'installed' && (
+                <Button size="sm" variant="danger" onClick={() => setConfirm('uninstall')}>
+                  Uninstall
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setConfirm('forget')}>
+                Remove from library
+              </Button>
+            </div>
+          </Card>
+        )}
 
       <Modal
         open={reinstall}
@@ -381,16 +603,21 @@ function Details({ game }: { game: Game }) {
           </Button>
         }
       >
-        <p className="mb-4 text-sm text-zinc-400">Rebuilds the game from {game.source.archive}. Saves are not touched.</p>
-        {game.mods.files > 0 && (
-          <Switch checked={reapply} onChange={setReapply} label="Re-apply my mods" hint="Off moves your mod files aside instead of applying them to the fresh install." />
-        )}
+        <p className="small muted" style={{ marginBottom: 16 }}>Rebuilds the game from {game.source.archive}. Saves are not touched.</p>
+        {game.mods.files > 0 && <Switch checked={reapply} onChange={setReapply} label="Re-apply my mods" hint="Off moves your mod files aside instead of applying them to the fresh install." />}
       </Modal>
 
-      <Confirm open={confirm === 'download'} onClose={() => setConfirm(null)} danger title="Delete this download?" confirmLabel="Delete download" onConfirm={async () => {
-        setConfirm(null)
-        await act(() => del(`/api/games/${game.id}/download`), 'Download deleted')
-      }}>
+      <Confirm
+        open={confirm === 'download'}
+        onClose={() => setConfirm(null)}
+        danger
+        title="Delete this download?"
+        confirmLabel="Delete download"
+        onConfirm={async () => {
+          setConfirm(null)
+          await act(() => del(`/api/games/${game.id}/download`), 'Download deleted')
+        }}
+      >
         Deletes {game.source.archive}. Reinstalling this game, or another game using the same download, will need the download again. Installed games and saves are kept.
       </Confirm>
       <Confirm

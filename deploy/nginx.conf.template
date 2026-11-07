@@ -77,7 +77,8 @@ http {
       proxy_set_header Host $http_host;
       proxy_set_header X-Forwarded-Proto $scheme;
       proxy_cache auth;
-      proxy_cache_key "$cookie_renplay_session|$http_authorization|$resource_uri";
+      # The device level narrows what a request may read, so it is part of the answer too.
+      proxy_cache_key "$cookie_renplay_session|$http_authorization|$http_x_renplay_adult|$resource_uri";
       proxy_cache_valid 204 60s;
       proxy_ignore_headers Set-Cookie Cache-Control;
       proxy_hide_header Set-Cookie;
@@ -154,16 +155,24 @@ http {
       add_header X-Content-Type-Options "nosniff" always;
     }
 
-    location /api/covers/ {
+    # Made pictures only (the originals next to them are never served). Named by their content,
+    # so browsers keep them. The auth subrequest checks the person's adult level per picture.
+    # Quoted: nginx reads the braces of {32} as a block otherwise.
+    location ~ "^/api/art/(?<art_file>[0-9a-f]{32}\.webp)$" {
       set $resource_uri $uri;
-      alias ${DATA_DIR}/covers/;
-      add_header Cache-Control "private, no-store" always;
+      alias ${DATA_DIR}/art/$art_file;
+      default_type image/webp;
+      add_header Cache-Control "private, max-age=31536000, immutable" always;
+      add_header X-Content-Type-Options "nosniff" always;
     }
 
     location /api/walkthroughs/ {
       set $resource_uri $uri;
       alias ${DATA_DIR}/walkthroughs/;
+      # Text walkthroughs are plain UTF-8 text, never sniffed as anything else.
+      charset utf-8;
       add_header Cache-Control "private, no-store" always;
+      add_header X-Content-Type-Options "nosniff" always;
     }
 
     # Chunked archive uploads stream straight through to the server. (No

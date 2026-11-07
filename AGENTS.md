@@ -15,7 +15,7 @@ user-visible change.
 | Repository | What |
 |---|---|
 | `renplay` (this one) | The app: server, library UI, in-game runtime, container image |
-| `catalog` | Curated recipes and covers, published as `https://catalog.renplay.org/index.v3.json` (schema 3) |
+| `catalog` | Curated recipes and art, published as `https://catalog.renplay.org/index.v4.json` (schema 4) |
 | `engines` | Official Ren'Py web engines repackaged per version, index at `https://engines.renplay.org/index.json` |
 | `website` | The website, https://renplay.org |
 | `.github` | Organization profile and the default `FUNDING.yml` (Ko-fi) |
@@ -24,9 +24,11 @@ user-visible change.
 
 These decide most review comments. Follow them without being asked.
 
-- **Curated, not configurable.** Title, developer, tags, links and cover come only from the game's
-  catalog recipe. Users cannot edit them; there are no per-install image or engine options in the
-  UI. Add a setting only when a real user need cannot be solved by better defaults or a recipe.
+- **Curated, not configurable.** Title, developer, tags and links come only from the game's
+  catalog recipe, and users cannot edit them. Art is the one exception: the recipe gives the
+  default, and a person can choose another picture or upload one for their own view, an admin for
+  everyone. There are no per-install engine options in the UI. Add a setting only when a real user
+  need cannot be solved by better defaults or a recipe.
 - **Ren'Py first.** Renplay is a Ren'Py player. Other engines are second-class and shown as Beta:
   recognized, and supported only when their normal download plays easily (HTML games today), with
   the features that come cheap. A feature may work only for Ren'Py; never make Ren'Py worse for
@@ -41,6 +43,14 @@ These decide most review comments. Follow them without being asked.
   a capital letter too.
 - **Plain, short copy.** Full sentences, no jargon (say "save folder", not "config.save_directory",
   outside developer-facing places), no exclamation marks.
+- **Adult games have three levels.** Off (they do not exist for that person), Blurred (they show,
+  but no picture of them is ever sent) and Shown, set by the installation, the person's account (an
+  admin or a sign-in group), the person and the device. Each layer only narrows the one above. The
+  server enforces the person's level and the device's on every route (`content.ts`). Every route is
+  listed in `adult-levels.test.ts` with what the levels do on it, so a new route fails the tests
+  until it is classified. At Blurred the game plays (with its walkthrough and the person's save
+  files) but no picture of it is sent. Safe-for-work games
+  are never affected.
 - **Safe for work on GitHub.** Nothing published (docs, screenshots, the website, the catalog)
   may show adult art, even though many games are adult. Covers of adult games are linked from the
   developers' hosting, never copied; screenshots use `--sfw` (adult pictures blurred) or
@@ -53,7 +63,8 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/app.ts         HTTP app; src/index.ts starts it
   src/config.ts      Environment variables (all documented in README.md)
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
-  src/catalog.ts     Catalog index: recipe matching, linking games to recipes, cover cache, updates
+  src/catalog.ts     Catalog index: recipe matching, linking games to recipes, updates
+  src/art.ts         The art cache: five formats per game, the making order, choices, uploads
   src/engines.ts     Engine packs: index, download on demand, checksum, pruning
   src/builds.ts      Build folders /games/<id>/<build>/, build.json, caches
   src/jobs.ts        Background job queue (installs, mod builds, hashing) with logs
@@ -67,8 +78,10 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/saves/         Save store with history; savefile.ts reads Ren'Py save metadata
   scripts/           screenshots.mjs (Playwright, phone and desktop)
 selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. No tests; type-checked.
-  src/pages/         Library, GamePage, AddGames, Player, Settings, Activity
-  src/components/    AppShell (navigation, footer), GameCard (covers), SaveGallery, FileBrowser, ui.tsx
+  src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
+  src/lantern/       The 4.0 design system: Tile, Stage, the room, Sheet, controls, focus, travel
+                     (tokens and styles in src/index.css, the reference prototype in renplay-plans)
+  src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
   src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
 runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
 deploy/            nginx.conf.template and entrypoint.sh for the container
@@ -100,7 +113,8 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   restores compiled caches (bytecode and recompiled `.rpyc`), and talks to the player UI through
   `postMessage` (`renplay:*` messages).
 - **Catalog:** fetched every 6 hours or on demand. Games link to recipes by id, archive or save
-  folder (`Catalog.link`); covers are downloaded into `/data/covers` under content-hashed names.
+  folder (`Catalog.link`). The art cache (`art.ts`) downloads each picture once and makes every
+  format into `/data/art` under content-hashed names.
 
 ## Lessons that shaped the code
 

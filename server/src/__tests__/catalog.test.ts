@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { ArtStore } from '../art.js'
 import { Catalog, installedRelease, normalizeRecipe } from '../catalog.js'
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
@@ -71,15 +72,21 @@ describe('catalog', () => {
     return { cfg, db, catalog: new Catalog(cfg, db) }
   }
 
-  it('links installed games to their recipe and downloads covers', async () => {
+  it('links installed games to their recipe and makes their art from a schema 3 cover', async () => {
     const { cfg, db, catalog } = setup()
+    catalog.art = new ArtStore(cfg, db, catalog.content)
     db.insertGame({ id: 'ripples', title: 'ripples', status: 'installed', version: '0.9.23' })
     db.insertGame({ id: 'some-save', title: 'Some', status: 'installed', save_dir: 'BySave-1' })
     db.insertGame({ id: 'some-archive', title: 'Other', status: 'installed', source: JSON.stringify({ archive: 'Pattern-2.0-pc.zip' }) })
     db.insertGame({ id: 'unknown', title: 'Unknown', status: 'installed' })
-    // Covers of renplay 2.1 (picked from the game files) are removed.
+    // Renplay 3.x covers are forgotten: 4.0 makes its pictures in the art cache.
     mkdirSync(cfg.coversDir, { recursive: true })
-    writeFileSync(join(cfg.coversDir, 'ripples-old.webp'), 'old')
+    writeFileSync(join(cfg.coversDir, 'ripples.0123456789ab.webp'), 'old')
+    db.setSetting('catalog_covers', { ripples: { url: 'x', sha256: '', file: 'ripples.0123456789ab.webp', etag: '' } })
+    await catalog.init()
+    catalog.stop()
+    expect(existsSync(cfg.coversDir)).toBe(false)
+    expect(db.getSetting('catalog_covers', null)).toBeNull()
 
     const res = await catalog.refresh()
     expect(res.games).toBe(3)
@@ -88,25 +95,22 @@ describe('catalog', () => {
     expect(db.getGame('some-archive')!.recipe_id).toBe('by-pattern')
     expect(db.getGame('unknown')!.recipe_id).toBe('')
 
-    const url = catalog.cover('ripples')!
-    expect(url).toMatch(/^\/api\/covers\/ripples\.[0-9a-f]{12}\.webp$/)
-    expect(readdirSync(cfg.coversDir)).toEqual([url.split('/').pop()])
-    // Stored as a WebP thumbnail, scaled down to 960 pixels wide.
-    const thumb = await sharp(readFileSync(join(cfg.coversDir, url.split('/').pop()!))).metadata()
-    expect([thumb.format, thumb.width, thumb.height]).toEqual(['webp', 960, 762])
-    // An image that does not match the catalog's checksum is refused.
-    expect(catalog.cover('by-save')).toBeNull()
+    // The 1260x1000 cover is a grid source: whole on its glow, with its credit.
+    expect(catalog.recipe('ripples')!.art).toEqual([expect.objectContaining({ kind: 'grid', source: 'developer', width: 1260, height: 1000 })])
+    const art = catalog.gameArt(db.getGame('ripples')!) as Record<string, { url1x: string | null; width: number; made: string | null }>
+    expect(art['grid']).toMatchObject({ width: 600, made: 'whole' })
+    const file = join(cfg.dataDir, 'art', art['grid']!.url1x!.split('/').pop()!)
+    expect((await sharp(readFileSync(file)).metadata()).format).toBe('webp')
+    // A picture that does not match the catalog's checksum is refused, a failed download reported.
     expect(res.errors.some((e) => e.includes('by-save') && e.includes('changed'))).toBe(true)
-    // A cover that fails to download is reported, not fatal.
-    expect(catalog.cover('by-pattern')).toBeNull()
     expect(res.errors.some((e) => e.includes('by-pattern'))).toBe(true)
+    expect((catalog.gameArt(db.getGame('some-save')!) as Record<string, { url1x: string | null }>)['grid']?.url1x ?? null).toBeNull()
 
-    // Unchanged covers are not downloaded again.
+    // Pictures already made are not downloaded again.
     const before = coverRequests
     await catalog.refresh()
-    expect(coverRequests).toBe(before + 1)
-    expect(catalog.cover('ripples')).toBe(url)
-    expect(existsSync(join(cfg.coversDir, url.split('/').pop()!))).toBe(true)
+    expect(coverRequests).toBe(before)
+    expect(existsSync(file)).toBe(true)
     db.close()
   })
 
@@ -135,7 +139,7 @@ describe('catalog', () => {
     expect(cols).not.toContain('cover')
     expect(cols).not.toContain('save_dir_locked')
     expect(db.getGame('kept')).toMatchObject({ title: 'Kept', family: 'renpy', engine_label: '', entry: '' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(10)
+    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(16)
     db.close()
   })
 
@@ -188,7 +192,7 @@ describe('catalog', () => {
     db.close()
     db = Db.open(root)
     expect(db.getGame('kept')).toMatchObject({ title: 'Kept', favorite_at: '', source: '{"archive":"game.zip"}' })
-    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 10 })
+    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 16 })
     db.updateGame('kept', { favorite_at: '2026-11-04T12:00:00.000Z' })
     db.close()
     db = Db.open(root)

@@ -152,7 +152,12 @@
     saveDir: cfg.saveDir || null,
     known: new Map(), // path -> { mtime, size, hash }
     lazy: new Map(), // path -> { size, mtime, loaded }
-    queue: new Map(), // path -> { data|null, mtime }
+    queue: new Map(), // path -> { data|null, mtime, base }
+    // The server's version of each file this device last saw (its mtime), sent with every upload so
+    // the server can tell when another device saved the same file in between.
+    base: new Map(),
+    // True once the server's list arrived: without it (an offline start) no base is known.
+    baseKnown: false,
     inflight: false,
     online: true,
     lastSync: 0,
@@ -295,9 +300,9 @@
 
   // ~/.renpy is shared by games, never by accounts (including unsent changes).
   function localKey(path) { return String(cfg.userId) + ':' + path }
-  function idbPut(path, data, mtime, synced) {
+  function idbPut(path, data, mtime, synced, base) {
     return idbTx('readwrite', function (s) {
-      s.put({ key: localKey(path), userId: cfg.userId, game: cfg.id, path: path, data: data, mtime: mtime, synced: synced ? 1 : 0 })
+      s.put({ key: localKey(path), userId: cfg.userId, game: cfg.id, path: path, data: data, mtime: mtime, synced: synced ? 1 : 0, base: base })
     }).catch(function () {})
   }
 
@@ -334,12 +339,20 @@
     })
   }
 
-  function idbMarkSynced(path, mtime) {
+  function idbMarkSynced(path, mtime, base) {
     return idbTx('readwrite', function (s) {
       var r = s.get(localKey(path))
       r.onsuccess = function () {
         var v = r.result
-        if (!v || v.mtime !== mtime) return
+        if (!v) return
+        if (v.mtime !== mtime) {
+          // A newer write waits here: it now builds on the version the server just took.
+          if (base !== undefined && !v.synced) {
+            v.base = base
+            s.put(v)
+          }
+          return
+        }
         if (v.data === null) s.delete(localKey(path))
         else {
           v.synced = 1
@@ -539,11 +552,58 @@
     })
   }
 
+  /** The server version this device last saw, 0 for none, or null when that is not known. */
+  function currentBase(path) {
+    if (!state.baseKnown) return null
+    return state.base.has(path) ? state.base.get(path) : 0
+  }
+
   function enqueue(path, bytes, mtime) {
     var data = bytes ? new Uint8Array(bytes) : null
+    // The base is read when the upload is sent, after any upload before it. Only the copy kept on
+    // this device records it now, for a later visit that delivers it.
     state.queue.set(path, { data: data, mtime: mtime })
-    idbPut(path, data, mtime, false)
+    idbPut(path, data, mtime, false, currentBase(path))
     pump()
+  }
+
+  function readLocal(path) {
+    try {
+      return FS.readFile(HOME + '/' + path)
+    } catch (e) {
+      return null
+    }
+  }
+
+  /**
+   * The conflict rule: another device saved this file since this one last saw it. The copy saved
+   * later stays in the slot and the other is kept in History, so nothing is lost. When the server
+   * kept its own copy, the game gets that copy too.
+   */
+  function onConflict(path, answer, sentHash) {
+    post('save-conflict', { path: path, kept: answer.conflict === 'kept' ? 'other' : 'this', deleted: sentHash === null })
+    if (answer.conflict !== 'kept') return
+    var mtime = answer.mtime
+    fetch(API + '/raw?path=' + encodeURIComponent(path), { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status)
+        mtime = Number(r.headers.get('x-renplay-mtime')) || mtime
+        return r.arrayBuffer()
+      })
+      .then(function (buf) {
+        // Only while the game still holds what it sent (or, after a delete, nothing): a save made
+        // since then is newer and goes up as usual.
+        var local = readLocal(path)
+        if (sentHash === null ? local : !local || hash(local) !== sentHash) return
+        var bytes = new Uint8Array(buf)
+        writeLocal(path, bytes, mtime)
+        state.known.set(path, { mtime: mtime, size: bytes.length, hash: hash(bytes) })
+        state.base.set(path, mtime)
+        idbPut(path, bytes, mtime, true, mtime)
+      })
+      .catch(function (e) {
+        console.warn('[renplay] could not fetch the kept copy of', path, e)
+      })
   }
 
   function pump() {
@@ -557,16 +617,36 @@
     state.inflight = true
     status()
     var url = API + '/file?path=' + encodeURIComponent(path)
+    var headers = { 'content-type': 'application/octet-stream', 'x-mtime': String(item.mtime) }
+    // A write kept from an earlier visit carries the base it was made on, one made now the newest.
+    // A write kept by an older Renplay has none and is delivered as before.
+    var base = item.base !== undefined ? item.base : currentBase(path)
+    if (base !== null) headers['x-base'] = String(base)
     var req = item.data
-      ? fetch(url, { method: 'PUT', body: item.data, headers: { 'content-type': 'application/octet-stream', 'x-mtime': String(item.mtime) } })
-      : fetch(url, { method: 'DELETE' })
+      ? fetch(url, { method: 'PUT', body: item.data, headers: headers })
+      : fetch(url, { method: 'DELETE', headers: base !== null ? { 'x-base': String(base) } : {} })
+    var sentHash = item.data ? hash(item.data) : null
     req
       .then(function (r) {
-        if (!r.ok && !(r.status === 404 && !item.data)) throw new Error('HTTP ' + r.status)
+        // 409 on a delete: another device saved the file since, so it stays and comes back here.
+        var deleteKept = !item.data && r.status === 409
+        if (!r.ok && !deleteKept && !(r.status === 404 && !item.data)) throw new Error('HTTP ' + r.status)
         state.online = true
         state.failures = 0
         state.lastSync = Date.now()
-        idbMarkSynced(path, item.mtime)
+        if (!item.data) {
+          idbMarkSynced(path, item.mtime)
+          state.base.delete(path)
+          if (deleteKept) return r.json().then(function (answer) { onConflict(path, answer, null) }, function () {})
+          return
+        }
+        return r.json().then(function (answer) {
+          if (answer && answer.mtime) state.base.set(path, answer.mtime)
+          idbMarkSynced(path, item.mtime, answer && answer.mtime)
+          if (answer && answer.conflict) onConflict(path, answer, sentHash)
+        }, function () {
+          idbMarkSynced(path, item.mtime)
+        })
       })
       .catch(function (e) {
         console.warn('[renplay] upload failed for', path, e)
@@ -606,6 +686,7 @@
     return fetchJSON(API + '/boot', { cache: 'no-store' }, 3)
       .then(function (b) {
         server = b
+        state.baseKnown = true
       })
       .catch(function (e) {
         console.warn('[renplay] save server unreachable, using the local copy', e)
@@ -627,9 +708,11 @@
           var bytes = b64ToBytes(f.data)
           writeLocal(f.path, bytes, f.mtime)
           state.known.set(f.path, { mtime: f.mtime, size: bytes.length, hash: hash(bytes) })
+          state.base.set(f.path, f.mtime)
         })
         if (server && server.lazy) {
           server.lazy.forEach(function (f) {
+            state.base.set(f.path, f.mtime)
             if (!serverFiles.has(f.path)) createLazy(f.path, f.size, f.mtime)
           })
         }
@@ -639,21 +722,22 @@
           if (!server) {
             if (e.data) writeLocal(e.path, e.data, e.mtime)
             if (e.synced) state.known.set(e.path, { mtime: e.mtime, size: e.data ? e.data.length : 0, hash: e.data ? hash(e.data) : null })
-            else if (e.data) state.queue.set(e.path, { data: e.data, mtime: e.mtime })
+            else if (e.data) state.queue.set(e.path, { data: e.data, mtime: e.mtime, base: e.base === undefined ? null : e.base })
             return
           }
           if (e.synced) return
-          // Always deliver an unsent write. Server history preserves any newer server copy.
+          // Always deliver an unsent write, with the base it was made on: the server applies the
+          // conflict rule when another device saved the same file meanwhile.
           if (e.data) {
             writeLocal(e.path, e.data, e.mtime)
             state.known.set(e.path, { mtime: e.mtime, size: e.data.length, hash: hash(e.data) })
-            state.queue.set(e.path, { data: e.data, mtime: e.mtime })
+            state.queue.set(e.path, { data: e.data, mtime: e.mtime, base: e.base === undefined ? null : e.base })
           } else {
             try {
               FS.unlink(HOME + '/' + e.path)
             } catch (er) {}
             state.known.delete(e.path)
-            state.queue.set(e.path, { data: null, mtime: e.mtime })
+            state.queue.set(e.path, { data: null, mtime: e.mtime, base: e.base === undefined ? null : e.base })
           }
         })
         state.ready = true
@@ -1149,6 +1233,16 @@
     })
   }
 
+  /** The patches asked for, as a Python dict of known names and True or False only. */
+  function patchArg(p) {
+    if (!p || typeof p !== 'object') return 'None'
+    var out = []
+    ;['rollback', 'skip', 'console'].forEach(function (k) {
+      if (typeof p[k] === 'boolean') out.push('"' + k + '": ' + (p[k] ? 'True' : 'False'))
+    })
+    return out.length ? '{' + out.join(', ') + '}' : 'None'
+  }
+
   function pyStr(s) {
     return JSON.stringify(String(s))
   }
@@ -1208,13 +1302,20 @@
     return exec(py, 30000)
   }
 
+  /** Saves where the person is: an autosave, or in a game without autosave a quick save. */
   function autosave() {
     return exec(
       'result = False\n' +
-        'if not renpy.context()._main_menu and config.has_autosave:\n' +
-        '    renpy.force_autosave(take_screenshot=True, block=True)\n' +
+        'if not renpy.context()._main_menu:\n' +
+        '    if config.has_autosave:\n' +
+        '        renpy.force_autosave(take_screenshot=True, block=True)\n' +
+        '    else:\n' +
+        '        import renpy.loadsave as _rl\n' +
+        '        renpy.take_screenshot()\n' +
+        '        _rl.cycle_saves("quick-", config.quicksave_slots)\n' +
+        '        renpy.save("quick-1", extra_info=save_name)\n' +
         '    result = True\n',
-      6000,
+      8000,
     ).catch(function () {
       return false
     })
@@ -1234,12 +1335,115 @@
         break
       case 'renplay:save-and-exit':
         autosave()
-          .then(function () {
-            return flush(8000)
+          .then(function (saved) {
+            return flush(10000).then(function (ok) {
+              post('flushed', { ok: ok, saved: !!saved, id: d.id })
+            })
           })
-          .then(function (ok) {
-            post('flushed', { ok: ok, id: d.id })
+        break
+      case 'renplay:save-now':
+        // A save into Ren'Py's own quick-save slots, rotated as the game's Quick Save does, with a
+        // screenshot. Not in the main menu, where there is nothing to save.
+        exec(
+          'result = False\n' +
+            'if not renpy.context()._main_menu:\n' +
+            '    import renpy.loadsave as _rl\n' +
+            '    renpy.take_screenshot()\n' +
+            '    _rl.cycle_saves("quick-", config.quicksave_slots)\n' +
+            '    renpy.save("quick-1", extra_info=save_name)\n' +
+            '    result = True\n',
+          8000,
+        )
+          .then(function (saved) {
+            return flush(8000).then(function (ok) {
+              post('saved-now', { ok: !!saved && ok, saved: !!saved, id: d.id })
+            })
           })
+          .catch(function () {
+            post('saved-now', { ok: false, saved: false, id: d.id })
+          })
+        break
+      case 'renplay:options':
+        // This person's patches for the game (kept in its persistent data, so they follow the person
+        // to every device) and Ren'Py's text size. Applied when the game is ready and after a load.
+        exec(
+          [
+          "def _renplay_options(want, size):",
+          "    import renpy",
+          "    st = renpy.store",
+          "    config = st.config",
+          "    p = st.persistent",
+          "    cur = dict(getattr(p, \"_renplay_patches\", None) or {})",
+          "    orig = getattr(renpy, \"_renplay_orig\", None)",
+          "    if orig is None:",
+          "        orig = renpy._renplay_orig = dict(rollback=config.rollback_enabled, hard=config.hard_rollback_limit, skip=config.allow_skipping, console=config.console)",
+          "    off = []",
+          "    if want:",
+          "        for k in (\"rollback\", \"skip\", \"console\"):",
+          "            if k in want:",
+          "                if cur.get(k) and not want[k]:",
+          "                    off.append(k)",
+          "                cur[k] = bool(want[k])",
+          "        p._renplay_patches = cur",
+          "    def keep():",
+          "        c = getattr(st.persistent, \"_renplay_patches\", None) or {}",
+          "        if c.get(\"rollback\"):",
+          "            config.rollback_enabled = True",
+          "            config.hard_rollback_limit = max(config.hard_rollback_limit, 100)",
+          "        if c.get(\"skip\"):",
+          "            config.allow_skipping = True",
+          "            st._skipping = True",
+          "        if c.get(\"console\"):",
+          "            config.console = True",
+          "            if st._console.console is None:",
+          "                st._console.console = st._console.DebugConsole()",
+          "                renpy._renplay_console_made = True",
+          "    if \"rollback\" in off:",
+          "        config.rollback_enabled = orig[\"rollback\"]",
+          "        config.hard_rollback_limit = orig[\"hard\"]",
+          "    if \"skip\" in off:",
+          "        config.allow_skipping = orig[\"skip\"]",
+          "    if \"console\" in off:",
+          "        config.console = orig[\"console\"]",
+          "        if getattr(renpy, \"_renplay_console_made\", False):",
+          "            st._console.console = None",
+          "            renpy._renplay_console_made = False",
+          "    keep()",
+          "    previous = getattr(renpy, \"_renplay_keep\", None)",
+          "    config.after_load_callbacks = [f for f in config.after_load_callbacks if f is not previous] + [keep]",
+          "    config.interact_callbacks = [f for f in config.interact_callbacks if f is not previous] + [keep]",
+          "    renpy._renplay_keep = keep",
+          "    if size is not None:",
+          "        st._preferences.font_size = float(size)",
+          "        st.renpy.free_memory()",
+          "        renpy.display.interface.display_reset = True",
+          "        st.renpy.restart_interaction()",
+          "    if want or size is not None:",
+          "        st.renpy.save_persistent()",
+          "    return dict(patches=cur, fontSize=st._preferences.font_size)",
+            'result = _renplay_options(' + patchArg(d.patches) + ', ' + (typeof d.fontSize === 'number' && d.fontSize >= 0.5 && d.fontSize <= 2 ? String(d.fontSize) : 'None') + ')',
+          ].join('\n'),
+          6000,
+        ).then(
+          function (r) {
+            post('options', { ok: true, patches: (r && r.patches) || {}, fontSize: r && r.fontSize })
+          },
+          function (er) {
+            console.warn('[renplay] options', er)
+            post('options', { ok: false })
+          },
+        )
+        break
+      case 'renplay:accessibility':
+        // Ren'Py's own accessibility menu (shift+A), where the game offers it.
+        exec('renpy.run(ToggleScreen("_accessibility"))\nrenpy.restart_interaction()\nresult = True', 4000).then(
+          function () {
+            post('accessibility', { ok: true })
+          },
+          function () {
+            post('accessibility', { ok: false })
+          },
+        )
         break
       case 'renplay:load':
         loadSlot(d.slot).catch(function (er) {

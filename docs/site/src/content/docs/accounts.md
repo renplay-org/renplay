@@ -85,7 +85,7 @@ RENPLAY_OIDC_CLIENT_ID=renplay
 RENPLAY_OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc-client-secret
 RENPLAY_OIDC_NAME="Pocket ID"
 RENPLAY_OIDC_ADMIN_GROUP=renplay-admins
-RENPLAY_OIDC_ADULT_GROUP=renplay-adults
+RENPLAY_OIDC_ADULT_GROUPS=renplay-adults=shown,renplay-family=blurred
 ```
 
 Accounts are matched by issuer and subject, never by email or display name. First sign-in creates
@@ -121,7 +121,7 @@ RENPLAY_OIDC_NAME=Authentik
 
 If the standard mappings omit groups from the ID token, add a `groups` scope mapping returning
 `{"groups": [group.name for group in request.user.ak_groups.all()]}`. Assign group names matching
-`RENPLAY_OIDC_ADMIN_GROUP` and `RENPLAY_OIDC_ADULT_GROUP`.
+`RENPLAY_OIDC_ADMIN_GROUP` and the groups in `RENPLAY_OIDC_ADULT_GROUPS`.
 
 ### Authelia
 
@@ -168,7 +168,7 @@ RENPLAY_LDAP_BIND_PASSWORD_FILE=/run/secrets/ldap-password
 RENPLAY_LDAP_BASE_DN=dc=example,dc=org
 RENPLAY_LDAP_USER_FILTER='(&(objectClass=person)(uid={username}))'
 RENPLAY_LDAP_ADMIN_FILTER='memberOf=cn=renplay-admins,ou=groups,dc=example,dc=org'
-RENPLAY_LDAP_ADULT_FILTER='memberOf=cn=renplay-adults,ou=groups,dc=example,dc=org'
+RENPLAY_LDAP_ADULT_GROUPS=renplay-adults=shown,renplay-family=blurred
 ```
 
 For LLDAP's default internal listener use `ldap://lldap:3890` only on a trusted private network.
@@ -194,12 +194,18 @@ created on first sign-in.
 
 ### Group-driven permissions
 
-Configured admin and adult groups/filters set their respective provider grants. They are refreshed
-at every sign-in through that provider, including revocations. **Users** shows whether admin access
+Configured admin groups or filters grant admin access, and adult groups set the highest adult games
+level of their members. `RENPLAY_OIDC_ADULT_GROUPS` and `RENPLAY_LDAP_ADULT_GROUPS` take
+`group=off|blurred|shown` pairs separated by commas. OIDC matches the groups claim exactly, LDAP the
+cn of the user's memberOf groups, ignoring case. A person in several groups gets the highest of
+their levels, and a person in none gets Off. The 3.x variables still work:
+`RENPLAY_OIDC_ADULT_GROUP=name` means that group gets Shown, and a match of
+`RENPLAY_LDAP_ADULT_FILTER` gets Shown. Both are refreshed at every sign-in through that provider,
+including revocations. **Users** shows whether admin access
 was assigned in Renplay, granted by `RENPLAY_ADMINS`, or set by a provider group. Provider-managed
 permissions cannot be edited there. Admin access assigned directly in **Users** is kept across all
 provider sign-ins and unlinking. Missing or malformed groups grant neither permission. A configured
-adult group can restrict even the owner. Instance-wide blocking always wins. With several linked
+adult group can restrict even the owner. The installation's level always wins. With several linked
 providers, the last provider sign-in that manages a permission sets it, unless admin access was
 assigned directly in Renplay. Local password sign-in does not refresh directory groups. Changes
 are applied at the next provider sign-in, not continuously in the background.
@@ -226,8 +232,8 @@ linking. An identity already belonging to another account cannot be linked or si
 You can unlink a method only when another usable method remains with the current configuration.
 A directory username reserved by another local account does not count. Unlinking ends other
 sessions. If the sign-in supplied the current admin grant, unlinking removes it, including grants
-from `RENPLAY_ADMINS`. Admin access assigned in **Users** is kept. Unlinking a provider with an adult
-access rule changes adult access to Blocked. The last enabled admin must keep its admin method
+from `RENPLAY_ADMINS`. Admin access assigned in **Users** is kept. Unlinking a provider with adult
+groups sets that account's adult games level to Off. The last enabled admin must keep its admin method
 until another admin exists. Unavailable providers and disabled local passwords do not count as
 working remaining sign-in methods.
 
@@ -252,20 +258,18 @@ trusted network or behind your own authentication. Disabling sign-in is not a wa
 
 ## Adult games
 
-The instance's choice still comes first. An admin grants adult access per account; new accounts
-are blocked unless `RENPLAY_ADULT_DEFAULT=allow`. The first admin has access unless a provider's
-group rule restricts it. Games with no recipe
-count as adult for restricted accounts until an admin marks them safe.
+Adult games have three levels, Off, Blurred and Shown, set in four layers that only narrow: the
+installation, each person's account (set by an admin in **Users**, or by a sign-in group), the
+person's own choice, and the device. New people start at `RENPLAY_ADULT_DEFAULT`, Off unless you
+set it. The first admin starts at Shown unless a sign-in group says otherwise.
 
-**Account → Adult pictures** has **Show**, **Hide pictures** (the default) and **Hide adult games**.
-**On this device** (also in **Settings → This browser**) can narrow that choice, never widen it:
-a device cannot show pictures hidden by the account, or show adult games the account hides.
-These controls only appear for users with adult access.
+**Account → Adult games** shows the four rows and says what you see and why. Games with no recipe
+count as adult for a person at Off until an admin marks them safe.
 See [Adult games](/start-here/adult-games/).
 
 ## Users
 
-Open **Settings → Users** (admins only) to add users, change roles and adult access, disable or
+Open **Settings → Users** (admins only) to add users, change roles and adult games levels, disable or
 re-enable an account, or reset its password. Each row shows games with save folders and the number
 of current save files (including persistent and HTML storage, excluding shared keys and history).
 Users cannot demote, disable or remove the last enabled admin. Add another admin first.

@@ -17,7 +17,6 @@ import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, s
 import { defaultImagePolicy, imageConcurrency } from './optimize.js'
 import { PackWriter, writeIndex } from './pack.js'
 import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
-import { ADULT_REASON } from '../content.js'
 import { detectEngine, type EngineInfo } from './family.js'
 import { extractHtml, storyId, versionFromName } from './html.js'
 import { detectLayout, extractProject } from './project.js'
@@ -109,7 +108,8 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     } else {
       match = catalog.match({ name: source.archive, size: source.size, sha256: source.sha256 })
     }
-    if (catalog.content.blocked && (match?.recipe.nsfw || (p.recipeId && catalog.isAdultId(p.recipeId)))) throw new Error(ADULT_REASON)
+    // The route refuses adult games up front; this catches a switch to off while the job waited.
+    if (catalog.content.hidesRecipe(match?.recipe.nsfw) || (p.recipeId && catalog.isAdultId(p.recipeId) && catalog.content.hidesRecipe(true))) throw new Error('This is an adult game, and adult games are off on this Renplay.')
     if (match) ctx.log(`Recipe: ${match.recipe.id}${match.release ? ` (${match.release.version}, ${match.release.status})` : ' (unlisted version)'}`)
     const settings = match ? catalog.settings(match.recipe, match.release) : {}
 
@@ -248,9 +248,12 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
       await deps.overlays.archive(existing.id)
       ctx.log('Previous mods were moved aside (not re-applied to this version)')
     }
+    const recipeId = match?.recipe.id ?? existing?.recipe_id ?? ''
     const row: Partial<GameRow> = {
       status: 'installed',
-      recipe_id: match?.recipe.id ?? existing?.recipe_id ?? '',
+      recipe_id: recipeId,
+      // Adult or not from the recipe now, not at the next catalog sync: the game is visible the moment it is installed.
+      adult: adultFlag(catalog, recipeId, existing),
       version: meta.version ?? match?.release?.version ?? '',
       renpy_version: gameRenpy ?? '',
       engine,
@@ -368,9 +371,11 @@ async function installHtml(
   await rename(staging, builds.dir(id, build))
   const size = await dirSize(builds.dir(id, build))
   const previous = existing?.build ? baseOf(existing.build) : undefined
+  const recipeId = match?.recipe.id ?? existing?.recipe_id ?? ''
   const row: Partial<GameRow> = {
     status: 'installed',
-    recipe_id: match?.recipe.id ?? existing?.recipe_id ?? '',
+    recipe_id: recipeId,
+    adult: adultFlag(deps.catalog, recipeId, existing),
     version: version ?? '',
     renpy_version: engine.version ?? '',
     engine: '',
@@ -390,6 +395,12 @@ async function installHtml(
   await builds.prune(id, previous)
   ctx.log(`Installed ${id} (build ${build}, ${engine.label}, ${(size.bytes / 1e9).toFixed(2)} GB)`)
   return { game: id, build, family: engine.family, size: size.bytes, saveDir, title, version, images, recipe: match?.recipe.id ?? null }
+}
+
+/** A game is adult when its recipe is. Without a recipe it keeps what the library knew. */
+export function adultFlag(catalog: Pick<Catalog, 'isAdultId'>, recipeId: string, existing: GameRow | null | undefined): number {
+  if (recipeId) return catalog.isAdultId(recipeId) ? 1 : 0
+  return existing?.adult ?? 0
 }
 
 async function modsInfo(deps: ImportDeps, id: string): Promise<BuildInfo['mods']> {

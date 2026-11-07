@@ -1,6 +1,6 @@
 import type { Game, Vocabulary } from '../lib/api'
 import { gameTags } from '../lib/tags'
-import { Badge } from './ui'
+import { TagPill } from '../lantern/controls'
 
 export default function GameTags({ game, vocabulary, showContent = false }: { game: Game; vocabulary: Vocabulary; showContent?: boolean }) {
   const tags = gameTags(game, vocabulary)
@@ -8,15 +8,23 @@ export default function GameTags({ game, vocabulary, showContent = false }: { ga
   const content = tags.filter((t) => t.group === 'content')
   return (
     <>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="row wrap" style={{ gap: 6 }}>
         {primary.map((tag) => (
-          <span key={tag.id} className={['art', 'protagonist'].includes(tag.group) ? 'text-xs text-zinc-500' : 'text-xs text-zinc-200'}>{tag.label}</span>
+          <span key={tag.id} className={['art', 'protagonist'].includes(tag.group) ? 'tag dim' : 'tag'}>
+            {tag.label}
+          </span>
         ))}
       </div>
       {showContent && content.length > 0 && (
-        <details className="mt-3 text-xs text-zinc-400">
-          <summary className="min-h-10 cursor-pointer py-2">Show content tags</summary>
-          <div className="flex flex-wrap gap-2">{content.map((tag) => <Badge key={tag.id}>{tag.label}</Badge>)}</div>
+        <details style={{ marginTop: 10 }}>
+          <summary className="small muted" style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+            Show content tags
+          </summary>
+          <div className="row wrap" style={{ gap: 6, marginTop: 6 }}>
+            {content.map((tag) => (
+              <TagPill key={tag.id}>{tag.label}</TagPill>
+            ))}
+          </div>
         </details>
       )}
     </>

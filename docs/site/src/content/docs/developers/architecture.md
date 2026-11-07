@@ -31,7 +31,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 | `/data/saves/`, `/data/save-history/` | Compatibility symlinks to owner 1's folders |
 | `/data/users-removed/` | Archived removed accounts; never automatically purged |
 | `/data/overlays/<id>/` | Mods: the user's files layered over a game |
-| `/data/covers/` | Covers downloaded from the catalog (content-hashed names) |
+| `/data/art/` | The art cache: made pictures by content hash, originals in `src/` (`art.ts`) |
 | `/data/walkthroughs/` | Walkthrough PDFs |
 
 `/data` is what to back up. Everything in `/games` except `_archives` can be rebuilt (from the
@@ -129,10 +129,11 @@ for schema 7, migration, sessions, nginx protection and the request-local permis
 
 ## The catalog
 
-`catalog.ts` fetches the index (`index.v3.json`, catalog schema 3; `normalizeRecipe` also reads
-schema 2) every hour (or from Settings). It links installed games to
-recipes (by id, archive or save folder) and reports newer working releases as updates. Library
-metadata (title, developer, tags, links, cover, summary and game state) comes only from recipes.
+`catalog.ts` fetches the index (`index.v4.json`, catalog schema 4; `normalizeRecipe` also reads
+schemas 2 and 3, turning a schema 3 cover into a grid) every hour (or from Settings). It links
+installed games to recipes (by id, archive or save folder) and reports newer working releases as
+updates. Library metadata (title, developer, tags, links, summary and game state) comes only from
+recipes. Art comes from recipes too, and a person or an admin can choose another picture.
 
 The cache stores recipes and the tag vocabulary together for offline starts. Vocabulary entries
 from multiple indexes merge in configured order, with the first definition winning.
@@ -175,23 +176,49 @@ save-gallery metadata share a bounded cache keyed by store root, folder, filenam
 a changed or deleted save is reflected on the next list. Up next uses the newest played installed,
 non-finished game and invalidates on player exit.
 
-Optional catalog `free` and `cover.sfw` are additive to schema 3. The API keeps its existing cover
-URL field and exposes `coverSfw` alongside it, including on archive matches. Safe covers are
-allowed while adult save screenshots remain hidden. The empty library's starter is the first
-Ren'Py recipe with `free: true` that is not `nsfw` and has a working release; without one it shows
-no starter. Account preference `adultPictures` defaults to `hide-pictures`; `show` and `hide-games`
-are the other values. Device overrides use `renplay:adult-pictures:<user id>`. A device cannot grant
-adult access the account lacks, or widen the account's picture preference. Hidden art is not requested.
+The empty library's starter is the first Ren'Py recipe with `free: true` that is not `nsfw` and
+has a working release. Without one it shows no starter.
+
+**Adult levels** (`content.ts`). A request's level is the lowest of the installation's, the
+person's ceiling, the person's choice and this device's. The browser keeps the device level in
+`localStorage` (`renplay:adult-device`, for everyone using that browser) and sends it as the
+`X-Renplay-Adult` header on API calls. The game page, an iframe, gets it as `?adult=` in `playUrl`.
+A device value can only narrow, so the server trusts it. It is enforced on every API answer, so a
+page below the device level never holds an adult picture's address. Requests a browser makes on its
+own (pictures, files nginx serves, the assets of HTML games) carry no header and are checked at the
+person's level. At Off an adult game is left out of every
+answer and every route addressed to it answers 404: games, files, saves, jobs (also jobs with only
+a download or a recipe), downloads, the Users tools, counts and catalog problems. At Blurred the game
+is listed and plays, with its walkthrough and the person's own save files, but no picture of it is
+sent: no art URL in JSON (each format is its ThumbHash and tint), 404 for art, save screenshots and the build's presplash, directly and
+through nginx's `/api/auth/check`. `adult-levels.test.ts` lists every registered route with what
+the levels do on it, so a new route fails until it is classified. The 3.x columns (`adult_access`,
+the `adultPictures` preference, the `adult_games` setting) are kept in step, the installation level
+included, so a downgrade to 3.2 never shows more.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1–200) and `offset` (default 0). Invalid or unsafe integers use the defaults.
 Jobs sort active first, then newest first, with the id breaking timestamp ties. Offset pages
 reflect the current queue; running jobs can move between pages as their status changes.
 
-Covers are the games' official cover art, linked by the catalog from the developers' own hosting
-(itch.io, Steam) with a sha256. Renplay downloads each one once, refuses it if the checksum
-differs, and keeps a WebP thumbnail (at most 960 pixels wide) in `/data/covers` under a
-content-hashed name.
+**Art** (`art.ts`). A game has five formats: grid 600x900, wide 920x430, hero 1920x620, a logo and
+a square icon. For each, the chosen picture is a person's choice, else the admin's for everyone
+(`art_choices`, scope 0), else the catalog's default. `planFormat` decides how a format is made:
+real art in the shape is resized; another shape is cropped around its focal point when the recipe
+gives one or when the crop keeps 60 percent (else sharp's attention guess); otherwise a wide from a
+poster puts the poster at the left on its glow, a grid from a wide picture puts it across the upper
+half, a missing hero is the picture enlarged and blurred, and anything else is the picture whole on
+its glow. The icon is cut from the grid (62 percent of its short side). Logos are never made. Each
+original is downloaded once into `/data/art/src/<sha256>` and checked against the index; made
+pictures are WebP at 1x, and at 2x only when the source has 1.5 pixels per 1x pixel, named by their
+content and recorded in `art_made` with a ThumbHash and a tint (the catalog build's method). The
+key of a made picture is its source, method and focal point, so a change of either makes a new one.
+`sync()` runs after each catalog refresh and at start: it makes every format of every recipe and
+library game for everyone and for each person who chose something, then forgets made pictures and
+originals nothing uses. A request that finds a format not made yet gets the source's hash and the
+format is made in the background. `/api/art/<file>` and nginx's location serve made pictures only,
+with a year of private caching, after the same level check. Uploads (`art_uploads`) stay in the
+instance's cache.
 
 ## Mods
 
@@ -208,11 +235,11 @@ upgrading changes nothing; a fresh install has no answer, blocks, and asks once 
 
 Blocking is done where the data enters and where it leaves:
 
-- **Catalog.** Each configured URL is read from its safe-for-work sibling (`index.v3.json` becomes
-  `index.v3.sfw.json`). If that is missing, the full index is fetched and its adult recipes and
-  content tags are dropped, with a log line. Adult recipes and covers are never cached; switching to
-  block deletes the ones cached and the cached covers. Only a stub is kept per known adult recipe
-  (id, archive names, sizes and checksums, save folder, no title, tags or cover), so that
+- **Catalog.** Each configured URL is read from its safe-for-work sibling (`index.v4.json` becomes
+  `index.v4.sfw.json`). If that is missing, the full index is fetched and its adult recipes and
+  content tags are dropped, with a log line. Adult recipes are never cached at Off, and the next art
+  sync forgets their pictures. Below Shown no adult picture is downloaded. Only a stub is kept per
+  known adult recipe (id, archive names, sizes and checksums, save folder, no title, tags or art), so that
   `match()` can recognize its archive: `POST /api/imports` and the install job refuse it with a plain
   reason, and `GET /api/archives` marks it `blocked`.
 - **Library.** `games.adult` remembers, from the last catalog that knew the recipe, which games are
@@ -224,7 +251,7 @@ Blocking is done where the data enters and where it leaves:
   enforced in the catalog, games, save tree, exports and play routes. Unknown games count as adult
   for restricted users unless an admin marks one safe. Account preference Hide adult games narrows
   this further; Hide pictures is cosmetic, not access control.
-- **Static files.** nginx's server-level `auth_request` checks covers, walkthroughs and build files
+- **Static files.** nginx's server-level `auth_request` checks art, walkthroughs and build files
   too. Successful permission checks have a 60-second cache. Proxied routes check in Node; public
   engines, the runtime, UI and health remain open.
 

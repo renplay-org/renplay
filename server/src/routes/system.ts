@@ -1,4 +1,7 @@
 import { keepaliveToken } from '../auth.js'
+import type { SaveBackups } from '../backups.js'
+import { SYNC_SETTING, syncCodesOn } from './saves.js'
+import type { Catalog } from '../catalog.js'
 import { keepDownloads } from '../downloads.js'
 import { statfs } from 'node:fs/promises'
 import { Router } from 'express'
@@ -20,7 +23,7 @@ async function disk(path: string) {
   }
 }
 
-export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode): Router {
+export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode, catalog: Catalog, backups: SaveBackups): Router {
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/health', (_req, res) => {
@@ -48,6 +51,32 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
     })
   })
 
+  // ---- Sync codes ------------------------------------------------------------
+
+  router.put('/system/sync', (req, res) => {
+    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'Expected { on: true or false }')
+    db.setSetting(SYNC_SETTING, req.body.on)
+    res.json({ on: req.body.on })
+  })
+
+  // ---- save backups ---------------------------------------------------------
+
+  router.get('/system/backups', async (_req, res) => {
+    res.json(await backups.info())
+  })
+
+  router.post('/system/backups', async (_req, res) => {
+    if (!backups.dir) throw new HttpError(409, 'Save backups are off. Set RENPLAY_BACKUP_DIR to a folder to turn them on.')
+    const name = await backups.run()
+    res.json({ ok: true, name, ...(await backups.info()) })
+  })
+
+  router.get('/system/backups/:name', (req, res, next) => {
+    const path = backups.path(req.params.name)
+    if (!path) throw new HttpError(404, 'Backup not found')
+    res.download(path, req.params.name, (err) => err && next(new HttpError(404, 'Backup not found')))
+  })
+
   router.get('/system', async (_req, res) => {
     const games = db.allGames().filter((g) => !content.hides(g))
     const used = new Map<string, string[]>()
@@ -57,6 +86,7 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
     const { orphans } = await builds.verify()
     res.json({
       version,
+      sync: { on: syncCodesOn(db), server: cfg.syncServer },
       engines: {
         installed: installed.map((e) => ({ ...e, usedBy: used.get(e.version) ?? [] })),
         available: available.map((e) => ({ version: e.version, renpy: e.renpy, bytes: Object.values(e.files).reduce((n, f) => n + f.size, 0) })),
@@ -105,8 +135,11 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
     }
     const limit = Math.max(1, Math.min(200, pageNumber(req.query['limit'], 30)))
     const offset = pageNumber(req.query['offset'], 0)
+    // Off: hidden jobs are left out before paging, so pages, the total and busy only count what this person may see.
+    const visible = content.viewerLevel() === 'off' ? db.listJobs(Number.MAX_SAFE_INTEGER, 0).filter((j) => !catalog.jobHidden(j)) : null
+    const page = visible ? visible.slice(offset, offset + limit) : db.listJobs(limit, offset)
     res.json({
-      jobs: db.listJobs(limit, offset).filter((j) => !content.hides(j.game ? db.getGame(j.game) : null)).map((j) => ({
+      jobs: page.map((j) => ({
         id: j.id,
         type: j.type,
         game: j.game,
@@ -121,30 +154,39 @@ export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engine
         startedAt: j.started_at || null,
         finishedAt: j.finished_at || null,
       })),
-      busy: jobs.isBusy(),
-      total: db.countJobs(),
+      busy: visible ? visible.some((j) => j.status === 'running') : jobs.isBusy(),
+      total: visible ? visible.length : db.countJobs(),
     })
   })
 
+  /** The job, unless it belongs to a game that does not exist for this person. */
+  const visibleJob = (id: string) => {
+    const j = db.getJob(id)
+    if (!j || catalog.jobHidden(j)) throw new HttpError(404, 'Job not found')
+    return j
+  }
+
   router.get('/jobs/:id/log', (req, res) => {
-    const j = db.getJob(req.params.id)
-    if (!j) throw new HttpError(404, 'Job not found')
+    const j = visibleJob(req.params.id)
     res.type('text/plain').send(jobs.getLog(j.id))
   })
 
   router.post('/jobs/:id/cancel', (req, res) => {
+    visibleJob(req.params.id)
     if (!jobs.cancel(req.params.id)) throw new HttpError(409, 'Job is not running or queued')
     res.json({ ok: true })
   })
 
   router.post('/jobs/:id/retry', (req, res) => {
+    visibleJob(req.params.id)
     const id = jobs.retry(req.params.id)
     if (!id) throw new HttpError(409, 'Job cannot be retried')
     res.json({ jobId: id })
   })
 
   router.delete('/jobs', (_req, res) => {
-    jobs.clearFinished()
+    // An admin at Off clears what they can see. The jobs about hidden games stay.
+    jobs.clearFinished(content.viewerLevel() === 'off' ? (j) => catalog.jobHidden(j) : undefined)
     res.json({ ok: true })
   })
 

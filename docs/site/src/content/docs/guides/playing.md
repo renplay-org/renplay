@@ -8,14 +8,35 @@ description: Play on phones and computers, install the home-screen app, and move
 Open **Search** in the header (also available on phones), or press **⌘K** on Apple devices and
 **Ctrl+K** elsewhere. Search titles, developers and tags across your library and the catalog,
 open a page, or resume your Up next game. Use arrow keys and Enter or tap a result. Catalog
-results show where to get the game; only admins see Add games, Activity and Users.
-The same adult-access and hidden-picture choices apply in search as in the library.
+results show where to get the game. Only admins see Add games, Activity and Users.
+Search follows your adult games level, as the library does.
 
 ## On a computer
 
-Open the game and press **Play**. The game paces itself to your display. A toolbar offers saves,
-fullscreen, mute and display options. **Up next** on the library home opens your latest save
-straight away; mark a story **Finished** on its page to leave it out.
+Open the game and press **Play**. The game paces itself to your display and fills the screen.
+The **Renplay** pill at the top left (or **Esc**, or a swipe from the left edge on a phone) opens
+the player menu: **Saves** to load one, **Guide** for the game's walkthroughs, and **Options** for
+sound, full screen, the display, the text size and Ren'Py's own accessibility menu. Under **For you
+in this game**, **Rollback**, **Skip** and the **Developer console** turn those on even where the
+game turns them off. They are kept with the game's saves, so they follow you to every device, and
+the game's files do not change. **Save now** makes a quick
+save, and **Save and exit** saves and goes back to the library. Walkthroughs open in a window
+beside the game that you can move, resize and see through, or below it on a phone held upright.
+**Up next** on the library home opens your latest save straight away.
+
+## Up next, status and ratings
+
+**Up next** holds the games you are playing, newest first. **Not now** takes a game out of it until
+you play it again. On a game's page, under **Play**, set its **Status**: Playing, Stalled, Dropped
+or Finished. Stalled, Dropped and Finished leave Up next, and your saves are kept. Rate a game with
+up to five stars. The library can sort by **Rating** and **Time played**.
+
+## History
+
+**Account → Play history** shows how long you played, day by day, and the time per game with your
+ratings and statuses. A game's page shows its last sessions. Renplay counts the time a game is open
+and in front of you, and stops after 15 minutes without a tap, click or key. Each person has their
+own history.
 
 ## On a phone
 
@@ -38,7 +59,7 @@ The player explains this itself where a fullscreen button would not work.
 
 Use the fullscreen button in the player.
 
-Serve Renplay over HTTPS so the browser can cache the game and the home-screen app works; see
+Serve Renplay over HTTPS so the browser can cache the game and the home-screen app works. See
 [Reverse proxy and HTTPS](/install/reverse-proxy/).
 
 ## Saves and history
@@ -49,15 +70,40 @@ Serve Renplay over HTTPS so the browser can cache the game and the home-screen a
 - **Every overwrite and delete keeps the earlier version.** `RENPLAY_SAVE_HISTORY` sets how many
   versions are kept per save file (20 by default). Look at them in the game’s saves view.
 - Uninstalling or reinstalling a game never deletes saves.
+- When two devices change the same save without seeing each other's copy, the copy saved later
+  stays in the slot and the other is kept in History. The player and the game's saves both say so.
+- Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every
+  earlier version instead of the newest few. Only you see names, notes and pins, and the save file
+  itself never changes.
+- Admins also get a daily zip of everyone's saves. See [Backups](/upgrading/#daily-save-backups).
 
 ## Export to desktop Ren’Py, and import from it
 
 Export a game’s saves from its page, or all of them in **Settings**. Put the files in the desktop
-game’s save folder and it loads them. The other way works too: import a desktop game’s saves
-into Renplay.
+game’s save folder and it loads them.
+
+To bring saves the other way, open **Settings** on the computer where you played and choose
+**Import from a computer**. Renplay shows where Ren’Py keeps saves on that system
+(`~/Library/RenPy` on a Mac, `%APPDATA%\RenPy` on Windows, `~/.renpy` on Linux). Choose that
+folder, or a zip of it, and a preview lists each game's saves as new, newer or older than the
+server's copy before anything is written. Older copies never replace newer ones: they are kept in
+History. Saves for games you have not added yet wait on the server until you add them. To import
+saves for one game only, use **Import** under the game's **Saves**.
+
+### Sync codes
+
+Games made with Ren’Py 8.1 or newer have **Upload Sync** and **Download Sync** on their save and
+load screens. Renplay speaks the same codes, once an admin turns on **Sync codes** in
+**Settings**. Under the game's **Saves**, **Sync code** makes a code from your saves to type into
+Download Sync on a computer or Android phone, or brings in the saves from a code that Upload Sync
+made there. The saves travel encrypted through Ren’Py’s sync server, which keeps them for an hour,
+and they leave your server only when you ask for a code. Saves brought in follow the rule for two
+devices: the newer copy stays in the slot and the other is kept in History.
 
 ## Walkthroughs and play time
 
-A game can have a walkthrough PDF next to it in the player. Renplay counts the time a game is open
-and visible, and shows it with your latest save. Time is counted from the moment you upgraded to
-a version that counts it.
+A game can keep several walkthroughs: PDFs, pictures and text files. Admins add them under
+**Walkthroughs** on the game's page, and rename, reorder or remove them from each one's **More**
+menu. Everyone who plays the game can open them. Renplay counts the time a game is open and
+visible, and shows it with your latest save. Time is counted from the moment you upgraded to a
+version that counts it.

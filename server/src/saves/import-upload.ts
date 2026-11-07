@@ -14,7 +14,7 @@ export const IMPORT_CONCURRENCY = 2
 let active = 0
 
 /** One global budget covers personal and admin imports, including disconnected handlers. */
-export function saveImport(field: 'file' | 'files', handler: (req: Request, res: Response) => Promise<void>): RequestHandler {
+export function saveImport(field: 'file' | 'files', handler: (req: Request, res: Response) => Promise<void>, opts: { fields?: number } = {}): RequestHandler {
   return async (req, res, next) => {
     if (active >= IMPORT_CONCURRENCY) return next(new HttpError(429, 'Another save import is running. Try again shortly.'))
     if (Number(req.get('content-length')) > IMPORT_MAX_BYTES + (1 << 20)) return next(new HttpError(413, 'Save import too large'))
@@ -35,7 +35,7 @@ export function saveImport(field: 'file' | 'files', handler: (req: Request, res:
         },
         _removeFile(_req, file, done) { rm(file.path, { force: true }).then(() => done(null), done) },
       }
-      const upload = multer({ storage, limits: { fileSize: IMPORT_MAX_FILE_BYTES, files: field === 'file' ? 1 : 200, fields: 0, parts: 201, fieldNameSize: 100, headerPairs: 100 } })
+      const upload = multer({ storage, limits: { fileSize: IMPORT_MAX_FILE_BYTES, files: field === 'file' ? 1 : 200, fields: opts.fields ?? 0, parts: 201 + (opts.fields ?? 0), fieldNameSize: 100, headerPairs: 100 } })
       await new Promise<void>((resolve, reject) => (field === 'file' ? upload.single(field) : upload.array(field))(req, res, (error) => error ? reject(error) : resolve()))
       await handler(req, res)
     } catch (error) { next(error) }

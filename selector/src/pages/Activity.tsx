@@ -1,19 +1,29 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, CircleSlash, Clock, Loader2, RotateCw, ScrollText, Square, Trash2, XCircle } from 'lucide-react'
+import { Check, Clock, Loader2, RotateCw, ScrollText, Square, Trash2, XCircle, CircleSlash } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import DocsLink from '../components/DocsLink'
-import { Badge, Button, Empty, Modal, Progress, Spinner, errorText, useToast } from '../components/ui'
+import { Button, Empty, Modal, Progress, Spinner, errorText, useToast } from '../components/ui'
+import { TagPill } from '../lantern/controls'
+import { useRoom } from '../lantern/Room'
 import { api, del, jobTitle, post, type Job, type JobsResponse } from '../lib/api'
 import { ago, bytes, pct, capitalize } from '../lib/format'
 import { useGames, useJobs } from '../lib/queries'
 
 const icon = {
-  queued: <Clock className="size-4 text-zinc-400" />,
-  running: <Loader2 className="size-4 animate-spin text-accent-300" />,
-  done: <CheckCircle2 className="size-4 text-emerald-400" />,
-  failed: <XCircle className="size-4 text-red-400" />,
-  cancelled: <CircleSlash className="size-4 text-zinc-500" />,
-  interrupted: <CircleSlash className="size-4 text-amber-400" />,
+  queued: <Clock />,
+  running: <Loader2 className="animate-spin" />,
+  done: <Check />,
+  failed: <XCircle />,
+  cancelled: <CircleSlash />,
+  interrupted: <CircleSlash />,
+}
+const iconClass: Record<Job['status'], string> = {
+  queued: '',
+  running: 'run',
+  done: 'ok',
+  failed: 'bad',
+  cancelled: '',
+  interrupted: 'bad',
 }
 
 function dayGroup(job: Job): string {
@@ -60,6 +70,7 @@ export default function Activity() {
   const qc = useQueryClient()
   const toast = useToast()
   const [logFor, setLogFor] = useState<Job | null>(null)
+  useRoom({ game: null, quiet: true })
   if (isLoading) return <Spinner />
   const attempts = new Map<string, { job: Job; count: number }>()
   const seen = new Set<string>()
@@ -81,39 +92,44 @@ export default function Activity() {
     }
   }
   return (
-    <div className="animate-fade-in">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-white">Activity</h1>
-        <Button size="sm" variant="ghost" icon={<Trash2 className="size-4" />} onClick={() => act(() => del('/api/jobs'))}>
+    <div style={{ maxWidth: 1080 }}>
+      <div className="row between wrap" style={{ gap: 12 }}>
+        <div>
+          <h1 className="h1">Activity</h1>
+          <p className="lead" style={{ marginTop: 6 }}>Installs, updates and optimizations. One job runs at a time.</p>
+        </div>
+        <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => act(() => del('/api/jobs'))}>
           Clear finished
         </Button>
       </div>
       {!jobs.length ? (
-        <Empty title="Nothing happening">Installs, updates and optimizations show up here.</Empty>
+        <div style={{ marginTop: 18 }}>
+          <Empty title="Nothing happening">Installs, updates and optimizations show up here.</Empty>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {jobs.map(({ job: j, count }, index) => {
-            const active = j.status === 'running' || j.status === 'queued'
-            const res = resultText(j)
-            return (
-              <Fragment key={j.id}>
-              {(index === 0 || dayGroup(jobs[index - 1].job) !== dayGroup(j)) && <h2 className="pb-1 pt-5 text-sm font-semibold text-zinc-400">{dayGroup(j)}</h2>}
-              <div className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/[0.07]">
-                <div className="flex flex-wrap items-center gap-3">
-                  {icon[j.status]}
-                  <div className="min-w-0 flex-1 basis-[70%] sm:basis-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="min-w-0 break-words font-medium text-zinc-100">{jobTitle(j, games ?? [])}</span>
-                      {(count > 1 || j.status === 'failed' || j.status === 'interrupted') && <Badge>{count} attempt{count === 1 ? '' : 's'}</Badge>}
+        jobs.map(({ job: j, count }, index) => {
+          const active = j.status === 'running' || j.status === 'queued'
+          const res = resultText(j)
+          return (
+            <Fragment key={j.id}>
+              {(index === 0 || dayGroup(jobs[index - 1]!.job) !== dayGroup(j)) && <div className="day">{dayGroup(j)}</div>}
+              <div className="rows">
+                <div className="r stack-ph">
+                  <div className={`ic ${iconClass[j.status]}`}>{icon[j.status]}</div>
+                  <div className="grow">
+                    <div className="row wrap" style={{ gap: 8 }}>
+                      <span className="t">{jobTitle(j, games ?? [])}</span>
+                      {(count > 1 || j.status === 'failed' || j.status === 'interrupted') && <TagPill>{count} attempt{count === 1 ? '' : 's'}</TagPill>}
+                      {j.status === 'queued' && <TagPill>Queued</TagPill>}
                     </div>
-                    <div className="mt-0.5 break-words text-sm text-zinc-500">
+                    <div className="m">
                       {j.status === 'running' ? (
                         <>
                           {j.stage}
                           {j.message ? ` · ${j.message}` : ''}
                         </>
                       ) : j.status === 'failed' || j.status === 'interrupted' ? (
-                        <span className="text-red-300">{j.error} <DocsLink path="troubleshooting/">Troubleshooting</DocsLink></span>
+                        <span className="red">{j.error} <DocsLink path="troubleshooting/">Troubleshooting</DocsLink></span>
                       ) : (
                         <>
                           {STATUS_LABEL[j.status]} · {capitalize(ago(j.finishedAt ?? j.createdAt))}
@@ -121,32 +137,35 @@ export default function Activity() {
                         </>
                       )}
                     </div>
+                    {j.status === 'running' && <Progress value={j.progress} className="thin" />}
                   </div>
-                  {j.status === 'running' && <span className="text-sm tabular-nums text-zinc-300">{pct(j.progress)}</span>}
-                  <div className="ml-auto flex gap-1">
-                    <Button size="sm" variant="ghost" icon={<ScrollText className="size-4" />} onClick={() => setLogFor(j)}>
+                  {j.status === 'running' && <span className="tnum muted-2 small">{pct(j.progress)}</span>}
+                  <div className="end">
+                    <Button size="sm" variant="ghost" icon={<ScrollText />} onClick={() => setLogFor(j)}>
                       Log
                     </Button>
                     {active && (
-                      <Button size="sm" variant="ghost" icon={<Square className="size-4" />} onClick={() => act(() => post(`/api/jobs/${j.id}/cancel`))}>
+                      <Button size="sm" variant="ghost" icon={<Square />} onClick={() => act(() => post(`/api/jobs/${j.id}/cancel`))}>
                         Cancel
                       </Button>
                     )}
                     {(j.status === 'failed' || j.status === 'interrupted' || j.status === 'cancelled') && (
-                      <Button size="sm" icon={<RotateCw className="size-4" />} onClick={() => act(() => post(`/api/jobs/${j.id}/retry`))}>
+                      <Button size="sm" icon={<RotateCw />} onClick={() => act(() => post(`/api/jobs/${j.id}/retry`))}>
                         Retry
                       </Button>
                     )}
                   </div>
                 </div>
-                {j.status === 'running' && <Progress value={j.progress} className="mt-3" />}
-                {j.status === 'queued' && <Badge className="mt-3">Queued</Badge>}
-              </div></Fragment>
-            )
-          })}
+              </div>
+            </Fragment>
+          )
+        })
+      )}
+      {hasNextPage && (
+        <div className="center" style={{ marginTop: 18 }}>
+          <Button loading={isFetchingNextPage} onClick={() => void fetchNextPage()}>Show more</Button>
         </div>
       )}
-      {hasNextPage && <div className="mt-6 text-center"><Button loading={isFetchingNextPage} onClick={() => void fetchNextPage()}>Show more</Button></div>}
       {logFor && <LogDialog job={logFor} onClose={() => setLogFor(null)} />}
     </div>
   )
@@ -160,7 +179,7 @@ function LogDialog({ job, onClose }: { job: Job; onClose: () => void }) {
   })
   return (
     <Modal open onClose={onClose} title="Job log" wide>
-      <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-xl bg-black/40 p-4 font-mono text-[12px] leading-relaxed text-zinc-300">{data || 'No output yet.'}</pre>
+      <pre style={{ maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', borderRadius: 12, background: 'rgba(0,0,0,.4)', padding: 16, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, lineHeight: 1.6, color: 'var(--fg-2)' }}>{data || 'No output yet.'}</pre>
     </Modal>
   )
 }

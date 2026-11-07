@@ -22,7 +22,7 @@ async function open(browser, options, label) {
   const page = await ctx.newPage()
   await page.route('**/api/**', (r) => (r.request().method() === 'GET' ? r.continue() : r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })))
   page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`))
-  if (sfw) await page.addInitScript(() => localStorage.setItem('renplay:blur-adult-covers', '1'))
+  if (sfw) await page.addInitScript(() => localStorage.setItem('renplay:adult-device', 'blurred'))
   return { ctx, page }
 }
 

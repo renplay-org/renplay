@@ -1,7 +1,7 @@
 {
   "name": "renplay-selector",
   "private": true,
-  "version": "3.2.0",
+  "version": "4.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,8 @@
     "lucide-react": "^1.66.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.16.0"
+    "react-router-dom": "^7.16.0",
+    "thumbhash": "^0.1.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.4",
