@@ -134,7 +134,7 @@ export async function trashDir(path: string, trashRoot: string): Promise<void> {
     await rm(path, { recursive: true, force: true })
     return
   }
-  void rm(dest, { recursive: true, force: true }).catch((e) => console.warn('trash cleanup failed', dest, e))
+  void rm(dest, { recursive: true, force: true }).catch((e) => console.warn(`Could not clean up ${dest}: ${(e as Error).message}`))
 }
 
 export async function emptyTrash(trashRoot: string): Promise<void> {

@@ -25,7 +25,7 @@ First look at the logs: **Settings** → **Activity** shows every install job wi
    a while; the player shows its progress.
 2. Open the game’s page in another browser. If it works there, clear site data for Renplay in the
    first one.
-3. Look at the player’s log (the toolbar can download it) for a Python error.
+3. Look at the game’s log for a Python error: the player menu’s **Options** has **Download the game’s log**.
 4. Check the [catalog](/catalog/): the recipe may say the game needs a different engine version or a
    patch. [Report it](/catalog/#request-a-game) if the catalog says nothing.
 5. Try pinning another engine with `RENPLAY_ENGINE` (see [Configuration](/configuration/)) and
@@ -83,6 +83,35 @@ Gateways that strip `Accept-Encoding` or decode gzip break compressed files. Ren
 engine as pre-compressed files for that reason. If a game loads halfway and stops, check that the
 proxy passes `Range` requests and does not rewrite bodies. See
 [Reverse proxy and HTTPS](/install/reverse-proxy/).
+
+## Reading the server log
+
+Every line has the same columns: the date and time (the server's `TZ`), the level, where it comes
+from, and what happened.
+
+```text
+2026-11-07 12:10:31  info   [server]   Renplay 4.0.1
+2026-11-07 12:10:31  info   [server]   Sign-in: off, everyone plays as the owner
+2026-11-07 12:10:34  info   [catalog]  Updated: 23 recipes
+2026-11-07 12:12:05  info   [job]      Install of eternum started
+2026-11-07 12:15:17  info   [job]      Install of eternum finished in 3 m 12 s
+2026-11-07 12:16:40  warn   [http]     GET /api/games/missing 404 in 5 ms, 26 B, from 203.0.113.7
+2026-11-07 12:16:41  info   [http]     PUT /api/games/eternum/rating 200 in 9 ms, 85 B, from 203.0.113.7
+```
+
+The start lists the version, the library, sign-in, the adult games level, the catalog, save backups
+and the folders. After that come installs, catalog updates, backups, sign-ins, warnings and errors,
+and requests: one line each, with the address of the person who sent it as the proxy in front saw
+it. Games, pictures, health checks and the play time heartbeat are never logged.
+
+`RENPLAY_LOG_LEVEL` chooses how much:
+
+| Level | Shows |
+|---|---|
+| `error` | Errors only |
+| `warn` | Also warnings and requests that failed (4xx, 5xx) |
+| `info` | Also the start, installs, catalog updates, backups, sign-ins, and requests that change something. The default |
+| `debug` | Also every request, and each install's own log as it runs |
 
 ## Nothing helps
 

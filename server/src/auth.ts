@@ -14,6 +14,7 @@ import { saveImport } from './saves/import-upload.js'
 import { HttpError, cleanRelPath, isSaveDirName } from './util/paths.js'
 import { SignInProviders, signInRandom, type ExternalIdentity } from './sign-in-providers.js'
 import { fetchAvatar, storeAvatar } from './avatars.js'
+import { always, log } from './util/log.js'
 
 // Measured locally at 207 ms (N=65536: 105 ms); explicit 128 MiB work factor.
 const PASSWORD_PREFIX = 'scrypt$1$131072$8$1$'
@@ -118,7 +119,7 @@ export class Accounts {
     if (this.enabled && !this.cfg.authLocal && !this.cfg.admins.length && !this.cfg.oidcAdminGroup && !this.cfg.ldapAdminFilter) throw new Error('SSO-only sign-in needs RENPLAY_ADMINS or an admin group or filter.')
     if (!!this.cfg.adminUsername !== !!this.cfg.adminPassword) throw new Error('Set both RENPLAY_ADMIN_USERNAME and RENPLAY_ADMIN_PASSWORD (or its _FILE variant)')
     if (this.unclaimed && this.cfg.adminUsername) await this.claim(this.cfg.adminUsername, this.cfg.adminUsername, this.cfg.adminPassword)
-    if (this.enabled && this.cfg.authLocal && this.unclaimed) console.log(`Setup code: ${this.setupCode}`)
+    if (this.enabled && this.cfg.authLocal && this.unclaimed) always('sign-in', `Setup code: ${this.setupCode}`)
     if (!this.enabled && this.user(this.cfg.authUser).disabled) throw new Error('RENPLAY_AUTH_USER is disabled')
     for (const u of this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]) await this.tag(u)
     for (const [legacy, target] of [[this.cfg.savesDir, this.store(1).root], [this.cfg.saveHistoryDir, this.store(1).historyRoot]]) {
@@ -162,6 +163,7 @@ export class Accounts {
     res.cookie('renplay_session', value, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/', maxAge: value ? DAYS30 : 0 })
   }
   private newSession(req: Request, res: Response, id: number): void {
+    log('sign-in', `Signed in: ${this.user(id).username}`)
     const token = random(), now = Date.now()
     this.db.raw.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?)').run(hash(token), id, now, now, now + DAYS30, (req.get('user-agent') ?? '').slice(0, 200))
     this.cookie(req, res, token)
@@ -385,7 +387,7 @@ export class Accounts {
       if (!manuallyAssigned && (identity.roleManaged || identity.admin || sameGrant)) {
         if (u.role === 'admin' && !identity.admin && !u.disabled) {
           const { n } = this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }
-          if (n <= 1) console.warn(`Last enabled admin ${id!} lost the sign-in provider admin grant. Restore provider group membership or configure RENPLAY_ADMINS without an admin group or filter to recover access.`)
+          if (n <= 1) console.warn(`sign-in: Last enabled admin ${id!} lost the sign-in provider admin grant. Restore provider group membership or configure RENPLAY_ADMINS without an admin group or filter to recover access.`)
         }
         this.db.raw.prepare('UPDATE users SET role = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = ?').run(identity.admin ? 'admin' : 'player', identity.roleManaged ? 'provider' : 'allowlist', identity.provider, identity.subject, id!)
       }

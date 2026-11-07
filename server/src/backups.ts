@@ -2,6 +2,7 @@ import { createWriteStream } from 'node:fs'
 import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import yazl from 'yazl'
+import { log, size } from './util/log.js'
 import type { Config } from './config.js'
 import type { Db } from './db.js'
 
@@ -129,11 +130,13 @@ export class SaveBackups {
       // Keep the newest few.
       for (const old of (await this.files()).slice(this.cfg.backupKeep)) await rm(join(dir, old.name), { force: true })
       this.error = null
+      log('backup', `Saves backed up: ${name}, ${count} ${count === 1 ? 'file' : 'files'}, ${size((await stat(join(dir, name))).size)}`)
       return name
     } catch (e) {
       ;(out as ReturnType<typeof createWriteStream> | null)?.destroy()
       await rm(temp, { force: true }).catch(() => {})
       this.error = (e as Error).message
+      log('backup', `Saves not backed up: ${this.error}`, 'error')
       throw e
     }
   }

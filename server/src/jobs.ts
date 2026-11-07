@@ -5,7 +5,11 @@ import https from 'node:https'
 import type { Config } from './config.js'
 import { parseJson, type Db, type JobRow } from './db.js'
 import { newId } from './util/fsx.js'
+import { log, took } from './util/log.js'
 import { JOB_LOG_LIMIT, JobLogs } from './joblogs.js'
+
+/** How the log names each kind of job. */
+const JOB_NAMES: Record<string, string> = { import: 'Install', 'apply-mods': 'Mod build', 'hash-archive': 'Checksum' }
 
 export interface JobContext<P = any> {
   id: string
@@ -130,6 +134,9 @@ export class JobManager {
     this.keepalive ??= startKeepalive(this.cfg)
     this.db.updateJob(next.id, { status: 'running', started_at: new Date().toISOString(), stage: 'Starting', progress: 0 })
     this.notify()
+    const started = Date.now()
+    const what = `${JOB_NAMES[next.type] ?? next.type}${next.game ? ` of ${next.game}` : ''}`
+    log('job', `${what} started`)
 
     const ctx: JobContext = {
       id: next.id,
@@ -143,12 +150,14 @@ export class JobManager {
         // Local time of the server (TZ), as people read the log.
         const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false })
         const text = `[${stamp}] ${line}\n`
+        // At debug the pod log follows each job as it runs.
+        log('job', line, 'debug')
         this.liveLog = (this.liveLog + text).slice(-JOB_LOG_LIMIT)
         try {
           this.logs.append(next.id, text)
         } catch (err) {
           // A full disk must not turn a log message into an unhandled job failure.
-          if (!this.logWriteFailed) console.error(`Could not persist job ${next.id} log:`, err)
+          if (!this.logWriteFailed) console.error(`job: Could not keep the log of job ${next.id}: ${(err as Error).message}`)
           this.logWriteFailed = true
         }
       },
@@ -169,12 +178,15 @@ export class JobManager {
         log: this.getLog(next.id),
         finished_at: new Date().toISOString(),
       })
+      log('job', `${what} finished in ${took(Date.now() - started)}`)
     } catch (e) {
       this.flush()
       const cancelled = abort.signal.aborted
       const msg = e instanceof Error ? e.message : String(e)
       ctx.log(`${cancelled ? 'Cancelled' : 'Failed'}: ${msg}`)
-      if (!cancelled && e instanceof Error && e.stack) console.error(`job ${next.id} (${next.type}) failed:`, e.stack)
+      if (cancelled) log('job', `${what} cancelled`)
+      else log('job', `${what} failed after ${took(Date.now() - started)}: ${msg}`, 'error')
+      if (!cancelled && e instanceof Error && e.stack) log('job', e.stack, 'debug')
       this.db.updateJob(next.id, {
         status: cancelled ? 'cancelled' : 'failed',
         error: msg,
