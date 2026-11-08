@@ -2,7 +2,7 @@ import { CloudOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Pill } from '../lantern/controls'
 import type { Game } from '@shared/api'
-import { bytes } from '../lib/format'
+import { bytes } from '@shared/format'
 import { keep, keptGame, offlineSupport, removeKept } from '../lib/offline'
 import { Confirm, Progress, errorText, useToast } from './ui'
 

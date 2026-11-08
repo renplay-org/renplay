@@ -7,7 +7,8 @@ import { TagPill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { api, del, jobTitle, post } from '../lib/api'
 import type { Job, JobsResponse } from '@shared/api'
-import { ago, bytes, pct, capitalize } from '../lib/format'
+import { ago, pct, capitalize } from '../lib/format'
+import { bytes } from '@shared/format'
 import { useGames, useJobs } from '../lib/queries'
 
 const icon = {
