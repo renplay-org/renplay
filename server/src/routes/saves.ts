@@ -55,22 +55,23 @@ export async function cachedSceneHash(store: SaveStore, dir: string, file: { nam
 export const syncCodesOn = (db: Db): boolean => db.getSetting<boolean>(SYNC_SETTING, false) === true
 export const SYNC_SETTING = 'renpy_sync'
 
-/** Limits for a shared account on a public server (the demo): one file, and everything with its history. */
+/** Limits for a shared account on a public server (the demo): one file, and all files with their history. */
 export interface SaveLimits {
   file: number
   total: number
+  files: number
 }
 
-export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer = 'https://sync.renpy.org', limits: SaveLimits = { file: 64 << 20, total: Infinity }): Router {
+export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer = 'https://sync.renpy.org', limits: SaveLimits = { file: 64 << 20, total: Infinity, files: Infinity }): Router {
   const router = Router({ caseSensitive: true, strict: true })
   // What the saves and their history take, counted again at most every 5 seconds.
-  let used: { at: number; bytes: Promise<number> } | null = null
-  const usedBytes = () => {
+  let used: { at: number; size: Promise<{ bytes: number; files: number }> } | null = null
+  const usedSize = () => {
     if (!used || Date.now() - used.at > 5000) {
-      const bytes = Promise.all([dirSize(store.root), dirSize(store.historyRoot)]).then(([a, b]) => a.bytes + b.bytes)
-      used = { at: Date.now(), bytes }
+      const size = Promise.all([dirSize(store.root), dirSize(store.historyRoot)]).then(([a, b]) => ({ bytes: a.bytes + b.bytes, files: a.files + b.files }))
+      used = { at: Date.now(), size }
     }
-    return used.bytes
+    return used.size
   }
 
   const game = (req: Request): GameRow => {
@@ -149,13 +150,17 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     res.type('application/octet-stream').send(data)
   })
 
-  router.put('/:id/file', express.raw({ type: () => true, limit: '64mb' }), async (req, res) => {
+  // The body is refused while it arrives once it passes the limit, never held whole in memory.
+  router.put('/:id/file', express.raw({ type: () => true, limit: limits.file }), async (req, res) => {
     const g = game(req)
     const { dir, name } = resolvePath(g, req.query['path'])
     const body = req.body as Buffer
     if (!Buffer.isBuffer(body)) throw new HttpError(400, 'Expected a binary body')
     if (body.length > limits.file) throw new HttpError(413, `A save here can be at most ${Math.round(limits.file / (1 << 20))} MB`)
-    if (Number.isFinite(limits.total) && (await usedBytes()) + body.length > limits.total) throw new HttpError(507, 'The saves here are full until the next fresh start')
+    if (Number.isFinite(limits.total)) {
+      const size = await usedSize()
+      if (size.bytes + body.length > limits.total || size.files >= limits.files) throw new HttpError(507, 'The saves here are full until the next fresh start')
+    }
     const mtime = Number(req.header('x-mtime')) || undefined
     // The version the device last saw, for the conflict rule. Older runtimes send none.
     const rawBase = req.header('x-base')

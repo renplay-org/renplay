@@ -60,8 +60,22 @@ jobs:
           context: deploy/demo
           platforms: linux/amd64
           build-args: IMAGE=ghcr.io/renplay-org/renplay:${{ steps.version.outputs.version }}
-          push: true
+          load: true
           tags: ghcr.io/renplay-org/renplay:demo
+
+      # A release without demo mode, or a broken build, must not replace a working demo.
+      - name: Try the demo in the new image
+        run: |
+          docker run -d --name demo -e PORT=10000 -p 8080:8080 --memory 512m ghcr.io/renplay-org/renplay:demo
+          for i in $(seq 1 60); do curl -fs -o /dev/null http://127.0.0.1:8080/api/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8080/api/auth/providers | grep -q '"demo":true'
+          curl -fsS -c /tmp/jar -X POST -H 'Sec-Fetch-Site: same-origin' http://127.0.0.1:8080/api/auth/demo > /dev/null
+          curl -fsS -b /tmp/jar http://127.0.0.1:8080/api/games/the-question | grep -q '"status":"installed"'
+          docker logs demo | tail -20
+          docker rm -f demo
+
+      - name: Push the image
+        run: docker push ghcr.io/renplay-org/renplay:demo
 
       - name: Start the demo from the new image
         env:

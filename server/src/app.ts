@@ -198,7 +198,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use('/api/content', createContentRouter(cfg, content, catalog))
   app.get('/api/saves-export', (req, res, next) => { void createSavesExportAll(accounts.store(), db, content)(req, res).catch(next) })
   app.use('/api/saves-import', createSavesImportRouter(() => accounts.store(), db, content, catalog))
-  app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content, cfg.syncServer, cfg.demo ? { file: 8 << 20, total: 256 << 20 } : undefined)(req, res, next))
+  app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content, cfg.syncServer, cfg.demo ? { file: 2 << 20, total: 32 << 20, files: 1000 } : undefined)(req, res, next))
   app.use('/api/games', createFilesRouter(db, builds, overlays, jobs, content))
   app.use('/api/games', createGamesRouter(deps))
   app.use('/api/history', createHistoryRouter(db, catalog, accounts))

@@ -67,7 +67,13 @@ try {
     const games = (await (await api('/api/games')).json()).games.filter((g) => g.status === 'installed')
     return games.length === archives.length && games.every((g) => g.art?.grid?.url1x && Object.values(g.art).every((f) => f.url1x))
   })
-  console.log(`seed: art made for ${archives.length} ${archives.length === 1 ? 'game' : 'games'}`)
+  // And the catalog's safe-for-work games (adult art is never downloaded below Shown), so the demo
+  // does not make them on its 0.1 CPU.
+  await until('the catalog art', async () => {
+    const games = (await (await api('/api/catalog')).json()).games.filter((g) => !g.nsfw)
+    return games.every((g) => g.art?.grid?.url1x)
+  })
+  console.log(`seed: art made for ${archives.length} ${archives.length === 1 ? 'game' : 'games'} and the catalog`)
   console.log('seed: done')
 } finally {
   server.kill('SIGTERM')

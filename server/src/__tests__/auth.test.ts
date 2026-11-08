@@ -320,7 +320,7 @@ describe('accounts authentication and security', () => {
     await request(a.app).get('/api/games').set('Cookie', guest).expect(200)
     await request(a.app).put('/api/games/safe/rating').set(site).set('Cookie', guest).send({ rating: 4 }).expect(200)
     await request(a.app).put('/api/saves/safe/file?path=safe/1-1-LT1.save').set(site).set('Cookie', guest).set('Content-Type', 'application/octet-stream').send(Buffer.from('a save')).expect(200)
-    // A huge file is not a save.
+    // A huge file is not a save, and it is refused before it is read whole.
     await request(a.app).put('/api/saves/safe/file?path=safe/big.save').set(site).set('Cookie', guest).set('Content-Type', 'application/octet-stream').send(Buffer.alloc(9 << 20)).expect(413)
     // Nothing that changes the shared account or adds files to the server.
     for (const [method, path, body] of [
@@ -332,6 +332,13 @@ describe('accounts authentication and security', () => {
       ['get', '/api/me/sessions', undefined],
       ['post', '/api/games/safe/art/upload?kind=grid', undefined],
       ['post', '/api/saves/safe/sync', { tz: 'UTC' }],
+      // Saves come only from playing: no imports, copies or a new save folder for everyone.
+      ['post', '/api/saves/safe/import', undefined],
+      ['post', '/api/saves/safe/copy', { from: 'safe', to: 'other' }],
+      ['post', '/api/saves/safe/save-dir', { saveDir: 'x', screen: [19999, 19999] }],
+      // Choices every visitor would share.
+      ['put', '/api/me/tags', { include: [], exclude: ['romance'] }],
+      ['put', '/api/me/adult', { level: 'off' }],
     ] as const) await (request(a.app) as any)[method](path).set(site).set('Cookie', guest).send(body).expect(403)
     // No other way in: not even the admin's password works in a demo.
     await request(a.app).post('/api/auth/login').set(site).send({ username: 'admin', password: 'correct password' }).expect(403)

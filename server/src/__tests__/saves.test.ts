@@ -39,7 +39,7 @@ describe('SaveStore', () => {
     const db = Db.open(join(root, 'data'))
     db.insertGame({ id: 'g', title: 'G', status: 'installed', build: 'b1', save_dir: 'G-1' })
     const app = express()
-    app.use('/api/saves', createSavesRouter(store, db, new ContentMode(loadConfig(), db), undefined, { file: 100, total: 250 }))
+    app.use('/api/saves', createSavesRouter(store, db, new ContentMode(loadConfig(), db), undefined, { file: 100, total: 250, files: 3 }))
     const put = (name: string, size: number) => request(app).put(`/api/saves/g/file?path=G-1/${name}`).set('content-type', 'application/octet-stream').send(Buffer.alloc(size, 1))
     await put('1-1-LT1.save', 101).expect(413)
     await put('1-1-LT1.save', 100).expect(200)
@@ -48,8 +48,17 @@ describe('SaveStore', () => {
     await new Promise((r) => setTimeout(r, 5100))
     await put('1-3-LT1.save', 100).expect(507)
     expect(await store.stat('G-1', '1-3-LT1.save')).toBeNull()
+    // And a number of files: many tiny ones fill it as well.
+    const few = new SaveStore(join(root, 'few'), join(root, 'few-history'), 3)
+    const small = express()
+    small.use('/api/saves', createSavesRouter(few, db, new ContentMode(loadConfig(), db), undefined, { file: 100, total: 10_000, files: 2 }))
+    const tiny = (name: string) => request(small).put(`/api/saves/g/file?path=G-1/${name}`).set('content-type', 'application/octet-stream').send(Buffer.from('x'))
+    await tiny('1-1-LT1.save').expect(200)
+    await tiny('1-2-LT1.save').expect(200)
+    await new Promise((r) => setTimeout(r, 5100))
+    await tiny('1-3-LT1.save').expect(507)
     db.close()
-  }, 15_000)
+  }, 25_000)
 
   it('writes, keeps history on overwrite, and restores', async () => {
     await store.write('Game-1', '1-1-LT1.save', Buffer.from('v1'))

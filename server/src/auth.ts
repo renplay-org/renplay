@@ -109,10 +109,16 @@ const DEMO_REFUSED: Array<[method: string, path: RegExp]> = [
   ['POST', /^\/api\/games\/[^/]+\/art\/upload$/],
   ['DELETE', /^\/api\/games\/[^/]+\/art\/uploads\/.+$/],
   ['POST', /^\/api\/saves-import$/],
-  ['POST', /^\/api\/saves\/[^/]+\/sync(\/download)?$/],
+  // Choices everyone shares, since everyone is the same guest.
+  ['PUT', /^\/api\/me\/(tags|adult)$/],
 ]
+/** The guest's save writes: a game's own saving, a save's name and note, deleting one, restoring one. */
+const DEMO_SAVE_WRITES = /^\/api\/saves\/[^/]+\/(file|meta|slot|history\/restore)$/
 export function demoCheck(req: Request): void {
-  if (DEMO_REFUSED.some(([m, p]) => (m === '*' || m === req.method) && p.test(req.path))) throw new HttpError(403, 'The demo cannot do this. Install your own Renplay to try it.')
+  const refused = DEMO_REFUSED.some(([m, p]) => (m === '*' || m === req.method) && p.test(req.path))
+  // Imports, copies, Sync codes and the save folder are not among them: they bring in files or change the game for everyone.
+  const saveWrite = req.method !== 'GET' && req.method !== 'HEAD' && /^\/api\/saves\//.test(req.path) && !DEMO_SAVE_WRITES.test(req.path)
+  if (refused || saveWrite) throw new HttpError(403, 'The demo cannot do this. Install your own Renplay to try it.')
 }
 
 export class Accounts {
