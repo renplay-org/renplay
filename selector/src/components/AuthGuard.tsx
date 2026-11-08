@@ -4,7 +4,7 @@ import { ApiError } from '../lib/api'
 import { useAuth, useProviders } from '../lib/auth'
 import { setAdminLighterBackground } from '../lib/backdrop'
 import { useDefaults } from '../lib/queries'
-import { Spinner } from './ui'
+import { Spinner } from '../lantern/ui'
 
 /** The signed-in pages: sign-in, setup or the library as the session says, and admin-only pages for admins. */
 export function AuthGuard({ admin = false }: { admin?: boolean }) {

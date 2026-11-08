@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Upload } from 'lucide-react'
 import { useState } from 'react'
-import { Button, errorText, useToast } from '../../components/ui'
-import { SourceLabel, LanternSwitch } from '../../lantern/controls'
+import { errorText, useToast } from '../../lantern/ui'
+import { SourceLabel, LanternSwitch, Pill } from '../../lantern/controls'
 import { api, post, put } from '../../lib/api'
 import { ago } from '../../lib/format'
 import { bytes } from '@shared/format'
@@ -19,12 +19,12 @@ export function SavesPanel() {
       <h2 className="h3" style={{ marginBottom: 6 }}>Saves</h2>
       <p className="small muted">Every save, autosave and persistent change is stored on the server when the game writes it, with previous versions kept. Export everything as a zip that works with desktop Ren’Py, or bring in the saves from a computer.</p>
       <div className="row wrap" style={{ marginTop: 12, gap: 8 }}>
-        <Button size="sm" icon={<Download />} href="/api/saves-export">
+        <Pill size="sm" icon={<Download />} href="/api/saves-export">
           Export all saves
-        </Button>
-        <Button size="sm" icon={<Upload />} to="/import-saves">
+        </Pill>
+        <Pill size="sm" icon={<Upload />} to="/import-saves">
           Import from a computer
-        </Button>
+        </Pill>
       </div>
       {sys?.sync && (
         <div style={{ marginTop: 16 }}>
@@ -90,9 +90,9 @@ function SaveBackups() {
             </div>
           )}
           <div>
-            <Button size="sm" loading={busy || data.running} onClick={() => void now()}>
+            <Pill size="sm" loading={busy || data.running} onClick={() => void now()}>
               Back up now
-            </Button>
+            </Pill>
           </div>
         </>
       ) : (

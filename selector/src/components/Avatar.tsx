@@ -1,4 +1,4 @@
-import { cx } from './ui'
+import { cx } from '../lantern/ui'
 
 export default function Avatar({ name, avatar, className, bare }: { name: string; avatar?: string; className?: string; bare?: boolean }) {
   const initials = name

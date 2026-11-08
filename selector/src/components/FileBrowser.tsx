@@ -24,8 +24,9 @@ import { api, del, post } from '../lib/api'
 import type { FileEntry, Game } from '@shared/api'
 import { bytes } from '@shared/format'
 import { useFiles, useJobs } from '../lib/queries'
-import { Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, cx, errorText, useToast } from './ui'
-import { Pill, TagPill } from '../lantern/controls'
+import { Confirm, Empty, Menu, MenuItem, Spinner, cx, errorText, useToast } from '../lantern/ui'
+import { Pill, TagPill, Bar } from '../lantern/controls'
+import Sheet from '../lantern/Sheet'
 
 const CodeEditor = lazy(() => import('./CodeEditor'))
 
@@ -146,7 +147,7 @@ export default function FileBrowser({ game }: { game: Game }) {
             <p className="xs muted" style={{ marginBottom: 6 }}>
               {applyJob.stage || 'Applying'}
             </p>
-            <Progress value={applyJob.progress} indeterminate={applyJob.status === 'queued'} />
+            <Bar value={applyJob.progress} indeterminate={applyJob.status === 'queued'} />
           </div>
         )}
         {lastApply?.status === 'failed' && !applyJob && <p className="notice red small">Applying mods failed: {lastApply.error}</p>}
@@ -220,13 +221,13 @@ export default function FileBrowser({ game }: { game: Game }) {
         )}
       </section>
 
-      <Modal
+      <Sheet
         open={newName !== null}
         onClose={() => setNewName(null)}
         title="New file"
         footer={
-          <Button
-            variant="primary"
+          <Pill
+            variant="p"
             disabled={!newName?.trim()}
             onClick={() => {
               const p = `${dir}/${newName!.trim().replace(/^\/+/, '')}`
@@ -235,14 +236,14 @@ export default function FileBrowser({ game }: { game: Game }) {
             }}
           >
             Create
-          </Button>
+          </Pill>
         }
       >
         <label className="field">
           <span>File name in {dir}</span>
           <input autoFocus value={newName ?? ''} onChange={(e) => setNewName(e.target.value)} placeholder="zz_my_mod.rpy" className="input" />
         </label>
-      </Modal>
+      </Sheet>
 
       {editing && <EditorDialog game={game} path={editing.path} isNew={editing.isNew} onClose={() => setEditing(null)} onSaved={refresh} />}
 
@@ -383,7 +384,7 @@ function EditorDialog({ game, path, isNew, onClose, onSaved }: { game: Game; pat
     }
   }
   return (
-    <Modal
+    <Sheet
       open
       wide="xl"
       fullPhone
@@ -392,12 +393,12 @@ function EditorDialog({ game, path, isNew, onClose, onSaved }: { game: Game; pat
       footer={
         <>
           <span className="mr-auto text-xs text-zinc-500">{dirty ? 'Unsaved changes · ⌘S to save' : 'Saved'}</span>
-          <Button variant="ghost" onClick={onClose}>
+          <Pill variant="q" onClick={onClose}>
             Close
-          </Button>
-          <Button variant="primary" loading={saving} disabled={!dirty && !isNew} onClick={save}>
+          </Pill>
+          <Pill variant="p" loading={saving} disabled={!dirty && !isNew} onClick={save}>
             Save
-          </Button>
+          </Pill>
         </>
       }
     >
@@ -418,6 +419,6 @@ function EditorDialog({ game, path, isNew, onClose, onSaved }: { game: Game; pat
           </Suspense>
         )}
       </div>
-    </Modal>
+    </Sheet>
   )
 }

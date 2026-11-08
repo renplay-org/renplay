@@ -1,12 +1,12 @@
 import { ExternalLink, FileCode2, RefreshCw } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import RecipeDialog from '../../components/RecipeDialog'
-import { Button } from '../../components/ui'
 import { post } from '../../lib/api'
 import type { CatalogSource } from '@shared/api'
 import { ago } from '../../lib/format'
 import { useCatalog, useGames, useSystem } from '../../lib/queries'
 import { setBy, useRun } from './common'
+import { Pill } from '../../lantern/controls'
 
 /** The catalog: where recipes come from, refreshing it, and a recipe for an installed game. */
 export function CatalogPanel() {
@@ -27,12 +27,12 @@ export function CatalogPanel() {
         </p>
         {catalog?.status.sources && <CatalogSources sources={catalog.status.sources} label={(s) => setBy(sys, s.kind === 'folder' ? 'RENPLAY_RECIPES_DIR' : 'RENPLAY_CATALOG_URLS')} />}
         <div className="actions" style={{ marginTop: 12 }}>
-          <Button size="sm" icon={<RefreshCw />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>
+          <Pill size="sm" icon={<RefreshCw />} onClick={() => run(() => post('/api/catalog/refresh'), 'Catalog refreshed')}>
             Refresh catalog
-          </Button>
-          <Button size="sm" variant="ghost" icon={<ExternalLink />} href="https://renplay.org/github/catalog" target="_blank" rel="noreferrer">
+          </Pill>
+          <Pill size="sm" variant="q" icon={<ExternalLink />} href="https://renplay.org/github/catalog" target="_blank" rel="noreferrer">
             Catalog on GitHub
-          </Button>
+          </Pill>
         </div>
         {installed.length > 0 && (
           <div style={{ borderTop: '1px solid var(--line)', marginTop: 14, paddingTop: 14 }}>
@@ -46,9 +46,9 @@ export function CatalogPanel() {
                   </option>
                 ))}
               </select>
-              <Button size="sm" icon={<FileCode2 />} disabled={!recipeGame} onClick={() => setRecipeOpen(true)}>
+              <Pill size="sm" icon={<FileCode2 />} disabled={!recipeGame} onClick={() => setRecipeOpen(true)}>
                 Export recipe
-              </Button>
+              </Pill>
             </div>
           </div>
         )}

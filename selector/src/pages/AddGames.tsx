@@ -7,13 +7,14 @@ import DocsLink from '../components/DocsLink'
 import { Frame, tintOf } from '../lantern/art'
 import { Pill, Bar, TagPill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
-import { BetaBadge, Button, Confirm, Modal, Progress, Spinner, Switch, MenuItem, cx, errorText, useToast } from '../components/ui'
+import { BetaBadge, Confirm, Spinner, Switch, MenuItem, cx, errorText, useToast } from '../lantern/ui'
 import { del, post } from '../lib/api'
 import type { Archive, ArchiveInfo, InspectResponse, Job } from '@shared/api'
 import { ago, pct } from '../lib/format'
 import { bytes } from '@shared/format'
 import { useArchives, useCatalog, useGames, useJobs, useSystem } from '../lib/queries'
 import { uploadArchive, type UploadHandle } from '../lib/upload'
+import Sheet from '../lantern/Sheet'
 
 // A game in the catalog works; only a release marked broken is worth a word.
 const BROKEN = 'Does not work'
@@ -53,9 +54,9 @@ function Downloads() {
   const installed = archives.filter((a) => a.installedAs && !job(a))
   const others = archives.filter(other)
   const refresh = (
-    <Button size="sm" variant="ghost" icon={<RefreshCw className={cx(isFetching && 'animate-spin')} />} onClick={() => void refetch()}>
+    <Pill size="sm" variant="q" icon={<RefreshCw className={cx(isFetching && 'animate-spin')} />} onClick={() => void refetch()}>
       Refresh
-    </Button>
+    </Pill>
   )
   return (
     <div className="stack" style={{ gap: 32, marginTop: 24 }}>
@@ -198,7 +199,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
                 {reinstall ? 'Reinstall' : updates ? 'Update' : 'Install'}
               </Pill>
             )}
-            <ActionMenu trigger={(open) => <Button size="sm" variant="ghost" icon={<MoreHorizontal />} onClick={open} aria-label={`Actions for ${a.name}`} />}>
+            <ActionMenu trigger={(open) => <Pill size="sm" variant="q" icon={<MoreHorizontal />} onClick={open} aria-label={`Actions for ${a.name}`} />}>
               {(close) => (
                 <MenuItem icon={<Trash2 />} danger onClick={() => { close(); setConfirmDelete(true) }}>
                   Delete download ({bytes(a.size)})
@@ -254,17 +255,17 @@ function InstallDialog({ archive, deletes, onClose }: { archive: Archive; delete
   const [reapply, setReapply] = useState(true)
   const [busy, setBusy] = useState(false)
   return (
-    <Modal
+    <Sheet
       open
       onClose={onClose}
       title={archive.installedAs ? `Reinstall ${targetGame?.title ?? title}` : target ? `Update ${targetGame?.title ?? target}` : `Install ${title}`}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Pill variant="q" onClick={onClose}>
             Cancel
-          </Button>
-          <Button
-            variant="primary"
+          </Pill>
+          <Pill
+            variant="p"
             loading={busy}
             onClick={async () => {
               setBusy(true)
@@ -287,7 +288,7 @@ function InstallDialog({ archive, deletes, onClose }: { archive: Archive; delete
             }}
           >
             {archive.installedAs ? 'Reinstall' : target ? 'Update' : 'Install'}
-          </Button>
+          </Pill>
         </>
       }
     >
@@ -299,7 +300,7 @@ function InstallDialog({ archive, deletes, onClose }: { archive: Archive; delete
         {target && <div className="notice amber">Replaces the installed version. Saves stay where they are.</div>}
         {targetGame && targetGame.mods.files > 0 && <Switch checked={reapply} onChange={setReapply} label={`Re-apply my mods (${targetGame.mods.files} changes)`} hint="Mods made for the old version may not work with the new one. Off moves them aside." />}
       </div>
-    </Modal>
+    </Sheet>
   )
 }
 
@@ -347,23 +348,23 @@ function UploadZone() {
             <span className="truncate" style={{ fontWeight: 650 }}>{up.file.name}</span>
             <span className="tnum muted" style={{ flex: 'none' }}>{pct(up.sent / up.file.size)}</span>
           </div>
-          <Progress value={up.sent / up.file.size} />
+          <Bar value={up.sent / up.file.size} />
           <div className="xs muted">
             {bytes(up.sent)} of {bytes(up.file.size)}. If it stops, pick the same file again to continue.
           </div>
           <div className="actions" style={{ justifyContent: 'center' }}>
             {up.paused ? (
-              <Button size="sm" icon={<Play />} onClick={() => (up.handle.resume(), setUp({ ...up, paused: false }))}>
+              <Pill size="sm" icon={<Play />} onClick={() => (up.handle.resume(), setUp({ ...up, paused: false }))}>
                 Resume
-              </Button>
+              </Pill>
             ) : (
-              <Button size="sm" icon={<Pause />} onClick={() => (up.handle.pause(), setUp({ ...up, paused: true }))}>
+              <Pill size="sm" icon={<Pause />} onClick={() => (up.handle.pause(), setUp({ ...up, paused: true }))}>
                 Pause
-              </Button>
+              </Pill>
             )}
-            <Button size="sm" variant="ghost" icon={<X />} onClick={() => up.handle.cancel()}>
+            <Pill size="sm" variant="q" icon={<X />} onClick={() => up.handle.cancel()}>
               Cancel
-            </Button>
+            </Pill>
           </div>
         </div>
       ) : (
@@ -379,9 +380,9 @@ function UploadZone() {
           </p>
           <input ref={inputRef} type="file" accept=".zip,.7z,.rar,.tar,.tgz" className="hidden" onChange={(e) => e.target.files?.[0] && start(e.target.files[0])} />
           <div className="actions" style={{ justifyContent: 'center', marginTop: 14 }}>
-            <Button variant="primary" icon={<CloudUpload />} onClick={() => inputRef.current?.click()}>
+            <Pill variant="p" icon={<CloudUpload />} onClick={() => inputRef.current?.click()}>
               Choose a file
-            </Button>
+            </Pill>
           </div>
         </>
       )}

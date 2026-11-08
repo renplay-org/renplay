@@ -11,7 +11,7 @@ import EmptyLibrary from '../components/EmptyLibrary'
 import TagFilters from '../components/TagFilters'
 import Shelf from '../components/Shelf'
 import SortMenu from '../components/SortMenu'
-import { Button, Empty, errorText, useToast } from '../components/ui'
+import { Empty, errorText, useToast } from '../lantern/ui'
 import { del, post } from '../lib/api'
 import { slotName } from '../lib/format'
 import type { Game } from '@shared/api'
@@ -215,7 +215,7 @@ export default function Library() {
 
   if (error)
     return (
-      <Empty title="Could not load the library" action={<Button variant="primary" onClick={() => void refetch()}>Retry</Button>}>
+      <Empty title="Could not load the library" action={<Pill variant="p" onClick={() => void refetch()}>Retry</Pill>}>
         {String(error)}
       </Empty>
     )
@@ -291,7 +291,7 @@ export default function Library() {
               <div key={job.id} className="panel" style={{ width: 'calc(var(--tile-w) * 2 + var(--gap))', flex: 'none' }}>
                 <p className="t" style={{ fontWeight: 650 }}>{all.find((g) => g.id === job.game)?.title || job.game || 'Install interrupted'}</p>
                 <p className="small muted" style={{ margin: '8px 0 12px' }}>{job.error || 'The install was interrupted. Your saves are kept.'}</p>
-                <Button
+                <Pill
                   size="sm"
                   onClick={async () => {
                     try {
@@ -304,10 +304,10 @@ export default function Library() {
                   }}
                 >
                   Retry
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => dismiss(job.id)}>
+                </Pill>
+                <Pill size="sm" variant="q" onClick={() => dismiss(job.id)}>
                   Dismiss
-                </Button>
+                </Pill>
               </div>
             ))}
           </Shelf>
@@ -327,7 +327,7 @@ export default function Library() {
         </div>
         <TagFilters tags={tagChips(all, vocabulary)} selected={tag} onSelect={(id) => update('tag', id)} />
         {!shown.length ? (
-          <Empty title="No games match" action={<Button onClick={() => setParams({})}>Clear filters</Button>}>
+          <Empty title="No games match" action={<Pill onClick={() => setParams({})}>Clear filters</Pill>}>
             Nothing in your library has every included tag without an excluded one.
           </Empty>
         ) : (
@@ -339,9 +339,9 @@ export default function Library() {
         )}
         {shown.length > limit && (
           <div className="center" style={{ marginTop: 20 }}>
-            <Button onClick={() => setLimit(limit + 48)}>
+            <Pill onClick={() => setLimit(limit + 48)}>
               Show more
-            </Button>
+            </Pill>
           </div>
         )}
       </section>

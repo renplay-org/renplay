@@ -3,7 +3,7 @@ import { Heart } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../lib/api'
 import type { Game } from '@shared/api'
-import { errorText, useToast } from './ui'
+import { errorText, useToast } from '../lantern/ui'
 
 export default function FavoriteButton({ game }: { game: Game }) {
   const qc = useQueryClient()

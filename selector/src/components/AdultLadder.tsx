@@ -4,7 +4,7 @@ import { adultLabels, useAdultState, useDeviceLevel, useSetAdultChoice } from '.
 import { ADULT_LEVELS, lowestLevel, type AdultLevel } from '@shared/levels'
 import { Seg, SourceLabel } from '../lantern/controls'
 import { useAuth } from '../lib/auth'
-import { errorText, Spinner, useToast } from './ui'
+import { errorText, Spinner, useToast } from '../lantern/ui'
 
 /**
  * Three pills, Off, Blurred and Shown. A pill above `max` (the row above) is

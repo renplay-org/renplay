@@ -4,7 +4,7 @@ import { Pill } from '../lantern/controls'
 import Sheet from '../lantern/Sheet'
 import { api, post } from '../lib/api'
 import Avatar from './Avatar'
-import { errorText } from './ui'
+import { errorText } from '../lantern/ui'
 import type { SwitchPeople } from '@shared/api'
 
 /*

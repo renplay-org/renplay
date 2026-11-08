@@ -1,5 +1,5 @@
-import { Seg, SourceLabel } from '../../lantern/controls'
-import { Button, Switch } from '../../components/ui'
+import { Seg, SourceLabel, Pill } from '../../lantern/controls'
+import { Switch } from '../../lantern/ui'
 
 /** Named text sizes: Ren'Py's own text size preference, kept with the game's persistent data. */
 const TEXT_SIZES = [
@@ -37,9 +37,9 @@ export default function GameOptions({ options, onChange, onAccessibility }: { op
         </div>
       )}
       <div>
-        <Button size="sm" onClick={onAccessibility}>
+        <Pill size="sm" onClick={onAccessibility}>
           Accessibility menu
-        </Button>
+        </Pill>
         <p className="xs muted" style={{ marginTop: 6 }}>Ren’Py’s own menu for fonts, self-voicing and mono audio, where the game offers it.</p>
       </div>
       {options && (

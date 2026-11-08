@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Avatar from '../components/Avatar'
-import { Button, Modal, Spinner, errorText, useToast } from '../components/ui'
+import { Spinner, errorText, useToast } from '../lantern/ui'
 import { Pill, TagPill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { adultLabels } from '../lib/adult'
@@ -13,6 +13,7 @@ import { useAuth, useProviders } from '../lib/auth'
 import { useGames } from '../lib/queries'
 import { AccountSection } from './Account'
 import type { People, PersonListed } from '@shared/api'
+import Sheet from '../lantern/Sheet'
 
 type Action = 'add' | 'edit' | 'password' | 'copy' | 'merge' | 'import' | 'remove'
 const historyNotice = 'Nothing is overwritten without a copy in the destination’s save history.'
@@ -89,8 +90,8 @@ export default function Users() {
         <AccountSection title="Moving saves">
           <p className="small muted">Copy one game or all save folders between users. {historyNotice} Merging also combines progress and archives the source account.</p>
           <div className="actions">
-            <Button size="sm" disabled={all.length < 2} onClick={() => open('copy')}>Copy saves</Button>
-            <Button size="sm" disabled={!all.length} onClick={() => open('import')}>Import a save folder</Button>
+            <Pill size="sm" disabled={all.length < 2} onClick={() => open('copy')}>Copy saves</Pill>
+            <Pill size="sm" disabled={!all.length} onClick={() => open('import')}>Import a save folder</Pill>
           </div>
         </AccountSection>
         <AccountSection title="Sign-in">
@@ -99,24 +100,24 @@ export default function Users() {
           <a className="link small" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }} href="https://renplay.org/docs/accounts/" target="_blank" rel="noreferrer">About accounts and sign-in ↗</a>
         </AccountSection>
       </div>
-      <Modal open={!!menu} onClose={() => setMenu(null)} title={menu ? `Actions for ${menu.name}` : 'PersonListed actions'}>
+      <Sheet open={!!menu} onClose={() => setMenu(null)} title={menu ? `Actions for ${menu.name}` : 'PersonListed actions'}>
         {menu && (
           <div className="stack">
             <div className="stack" style={{ gap: 8 }}>
-              <Button onClick={() => open('edit', menu)}>Edit role and access</Button>
-              <Button onClick={() => open('password', menu)}>Reset password</Button>
-              <Button onClick={() => open('copy', menu)} disabled={all.length < 2}>Copy saves</Button>
-              <Button href={`/api/users/${menu.id}/saves/export`}>Export save folder</Button>
-              <Button onClick={() => open('import', menu)}>Import a save folder</Button>
-              <Button disabled={menu.protected || lastAdmin(menu)} onClick={() => open('merge', menu)}>Merge into another user</Button>
-              <Button variant="danger" disabled={menu.protected || lastAdmin(menu)} onClick={() => open('remove', menu)}>Remove user</Button>
+              <Pill onClick={() => open('edit', menu)}>Edit role and access</Pill>
+              <Pill onClick={() => open('password', menu)}>Reset password</Pill>
+              <Pill onClick={() => open('copy', menu)} disabled={all.length < 2}>Copy saves</Pill>
+              <Pill href={`/api/users/${menu.id}/saves/export`}>Export save folder</Pill>
+              <Pill onClick={() => open('import', menu)}>Import a save folder</Pill>
+              <Pill disabled={menu.protected || lastAdmin(menu)} onClick={() => open('merge', menu)}>Merge into another user</Pill>
+              <Pill variant="d" disabled={menu.protected || lastAdmin(menu)} onClick={() => open('remove', menu)}>Remove user</Pill>
             </div>
             {menu.protected && <p className="small muted">The owner and the account used with sign-in off must stay. Their saves can still be copied.</p>}
             {lastAdmin(menu) && <p className="small muted">Keep at least one enabled admin. Users cannot demote, disable or remove this account. Provider sign-in can still revoke its grant.</p>}
           </div>
         )}
-      </Modal>
-      <Modal open={!!dialog} onClose={() => !busy && setDialog(null)} title={dialog ? titles[dialog.action] : ''}>
+      </Sheet>
+      <Sheet open={!!dialog} onClose={() => !busy && setDialog(null)} title={dialog ? titles[dialog.action] : ''}>
         {dialog && (
           <form className="stack" onSubmit={(e) => {
             e.preventDefault(); const form = new FormData(e.currentTarget), action = dialog.action, id = dialog.user?.id ?? Number(form.get('source'))
@@ -179,11 +180,11 @@ export default function Users() {
             {dialog.action === 'edit' && dialog.user?.id === me?.user.id && <p className="small amber">You are editing your own account. Disabling it or changing its role changes your access immediately.</p>}
             {error && <p role="alert" className="small red">{error}</p>}
             <div>
-              <Button type="submit" loading={busy} variant={dialog.action === 'remove' || dialog.action === 'merge' ? 'danger' : 'primary'}>{dialog.action === 'edit' ? 'Save changes' : titles[dialog.action]}</Button>
+              <Pill type="submit" loading={busy} variant={dialog.action === 'remove' || dialog.action === 'merge' ? 'd' : 'p'}>{dialog.action === 'edit' ? 'Save changes' : titles[dialog.action]}</Pill>
             </div>
           </form>
         )}
-      </Modal>
+      </Sheet>
     </div>
   )
 }

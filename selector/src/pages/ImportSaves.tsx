@@ -5,9 +5,10 @@ import { Link } from 'react-router-dom'
 import { useRoom } from '../lantern/Room'
 import { api } from '../lib/api'
 import { readZip } from '../lib/zipread'
-import { Button, Progress, Spinner, errorText, useToast } from '../components/ui'
+import { Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveImportIndex } from '@shared/api'
 import { computerSystem, type ComputerSystem } from '../lib/platform'
+import { Bar, Pill } from '../lantern/controls'
 
 /** A file found in the chosen folder or zip, by its path from the Ren'Py folder. */
 interface Found {
@@ -215,10 +216,10 @@ export default function ImportSaves() {
             .{done.keys ? ' Saves from that computer load without a warning.' : ''}
           </p>
           <div className="row wrap" style={{ gap: 8 }}>
-            <Button variant="primary" to="/">
+            <Pill variant="p" to="/">
               Library
-            </Button>
-            <Button onClick={() => setDone(null)}>Import more</Button>
+            </Pill>
+            <Pill onClick={() => setDone(null)}>Import more</Pill>
           </div>
         </section>
       ) : !found ? (
@@ -231,13 +232,13 @@ export default function ImportSaves() {
                   <p>This looks like {folder.name}. Ren’Py keeps saves here:</p>
                   <div className="row wrap" style={{ gap: 8 }}>
                     <code className="path-chip">{folder.path}</code>
-                    <Button
+                    <Pill
                       size="sm"
                       icon={<Copy />}
                       onClick={() => void navigator.clipboard?.writeText(folder.path).then(() => toast('Copied', 'success'), () => toast('Select the path and copy it.'))}
                     >
                       Copy
-                    </Button>
+                    </Pill>
                   </div>
                   <p className="small muted">{folder.how}</p>
                   <p className="xs muted">
@@ -249,12 +250,12 @@ export default function ImportSaves() {
                 </div>
               </div>
               <div className="row wrap" style={{ gap: 8 }}>
-                <Button variant="primary" icon={<FolderOpen />} onClick={() => dirInput.current?.click()}>
+                <Pill variant="p" icon={<FolderOpen />} onClick={() => dirInput.current?.click()}>
                   Choose the Ren’Py folder
-                </Button>
-                <Button loading={reading} onClick={() => zipInput.current?.click()}>
+                </Pill>
+                <Pill loading={reading} onClick={() => zipInput.current?.click()}>
                   Or a zip of it
-                </Button>
+                </Pill>
               </div>
             </>
           ) : (
@@ -264,9 +265,9 @@ export default function ImportSaves() {
                 that folder here, you can choose it.
               </p>
               <div>
-                <Button loading={reading} onClick={() => zipInput.current?.click()}>
+                <Pill loading={reading} onClick={() => zipInput.current?.click()}>
                   Choose a zip
-                </Button>
+                </Pill>
               </div>
             </>
           )}
@@ -297,16 +298,16 @@ export default function ImportSaves() {
               ))}
             </div>
           )}
-          {progress !== null && <Progress value={progress * 100} />}
+          {progress !== null && <Bar value={progress} />}
           <div className="row wrap" style={{ gap: 8 }}>
             {send.length > 0 && (
-              <Button variant="primary" loading={progress !== null} onClick={() => void run()}>
+              <Pill variant="p" loading={progress !== null} onClick={() => void run()}>
                 {saves ? `Import ${plural(saves, 'save')}` : 'Import the save keys'}
-              </Button>
+              </Pill>
             )}
-            <Button variant="ghost" disabled={progress !== null} onClick={() => setFound(null)}>
+            <Pill variant="q" disabled={progress !== null} onClick={() => setFound(null)}>
               {send.length ? 'Cancel' : 'Back'}
-            </Button>
+            </Pill>
           </div>
           <p className="xs muted">
             Older copies never replace newer ones: they are kept in History. Saves for games you do not have yet wait on the server and appear when

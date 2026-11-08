@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Spinner } from '../components/ui'
+import { Spinner } from '../lantern/ui'
 import { DeviceAdultRow } from '../components/AdultLadder'
 import { useRoom } from '../lantern/Room'
 import { useAuth } from '../lib/auth'

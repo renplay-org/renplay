@@ -9,9 +9,9 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { formatFor, hashUrl, TitleArt, useHidden } from '../../lantern/art'
-import { Bar } from '../../lantern/controls'
+import { Bar, IconBtn, Pill } from '../../lantern/controls'
 import { flyGhost, takeTravel } from '../../lantern/travel'
-import { Button, IconButton, Progress, cx } from '../../components/ui'
+import { cx } from '../../lantern/ui'
 import type { Game } from '@shared/api'
 
 /** The door: the hero across the whole screen, the logo or title and the loading bar at its bottom left. It ends when the game is ready, never after a minimum time. */
@@ -100,10 +100,10 @@ export default function Door({
         {failed ? (
           <div className="stack" style={{ marginTop: 14, alignItems: 'flex-start', gap: 10 }}>
             <p className="red small">{failed}</p>
-            <Button onClick={onRetry}>Try again</Button>
+            <Pill onClick={onRetry}>Try again</Pill>
           </div>
         ) : (
-          <div style={{ marginTop: 14, maxWidth: 360 }}>{progress && progress.total > 0 ? <Bar value={loadPct} /> : <Progress value={0} indeterminate />}</div>
+          <div style={{ marginTop: 14, maxWidth: 360 }}>{progress && progress.total > 0 ? <Bar value={loadPct} /> : <Bar value={0} indeterminate />}</div>
         )}
         {homeTip && (
           <div className="notice" style={{ marginTop: 16, maxWidth: 420 }}>
@@ -114,9 +114,9 @@ export default function Door({
                 How
               </button>
             </span>
-            <IconButton label="Dismiss" onClick={onDismissHomeTip}>
+            <IconBtn label="Dismiss" onClick={onDismissHomeTip}>
               <X className="size-4" />
-            </IconButton>
+            </IconBtn>
           </div>
         )}
         {slow && !failed && (

@@ -2,11 +2,12 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Frame } from '../lantern/art'
 import { useRoom } from '../lantern/Room'
-import { Empty, Spinner, Button, errorText } from '../components/ui'
+import { Empty, Spinner, errorText } from '../lantern/ui'
 import { api } from '../lib/api'
 import type { ArtFormat } from '@shared/art'
 import { duration, timeZone } from '../lib/format'
 import type { HistoryPage } from '@shared/api'
+import { Pill } from '../lantern/controls'
 
 /** A length of time in seconds: "45m", "1h 20m". */
 const length = (seconds: number) => (seconds < 60 ? 'Under a minute' : duration(seconds))
@@ -81,9 +82,9 @@ export default function History() {
             </div>
           ))}
           {pages.hasNextPage && (
-            <Button onClick={() => void pages.fetchNextPage()} loading={pages.isFetchingNextPage}>
+            <Pill onClick={() => void pages.fetchNextPage()} loading={pages.isFetchingNextPage}>
               Earlier days
-            </Button>
+            </Pill>
           )}
         </section>
 

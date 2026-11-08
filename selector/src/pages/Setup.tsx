@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { Pill } from '../lantern/controls'
-import { errorText } from '../components/ui'
+import { errorText } from '../lantern/ui'
 import { post } from '../lib/api'
 import { useProviders } from '../lib/auth'
 

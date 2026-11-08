@@ -9,6 +9,7 @@ release notes say what).
 
 ### Fixed
 
+- Import saves from a computer shows how far it is. Its progress bar was full as soon as it started.
 - Download log in the player's options says when the game has not written a log yet, instead of doing nothing.
 
 ### Removed

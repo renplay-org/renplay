@@ -8,8 +8,9 @@ import { slotName } from '../lib/format'
 import type { CatalogGame } from '@shared/api'
 import RecipeCard from './RecipeCard'
 import { Frame } from '../lantern/art'
-import { Modal, cx } from './ui'
+import { cx } from '../lantern/ui'
 import { isApple } from '../lib/platform'
+import Sheet from '../lantern/Sheet'
 
 export default function SearchPalette() {
   const [open, setOpen] = useState(false)
@@ -81,7 +82,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
     list.current?.querySelector(`[data-index="${index}"]`)?.scrollIntoView({ block: 'nearest' })
   }, [index])
   return (
-    <Modal open onClose={onClose} title="Search Renplay">
+    <Sheet open onClose={onClose} title="Search Renplay">
       <div className="stack">
         {recipe ? (
           <>
@@ -147,6 +148,6 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
           </>
         )}
       </div>
-    </Modal>
+    </Sheet>
   )
 }

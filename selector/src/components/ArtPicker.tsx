@@ -9,7 +9,7 @@ import type { Game } from '@shared/api'
 import type { ArtFormat } from '@shared/art'
 import type { ArtKind } from '@shared/recipe'
 import { useAuth } from '../lib/auth'
-import { errorText, useToast } from './ui'
+import { errorText, useToast } from '../lantern/ui'
 import type { ArtCandidate, ArtCandidates, ArtUploaded } from '@shared/api'
 
 const KINDS: Array<{ value: ArtKind; label: string }> = [

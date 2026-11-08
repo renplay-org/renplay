@@ -1,13 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { HardDrive } from 'lucide-react'
 import { useState } from 'react'
-import { Button, Confirm, Modal, Progress, Spinner, errorText, useToast } from '../../components/ui'
-import { SourceLabel, LanternSwitch } from '../../lantern/controls'
+import { Confirm, Spinner, errorText, useToast } from '../../lantern/ui'
+import { SourceLabel, LanternSwitch, Bar, Pill } from '../../lantern/controls'
 import { api, del, post, put } from '../../lib/api'
 import { bytes } from '@shared/format'
 import { useSystem } from '../../lib/queries'
 import type { StorageReport } from '@shared/api'
 import { Setting, setBy, useRun } from './common'
+import Sheet from '../../lantern/Sheet'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
   if (!disk) return null
@@ -20,7 +21,7 @@ function DiskBar({ label, disk }: { label: string; disk: { total: number; free: 
           {bytes(disk.free)} free of {bytes(disk.total)}
         </span>
       </div>
-      <Progress value={used / disk.total} />
+      <Bar value={used / disk.total} />
     </div>
   )
 }
@@ -45,9 +46,9 @@ export function StoragePanel() {
               {sys.library.installed} of {sys.library.games} games installed, {bytes(sys.library.bytes)} in total.
             </p>
             <div>
-              <Button size="sm" onClick={() => setStorageOpen(true)}>
+              <Pill size="sm" onClick={() => setStorageOpen(true)}>
                 Show what uses space
-              </Button>
+              </Pill>
             </div>
             <div className="stack xs muted" style={{ gap: 4, overflowWrap: 'anywhere' }}>
               {(
@@ -108,7 +109,7 @@ function StorageSheet({ onClose }: { onClose: () => void }) {
     }
   }
   return (
-    <Modal open onClose={onClose} title="What uses space" wide fullPhone>
+    <Sheet open onClose={onClose} title="What uses space" wide fullPhone>
       {isLoading || !data ? (
         <Spinner />
       ) : (
@@ -139,9 +140,9 @@ function StorageSheet({ onClose }: { onClose: () => void }) {
                   <span className="row" style={{ gap: 8 }}>
                     <span className="small muted tnum">{bytes(g.bytes)}</span>
                     {g.download && g.status === 'installed' && (
-                      <Button size="sm" variant="ghost" onClick={() => setConfirm(g)}>
+                      <Pill size="sm" variant="q" onClick={() => setConfirm(g)}>
                         Delete download
-                      </Button>
+                      </Pill>
                     )}
                   </span>
                 </div>
@@ -162,9 +163,9 @@ function StorageSheet({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
               {data.freeable.engines > 0 && (
-                <Button size="sm" style={{ marginTop: 8 }} onClick={() => void run(() => post('/api/system/prune'), 'Unused engines removed')}>
+                <Pill size="sm" style={{ marginTop: 8 }} onClick={() => void run(() => post('/api/system/prune'), 'Unused engines removed')}>
                   Remove unused engines
-                </Button>
+                </Pill>
               )}
             </section>
           )}
@@ -198,6 +199,6 @@ function StorageSheet({ onClose }: { onClose: () => void }) {
       >
         Deletes {confirm?.download?.name}. Reinstalling {confirm?.title} will need the download again. The installed game and its saves are kept.
       </Confirm>
-    </Modal>
+    </Sheet>
   )
 }
