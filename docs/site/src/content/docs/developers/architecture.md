@@ -94,9 +94,9 @@ its current entry has been consumed. RPA indexes are capped at 32 MiB compressed
 uncompressed. Archives with unreadable or oversized indexes are kept intact. File indexes and
 small image placeholders still scale with the number of files, but file bodies are not queued.
 
-Job logs (`joblogs.ts`) use synchronous appends under `/data/job-logs/`, with two files of at most
+Job logs (`jobs/logs.ts`) use synchronous appends under `/data/job-logs/`, with two files of at most
 96 KiB per job. The log API returns the latest 96 KiB after a restart, even if the job never finished.
-Finished jobs also retain their database log for compatibility. Clearing finished activity deletes
+Jobs from before 2.11 have their log only in the database, and the log API still reads it. Clearing finished activity deletes
 its log files. Startup removes any orphan files left by an interrupted cleanup.
 
 ### Why packs

@@ -1,15 +1,10 @@
-import { keepaliveToken } from './auth.js'
-import { viewers } from './accounts-context.js'
-import http from 'node:http'
-import https from 'node:https'
-import type { Config } from './config.js'
-import { parseJson, type Db, type JobRow } from './db.js'
-import { newId } from './util/fsx.js'
-import { log, took } from './util/log.js'
-import { JOB_LOG_LIMIT, JobLogs } from './joblogs.js'
-
-/** How the log names each kind of job. */
-const JOB_NAMES: Record<string, string> = { import: 'Install', 'apply-mods': 'Mod build', 'hash-archive': 'Checksum' }
+import { viewers } from '../accounts-context.js'
+import type { Config } from '../config.js'
+import { parseJson, type Db, type JobRow } from '../db.js'
+import { newId } from '../util/fsx.js'
+import { log, took } from '../util/log.js'
+import { startKeepalive } from './keepalive.js'
+import { JOB_LOG_LIMIT, JobLogs } from './logs.js'
 
 export interface JobContext<P = any> {
   id: string
@@ -24,7 +19,7 @@ export interface JobContext<P = any> {
 export type JobHandler = (ctx: JobContext) => Promise<unknown>
 
 export class JobManager {
-  private handlers = new Map<string, JobHandler>()
+  private handlers = new Map<string, { name: string; run: JobHandler }>()
   private running: { id: string; abort: AbortController } | null = null
   private logs: JobLogs
   private liveLog = ''
@@ -41,8 +36,9 @@ export class JobManager {
     this.logs = new JobLogs(cfg.dataDir)
   }
 
-  register(type: string, handler: JobHandler): void {
-    this.handlers.set(type, handler)
+  /** Adds a kind of job. `name` is how the log calls it, like Install. */
+  register(type: string, name: string, run: JobHandler): void {
+    this.handlers.set(type, { name, run })
   }
 
   /** Marks jobs left running by a previous process and resumes the queue. */
@@ -96,9 +92,10 @@ export class JobManager {
     return this.enqueue(job.type, job.game, parseJson(job.params, {}))
   }
 
+  /** A job's log. Jobs from before 2.11 have it only in the database. */
   getLog(id: string): string {
     if (this.running?.id === id) return this.liveLog
-    return this.db.getJob(id)?.log || this.logs.read(id) || ''
+    return this.logs.read(id) ?? this.db.getJob(id)?.log ?? ''
   }
 
   /** Clears finished jobs, except those `keep` keeps (jobs a person at Off cannot see). */
@@ -135,7 +132,7 @@ export class JobManager {
     this.db.updateJob(next.id, { status: 'running', started_at: new Date().toISOString(), stage: 'Starting', progress: 0 })
     this.notify()
     const started = Date.now()
-    const what = `${JOB_NAMES[next.type] ?? next.type}${next.game ? ` of ${next.game}` : ''}`
+    const what = `${handler?.name ?? next.type}${next.game ? ` of ${next.game}` : ''}`
     log('job', `${what} started`)
 
     const ctx: JobContext = {
@@ -168,14 +165,13 @@ export class JobManager {
 
     try {
       if (!handler) throw new Error(`No handler for ${next.type}`)
-      const result = await handler(ctx)
+      const result = await handler.run(ctx)
       this.flush()
       this.db.updateJob(next.id, {
         status: 'done',
         progress: 1,
         stage: 'Done',
         result: JSON.stringify(result ?? {}),
-        log: this.getLog(next.id),
         finished_at: new Date().toISOString(),
       })
       log('job', `${what} finished in ${took(Date.now() - started)}`)
@@ -190,7 +186,6 @@ export class JobManager {
       this.db.updateJob(next.id, {
         status: cancelled ? 'cancelled' : 'failed',
         error: msg,
-        log: this.getLog(next.id),
         finished_at: new Date().toISOString(),
       })
     } finally {
@@ -215,38 +210,5 @@ export class JobManager {
       this.db.updateJob(id, rest)
       this.notify()
     }
-  }
-}
-
-/**
- * Keeps a scale-to-zero deployment awake while jobs run by holding a request
- * open through the HTTP proxy that counts in-flight requests.
- */
-function startKeepalive(cfg: Config): { stop: () => void } {
-  if (!cfg.keepaliveUrl) return { stop: () => {} }
-  let stopped = false
-  let req: http.ClientRequest | null = null
-  const loop = () => {
-    if (stopped) return
-    const url = new URL('/api/keepalive?hold=120', cfg.keepaliveUrl)
-    const mod = url.protocol === 'https:' ? https : http
-    req = mod.request(
-      url,
-      { method: 'GET', headers: { authorization: `Bearer ${keepaliveToken}`, ...(cfg.keepaliveHost ? { host: cfg.keepaliveHost } : {}) }, timeout: 150_000 },
-      (res) => {
-        res.resume()
-        res.on('end', () => setTimeout(loop, 500))
-      },
-    )
-    req.on('error', () => setTimeout(loop, 5000))
-    req.on('timeout', () => req?.destroy())
-    req.end()
-  }
-  loop()
-  return {
-    stop: () => {
-      stopped = true
-      req?.destroy()
-    },
   }
 }

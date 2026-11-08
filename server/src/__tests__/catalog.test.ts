@@ -13,8 +13,9 @@ import { Db } from '../db.js'
 
 /** A catalog with its content mode and art cache, as the server makes it (services.ts). */
 function catalogOf(cfg: Config, db: Db): Catalog {
-  const content = new ContentMode(cfg, db)
-  return new Catalog(cfg, db, content, new ArtStore(cfg, db, content))
+  const content: ContentMode = new ContentMode(cfg, db, () => catalog.adultSaveDirs())
+  const catalog = new Catalog(cfg, db, content, new ArtStore(cfg, db, content))
+  return catalog
 }
 
 describe('catalog', () => {

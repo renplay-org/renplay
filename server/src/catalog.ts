@@ -6,8 +6,8 @@ import { viewer } from './accounts-context.js'
 import { catalogPictures, type ArtSet, type ArtStore, type ArtSubject, type CatalogImage } from './art.js'
 import type { Config } from './config.js'
 import { ContentMode, parseAdultLevel, sfwIndexUrl } from './content.js'
-import { parseJson, type Db, type GameRow, type GameSource, type JobRow } from './db.js'
-import type { JobContext } from './jobs.js'
+import { parseJson, type Db, type GameRow, type GameSource } from './db.js'
+import type { JobContext } from './jobs/manager.js'
 import { cleanRelPath } from './util/paths.js'
 import { log } from './util/log.js'
 import { catalogHosts, fetchPublic } from './util/net.js'
@@ -523,27 +523,6 @@ export class Catalog {
       hidden = true
     }
     return hidden
-  }
-
-  /**
-   * Off: a job about an adult game does not exist either. A job names its game when it has one;
-   * a first install or a hash has only its download and recipe, and a forgotten game only its id.
-   */
-  jobHidden(j: Pick<JobRow, 'game' | 'params' | 'result'>): boolean {
-    if (this.content.viewerLevel() !== 'off') return false
-    const game = j.game ? this.db.getGame(j.game) : null
-    if (game) return this.content.hides(game)
-    const params = parseJson<{ recipeId?: unknown; path?: unknown; source?: { path?: unknown } }>(j.params, {})
-    const result = parseJson<{ recipe?: unknown; game?: unknown } | null>(j.result, null)
-    const ids = [j.game, params.recipeId, result?.recipe, result?.game].filter((x): x is string => typeof x === 'string' && x !== '')
-    if (ids.some((id) => this.isAdultId(id))) return true
-    const archive = [params.source?.path, params.path].find((x): x is string => typeof x === 'string' && x !== '')
-    if (!archive) return false
-    try {
-      return this.archiveHidden(cleanRelPath(archive))
-    } catch {
-      return false
-    }
   }
 
   match(archive: { name: string; size?: number; sha256?: string }): RecipeMatch | null {

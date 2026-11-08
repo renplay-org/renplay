@@ -13,7 +13,8 @@ import type { Catalog } from './catalog.js'
 import type { Config } from './config.js'
 import type { Db } from './db.js'
 import type { EngineStore } from './engines.js'
-import type { JobManager } from './jobs.js'
+import type { JobManager } from './jobs/manager.js'
+import { createJobsRouter } from './jobs/routes.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
 import { createHistoryRouter } from './routes/history.js'
@@ -145,6 +146,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   })
   if (opts.startJobs !== false) backups.start()
   app.use('/api', createSystemRouter(services))
+  app.use('/api', createJobsRouter(services))
   app.use('/api', createMetricsRouter(services))
   app.use('/api/content', createContentRouter(services))
   app.get('/api/saves-export', createSavesExportAll(services))

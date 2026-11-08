@@ -128,9 +128,8 @@ describe('adult games in the catalog', () => {
     hasSfw = true
     const { cfg } = tempConfig({ RENPLAY_CATALOG_URLS: base, ...env })
     const db = Db.open(cfg.dataDir)
-    const content = new ContentMode(cfg, db)
+    const content: ContentMode = new ContentMode(cfg, db, () => catalog.adultSaveDirs())
     const catalog = new Catalog(cfg, db, content, new ArtStore(cfg, db, content))
-    catalog.art = new ArtStore(cfg, db, content)
     // The originals the art cache downloaded, one file per picture.
     const originals = () => readdirSync(join(cfg.dataDir, 'art', 'src'), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name)
     return { cfg, db, content, catalog, originals }
