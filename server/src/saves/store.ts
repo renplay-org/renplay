@@ -41,13 +41,12 @@ export class SaveStore {
   private static locks = new Map<string, Promise<unknown>>()
   private acceptingWrites = true
 
-  /** Whether a save is pinned: its history keeps every version. Set by the owner of the store. */
-  pinned: (saveDir: string, rel: string) => boolean = () => false
-
+  /** `pinned` says whether a save is pinned: its history keeps every version. */
   constructor(
     readonly root: string,
     readonly historyRoot: string,
     private readonly keepVersions = 20,
+    private readonly pinned: (saveDir: string, rel: string) => boolean = () => false,
   ) {}
 
   private dir(saveDir: string): string {

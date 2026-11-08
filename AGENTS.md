@@ -80,9 +80,11 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
                      pickle in util/pickle.ts), project.ts (extraction), optimize.ts (WebP),
                      progressive.ts (what streams), pack.ts (asset packs), assemble.ts (game.zip),
                      import.ts (the whole install), applymods.ts (mod builds), detect.ts
-  src/routes/        REST API: games, library (imports, uploads, archives, catalog), saves, files
+  src/routes/        REST API: games, library (imports, uploads, archives, catalog), files
                      (mod file browser), play (game pages and streamed assets), system
-  src/saves/         Save store with history; savefile.ts reads Ren'Py save metadata
+  src/saves/         Everyone's saves: the store with history (store.ts), each person's store, notes
+                     and pins (stores.ts), routes, import, sync codes, backups. savefile.ts reads
+                     Ren'Py save metadata
   scripts/           screenshots.mjs (Playwright, phone and desktop)
 selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. No tests; type-checked.
   src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users

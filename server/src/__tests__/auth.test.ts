@@ -62,7 +62,7 @@ describe('accounts authentication and security', () => {
     game(a, 'download-game', { source: JSON.stringify({ archive: 'download.zip' }) })
     mkdirSync(join(cfg.gamesDir, 'download-game/b1'), { recursive: true })
     writeFileSync(join(cfg.gamesDir, 'download-game/b1/game.zip'), 'installed')
-    await a.accounts.store(1).write('download-game', '1.save', Buffer.from('sacred'))
+    await a.services.saveStores.of(1).write('download-game', '1.save', Buffer.from('sacred'))
     expect((await request(a.app).get('/api/games/download-game').set('Cookie', admin)).body.game.canReinstall).toBe(true)
     await request(a.app).put('/api/system/downloads').set(site).set('Cookie', player).send({ keepDownloads: false }).expect(403)
     await request(a.app).delete('/api/games/download-game/download').set(site).set('Cookie', player).expect(403)
@@ -87,9 +87,9 @@ describe('accounts authentication and security', () => {
   it('supplies Account password state and Users save counts and protected accounts', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin)
     expect((await request(a.app).get('/api/me').set('Cookie', admin).expect(200)).body.hasPassword).toBe(true)
-    await a.accounts.store(id).write('one-game', '1-1.save', Buffer.from('save'))
-    await a.accounts.store(id).write('one-game', 'persistent', Buffer.from('persistent'))
-    await a.accounts.store(id).write('tokens', 'security_keys.txt', Buffer.from('keys'))
+    await a.services.saveStores.of(id).write('one-game', '1-1.save', Buffer.from('save'))
+    await a.services.saveStores.of(id).write('one-game', 'persistent', Buffer.from('persistent'))
+    await a.services.saveStores.of(id).write('tokens', 'security_keys.txt', Buffer.from('keys'))
     const response = await request(a.app).get('/api/users').set('Cookie', admin).expect(200)
     expect(response.body.adultDefault).toBe('off')
     expect(response.body.users.find((u: { id: number }) => u.id === id)).toMatchObject({ games: 1, saves: 2, protected: false })
@@ -412,7 +412,7 @@ describe('personal data and save moves', () => {
     await returning.boot()
     await vi.waitFor(() => expect(returning.state.inflight).toBe(false))
     expect((await a.saves.read('safe', 'persistent')).toString()).toBe('offline A')
-    expect((await a.accounts.store(id).read('safe', 'persistent')).toString()).toBe('online B')
+    expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('online B')
     expect(await a.saves.history('safe', 'persistent')).toHaveLength(1)
   })
   it('runs shared background jobs outside the enqueuing account context', async () => {
@@ -438,11 +438,11 @@ describe('personal data and save moves', () => {
     expect(personal).toMatchObject({ playTime: 23, saves: { count: 0 } }); expect(personal.favoriteAt).toBeTruthy(); expect(personal.finishedAt).toBeTruthy()
     const owner = (await request(a.app).get('/api/games/safe').set('Cookie', admin)).body.game
     expect(owner).toMatchObject({ playTime: 0, favoriteAt: null, finishedAt: null })
-    expect((await a.accounts.store(id).read('safe', 'persistent')).toString()).toBe('player')
+    expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('player')
     expect((await a.saves.read('safe', 'persistent')).toString()).toBe('owner')
     await request(a.app).put('/api/saves/safe/file?path=safe/persistent').set(site).set('Cookie', player).set('X-Renplay-User', '1').send('wrong account').expect(401)
     await request(a.app).get('/api/saves/safe/screenshot?user=1&file=a.save').set('Cookie', player).expect(404)
-    for (const [store, label] of [[a.saves, 'owner'], [a.accounts.store(id), 'other']] as const) {
+    for (const [store, label] of [[a.saves, 'owner'], [a.services.saveStores.of(id), 'other']] as const) {
       await store.write('safe', '1-1-LT1.save', await zipBuffer({ log: 'x', json: JSON.stringify({ _save_name: label, _ctime: 10 }), 'screenshot.png': label }), { mtimeMs: 10000 })
     }
     const library = async (cookie: string) => (await request(a.app).get('/api/games/safe').set('Cookie', cookie)).body.game
@@ -453,7 +453,7 @@ describe('personal data and save moves', () => {
     expect(ownerScreenshot).not.toBe(playerScreenshot)
     expect((await request(a.app).get(playerScreenshot).set('Cookie', player)).body.toString()).toBe('other')
     await request(a.app).get(ownerScreenshot).set('Cookie', player).expect(404)
-    const tag = JSON.parse(readFileSync(join(a.accounts.store(id).root, '..', 'user.json'), 'utf-8'))
+    const tag = JSON.parse(readFileSync(join(a.services.saveStores.of(id).root, '..', 'user.json'), 'utf-8'))
     expect(tag).toMatchObject({ id, name: 'player' })
   })
   it('lets an existing admin claim the unclaimed owner, keeping both accounts’ saves and archiving the old folder', async () => {
@@ -461,7 +461,7 @@ describe('personal data and save moves', () => {
     let a = await start(cfg, false); game(a)
     const id = (await request(a.app).post('/api/users').send({ username: 'another', role: 'admin', password: 'another password' }).expect(201)).body.user.id
     await a.saves.write('safe', 'persistent', Buffer.from('owner'))
-    await a.accounts.store(id).write('safe', 'persistent', Buffer.from('another'))
+    await a.services.saveStores.of(id).write('safe', 'persistent', Buffer.from('another'))
     a.close(); apps.pop(); cfg.auth = 'on'; a = await start(cfg, false)
     const cookie = await login(a, 'another', 'another password')
     await request(a.app).post('/api/me/claim-owner').set(site).set('Cookie', cookie).expect(200)
@@ -479,14 +479,14 @@ describe('personal data and save moves', () => {
       cookies.push(await login(a, username, 'admin password'))
     }
     await request(a.app).put('/api/users/1').set(site).set('Cookie', owner).send({ role: 'player' }).expect(200)
-    const stores = ids.map((id) => a.accounts.store(id))
+    const stores = ids.map((id) => a.services.saveStores.of(id))
     await Promise.all(stores.map((store) => store.write('safe', 'persistent', Buffer.from('kept'))))
     const results = await Promise.all(ids.map((id, i) => request(a.app).delete(`/api/users/${id}`).set(site).set('Cookie', cookies[i]!)))
     expect(results.map((r) => r.status).sort()).toEqual([200, 409])
     expect(a.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get()!.n).toBe(1)
     const removed = results.findIndex((response) => response.status === 200)
     await expect(stores[removed]!.write('safe', 'persistent', Buffer.from('late write'))).rejects.toThrow('being archived')
-    expect(() => a.accounts.store(ids[removed])).toThrow('User not found')
+    expect(() => a.services.saveStores.of(ids[removed])).toThrow('User not found')
     const archived = readdirSync(join(a.accounts.cfg.dataDir, 'users-removed'))[0]!
     expect(readFileSync(join(a.accounts.cfg.dataDir, 'users-removed', archived, 'saves', 'safe', 'persistent'), 'utf-8')).toBe('kept')
   })
@@ -496,19 +496,19 @@ describe('personal data and save moves', () => {
     await a.saves.write('safe', 'localStorage.json', Buffer.from('{"owner":1}'))
     await a.saves.write('safe', 'indexedDB.json', Buffer.from('{"owner":2}'))
     await a.saves.write('tokens', 'security_keys.txt', Buffer.from('signing-key AAA BBB\n'))
-    await a.accounts.store(id).write('tokens', 'security_keys.txt', Buffer.from('signing-key CCC DDD\n'))
-    await a.accounts.store(id).write('safe', 'persistent', Buffer.from('target'))
+    await a.services.saveStores.of(id).write('tokens', 'security_keys.txt', Buffer.from('signing-key CCC DDD\n'))
+    await a.services.saveStores.of(id).write('safe', 'persistent', Buffer.from('target'))
     await request(a.app).post('/api/users/1/saves/copy').set(site).set('Cookie', admin).send({ target: id, game: 'safe' }).expect(200)
-    expect((await a.accounts.store(id).history('safe', 'persistent'))[0]!.reason).toBe('user-copy')
-    expect((await a.accounts.store(id).read('tokens', 'security_keys.txt')).toString()).toContain('verifying-key BBB')
-    const history = (await a.accounts.store(id).history('safe', 'persistent'))[0]!
-    expect(readFileSync(join(a.accounts.store(id).historyRoot, 'safe', history.id), 'utf-8')).toBe('target')
+    expect((await a.services.saveStores.of(id).history('safe', 'persistent'))[0]!.reason).toBe('user-copy')
+    expect((await a.services.saveStores.of(id).read('tokens', 'security_keys.txt')).toString()).toContain('verifying-key BBB')
+    const history = (await a.services.saveStores.of(id).history('safe', 'persistent'))[0]!
+    expect(readFileSync(join(a.services.saveStores.of(id).historyRoot, 'safe', history.id), 'utf-8')).toBe('target')
     await request(a.app).post('/api/users/1/saves/copy').set(site).set('Cookie', admin).send({ target: id }).expect(200)
-    expect((await a.accounts.store(id).read('tokens', 'security_keys.txt')).toString()).toContain('signing-key CCC DDD')
-    expect((await a.accounts.store(id).read('tokens', 'security_keys.txt')).toString()).toContain('verifying-key BBB')
+    expect((await a.services.saveStores.of(id).read('tokens', 'security_keys.txt')).toString()).toContain('signing-key CCC DDD')
+    expect((await a.services.saveStores.of(id).read('tokens', 'security_keys.txt')).toString()).toContain('verifying-key BBB')
     const exported = await request(a.app).get('/api/users/1/saves/export').set('Cookie', admin).responseType('blob').expect(200)
     await request(a.app).post(`/api/users/${id}/saves/import`).set(site).set('Cookie', admin).attach('file', exported.body, 'saves.zip').expect(200)
-    expect((await a.accounts.store(id).read('safe', 'indexedDB.json')).toString()).toBe('{"owner":2}')
+    expect((await a.services.saveStores.of(id).read('safe', 'indexedDB.json')).toString()).toBe('{"owner":2}')
     await request(a.app).post(`/api/users/${id}/saves/import`).set(site).set('Cookie', admin).attach('file', await zipBuffer({ 'root.txt': 'no folder' }), 'bad.zip').expect(400)
     await request(a.app).post(`/api/users/${id}/merge`).set(site).set('Cookie', admin).send({ target: 1 }).expect(200)
     expect(() => a.accounts.user(id)).toThrow('User not found')
@@ -520,13 +520,13 @@ describe('personal data and save moves', () => {
     await request(a.app).put('/api/saves/safe/file?path=safe/persistent').set('Content-Type', 'application/octet-stream').send(Buffer.from('off')).expect(200)
     a.close(); apps.pop(); cfg.auth = 'on'
     a = await start(cfg); let admin = await login(a); const id = await add(a, admin)
-    await a.accounts.store(id).write('safe', 'persistent', Buffer.from('personal'))
+    await a.services.saveStores.of(id).write('safe', 'persistent', Buffer.from('personal'))
     await a.saves.write('safe', 'persistent', Buffer.from('on-owner'))
     a.close(); apps.pop(); cfg.auth = 'off'
     a = await start(cfg)
     expect((await request(a.app).get('/api/saves/safe/raw?path=safe/persistent')).body.toString()).toBe('on-owner')
     await a.saves.write('safe', 'persistent', Buffer.from('off-again'))
-    expect((await a.accounts.store(id).read('safe', 'persistent')).toString()).toBe('personal')
+    expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('personal')
     a.close(); apps.pop(); cfg.authUser = id
     a = await start(cfg)
     expect((await request(a.app).get('/api/saves/safe/raw?path=safe/persistent')).body.toString()).toBe('personal')
@@ -543,12 +543,12 @@ describe('adult access and signed game URLs', () => {
   it('enforces adult and unknown game access on saves, raw paths, library, static files and play, with an admin safe flag', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password')
     game(a); game(a, 'adult', { adult: 1 }); game(a, 'unknown', { recipe_id: '' })
-    await a.accounts.store(id).write('adult', 'persistent', Buffer.from('adult'))
+    await a.services.saveStores.of(id).write('adult', 'persistent', Buffer.from('adult'))
     expect((await request(a.app).get('/api/games').set('Cookie', player)).body.games.map((g: any) => g.id)).toEqual(['safe'])
     for (const path of ['/api/games/adult', '/api/saves/adult', '/api/saves/adult/boot', '/api/saves/adult/export', '/g/adult/b1/', '/g/adult/b1/game.zip', '/api/saves/safe/raw?path=adult/persistent']) await request(a.app).get(path).set('Cookie', player).expect(404)
     expect((await request(a.app).get('/api/saves/safe/boot').set('Cookie', player)).body.lazy).toEqual([])
     await request(a.app).post('/api/saves/safe/save-dir').set(site).set('Cookie', player).send({ saveDir: 'adult' }).expect(404)
-    await a.accounts.store(id).write('orphan', 'persistent', Buffer.from('unclassified'))
+    await a.services.saveStores.of(id).write('orphan', 'persistent', Buffer.from('unclassified'))
     await request(a.app).post('/api/saves/safe/save-dir').set(site).set('Cookie', player).send({ saveDir: 'orphan' }).expect(404)
     await request(a.app).post('/api/saves/safe/save-dir').set(site).set('Cookie', player).send({ saveDir: 'tokens' }).expect(400)
     expect(a.db.getGame('safe')!.save_dir).toBe('safe')
@@ -623,7 +623,7 @@ describe('adult access and signed game URLs', () => {
     const page = '<html><head></head><body>Fixture</body></html>'
     writeFileSync(join(root, 'assets.pack'), page + page); writeFileSync(join(root, 'assets.json'), JSON.stringify({ 'index.html': [0, Buffer.byteLength(page)], 'secondary.html': [Buffer.byteLength(page), Buffer.byteLength(page)] }))
     await a.saves.write('html', 'localStorage.json', Buffer.from('{"owner":"state"}'))
-    await a.accounts.store(id).write('html', 'localStorage.json', Buffer.from('{"player":"state"}'))
+    await a.services.saveStores.of(id).write('html', 'localStorage.json', Buffer.from('{"player":"state"}'))
     const url = (await request(a.app).get('/api/games/html').set('Cookie', player).expect(200)).body.game.playUrl
     expect(url).toMatch(/^\/g\/html\/b1\/s\/.+\/game\/index.html$/)
     const response = await request(a.app).get(url).expect(200)

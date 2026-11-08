@@ -1,5 +1,5 @@
 import { DEFAULTS_KEY, readDefaults, type Defaults } from '../auth.js'
-import { SYNC_SETTING, syncCodesOn } from './saves.js'
+import { SYNC_SETTING, syncCodesOn } from '../saves/sync.js'
 import { keepDownloads } from '../downloads.js'
 import { readdir, stat, statfs } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -22,7 +22,7 @@ async function disk(path: string) {
 const PROVENANCE = ['RENPLAY_AUTH', 'GAMES_DIR', 'ARCHIVES_DIR', 'DATA_DIR', 'RENPLAY_BACKUP_DIR', 'RENPLAY_CATALOG_URLS', 'RENPLAY_RECIPES_DIR', 'RENPLAY_LOG_LEVEL', 'RENPLAY_SYNC_SERVER', 'RENPLAY_ENGINES_URL']
 
 export function createSystemRouter(s: Services): Router {
-  const { cfg, db, jobs, engines, builds, purger, version, content, catalog, backups } = s
+  const { cfg, db, jobs, engines, builds, purger, version, content, catalog } = s
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/health', (_req, res) => {
@@ -136,32 +136,6 @@ export function createSystemRouter(s: Services): Router {
     storage = null
     counting = null
     res.json({ ok: true })
-  })
-
-  // ---- Sync codes ------------------------------------------------------------
-
-  router.put('/system/sync', (req, res) => {
-    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'Expected { on: true or false }')
-    db.setSetting(SYNC_SETTING, req.body.on)
-    res.json({ on: req.body.on })
-  })
-
-  // ---- save backups ---------------------------------------------------------
-
-  router.get('/system/backups', async (_req, res) => {
-    res.json(await backups.info())
-  })
-
-  router.post('/system/backups', async (_req, res) => {
-    if (!backups.dir) throw new HttpError(409, 'Save backups are off. Set RENPLAY_BACKUP_DIR to a folder to turn them on.')
-    const name = await backups.run()
-    res.json({ ok: true, name, ...(await backups.info()) })
-  })
-
-  router.get('/system/backups/:name', (req, res, next) => {
-    const path = backups.path(req.params.name)
-    if (!path) throw new HttpError(404, 'Backup not found')
-    res.download(path, req.params.name, (err) => err && next(new HttpError(404, 'Backup not found')))
   })
 
   router.get('/system', async (_req, res) => {

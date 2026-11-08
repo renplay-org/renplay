@@ -1,6 +1,5 @@
 import { Router } from 'express'
-import { readdir, statfs } from 'node:fs/promises'
-import { join } from 'node:path'
+import { statfs } from 'node:fs/promises'
 import type { Services } from '../services.js'
 
 /*
@@ -11,25 +10,10 @@ import type { Services } from '../services.js'
  * secret.
  */
 
-/** Save files per person, counted at most once a minute. */
-let saveCount: { at: number; n: number } | null = null
-async function countSaves(dataDir: string): Promise<number> {
-  if (saveCount && Date.now() - saveCount.at < 60_000) return saveCount.n
-  let n = 0
-  const users = join(dataDir, 'users')
-  for (const user of await readdir(users).catch(() => [] as string[])) {
-    for (const dir of await readdir(join(users, user, 'saves')).catch(() => [] as string[])) {
-      n += (await readdir(join(users, user, 'saves', dir)).catch(() => [] as string[])).filter((f) => f.endsWith('.save')).length
-    }
-  }
-  saveCount = { at: Date.now(), n }
-  return n
-}
-
 const esc = (v: string) => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
 
 export function createMetricsRouter(s: Services): Router {
-  const { cfg, db, catalog, backups, content, version, accounts, progress } = s
+  const { cfg, db, catalog, backups, content, version, accounts, progress, saveStores } = s
   const router = Router()
 
   router.get('/metrics', async (_req, res) => {
@@ -53,7 +37,7 @@ export function createMetricsRouter(s: Services): Router {
     metric('renplay_games', 'gauge', 'Games in the library by status.', [...byStatus].map(([s, n]) => [{ status: s }, n]))
     metric('renplay_people', 'gauge', 'People with an account that is not disabled.', [[{}, people.n]])
     metric('renplay_jobs', 'gauge', 'Installs and other jobs running or waiting.', ['running', 'queued'].map((s) => [{ status: s }, jobRows.find((r) => r.status === s)?.n ?? 0]))
-    metric('renplay_save_files', 'gauge', 'Save files across everyone.', [[{}, await countSaves(cfg.dataDir)]])
+    metric('renplay_save_files', 'gauge', 'Save files across everyone.', [[{}, await saveStores.count()]])
     metric('renplay_play_sessions_total', 'counter', 'Play sessions recorded.', [[{}, play.sessions]])
     metric('renplay_play_seconds_total', 'counter', 'Seconds played, across everyone.', [[{}, play.seconds]])
     metric('renplay_catalog_recipes', 'gauge', 'Recipes in the catalog.', [[{}, status.count]])
