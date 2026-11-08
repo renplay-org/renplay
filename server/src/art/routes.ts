@@ -1,6 +1,6 @@
 import express, { Router, type Request } from 'express'
 import type { GameRow } from '../db.js'
-import { ART_KINDS, type ArtKind } from '../recipes/recipe.js'
+import { ART_KINDS, type ArtKind } from '../shared/recipe.js'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
 

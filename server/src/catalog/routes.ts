@@ -3,7 +3,7 @@ import { Router } from 'express'
 import YAML from 'yaml'
 import { viewer } from '../accounts/context.js'
 import { parseJson, type GameSource } from '../db.js'
-import { installedRelease } from '../recipes/recipe.js'
+import { installedRelease } from '../shared/recipe.js'
 import type { Services } from '../services.js'
 import { exists } from '../util/fsx.js'
 

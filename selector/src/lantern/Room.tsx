@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLighterBackground } from '../lib/backdrop'
-import type { ArtSet } from '../lib/api'
+import type { ArtSet } from '@shared/art'
 import { formatFor, hashUrl, tintOf, useHidden, type ArtGame } from './art'
 
 export interface RoomTarget {

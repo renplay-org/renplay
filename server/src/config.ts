@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { accessSync, constants, readFileSync, statSync } from 'node:fs'
-import { parseAdultGroups, parseAdultLevel, type AdultLevel } from './content/levels.js'
+import { parseAdultGroups } from './content/levels.js'
+import { parseAdultLevel, type AdultLevel } from './shared/levels.js'
 import { fallbackOf } from './envvars.js'
 
 /*

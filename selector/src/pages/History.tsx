@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { Frame } from '../lantern/art'
 import { useRoom } from '../lantern/Room'
 import { Empty, Spinner, Button, errorText } from '../components/ui'
-import { api, type ArtFormat } from '../lib/api'
+import { api } from '../lib/api'
+import type { ArtFormat } from '@shared/art'
 import { duration, timeZone } from '../lib/format'
 
 /** A length of time in seconds: "45m", "1h 20m". */

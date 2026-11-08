@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useAuth } from './auth'
-import type { AdultLevel } from './adult'
+import type { Defaults } from '@shared/defaults'
+import type { AdultLevel } from '@shared/levels'
 import { api, put, type CatalogResponse, type ContentState, type Archive, type FilesResponse, type Game, type Job, type SavesResponse, type SystemInfo } from './api'
 
 export function useGames() {
@@ -99,14 +100,6 @@ export function useFiles(id: string, dir: string) {
   })
 }
 
-/** Defaults for everyone, set by an admin: what a person starts with until they choose. */
-export interface Defaults {
-  tagsExclude: string[]
-  lighterBackground: boolean | null
-  textSize: number | null
-  rollback: boolean | null
-  skip: boolean | null
-}
 export function useDefaults() {
   return useQuery({ queryKey: ['defaults'], queryFn: () => api<Defaults>('/api/defaults'), staleTime: 5 * 60_000, retry: false })
 }

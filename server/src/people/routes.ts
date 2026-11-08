@@ -5,7 +5,7 @@ import { Router } from 'express'
 import { publicUser, validName, validUsername } from '../accounts/accounts.js'
 import { viewer, type User } from '../accounts/context.js'
 import { passwordHash, random } from '../accounts/passwords.js'
-import { parseAdultLevel } from '../content/levels.js'
+import { parseAdultLevel } from '../shared/levels.js'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
 

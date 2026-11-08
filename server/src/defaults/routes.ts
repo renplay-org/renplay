@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
-import { DEFAULTS_KEY, readDefaults, type Defaults } from './defaults.js'
+import { DEFAULTS_KEY, readDefaults } from './defaults.js'
+import type { Defaults } from '../shared/defaults.js'
 
 /** The defaults for everyone: anyone may read them, an admin sets them. */
 export function createDefaultsRouter(s: Services): Router {
