@@ -1,10 +1,11 @@
-import Sheet from './Sheet'
+import ActionMenu from './ActionMenu'
 import SceneCard from './SceneCard'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftRight, Copy, Download, FileArchive, History, MoreHorizontal, PencilLine, Pin, Play, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, del, post, slotName } from '../lib/api'
+import { api, del, post } from '../lib/api'
+import { slotName } from '../lib/format'
 import type { Game, SaveSlot } from '@shared/api'
 import { ago, dateTime, duration, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
@@ -174,7 +175,7 @@ export default function SaveGallery({ game }: { game: Game }) {
                     {duration(s.runtime) ? ` · ${duration(s.runtime)} played` : ''}
                   </div>
                 </div>
-                <Sheet
+                <ActionMenu
                   trigger={(toggle) => (
                     <button onClick={toggle} className="ib" style={{ width: 36, height: 36, marginRight: -6 }} aria-label="Save actions">
                       <MoreHorizontal />
@@ -204,7 +205,7 @@ export default function SaveGallery({ game }: { game: Game }) {
                       </MenuItem>
                     </>
                   )}
-                </Sheet>
+                </ActionMenu>
               </div>
             </div>
           ))}

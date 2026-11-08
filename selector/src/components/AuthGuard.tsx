@@ -1,15 +1,12 @@
 import { useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { api, ApiError } from './api'
-import { Spinner } from '../components/ui'
-import { setAdminLighterBackground } from './backdrop'
-import { useDefaults } from './queries'
-import type { Me, Providers } from '@shared/api'
+import { ApiError } from '../lib/api'
+import { useAuth, useProviders } from '../lib/auth'
+import { setAdminLighterBackground } from '../lib/backdrop'
+import { useDefaults } from '../lib/queries'
+import { Spinner } from './ui'
 
-export function useAuth() {
-  return useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/api/me'), retry: false })
-}
+/** The signed-in pages: sign-in, setup or the library as the session says, and admin-only pages for admins. */
 export function AuthGuard({ admin = false }: { admin?: boolean }) {
   const me = useAuth(), location = useLocation()
   useEffect(() => {
@@ -17,7 +14,7 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
     window.addEventListener('renplay:signed-out', refresh)
     return () => window.removeEventListener('renplay:signed-out', refresh)
   }, [me.refetch])
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<Providers>('/api/auth/providers') })
+  const providers = useProviders()
   if (providers.data?.setup && !providers.data.oidc && !providers.data.ldap && !me.isPending && !(me.data?.user.role === 'admin' && me.data.user.id !== 1)) return <Navigate to="/setup" replace />
   if (me.isPending || providers.isPending) return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
   if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />

@@ -14,9 +14,6 @@ import { createPortal } from 'react-dom'
 import Sheet from '../lantern/Sheet'
 import { Pill, IconBtn, TagPill, LanternSwitch } from '../lantern/controls'
 
-/** Form fields on plates: 46 px, radius 14. */
-export const accountInput = 'input'
-
 export function cx(...c: Array<string | false | null | undefined>): string {
   return c.filter(Boolean).join(' ')
 }
@@ -64,16 +61,6 @@ export function IconButton({
     <IconBtn label={label} className={cx(active && 'on', className)} style={active ? { background: 'var(--plate-2)', color: 'var(--fg)' } : undefined} {...rest}>
       {children}
     </IconBtn>
-  )
-}
-
-/** Small label pill. */
-export function Badge({ tone = 'neutral', children, className }: { tone?: 'neutral' | 'accent' | 'green' | 'amber' | 'red' | 'violet'; children: ReactNode; className?: string }) {
-  const t = className?.includes('glass') ? 'dark' : tone === 'accent' ? 'pink' : tone === 'violet' ? 'vio' : tone === 'neutral' ? undefined : tone
-  return (
-    <span className={className?.replace('glass', '').trim() || undefined}>
-      <TagPill tone={t as 'pink'}>{children}</TagPill>
-    </span>
   )
 }
 
@@ -168,18 +155,6 @@ export function Confirm({
     >
       <div className="small muted-2" style={{ lineHeight: 1.6, fontSize: 14 }}>{children}</div>
     </Modal>
-  )
-}
-
-export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (v: T) => void; tabs: Array<{ id: T; label: ReactNode }> }) {
-  return (
-    <div className="seg" role="group">
-      {tabs.map((t) => (
-        <button key={t.id} type="button" aria-pressed={value === t.id} onClick={() => onChange(t.id)} className={value === t.id ? 'on' : ''}>
-          {t.label}
-        </button>
-      ))}
-    </div>
   )
 }
 

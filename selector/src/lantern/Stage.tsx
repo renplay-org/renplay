@@ -45,7 +45,7 @@ function StageArt({ game, kind, hidden }: { game: ArtGame; kind: 'hero' | 'wide'
 }
 
 /** The stage poster: the grid, sunk into the art's bottom edge. A tile that travelled here lands on it. */
-export function StageCover({ game, hidden }: { game: ArtGame & { id: string }; hidden: boolean }) {
+function StageCover({ game, hidden }: { game: ArtGame & { id: string }; hidden: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const [settling, setSettling] = useState(false)
   useEffect(() => {

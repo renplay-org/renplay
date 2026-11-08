@@ -1,5 +1,5 @@
 import { Check, ChevronDown } from 'lucide-react'
-import Sheet from './Sheet'
+import ActionMenu from './ActionMenu'
 import { MenuItem } from './ui'
 
 const options = [
@@ -14,7 +14,7 @@ const options = [
 export default function SortMenu({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const label = options.find((option) => option.value === value)?.label ?? 'Recent'
   return (
-    <Sheet
+    <ActionMenu
       trigger={(open) => (
         <button className="sort" onClick={open} aria-label={`Sort games: ${label}`}>
           {label} <ChevronDown />
@@ -28,6 +28,6 @@ export default function SortMenu({ value, onChange }: { value: string; onChange:
           </MenuItem>
         ))
       }
-    </Sheet>
+    </ActionMenu>
   )
 }

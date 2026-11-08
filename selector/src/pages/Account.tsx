@@ -7,7 +7,7 @@ import AvatarUpload from '../components/AvatarUpload'
 import LinkedSignIns from '../components/LinkedSignIns'
 import AdultChoice from '../components/AdultLadder'
 import WhoIsPlaying from '../components/WhoIsPlaying'
-import { Button, Confirm, Modal, Spinner, accountInput, errorText, useToast } from '../components/ui'
+import { Button, Confirm, Modal, Spinner, errorText, useToast } from '../components/ui'
 import { useRoom } from '../lantern/Room'
 import { api, del, post, put } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -95,7 +95,7 @@ export default function Account() {
             <form onSubmit={(e) => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(() => put('/api/me', { name: form.get('name') }), 'Display name saved') }} className="stack">
               <label className="field">
                 <span>Display name</span>
-                <input key={me.user.name} name="name" autoComplete="name" required maxLength={100} defaultValue={me.user.name} className={accountInput} />
+                <input key={me.user.name} name="name" autoComplete="name" required maxLength={100} defaultValue={me.user.name} className="input" />
               </label>
               <div>
                 <Button type="submit" size="sm" loading={busy}>Save name</Button>
@@ -190,11 +190,11 @@ export default function Account() {
             {dialog === 'password' ? (
               <>
                 <p className="small muted">Your other sessions will end. Your saves stay safe.</p>
-                <label className="field"><span>Current password</span><input name="current" type="password" autoComplete="current-password" required className={accountInput} /></label>
-                <label className="field"><span>New password</span><input name="password" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required className={accountInput} /></label>
+                <label className="field"><span>Current password</span><input name="current" type="password" autoComplete="current-password" required className="input" /></label>
+                <label className="field"><span>New password</span><input name="password" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required className="input" /></label>
               </>
             ) : (
-              <label className="field"><span>Token name</span><input name="name" required maxLength={100} placeholder="Upload script" className={accountInput} /></label>
+              <label className="field"><span>Token name</span><input name="name" required maxLength={100} placeholder="Upload script" className="input" /></label>
             )}
             {error && <p role="alert" className="small red">{error}</p>}
             <div>
@@ -244,7 +244,7 @@ function PinSection({ admin, hasPin }: { admin: boolean; hasPin: boolean }) {
           <p className="small muted">With a PIN you can switch in on a shared device that someone is signed in on, without your password. It works only on browsers you signed in on before. Signing out everywhere or changing your password removes it.</p>
           <label className="field">
             <span>PIN, 4 to 8 digits</span>
-            <input className={accountInput} type="password" inputMode="numeric" autoComplete="new-password" pattern="\d{4,8}" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} />
+            <input className="input" type="password" inputMode="numeric" autoComplete="new-password" pattern="\d{4,8}" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} />
           </label>
           <div className="row" style={{ gap: 8 }}>
             <Button type="submit" size="sm" disabled={pin.length < 4}>

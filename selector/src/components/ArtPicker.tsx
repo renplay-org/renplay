@@ -20,7 +20,7 @@ const KINDS: Array<{ value: ArtKind; label: string }> = [
   { value: 'icon', label: 'Icon' },
 ]
 /** The size each format wants, as the upload tile says it. */
-export const UPLOAD_SIZE: Record<ArtKind, string> = {
+const UPLOAD_SIZE: Record<ArtKind, string> = {
   grid: '600 × 900, or 1200 × 1800',
   wide: '920 × 430, or 1840 × 860',
   hero: '1920 × 620, or 3840 × 1240',

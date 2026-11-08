@@ -18,7 +18,7 @@ const API = 'renplay-api-v1'
 const STATE = 'renplay:offline'
 
 /** A game kept in this browser: its build, size, and when it was kept. */
-export interface KeptGame {
+interface KeptGame {
   build: string
   bytes: number
   at: string

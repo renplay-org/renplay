@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CloudUpload, FileArchive, MoreHorizontal, Pause, Play, RefreshCw, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import Sheet from '../components/Sheet'
+import ActionMenu from '../components/ActionMenu'
 import DocsLink from '../components/DocsLink'
 import { Frame, tintOf } from '../lantern/art'
 import { Pill, Bar, TagPill } from '../lantern/controls'
@@ -198,13 +198,13 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
                 {reinstall ? 'Reinstall' : updates ? 'Update' : 'Install'}
               </Pill>
             )}
-            <Sheet trigger={(open) => <Button size="sm" variant="ghost" icon={<MoreHorizontal />} onClick={open} aria-label={`Actions for ${a.name}`} />}>
+            <ActionMenu trigger={(open) => <Button size="sm" variant="ghost" icon={<MoreHorizontal />} onClick={open} aria-label={`Actions for ${a.name}`} />}>
               {(close) => (
                 <MenuItem icon={<Trash2 />} danger onClick={() => { close(); setConfirmDelete(true) }}>
                   Delete download ({bytes(a.size)})
                 </MenuItem>
               )}
-            </Sheet>
+            </ActionMenu>
           </>
         )}
       </div>

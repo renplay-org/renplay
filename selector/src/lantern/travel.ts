@@ -6,7 +6,7 @@
  * one code path that works the same in every browser. Reduced motion skips it.
  */
 
-export interface Travel {
+interface Travel {
   id: string
   src: string | null
   rect: { x: number; y: number; w: number; h: number }

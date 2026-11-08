@@ -12,7 +12,7 @@ import DocsLink from '../../components/DocsLink'
 import { useEffect, useState } from 'react'
 import { Seg } from '../../lantern/controls'
 import { Button, IconButton, Spinner, Switch, cx } from '../../components/ui'
-import { slotName } from '../../lib/api'
+import { slotName } from '../../lib/format'
 import {
   type DisplayPrefs,
 } from '../../lib/display'

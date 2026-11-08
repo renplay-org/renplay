@@ -9,7 +9,7 @@ import { useSystem } from '../../lib/queries'
 import type { StorageReport } from '@shared/api'
 import { Setting, setBy, useRun } from './common'
 
-export function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
+function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
   if (!disk) return null
   const used = disk.total - disk.free
   return (
@@ -88,7 +88,7 @@ export function StoragePanel() {
 }
 
 /** What uses space, game by game, and what Renplay can free. */
-export function StorageSheet({ onClose }: { onClose: () => void }) {
+function StorageSheet({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
   const toast = useToast()
   const { data, isLoading } = useQuery({ queryKey: ['storage'], queryFn: () => api<StorageReport>('/api/system/storage') })

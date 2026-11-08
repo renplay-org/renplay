@@ -8,7 +8,7 @@ import { gameTags } from '../lib/tags'
 import type { TagPrefs as TagPrefsAnswer } from '@shared/api'
 
 /** The tags a person includes and leaves out, as the Catalog page works with them. */
-export type TagPrefs = Pick<TagPrefsAnswer, 'include' | 'exclude'>
+type TagPrefs = Pick<TagPrefsAnswer, 'include' | 'exclude'>
 
 type Tagged = Parameters<typeof gameTags>[0]
 type State = 'off' | 'include' | 'exclude'

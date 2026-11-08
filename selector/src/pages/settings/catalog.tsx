@@ -59,7 +59,7 @@ export function CatalogPanel() {
 }
 
 /** Where recipes come from: each catalog, then Your recipes, with what each gives this person. */
-export function CatalogSources({ sources, label }: { sources: CatalogSource[]; label: (s: CatalogSource) => ReactNode }) {
+function CatalogSources({ sources, label }: { sources: CatalogSource[]; label: (s: CatalogSource) => ReactNode }) {
   const name = (s: CatalogSource) => {
     if (s.kind === 'folder') return 'Your recipes'
     try {
