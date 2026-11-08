@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { viewer } from '../accounts-context.js'
-import { catalogPictures, type ArtSet, type ArtStore, type ArtSubject } from '../art.js'
+import { catalogPictures, type ArtSet, type ArtStore, type ArtSubject } from '../art/store.js'
 import type { Config } from '../config.js'
 import { ContentMode, parseAdultLevel, sfwIndexUrl } from '../content.js'
 import { parseJson, type Db, type GameRow, type GameSource } from '../db.js'
@@ -303,9 +303,7 @@ export class Catalog {
       const adult = g.adult === 1 || recipe?.nsfw === true || this.adult.has(g.recipe_id)
       // At Off an adult game's pictures are not made at all.
       if (adult && this.content.level === 'off') continue
-      const uploads = (this.db.raw.prepare('SELECT DISTINCT scope FROM art_uploads WHERE game = ?').all(g.id) as Array<{ scope: number }>).flatMap((r) => this.art.uploads(g.id, r.scope))
-      const unique = [...new Map(uploads.map((u) => [`${u.id}:${u.kind}`, u])).values()]
-      subjects.push({ game: g.id, recipe: g.recipe_id || null, adult, pictures: [...(recipe ? this.pictures(recipe) : []), ...unique] })
+      subjects.push({ game: g.id, recipe: g.recipe_id || null, adult, pictures: [...(recipe ? this.pictures(recipe) : []), ...this.art.allUploads(g.id)] })
     }
     return subjects
   }

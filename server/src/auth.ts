@@ -8,6 +8,7 @@ import type { Db, GameRow } from './db.js'
 import { parseJson } from './db.js'
 import type { ProgressStore } from './progress/store.js'
 import { viewer, viewers, type User, type Viewer } from './accounts-context.js'
+import type { ArtStore } from './art/store.js'
 import type { SaveStores } from './saves/stores.js'
 import { HttpError } from './util/paths.js'
 import { SignInProviders, signInRandom, type ExternalIdentity } from './sign-in-providers.js'
@@ -130,7 +131,7 @@ export class Accounts {
   private readonly limits = new Map<string, { count: number; until: number }>()
   private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
   private dummyPassword = ''
-  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly progress: ProgressStore, private readonly saveStores: SaveStores) {
+  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly progress: ProgressStore, private readonly saveStores: SaveStores, private readonly art: ArtStore) {
     // A demo needs its guest, so sign-in is always on there.
     this.enabled = cfg.demo || (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
@@ -348,9 +349,7 @@ export class Accounts {
   private mergeData(from: number, to: number): void {
     this.progress.merge(from, to)
     this.saveStores.mergeNotes(from, to)
-    // Their art choices and uploads too, where the other person has none for the same game and format.
-    this.db.raw.prepare('INSERT OR IGNORE INTO art_uploads (id, game, kind, scope, width, height, focal, thumbhash, tint, created_at) SELECT id, game, kind, ?, width, height, focal, thumbhash, tint, created_at FROM art_uploads WHERE scope = ?').run(to, from)
-    this.db.raw.prepare('INSERT OR IGNORE INTO art_choices (game, kind, scope, candidate) SELECT game, kind, ?, candidate FROM art_choices WHERE scope = ?').run(to, from)
+    this.art.mergePerson(from, to)
   }
 
   private managed(id: number) {
@@ -751,8 +750,7 @@ export class Accounts {
           for (const table of ['sessions', 'tokens', 'identities', 'device_people']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
           this.progress.forget(id)
           this.saveStores.forget(id)
-          // Their own art choices and uploads. Choices for everyone stay.
-          for (const table of ['art_choices', 'art_uploads']) this.db.raw.prepare(`DELETE FROM ${table} WHERE scope = ?`).run(id)
+          this.art.forgetPerson(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
           this.db.raw.exec('COMMIT')
         } catch (error) {
