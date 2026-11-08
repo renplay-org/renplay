@@ -9,6 +9,7 @@ release notes say what).
 
 ### Security
 
+- Pictures and recipe files a catalog points to are fetched only from the address Renplay checked. A name that answers with a public address first and a local one a moment later can no longer make the server reach into its own network.
 - Game pages play only inside Renplay's own player. Another site can no longer show them in a frame to trick people into clicking. The library itself can still be embedded, in a dashboard for example.
 
 ## [4.4.0] - 2026-11-08

@@ -1,5 +1,6 @@
-import { promises as dns } from 'node:dns'
+import { promises as dns, type LookupAddress, type LookupOptions } from 'node:dns'
 import { BlockList, isIP } from 'node:net'
+import { Agent } from 'undici'
 
 /*
  * Downloads that follow addresses from a catalog (art, recipe patches) go only to the public
@@ -39,16 +40,47 @@ async function checkPublic(url: URL, allowHosts: ReadonlySet<string>): Promise<v
   if (!addresses.length || addresses.some(isPrivateAddress)) throw new Error(`${host} is not on the public internet`)
 }
 
+class NotPublic extends Error {}
+
+/*
+ * The connection resolves the name once more, and connects only to the addresses it checked there:
+ * a name that answered with a public address for checkPublic and a local one a moment later (DNS
+ * rebinding) is refused. One dispatcher per set of allowed hosts. undici is the major version Node
+ * 24 bundles, so fetch() takes its dispatcher.
+ */
+const agents = new Map<string, Agent>()
+function pinned(allowHosts: ReadonlySet<string>): Agent {
+  const key = [...allowHosts].sort().join(' ')
+  let agent = agents.get(key)
+  if (!agent) {
+    const lookup = (hostname: string, options: LookupOptions, callback: (err: Error | null, address: string | LookupAddress[], family?: number) => void) => {
+      const host = hostname.replace(/^\[|\]$/g, '').toLowerCase()
+      resolver.lookup(host).then((found) => {
+        const addresses = found.map((address) => ({ address, family: isIP(address) }))
+        if (!allowHosts.has(host) && (!addresses.length || addresses.some((a) => isPrivateAddress(a.address)))) throw new NotPublic(`${host} is not on the public internet`)
+        if (options.all) callback(null, addresses)
+        else callback(null, addresses[0]!.address, addresses[0]!.family)
+      }).catch((e: Error) => callback(e, ''))
+    }
+    agent = new Agent({ connect: { lookup } })
+    agents.set(key, agent)
+  }
+  return agent
+}
+
 /**
  * fetch() for addresses that come from a catalog: each address, and each address a redirect leads
- * to (at most three), must be on the public internet unless its host is in `allowHosts`.
+ * to (at most three), must be on the public internet unless its host is in `allowHosts`, when it is
+ * checked and when it is connected to.
  */
 export async function fetchPublic(input: string | URL, init: RequestInit & { allowHosts?: ReadonlySet<string> } = {}): Promise<Response> {
   const { allowHosts = new Set(), ...rest } = init
   let url = new URL(input)
   for (let hop = 0; hop <= 3; hop++) {
     await checkPublic(url, allowHosts)
-    const res = await fetch(url, { ...rest, redirect: 'manual' })
+    const res = await fetch(url, { ...rest, redirect: 'manual', dispatcher: pinned(allowHosts) } as RequestInit).catch((e: Error) => {
+      throw e.cause instanceof NotPublic ? e.cause : e
+    })
     const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null
     if (!location) return res
     await res.body?.cancel().catch(() => {})
