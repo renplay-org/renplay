@@ -12,6 +12,7 @@ import { DefaultsForEveryone } from './settings/defaults'
 import { AdultGamesPanel, EnginesPanel, SignInOff } from './settings/general'
 import { SavesPanel } from './settings/saves'
 import { StoragePanel } from './settings/storage'
+import BackLink from '../components/BackLink'
 
 export default function Settings() {
   const { data } = useAuth()
@@ -31,6 +32,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
   if (isLoading || !sys) return <Spinner />
   return (
     <div>
+      <BackLink to="/account" label="You" />
       <h1 className="h1" style={{ marginBottom: 18 }}>Settings</h1>
       <div className="split">
         <nav className="side-nav" aria-label="Settings sections">

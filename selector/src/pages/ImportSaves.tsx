@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Copy, FolderOpen, Laptop } from 'lucide-react'
+import { Copy, FolderOpen, Laptop } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useRoom } from '../lantern/Room'
 import { api } from '../lib/api'
 import { readZip } from '../lib/zipread'
@@ -9,6 +8,7 @@ import { Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveImportIndex } from '@shared/api'
 import { computerSystem, type ComputerSystem } from '../lib/platform'
 import { Bar, Pill } from '../lantern/controls'
+import BackLink from '../components/BackLink'
 
 /** A file found in the chosen folder or zip, by its path from the Ren'Py folder. */
 interface Found {
@@ -179,9 +179,7 @@ export default function ImportSaves() {
   return (
     <div className="stack page-col" style={{ gap: 24 }}>
       <header>
-        <Link to="/settings" className="link small row" style={{ gap: 6, minHeight: 'var(--hit)', width: 'fit-content' }}>
-          <ArrowLeft className="size-4" /> Settings
-        </Link>
+        <BackLink to="/settings" desktop />
         <h1 className="h1">Import saves from a computer</h1>
         <p className="muted-2" style={{ marginTop: 8 }}>
           Bring the saves you made in desktop Ren’Py. Choose the Ren’Py save folder and Renplay matches each game.

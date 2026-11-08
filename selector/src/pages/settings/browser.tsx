@@ -3,10 +3,12 @@ import { DeviceAdultRow } from '../../components/AdultLadder'
 import { SourceLabel, LanternSwitch, Pill } from '../../lantern/controls'
 import { setLighterBackground, useLighterBackground } from '../../lib/backdrop'
 import { Setting } from './common'
+import BackLink from '../../components/BackLink'
 
 export function BrowserSettings() {
   return (
     <div className="stack page-col" style={{ gap: 18 }}>
+      <BackLink to="/account" label="You" />
       <h1 className="h1">This browser</h1>
       <section className="panel stack">
         <DeviceAdultRow />

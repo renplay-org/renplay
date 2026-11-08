@@ -75,41 +75,16 @@ export default function GamePage() {
     navigate(`/play/${gameId}${!menu && latest ? `?resume=${encodeURIComponent(slotName(latest.file))}` : ''}`)
   }
 
-  const meta = (
-    <>
-      {game.developer && <span>By {game.developer}</span>}
-      {game.state && (
-        <>
-          <span className="sep">·</span>
-          <span>{stateLabel[game.state]}</span>
-        </>
-      )}
-      {game.version && (
-        <>
-          <span className="sep">·</span>
-          <span>{game.version}</span>
-        </>
-      )}
-      {game.free && (
-        <>
-          <span className="sep">·</span>
-          <span>Free</span>
-        </>
-      )}
-      {game.phone && (
-        <>
-          <span className="sep">·</span>
-          <span>{phoneLabel[game.phone]}</span>
-        </>
-      )}
-      {game.family !== 'renpy' && (
-        <>
-          <span className="sep">·</span>
-          <BetaBadge engine={game.family} />
-        </>
-      )}
-    </>
-  )
+  // The parts the game has, with a separator between each two.
+  const metaParts = [
+    game.developer && <span key="by">By {game.developer}</span>,
+    game.state && <span key="m0">{stateLabel[game.state]}</span>,
+    game.version && <span key="m1">{game.version}</span>,
+    game.free && <span key="m2">Free</span>,
+    game.phone && <span key="m3">{phoneLabel[game.phone]}</span>,
+    game.family !== 'renpy' && <BetaBadge key="m4" engine={game.family} />,
+  ].filter(Boolean)
+  const meta = metaParts.flatMap((part, i) => (i ? [<span key={`sep${i}`} className="sep">·</span>, part] : [part]))
 
   const body = (
     <>

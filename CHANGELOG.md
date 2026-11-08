@@ -7,8 +7,16 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- On a phone, Settings, Play history, Activity and Import saves have a Back button, like a game's page. Import saves goes back to where you came from instead of always to Settings.
+
 ### Fixed
 
+- On a phone, tapping a text field no longer zooms the page in, and Renplay does not zoom with a double tap or a pinch.
+- A game without a developer no longer shows a dot before its version on its page.
+- The footer on a phone no longer ends a line with a dot.
+- The Users page names each person's username instead of starting a line with it.
 - Import saves from a computer shows how far it is. Its progress bar was full as soon as it started.
 - Download log in the player's options says when the game has not written a log yet, instead of doing nothing.
 

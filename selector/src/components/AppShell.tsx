@@ -45,19 +45,19 @@ function Footer() {
   return (
     <footer className="foot">
       <span>Renplay{data?.version ? ` ${data.version}` : ''}</span>
-      <span aria-hidden="true">·</span>
+      <span className="sep" aria-hidden="true">·</span>
       <a href="https://renplay.org/docs" target="_blank" rel="noreferrer">
         Docs
       </a>
-      <span aria-hidden="true">·</span>
+      <span className="sep" aria-hidden="true">·</span>
       <a href={REPO_URL} target="_blank" rel="noreferrer" className="row" style={{ gap: 6 }}>
         <GitHubMark className="size-3.5" /> GitHub
       </a>
-      <span aria-hidden="true">·</span>
+      <span className="sep" aria-hidden="true">·</span>
       <a href={KOFI_URL} target="_blank" rel="noreferrer" className="row" style={{ gap: 6 }}>
         <Heart style={{ width: 14, height: 14 }} /> Support on Ko-fi
       </a>
-      <span aria-hidden="true">·</span>
+      <span className="sep" aria-hidden="true">·</span>
       <span>The Renplay Team</span>
     </footer>
   )
