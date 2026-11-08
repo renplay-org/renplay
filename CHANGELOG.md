@@ -7,6 +7,14 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-11-08
+
+Renplay 4.3 is a polish release. The player loads with one honest progress bar and lets you mute,
+go full screen or leave while it does. Pages no longer jump while they load, opening a game starts
+at its top, and Resume is on the first screen of a phone. Adult games are one choice on your
+account. Mods and files is rebuilt, and menus have their blur back in Chrome. Nothing needs
+changing to upgrade. Every game's art is made again once, in the background.
+
 ### Changed
 
 - The account menu is a small menu under your picture instead of a window in the middle of the screen, with the admin's pages apart from your own.
@@ -542,7 +550,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.2.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.3.0...dev
+[4.3.0]: https://github.com/renplay-org/renplay/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/renplay-org/renplay/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/renplay-org/renplay/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/renplay-org/renplay/compare/v4.0.0...v4.0.1
