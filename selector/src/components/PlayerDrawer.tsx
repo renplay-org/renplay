@@ -1,4 +1,4 @@
-import { BookOpen, ExternalLink, Maximize2, X } from 'lucide-react'
+import { BookOpen, Expand, ExternalLink, Maximize2, Shrink, Volume2, VolumeX, X } from 'lucide-react'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Frame } from '../lantern/art'
 import { Pill, Seg } from '../lantern/controls'
@@ -31,7 +31,16 @@ export function PlayerDrawer({
   saves,
   guide,
   options,
+  muted,
+  onMute,
+  fullscreen,
+  onFullscreen,
 }: {
+  muted: boolean
+  onMute: () => void
+  fullscreen: boolean
+  /** Where the device can show the game in full screen (or say how, on iPhone). */
+  onFullscreen?: () => void
   game: Game
   tab: DrawerTab
   onTab: (tab: DrawerTab) => void
@@ -108,9 +117,19 @@ export function PlayerDrawer({
             <div className="truncate" style={{ fontWeight: 700, fontSize: 17 }}>{game.title}</div>
             {game.version && <div className="xs muted truncate">{game.version}</div>}
           </div>
-          <button type="button" className="ib" aria-label="Back to the game" onClick={onClose} data-initial>
-            <X />
-          </button>
+          <div className="pd-tools">
+            <button type="button" className="ib" aria-pressed={!muted} aria-label={muted ? 'Sound is off. Turn it on' : 'Sound is on. Turn it off'} onClick={onMute}>
+              {muted ? <VolumeX /> : <Volume2 />}
+            </button>
+            {onFullscreen && (
+              <button type="button" className="ib" aria-label={fullscreen ? 'Leave full screen' : 'Full screen'} onClick={onFullscreen}>
+                {fullscreen ? <Shrink /> : <Expand />}
+              </button>
+            )}
+            <button type="button" className="ib" aria-label="Back to the game" onClick={onClose} data-initial>
+              <X />
+            </button>
+          </div>
         </header>
         <Seg small label="Player menu" value={tab} onChange={onTab} options={tabs} className="pd-tabs" />
         <div className="pd-body">{tab === 'saves' ? saves : tab === 'guide' ? guide : options}</div>
@@ -136,7 +155,7 @@ export function PlayerDrawer({
           <div className="pd-links">
             {renpy && ready && (
               <button type="button" className="link small" onClick={onMainMenu}>
-                Main menu
+                Save and go to the main menu
               </button>
             )}
             <button type="button" className="link small" onClick={() => onExit('game')}>

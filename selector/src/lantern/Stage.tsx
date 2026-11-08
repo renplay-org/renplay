@@ -55,7 +55,15 @@ export function StageCover({ game, hidden }: { game: ArtGame & { id: string }; h
     setSettling(true)
     requestAnimationFrame(() => {
       const target = el.getBoundingClientRect()
-      flyGhost(t, { x: target.x, y: target.y, w: target.width, h: target.height }, () => setSettling(false))
+      // Where the cover ends up: the page is still rising in (each of main's children moves on its
+      // own), so that offset comes off.
+      let page: Element | null = el
+      while (page && page.parentElement?.tagName !== 'MAIN') page = page.parentElement
+      const moved = page ? getComputedStyle(page).transform : 'none'
+      const rise = moved && moved !== 'none' ? new DOMMatrixReadOnly(moved) : null
+      const dx = rise?.m41 ?? 0
+      const dy = rise?.m42 ?? 0
+      flyGhost(t, { x: target.x - dx, y: target.y - dy, w: target.width, h: target.height }, () => setSettling(false))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.id])

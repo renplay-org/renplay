@@ -43,6 +43,8 @@ export default function Card({
     onClick?.(e)
     if (e.defaultPrevented) return
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+    // On a phone the page changes under the finger: the new page simply rises in, no flight.
+    if (window.innerWidth < 720) return
     const rect = e.currentTarget.querySelector('.frame')?.getBoundingClientRect()
     if (!rect) return
     const f = formatFor(game.art, kind)

@@ -14,10 +14,13 @@ export function useGames() {
 }
 
 export function useGame(id: string | undefined) {
+  const qc = useQueryClient()
   return useQuery({
     queryKey: ['game', id],
     queryFn: () => api<{ game: Game }>(`/api/games/${id}`).then((r) => r.game),
     enabled: !!id,
+    // The library's list has the same game: its page shows at once while the full answer comes.
+    placeholderData: () => qc.getQueryData<Game[]>(['games'])?.find((g) => g.id === id),
     refetchInterval: (q) => (q.state.data?.job ? 2000 : false),
   })
 }

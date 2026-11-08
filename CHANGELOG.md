@@ -7,6 +7,40 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-11-08
+
+Renplay 4.3 is a polish release. The player loads with one honest progress bar and lets you mute,
+go full screen or leave while it does. Pages no longer jump while they load, opening a game starts
+at its top, and Resume is on the first screen of a phone. Adult games are one choice on your
+account. Mods and files is rebuilt, and menus have their blur back in Chrome. Nothing needs
+changing to upgrade. Every game's art is made again once, in the background.
+
+### Changed
+
+- The account menu is a small menu under your picture instead of a window in the middle of the screen, with the admin's pages apart from your own.
+- **Main menu** is gone from the game page: **Resume** or **Play** starts the game, and its own menu is a tap away. In the player's drawer it is now **Save and go to the main menu**.
+- **All tags** (and **Clear tags**) sit at the right end of the tag row in the library and the catalog. On a phone, rows that scroll sideways fade at their right edge.
+- Activity uses the page's whole width, and Settings and Import saves sit in a centred column.
+- The game page's title in the browser tab is the game's name.
+- The loading screen has **Game page**, **Sound** and **Full screen**, so you can leave, mute or go full screen before the game starts. Its progress is one bar that only goes up, from the engine to the game's first screen.
+- **Full screen** sits beside the **Renplay** pill over the game, and the drawer has **Sound** and **Full screen** at its top. The pill is lit for the first seconds of a game, then quiet.
+- A game's page opens at its top, at once and without a spinner, and its picture flies from the tile to the poster. **Back** returns to where you were in the library. On a phone the page rises in without the flight.
+- On phones, **Resume** and **Play** come right under a game's title, before its tags and summary, so they are on the first screen in portrait and landscape. Held sideways, the stage is shorter. The bar with **Resume** at the bottom appears as soon as the button is behind the tab bar.
+- The library's stage on a phone shows where you are in two short lines, and **Not now** sits centred under the two buttons.
+- **Adult games** on your account is one choice: Off, Blurred or Shown. Levels above your limit cannot be chosen, and one line says who sets that limit: the installation, an admin or a sign-in group. The admin's limit for everyone is **Highest level for everyone** in **Settings**, and each person's in **Users**.
+- Showing less in one browser, for a shared screen, is in **Settings → This browser**, and **Hide adult games here** in the account menu does it in one tap. Your account page says when this browser shows less, with **Follow my choice here**.
+- **Mods and files** (the game page tab that was **Mods and options**) starts with what your mods change and **Install mod zip**, **Apply changes** and **Remove all mods**, then the game's files with rows a finger can hit, a **+** for a new file or an upload, and long folders shown 200 at a time.
+- The library's **Added this week** shelf shows only while most of the library is not new, and an install that cannot finish can be dismissed from the library. The tile of the game on the stage is lit in its own colour: the white ring is for keyboard focus only.
+- **Fit** shows the game in its own shape with the player's bars around it, and **Fill** crops only the sides, never the top or bottom where games keep their dialogue.
+
+### Fixed
+
+- Menus, sheets and the tab bar had no blur behind them in Chrome, Edge and other Chromium browsers, so text behind them showed through. The build dropped the property those browsers read.
+- Pages no longer jump while they load: the footer, a game's logo and the Add games page held their place.
+- **Resume** and **Play** show the focus ring when reached with the keyboard.
+- A picture is never cut and stretched to more than about twice its size for a game's art: a small store header no longer becomes a blurry background, and the soft background made instead is a smooth glow of the game's colours. Every game's art is made again once after the upgrade.
+- A game with saves but under a minute of play time said "Not played yet". It now says "Under a minute played".
+
 ## [4.2.0] - 2026-11-07
 
 Renplay 4.2 plays Ren’Py games with no network and with a controller. Keep a game offline from its
@@ -516,7 +550,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.2.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.3.0...dev
+[4.3.0]: https://github.com/renplay-org/renplay/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/renplay-org/renplay/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/renplay-org/renplay/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/renplay-org/renplay/compare/v4.0.0...v4.0.1

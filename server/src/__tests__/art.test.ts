@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ArtStore, catalogPictures, keeps, planFormat, type CatalogImage, type Picture } from '../art.js'
+import { ArtStore, catalogPictures, enlarges, keeps, planFormat, type CatalogImage, type Picture } from '../art.js'
 import type { Config } from '../config.js'
 import { Db } from '../db.js'
 import { isPrivateAddress, resolver } from '../util/net.js'
@@ -35,6 +35,19 @@ describe('the making order', () => {
     expect(planFormat('grid', { grid: pic('grid', 630, 500) })?.mode).toBe('whole')
     // A contributor's focal point always forces the crop.
     expect(planFormat('grid', { grid: pic('grid', 630, 500, { focal: [0.3, 0.5] }) })?.mode).toBe('crop')
+  })
+
+  it('never crops a picture to more than twice its size', () => {
+    // A Steam header (460x215) cut to a 1920 px hero would be four times its size: it glows instead.
+    expect(keeps('hero', { width: 460, height: 215 })).toBeGreaterThan(0.6)
+    expect(enlarges('hero', { width: 460, height: 215 })).toBeGreaterThan(4)
+    expect(planFormat('hero', { wide: pic('wide', 460, 215) })?.mode).toBe('glow')
+    // Not even with a focal point.
+    expect(planFormat('hero', { wide: pic('wide', 460, 215, { focal: [0.5, 0.5] }) })?.mode).toBe('glow')
+    // The same shape at twice the size crops.
+    expect(planFormat('hero', { wide: pic('wide', 1380, 645) })?.mode).toBe('crop')
+    // A picture chosen for the hero itself is cropped as chosen, small or not.
+    expect(planFormat('hero', { hero: pic('hero', 460, 215) })?.mode).toBe('crop')
   })
 
   it('composes a wide from a poster and a grid from a wide picture, and makes a hero glow', () => {

@@ -133,6 +133,12 @@ export function creditText(credit: ArtCredit | undefined): ReactNode {
 /** The stage and door title: the logo when there is one and pictures are on, otherwise text. A dark logo is inverted on ink. */
 export function TitleArt({ game, hidden, className = 'h1 xl' }: { game: ArtGame; hidden: boolean; className?: string }) {
   const logo = game.art?.logo
-  if (logo?.url1x && !hidden) return <img className={`logo-t ${logo.dark ? 'inv' : ''}`} src={logo.url1x} srcSet={logo.url2x ? `${logo.url1x} 1x, ${logo.url2x} 2x` : undefined} alt={game.title} />
+  // The logo is the page's heading, and its size is known before it loads, so nothing moves when it does.
+  if (logo?.url1x && !hidden)
+    return (
+      <h1 className="logo-h">
+        <img className={`logo-t ${logo.dark ? 'inv' : ''}`} src={logo.url1x} srcSet={logo.url2x ? `${logo.url1x} 1x, ${logo.url2x} 2x` : undefined} width={logo.width} height={logo.height} style={logo.height ? ({ '--logo-h': `${logo.height}px` } as CSSProperties) : undefined} alt={game.title} />
+      </h1>
+    )
   return <h1 className={className}>{game.title}</h1>
 }

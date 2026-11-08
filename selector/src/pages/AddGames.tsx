@@ -18,6 +18,8 @@ const BROKEN = 'Does not work'
 
 export default function AddGames() {
   useRoom({ game: null, quiet: true })
+  // The teaser waits for the downloads above it, so it is not pushed down when they arrive.
+  const archives = useArchives()
   return (
     <div>
       <h1 className="h1">Add games</h1>
@@ -25,7 +27,7 @@ export default function AddGames() {
         Add the PC download of a Ren’Py game, or an HTML game. Renplay builds it for the browser on the server.
       </p>
       <Downloads />
-      <CatalogTeaser />
+      {!archives.isLoading && <CatalogTeaser />}
     </div>
   )
 }
