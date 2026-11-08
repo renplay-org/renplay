@@ -9,7 +9,7 @@ import type { Db, GameRow } from '../db.js'
 import { readSaveMeta, readSaveScreenshot, slotInfo } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
 import { downloadSync, uploadSync } from '../saves/sync.js'
-import { sha1 } from '../util/fsx.js'
+import { dirSize, sha1 } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/paths.js'
 
 /** Metadata cache shared with the library, keyed by store/dir/name/mtime/size. */
@@ -55,8 +55,23 @@ export async function cachedSceneHash(store: SaveStore, dir: string, file: { nam
 export const syncCodesOn = (db: Db): boolean => db.getSetting<boolean>(SYNC_SETTING, false) === true
 export const SYNC_SETTING = 'renpy_sync'
 
-export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer = 'https://sync.renpy.org', maxFile = 64 << 20): Router {
+/** Limits for a shared account on a public server (the demo): one file, and everything with its history. */
+export interface SaveLimits {
+  file: number
+  total: number
+}
+
+export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer = 'https://sync.renpy.org', limits: SaveLimits = { file: 64 << 20, total: Infinity }): Router {
   const router = Router({ caseSensitive: true, strict: true })
+  // What the saves and their history take, counted again at most every 5 seconds.
+  let used: { at: number; bytes: Promise<number> } | null = null
+  const usedBytes = () => {
+    if (!used || Date.now() - used.at > 5000) {
+      const bytes = Promise.all([dirSize(store.root), dirSize(store.historyRoot)]).then(([a, b]) => a.bytes + b.bytes)
+      used = { at: Date.now(), bytes }
+    }
+    return used.bytes
+  }
 
   const game = (req: Request): GameRow => {
     const g = db.getGame(assertSlug(req.params.id))
@@ -139,7 +154,8 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const { dir, name } = resolvePath(g, req.query['path'])
     const body = req.body as Buffer
     if (!Buffer.isBuffer(body)) throw new HttpError(400, 'Expected a binary body')
-    if (body.length > maxFile) throw new HttpError(413, `A save here can be at most ${Math.round(maxFile / (1 << 20))} MB`)
+    if (body.length > limits.file) throw new HttpError(413, `A save here can be at most ${Math.round(limits.file / (1 << 20))} MB`)
+    if (Number.isFinite(limits.total) && (await usedBytes()) + body.length > limits.total) throw new HttpError(507, 'The saves here are full until the next fresh start')
     const mtime = Number(req.header('x-mtime')) || undefined
     // The version the device last saw, for the conflict rule. Older runtimes send none.
     const rawBase = req.header('x-base')

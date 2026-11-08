@@ -24,5 +24,6 @@ COPY --from=seed --chown=1000:1000 /games /games
 COPY --chmod=755 start.sh /app/deploy/demo-start.sh
 ENV RENPLAY_DEMO=on \
     RENPLAY_ADULT_GAMES=blurred \
-    RENPLAY_BACKUP_DIR=off
+    RENPLAY_BACKUP_DIR=off \
+    RENPLAY_SAVE_HISTORY=3
 ENTRYPOINT ["/app/deploy/demo-start.sh"]

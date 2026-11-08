@@ -9,7 +9,7 @@ release notes say what).
 
 ### Added
 
-- `RENPLAY_DEMO=on` runs Renplay as a public demo. The sign-in page offers **Try the demo**, a shared guest who can play, save, rate and keep games offline, but cannot upload, install, change the account or see Settings, and no other sign-in works. A banner says it is a demo. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.
+- `RENPLAY_DEMO=on` runs Renplay as a public demo. The sign-in page offers **Try the demo**, a shared guest who can play, save, rate and keep games offline, but cannot upload, install, change the account or see Settings, and no other sign-in works. Its saves are limited, so nobody can fill the demo's disk. A banner says it is a demo. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.
 
 ### Fixed
 

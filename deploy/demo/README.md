@@ -11,7 +11,8 @@ on Render's free plan, never on a maintainer's own servers.
   cannot be distributed outside Ren'Py, and other free games need their developers' permission.
 - The whole catalog, with adult games blurred. Nothing can be installed.
 - The guest can play, save, rate, mark a status and keep a game offline. They cannot upload,
-  install, change the account or open Settings, and a save file is at most 8 MB.
+  install, change the account or open Settings. A save file is at most 8 MB, all saves with their
+  history at most 256 MB (each keeps 3 earlier versions), so nobody can fill the demo's disk.
 - A banner on every page says it is a demo and links to the install guide.
 
 ## How it resets
