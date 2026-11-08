@@ -202,9 +202,12 @@ test file. Screenshots need `npx playwright install chromium webkit` once.
 - **Commits and PR titles:** Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`, `chore:`).
   The body says why, and what was tested.
 - **CI** (`.github/workflows/ci.yml`) runs on pull requests into `dev` and `main`, and the
-  rulesets require it: `check` (type checks, tests, the interface, docs, chart and workflow lint),
-  `Install contract (amd64, arm64)` (the image from a build cache, the contract, the chart on kind),
-  and `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
+  rulesets require it: `check` (type checks, tests, the interface, docs, chart, workflow and
+  deploy/ examples lint), `Install contract` (on amd64 and arm64: the image from a build cache, users
+  and a read-only root, an install, the upgrade from the newest release and back, the chart on
+  kind, deploy/compose.yaml; skipped when nothing in the image or the chart changed), and
+  `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
+  Upgrades are tested from the newest release only: nobody runs 2.x or 3.x.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
   `sites.yml` (the docs, with each release or by hand), `demo.yml` (the demo, with each release or
