@@ -62,8 +62,10 @@ Once, by a maintainer:
 3. **Settings → Custom domains**: `demo.renplay.org`. In the renplay-org Cloudflare DNS, a CNAME
    `demo` to the service's `onrender.com` address, DNS only (Render makes the certificate).
 4. **Settings → Deploy hook**: copy the URL into the renplay-org/renplay secret `RENDER_DEPLOY_HOOK`.
-5. Once it runs, check the log: requests should come **from** visitors' addresses, not one Render
-   address. If they do not, change `RENPLAY_TRUSTED_HOPS` in the Dockerfile.
+5. Once it runs, check that each visitor has their own address: from one address, the eleventh
+   **Try the demo** within a minute is refused, and another address still gets in. The demo takes
+   the address from Cloudflare's `CF-Connecting-IP` (Render's edge is Cloudflare), not by counting
+   Render's proxies.
 
 The free plan gives 512 MB and 0.1 CPU, enough for serving a small game: the demo uses about 75 MB
 and starts in about half a minute. A cold start takes about a minute in all, with Render's own
