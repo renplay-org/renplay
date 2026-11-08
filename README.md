@@ -91,7 +91,7 @@ More in the docs: [Docker Compose](https://docs.renplay.org/install/docker/),
 [playing on your phone](https://docs.renplay.org/guides/playing/),
 [configuration](https://docs.renplay.org/configuration/) (every environment variable),
 [upgrading and backups](https://docs.renplay.org/upgrading/),
-[the 3.x stability contract](https://docs.renplay.org/stability/) and
+[the 4.x stability contract](https://docs.renplay.org/stability/) and
 [troubleshooting](https://docs.renplay.org/troubleshooting/).
 
 **Back up `/data` and keep it on local disk:** it holds your saves and their history, accounts,
