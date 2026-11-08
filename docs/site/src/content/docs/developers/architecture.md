@@ -258,12 +258,14 @@ come from the base build's pack. Updating a game can re-apply mods or move them 
 
 ## Adult games
 
-`content.ts` holds the install-wide switch: `RENPLAY_ADULT_GAMES=allow|block` locks it, otherwise the
-`adult_games` setting does. Database version 6 stores `allow` for a library that already existed, so
-upgrading changes nothing. A fresh install has no answer, blocks, and asks once in the empty library
-(`GET`/`PUT /api/content` returns `{ adultGames, locked, chosen }`).
+`content.ts` holds the three levels, Off, Blurred and Shown. The installation's level is
+`RENPLAY_ADULT_GAMES=off|blurred|shown` when set (it locks it, and `allow` and `block` still mean
+Shown and Off), else the `adult_level` setting, else Shown until the owner answers the one question
+in the empty library (`GET`/`PUT /api/content`). Each person has a ceiling, set by an admin, by a
+sign-in group, or `RENPLAY_ADULT_DEFAULT` for new people, and their own choice. A request's level is
+the lowest of these and the browser's (see Adult levels above).
 
-Blocking is done where the data enters and where it leaves:
+At Off adult games are left out where the data enters and where it leaves:
 
 - **Catalog.** Each configured URL is read from its safe-for-work sibling (`index.v4.json` becomes
   `index.v4.sfw.json`). If that is missing, the full index is fetched and its adult recipes and
@@ -273,14 +275,13 @@ Blocking is done where the data enters and where it leaves:
   `match()` can recognize its archive: `POST /api/imports` and the install job refuse it with a plain
   reason, and `GET /api/archives` marks it `blocked`.
 - **Library.** `games.adult` remembers, from the last catalog that knew the recipe, which games are
-  adult. While blocked, `ContentMode.hides` makes the games list leave them out and every route that
-  names one (game, saves, files, play pages and streamed assets, copy targets, jobs, the saves export)
-  answer 404. Nothing is deleted. Switching back to allow shows them again. A game without a recipe
-  is not hidden.
-- **Account access.** Schema 7 adds admin-set adult access (blocked by default for new users),
-  enforced in the catalog, games, save tree, exports and play routes. Unknown games count as adult
-  for restricted users unless an admin marks one safe. Account preference Hide adult games narrows
-  this further; Hide pictures is cosmetic, not access control.
+  adult. At Off, `ContentMode.hides` makes the games list leave them out and every route that names
+  one (game, saves, files, play pages and streamed assets, copy targets, jobs, the saves export)
+  answer 404. Nothing is deleted, and a higher level shows them again. A game without a recipe
+  counts as adult for a person at Off until an admin marks it safe.
+- **Blurred.** No picture of an adult game is downloaded at the installation's Blurred, and none is
+  sent to a person at Blurred: the API gives formats as a ThumbHash and a tint, with no address, save
+  pictures as `screenshotHash`, and the presplash stays out of the game page.
 - **Static files.** nginx's server-level `auth_request` checks art, walkthroughs and build files
   too. Successful permission checks have a 60-second cache. Proxied routes check in Node. Public
   engines, the runtime, UI and health remain open.

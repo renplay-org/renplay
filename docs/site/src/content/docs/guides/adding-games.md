@@ -50,7 +50,7 @@ A big game takes minutes, mostly for image conversion. You can leave the page.
 - **Reinstall** from the kept archive makes a fresh build, and saves stay.
 - **Updates.** When the catalog lists a newer tested release than the one you have, Renplay says
   so. Download the new file and add it the same way.
-- **Mods.** A game's **Mods and files** tab (admins) starts with what your mods change: **Install
+- **Mods.** A Ren’Py game's **Mods and files** tab (admins) starts with what your mods change: **Install
   mod zip** adds a mod as it comes, **Apply changes** builds a new version of the game with your
   mods, and **Remove all mods** goes back to the original. Below, the game's files, folder by
   folder: open a script to edit it in the browser, or use **+** for a new file or an upload. Files

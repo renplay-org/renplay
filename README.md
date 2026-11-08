@@ -172,7 +172,7 @@ More in the [FAQ](https://docs.renplay.org/faq/).
 ## Support
 
 Questions, such as whether a game works, go to
-[Discussions](https://renplay.org/discussions). Bugs to
+[Discussions](https://renplay.org/discussions). Report bugs in
 [issues](https://renplay.org/issues).
 
 Renplay is made by the Renplay Team. It is free and open source. If it is useful to you, you can

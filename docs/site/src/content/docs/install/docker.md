@@ -52,7 +52,7 @@ docker run -d --name renplay --restart unless-stopped -p 8080:8080 \
 
 | Folder | What is in it |
 |---|---|
-| `/data` | Saves and their history, the library, mods, covers, walkthroughs. **Back this up.** |
+| `/data` | Saves and their history, the library, mods, game art, walkthroughs. **Back this up.** |
 | `/games` | Installed games, engines and scratch space. Scratch stays on this filesystem for atomic installs. Without a separate downloads mount, this also holds `_archives/`. |
 | `/downloads` | Optional downloads and drop folder. Mount your downloads share here to keep it separate from installed games. |
 

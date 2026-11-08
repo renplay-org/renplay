@@ -11,7 +11,7 @@ them they see.
 | Level | What it means |
 |---|---|
 | **Off** | Adult games do not exist. They are left out of the library, the catalog, search, Add games, Activity and every count. Nothing is blurred or tagged, there is simply nothing there. |
-| **Blurred** | Adult games show with their titles and details, and they play, with their walkthroughs and your save files. Their pictures do not: covers become title cards with an 18+ tag, save pictures become a soft blur of their colours, and loading pictures are hidden. The server never sends one of those pictures to that person, only a few dozen bytes that describe the blur. |
+| **Blurred** | Adult games show with their titles and details, and they play, with their walkthroughs and your save files. Their pictures do not: covers become a soft blur of their colours, with the title and an 18+ tag, save pictures become a soft blur of their colours, and loading pictures are hidden. The server never sends one of those pictures to that person, only a few dozen bytes that describe the blur. |
 | **Shown** | Adult games show with their pictures. |
 
 Safe-for-work games are never affected at any level.

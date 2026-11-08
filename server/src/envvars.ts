@@ -72,7 +72,7 @@ export const ENV_VARS: readonly EnvVar[] = [
     group: 'Folders',
     kind: 'text',
     fallback: '/data',
-    description: 'Saves and their history, the library database, mods, covers and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.',
+    description: 'Saves and their history, the library database, mods, game art and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.',
   },
   {
     name: 'ARCHIVES_DIR',
