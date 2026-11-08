@@ -24,7 +24,6 @@ import {
 import { isTouchDevice } from '../lib/platform'
 import { useDefaults, useGame } from '../lib/queries'
 import type { Defaults } from '@shared/defaults'
-import { queueHtmlSave, uploadHtmlSave, replayHtmlSaves } from '../lib/html-save-queue'
 import { keptGame, useOnline } from '../lib/offline'
 import { setGameHasPad } from '../lib/gamepad'
 import type { Me } from '@shared/api'
@@ -34,6 +33,7 @@ import { SLOW_SYNC, useSlow } from './player/useSlow'
 import { DisplayPanel, HomeScreenHelp, SavesPanel, SidePanel } from './player/panels'
 import { useFullscreen } from './player/useFullscreen'
 import { useMute } from './player/useMute'
+import { useHtmlSaves, useSaving } from './player/useSaving'
 import { usePlayTime } from './player/usePlayTime'
 import { useElementSize, useSafeInsets, useWakeLock } from './player/useScreen'
 import GameOptions, { type GameOptionsState } from './player/GameOptions'
@@ -73,7 +73,6 @@ export default function Player() {
   const slowSync = useSlow(sync.pending > 0, SLOW_SYNC)
   const [drawer, setDrawer] = useState<DrawerTab | null>(null)
   const [guide, setGuide] = useState<string | null>(null)
-  const [savingNow, setSavingNow] = useState(false)
   const toast = useToast()
   const [panel, setPanel] = useState<Panel>(null)
   // The pill and the full screen button are lit for a few seconds after the game is ready, then quiet.
@@ -83,7 +82,6 @@ export default function Player() {
   const [exiting, setExiting] = useState(false)
   // Save and exit could not get every save to the server: where the person meant to go.
   const [unsent, setUnsent] = useState<'library' | 'game' | null>(null)
-  const savingId = useRef<string | null>(null)
   // Ren'Py games: the patches this person chose and the text size, as the game reports them.
   const [gameOptions, setGameOptions] = useState<GameOptionsState | null>(null)
   // Defaults for everyone, sent with every options message so a game uses them until the person chooses.
@@ -97,24 +95,9 @@ export default function Player() {
   const [portraitOk, setPortraitOk] = useState(false)
   const [homeTip, setHomeTip] = useState(() => fsMode === 'home-screen' && !localStorage.getItem(HOME_TIP_KEY))
   const resumed = useRef(false)
-  const waiters = useRef(new Map<string, (ok: boolean) => void>())
   // Other engines run their own JavaScript, so they play in a sandboxed frame
   // (opaque origin, no access to Renplay) and their storage comes through here.
   const sandboxed = !!game && game.family !== 'renpy'
-  const storageWrite = useRef<Promise<unknown>>(Promise.resolve())
-  const storageUpload = useRef<Promise<unknown>>(Promise.resolve())
-  const [htmlQueueReady, setHtmlQueueReady] = useState(false)
-  useEffect(() => {
-    if (!sandboxed) return
-    let stopped = false
-    setHtmlQueueReady(false)
-    void replayHtmlSaves(userId, gameId).then(() => {
-      if (!stopped) setHtmlQueueReady(true)
-    }).catch(() => {
-      if (!stopped) setFailed('Your unsent saves are kept on this device. Connect and retry to sync them before playing.')
-    })
-    return () => { stopped = true }
-  }, [sandboxed, userId, gameId, attempt])
 
   const setPrefs = (p: DisplayPrefs) => {
     setPrefsState(p)
@@ -129,6 +112,8 @@ export default function Player() {
     [sandboxed],
   )
   const [muted, toggleMute] = useMute(send)
+  const saving = useSaving(send, ready, toast)
+  const htmlSaves = useHtmlSaves(sandboxed, userId, gameId, attempt, send, () => setSignedOut(true), setFailed)
   const { fullscreen, coversNotch, escLocked, escHint, escHeld, setEscHeld, toggleFullscreen } = useFullscreen(shellRef, fsMode, touch, send, () => setPanel('fullscreen'))
   const stage = useElementSize(stageRef, `${game?.id}:${isLoading}`)
   const insets = useSafeInsets()
@@ -183,13 +168,10 @@ export default function Player() {
           break
         case 'renplay:flushed':
           // After the storage that came before it is stored.
-          void storageWrite.current.finally(() => waiters.current.get(d.id)?.(d.ok !== false))
+          void htmlSaves.kept().finally(() => saving.flushed(d.id, d.ok !== false))
           break
         case 'renplay:saved-now':
-          if (d.id !== savingId.current) break
-          savingId.current = null
-          setSavingNow(false)
-          toast(d.saved ? (d.ok ? 'Saved' : 'Saved on this device. It syncs when the connection is back.') : 'Nothing to save in the main menu.', d.ok ? 'success' : 'info')
+          saving.savedNow(d.id, !!d.saved, !!d.ok)
           break
         case 'renplay:save-conflict':
           toast(
@@ -207,20 +189,7 @@ export default function Player() {
           break
         case 'renplay:storage':
           // A game's whole storage, kept within the size a save file may have on the server.
-          if (sandboxed && typeof d.data === 'string' && d.data.length <= 32 << 20 && game?.saveDir) {
-            const path = `${game.saveDir}/${d.kind === 'idb' ? 'indexedDB.json' : 'localStorage.json'}`
-            storageWrite.current = storageWrite.current
-              .catch(() => {})
-              .then(async () => {
-                const entry = await queueHtmlSave(userId, gameId, path, d.data)
-                send({ type: 'renplay:storage-kept', kind: d.kind, data: d.data, userId })
-                // A stalled upload must never delay the next durable snapshot or its acknowledgement.
-                storageUpload.current = storageUpload.current.catch(() => {})
-                  .then(() => uploadHtmlSave(entry))
-                  .catch(() => setSignedOut(true))
-              })
-              .catch(() => setSignedOut(true))
-          }
+          if (sandboxed && typeof d.data === 'string' && d.data.length <= 32 << 20 && game?.saveDir) htmlSaves.store(game.saveDir, d.kind, d.data)
           break
         case 'renplay:exited':
           void qc.invalidateQueries({ queryKey: ['games'] })
@@ -283,24 +252,7 @@ export default function Player() {
     return () => window.removeEventListener('renplay:pad-menu', onMenu)
   }, [drawer, ready, sandboxed, send, closeDrawer])
 
-  /**
-   * Saves (an autosave, or a quick save in a game without autosave), then waits until every save
-   * reached the server. Longer than the runtime's own limits, so its answer always arrives first.
-   */
-  const saveAndFlush = useCallback(
-    () =>
-      new Promise<boolean>((resolve) => {
-        const id = Math.random().toString(36).slice(2)
-        const t = setTimeout(() => (waiters.current.delete(id), resolve(false)), 20_000)
-        waiters.current.set(id, (ok) => {
-          clearTimeout(t)
-          waiters.current.delete(id)
-          resolve(ok)
-        })
-        send({ type: ready ? 'renplay:save-and-exit' : 'renplay:flush', id })
-      }),
-    [ready, send],
-  )
+  const { saveAndFlush } = saving
 
   const exit = useCallback(async (to: 'library' | 'game' = 'game', anyway = false) => {
     setExiting(true)
@@ -323,22 +275,6 @@ export default function Player() {
     if (ready && !sandboxed && defaults.data) send({ type: 'renplay:options', defaults: defaults.data })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, sandboxed, defaults.data])
-
-  /** Save now: a quick save, synced to the server. */
-  const saveNow = () => {
-    if (savingNow) return
-    const id = Math.random().toString(36).slice(2)
-    savingId.current = id
-    setSavingNow(true)
-    send({ type: 'renplay:save-now', id })
-    // A game that never answers does not leave the button saying Saving.
-    window.setTimeout(() => {
-      if (savingId.current !== id) return
-      savingId.current = null
-      setSavingNow(false)
-      toast('The game did not answer. Try again, or save from its own menu.')
-    }, 20_000)
-  }
 
   /** Main menu: the game saves first (saves that cannot reach the server wait on this device), then starts again at its main menu. */
   const mainMenu = async () => {
@@ -417,7 +353,7 @@ export default function Player() {
           <iframe
             ref={frameRef}
             key={attempt}
-            src={sandboxed && !htmlQueueReady ? undefined : game.playUrl}
+            src={sandboxed && !htmlSaves.ready ? undefined : game.playUrl}
             title={game.title}
             allow="autoplay; fullscreen; gamepad; clipboard-read; clipboard-write"
             sandbox={sandboxed ? 'allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms' : undefined}
@@ -525,8 +461,8 @@ export default function Player() {
           ready={ready}
           pending={sync.pending}
           online={sync.online}
-          saving={savingNow}
-          onSaveNow={saveNow}
+          saving={saving.savingNow}
+          onSaveNow={saving.saveNow}
           onExit={(to) => void exit(to)}
           onMainMenu={() => void mainMenu()}
           muted={muted}
