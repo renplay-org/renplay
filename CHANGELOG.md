@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-11-08
+
 ### Fixed
 
 - With a game kept offline, every page of the library opens without a network, also pages that were never opened before, and the offline copy of the library follows each new version of Renplay.
@@ -595,7 +597,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.4.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.5.0...dev
+[4.5.0]: https://github.com/renplay-org/renplay/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/renplay-org/renplay/compare/v4.3.1...v4.4.0
 [4.3.1]: https://github.com/renplay-org/renplay/compare/v4.3.0...v4.3.1
 [4.3.0]: https://github.com/renplay-org/renplay/compare/v4.2.0...v4.3.0
