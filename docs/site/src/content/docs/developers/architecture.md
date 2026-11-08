@@ -109,7 +109,8 @@ no-store HTTP responses. The runtime separately caches shared build data in Cach
 ## Playing
 
 The game page is the engine's own `index.html` with Renplay's runtime
-(`runtime/renplay-runtime.js`) injected. The runtime:
+(`runtime/renplay-runtime.js`, after `runtime/renplay-player.js`, which the HTML games' runtime
+shares) injected. The server builds it at start and serves it at `/renplay/runtime.js`. The runtime:
 
 - **Paces frames** to the display with `requestAnimationFrame`. Without it, Ren'Py's web build
   drew about 8 frames a second in tested games.

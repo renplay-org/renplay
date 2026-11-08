@@ -140,11 +140,12 @@ http {
       try_files $uri /index.html;
     }
 
-    # In-game runtime (versioned by query string).
+    # In-game runtime, built by the server from runtime/ (versioned by query string).
     location = /renplay/runtime.js {
       auth_request off;
-      alias /app/runtime/renplay-runtime.js;
-      add_header Cache-Control "public, max-age=31536000, immutable" always;
+      proxy_pass http://renplay;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
     }
 
     # Shared Ren'Py web engines, precompressed. Always send the .gz: the

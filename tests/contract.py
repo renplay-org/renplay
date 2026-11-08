@@ -8,6 +8,7 @@ not Ren'Py execution in a browser. No game or engine downloads are needed.
 import base64
 import io
 import json
+import re
 import struct
 import subprocess
 import sys
@@ -187,6 +188,10 @@ def smoke():
         assert game['status'] == 'installed' and game['engine'] == '8.5.3', game
         page = lib.request(game['playUrl'])
         assert b'renplay' in page.lower(), page
+        # The page's runtime, which nginx asks the server for.
+        runtime = re.search(rb'src="(/renplay/runtime\.js\?v=[0-9a-f]+)"', page)
+        assert runtime, page
+        assert b'renplay:fullscreen-state' in lib.request(runtime.group(1).decode()), 'The runtime lacks its shared part'
         assert lib.request(game['playUrl'] + 'build.json')['images']['converted'] == 1
         image = lib.request(game['playUrl'] + 'game/images/pixel.png')
         assert image[:4] == b'RIFF' and image[8:12] == b'WEBP', 'Native WebP conversion failed'

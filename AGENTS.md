@@ -107,7 +107,9 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. N
   src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
   src/lib/           api.ts (fetching), queries.ts, display.ts (screen geometry), platform.ts (what
                      device and browser this is), format.ts
-runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
+runtime/           Plain ES5-style scripts for the game pages: renplay-runtime.js (Ren'Py) and
+                     renplay-html.js (HTML games), each with renplay-player.js, what they share, in
+                     front. The server builds them (server/src/play/runtime.ts)
 image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it)
 charts/renplay/    The Helm chart
 deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
