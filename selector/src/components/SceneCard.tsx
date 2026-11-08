@@ -1,6 +1,6 @@
 import { Play } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
-import type { Game } from '../lib/api'
+import type { Game } from '@shared/api'
 import { useAdultView } from '../lib/adult'
 import { hashUrl, hue } from '../lantern/art'
 import { cx } from './ui'

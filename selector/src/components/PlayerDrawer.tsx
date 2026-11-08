@@ -2,7 +2,7 @@ import { BookOpen, Expand, ExternalLink, Maximize2, Shrink, Volume2, VolumeX, X 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Frame } from '../lantern/art'
 import { Pill, Seg } from '../lantern/controls'
-import type { Game } from '../lib/api'
+import type { Game } from '@shared/api'
 
 export type DrawerTab = 'saves' | 'guide' | 'options'
 type Walkthrough = Game['walkthroughs'][number]

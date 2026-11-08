@@ -1,6 +1,6 @@
 import { Check, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import type { Game } from '../lib/api'
+import type { Game } from '@shared/api'
 import { recipeLinks } from '../lib/links'
 
 export default function UpdateCard({ game }: { game: Game }) {

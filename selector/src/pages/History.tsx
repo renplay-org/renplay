@@ -6,36 +6,10 @@ import { Empty, Spinner, Button, errorText } from '../components/ui'
 import { api } from '../lib/api'
 import type { ArtFormat } from '@shared/art'
 import { duration, timeZone } from '../lib/format'
+import type { HistoryPage } from '@shared/api'
 
 /** A length of time in seconds: "45m", "1h 20m". */
 const length = (seconds: number) => (seconds < 60 ? 'Under a minute' : duration(seconds))
-
-interface HistorySession {
-  game: string
-  title: string
-  nsfw: boolean
-  startedAt: number
-  endedAt: number
-  seconds: number
-  icon: ArtFormat | null
-}
-interface HistoryGame {
-  id: string
-  title: string
-  nsfw: boolean
-  seconds: number
-  sessions: number
-  lastPlayedAt: number
-  rating: number | null
-  playStatus: 'playing' | 'stalled' | 'dropped' | 'finished' | null
-  icon: ArtFormat | null
-}
-interface HistoryPage {
-  totals: { seconds: number; sessions: number; games: number; since: number | null }
-  days: Array<{ day: string; seconds: number; sessions: HistorySession[] }>
-  games: HistoryGame[]
-  next: number | null
-}
 
 const STATUS: Record<string, string> = { playing: 'Playing', stalled: 'Stalled', dropped: 'Dropped', finished: 'Finished' }
 

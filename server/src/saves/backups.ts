@@ -6,22 +6,11 @@ import { log, size } from '../util/log.js'
 import type { Config } from '../config.js'
 import type { Db } from '../db.js'
 import type { SaveStores } from './stores.js'
+import type { BackupInfo } from '../shared/api.js'
 
 const DAY = 24 * 3600_000
 /** saves-YYYY-MM-DD-HHMMSS.zip, or HHMM as the first backups were named. */
 const NAME = /^saves-(\d{4}-\d{2}-\d{2}-\d{4}(?:\d{2})?)\.zip$/
-
-export interface BackupInfo {
-  /** Where backups go, or null when they are off. */
-  dir: string | null
-  keep: number
-  files: Array<{ name: string; size: number; at: number }>
-  last: number | null
-  /** When the next backup is due. Renplay runs it then, or the next time it runs after. */
-  next: number | null
-  running: boolean
-  error: string | null
-}
 
 /** Every file under a folder, as paths relative to it. */
 async function walk(root: string, dir = root): Promise<string[]> {

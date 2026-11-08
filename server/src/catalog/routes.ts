@@ -6,6 +6,7 @@ import { parseJson, type GameSource } from '../db.js'
 import { installedRelease } from '../shared/recipe.js'
 import type { Services } from '../services.js'
 import { exists } from '../util/fsx.js'
+import type { CatalogGame, CatalogResponse, DraftRecipe } from '../shared/api.js'
 
 /** The catalog's recipe schema, for editors that validate YAML (yaml-language-server). */
 export const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json'
@@ -21,12 +22,13 @@ export function createCatalogRouter(s: Services): Router {
       // Where Your recipes live on the server is for admins.
       status: { ...catalog.status(), count: catalog.list().length, sources: catalog.sources().map((s) => (s.kind === 'folder' && viewer()?.user.role !== 'admin' ? { ...s, location: '' } : s)) },
       vocabulary: content.hidesRecipe(true) ? Object.fromEntries(Object.entries(catalog.vocabulary).filter(([, v]) => v.group !== 'content')) : catalog.vocabulary,
-      games: catalog.list().map((r) => {
+      games: catalog.list().map((r): CatalogGame => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
         // The source as the interface says it: Your recipes, or the catalog (its address stays here).
-        return { ...r, _base: undefined, _origin: undefined, fromYourRecipes: r._origin === 'local' || undefined, art: catalog.recipeArt(r), local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
+        const { _base, _origin, ...recipe } = r
+        return { ...recipe, fromYourRecipes: _origin === 'local' || undefined, art: catalog.recipeArt(r), local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
       }),
-    })
+    } satisfies CatalogResponse)
   })
 
   router.post('/catalog/refresh', async (_req, res) => {
@@ -72,7 +74,7 @@ export function createCatalogRouter(s: Services): Router {
       ],
     }
     const yaml = `# yaml-language-server: $schema=${RECIPE_SCHEMA_URL}\n${YAML.stringify(JSON.parse(JSON.stringify(recipe)), { lineWidth: 0 })}`
-    res.json({ yaml, sha256Pending: !sha256, hashJob })
+    res.json({ yaml, sha256Pending: !sha256, hashJob } satisfies DraftRecipe)
   })
 
   return router

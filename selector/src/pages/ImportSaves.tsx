@@ -6,12 +6,7 @@ import { useRoom } from '../lantern/Room'
 import { api } from '../lib/api'
 import { readZip } from '../lib/zipread'
 import { Button, Progress, Spinner, errorText, useToast } from '../components/ui'
-
-interface Index {
-  dirs: Record<string, Record<string, { mtime: number; size: number }>>
-  games: Record<string, { id: string; title: string }>
-  catalog: Record<string, string>
-}
+import type { SaveImportIndex } from '@shared/api'
 
 /** A file found in the chosen folder or zip, by its path from the Ren'Py folder. */
 interface Found {
@@ -61,7 +56,7 @@ function collect(items: Array<{ path: string; size: number; mtime: number; read:
 
 type State = 'new' | 'newer' | 'older' | 'same'
 
-function compare(index: Index, f: Found): State {
+function compare(index: SaveImportIndex, f: Found): State {
   const [dir, name] = [f.rel.slice(0, f.rel.indexOf('/')), f.rel.slice(f.rel.indexOf('/') + 1)]
   const there = index.dirs[dir]?.[name]
   if (!there) return 'new'
@@ -78,7 +73,7 @@ interface Row {
   counts: Record<State, number>
 }
 
-function rowsOf(index: Index, found: Found[]): Row[] {
+function rowsOf(index: SaveImportIndex, found: Found[]): Row[] {
   const rows = new Map<string, Row>()
   for (const f of found) {
     if (f.rel.startsWith('tokens/')) continue
@@ -113,7 +108,7 @@ export default function ImportSaves() {
   const toast = useToast()
   const system = computer()
   const folder = system ? FOLDERS[system] : null
-  const index = useQuery({ queryKey: ['saves-import'], queryFn: () => api<Index>('/api/saves-import') })
+  const index = useQuery({ queryKey: ['saves-import'], queryFn: () => api<SaveImportIndex>('/api/saves-import') })
   const dirInput = useRef<HTMLInputElement>(null)
   const zipInput = useRef<HTMLInputElement>(null)
   const [found, setFound] = useState<Found[] | null>(null)

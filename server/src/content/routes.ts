@@ -3,12 +3,13 @@ import { viewer } from '../accounts/context.js'
 import { parseAdultLevel } from '../shared/levels.js'
 import { HttpError } from '../util/paths.js'
 import type { Services } from '../services.js'
+import type { ContentState } from '../shared/api.js'
 
 /** The adult levels: the installation's, what admins see of the setup, and marking a game safe for work. */
 export function createContentRouter(s: Services): Router {
   const { cfg, db, content, catalog } = s
   const router = Router({ caseSensitive: true, strict: true })
-  const state = () => {
+  const state = (): ContentState => {
     const installation = { level: content.level, fixed: content.locked, chosen: content.chosen, variable: 'RENPLAY_ADULT_GAMES' }
     // The starting level and the sign-in groups are the operator's setup: admins only.
     if (viewer()?.user.role !== 'admin') return { installation }

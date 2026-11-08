@@ -4,11 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftRight, Copy, Download, FileArchive, History, MoreHorizontal, PencilLine, Pin, Play, Trash2, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, del, post, slotName, type Game, type SaveSlot } from '../lib/api'
+import { api, del, post, slotName } from '../lib/api'
+import type { Game, SaveSlot } from '@shared/api'
 import { ago, bytes, dateTime, duration, timeZone } from '../lib/format'
 import { useGames, useSaves } from '../lib/queries'
 import { Seg } from '../lantern/controls'
 import { Button, Confirm, Empty, MenuItem, Modal, Spinner, errorText, useToast } from './ui'
+import type { SaveVersions, SyncDownloaded } from '@shared/api'
 
 type Kind = 'all' | 'manual' | 'auto' | 'quick'
 
@@ -307,7 +309,7 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
   const toast = useToast()
   const { data, isLoading } = useQuery({
     queryKey: ['history', game.id, file],
-    queryFn: () => api<{ versions: Array<{ id: string; name: string; size: number; savedAt: number; reason: string }> }>(`/api/saves/${game.id}/history${file ? `?file=${encodeURIComponent(file)}` : ''}`),
+    queryFn: () => api<SaveVersions>(`/api/saves/${game.id}/history${file ? `?file=${encodeURIComponent(file)}` : ''}`),
   })
   const reason = (r: string) =>
     ({ overwrite: 'Replaced in game', game: 'Replaced in game', 'game-delete': 'Deleted in game', 'user-delete': 'Deleted here', import: 'Replaced by import', restore: 'Before a restore', copy: 'Replaced by a copy', conflict: 'Older of two versions' })[r] ?? r
@@ -375,7 +377,7 @@ function SyncDialog({ game, onClose, onDownloaded }: { game: Game; onClose: () =
   const fetchCode = async () => {
     setFetching(true)
     try {
-      const r = await post<{ added: number; replaced: number; kept: number; same: number }>(`/api/saves/${game.id}/sync/download`, { code })
+      const r = await post<SyncDownloaded>(`/api/saves/${game.id}/sync/download`, { code })
       const parts = [r.added && `${r.added} new`, r.replaced && `${r.replaced} newer`, r.kept && `${r.kept} older, kept in History`].filter(Boolean)
       toast(parts.length ? `Saves brought in: ${parts.join(', ')}.` : 'These saves were already here.', 'success')
       setCode('')

@@ -12,6 +12,7 @@ import { useRoom } from '../lantern/Room'
 import { api, del, post, put } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { ago } from '../lib/format'
+import type { Sessions, TokenCreated, Tokens } from '@shared/api'
 
 export function AccountSection({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -21,8 +22,6 @@ export function AccountSection({ title, children }: { title: string; children: R
     </section>
   )
 }
-interface Session { id: string; label: string; created_at: number; touched_at: number; expires_at: number; current: boolean }
-interface Token { id: string; name: string; created_at: number }
 
 function sessionLabel(label: string): string {
   const browser = /Edg\//.test(label) ? 'Edge' : /Firefox\//.test(label) ? 'Firefox' : /Chrome\//.test(label) ? 'Chrome' : /Safari\//.test(label) ? 'Safari' : 'Browser'
@@ -32,8 +31,8 @@ function sessionLabel(label: string): string {
 
 export default function Account() {
   const { data: me } = useAuth(), qc = useQueryClient(), toast = useToast()
-  const sessions = useQuery({ queryKey: ['sessions'], queryFn: () => api<{ sessions: Session[] }>('/api/me/sessions') })
-  const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => api<{ tokens: Token[] }>('/api/me/tokens') })
+  const sessions = useQuery({ queryKey: ['sessions'], queryFn: () => api<Sessions>('/api/me/sessions') })
+  const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => api<Tokens>('/api/me/tokens') })
   const [dialog, setDialog] = useState<'password' | 'token' | ''>('')
   const [confirm, setConfirm] = useState<{ title: string; action: () => Promise<unknown> } | null>(null)
   const [secret, setSecret] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('')
@@ -186,7 +185,7 @@ export default function Account() {
             e.preventDefault(); const form = new FormData(e.currentTarget)
             if (dialog === 'password') {
               if (await run(() => post('/api/me/password', { current: form.get('current'), password: form.get('password') }), 'Password changed. Other sessions ended.')) setDialog('')
-            } else await run(async () => { const result = await post<{ token: string }>('/api/me/tokens', { name: form.get('name') }); setSecret(result.token) }, 'Token created')
+            } else await run(async () => { const result = await post<TokenCreated>('/api/me/tokens', { name: form.get('name') }); setSecret(result.token) }, 'Token created')
           }}>
             {dialog === 'password' ? (
               <>

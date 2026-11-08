@@ -11,6 +11,7 @@ import SearchPalette from './SearchPalette'
 import { useGames, useJobs } from '../lib/queries'
 import { RoomProvider } from '../lantern/Room'
 import { useArrowFocus } from '../lantern/focus'
+import type { Health } from '@shared/api'
 
 // Links go through renplay.org (redirects on the website), so moving GitHub or Ko-fi needs no release.
 export const REPO_URL = 'https://renplay.org/github'
@@ -39,7 +40,7 @@ function ActivityRing() {
 }
 
 function Footer() {
-  const { data } = useQuery({ queryKey: ['health'], queryFn: () => api<{ version: string }>('/api/health') })
+  const { data } = useQuery({ queryKey: ['health'], queryFn: () => api<Health>('/api/health') })
   return (
     <footer className="foot">
       <span>Renplay{data?.version ? ` ${data.version}` : ''}</span>

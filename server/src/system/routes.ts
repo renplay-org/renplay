@@ -7,6 +7,7 @@ import { parseJson } from '../db.js'
 import { cleanRelPath, safeJoin } from '../util/paths.js'
 import { dirSize } from '../util/fsx.js'
 import type { Services } from '../services.js'
+import type { Health, StorageReport, SystemInfo } from '../shared/api.js'
 
 async function disk(path: string) {
   try {
@@ -25,7 +26,7 @@ export function createSystemRouter(s: Services): Router {
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/health', (_req, res) => {
-    res.json({ ok: true, uptime: process.uptime(), version })
+    res.json({ ok: true, uptime: process.uptime(), version } satisfies Health)
   })
 
   /**
@@ -39,9 +40,9 @@ export function createSystemRouter(s: Services): Router {
    * What uses space, game by game (the build played, other builds such as mods, the download), the
    * engines, and folders of no game, with what could be freed. Counted at most once a minute.
    */
-  let storage: { at: number; body: unknown; level: string } | null = null
+  let storage: { at: number; body: StorageReport; level: string } | null = null
   // One count at a time for each level: a second request waits for the one running.
-  let counting: { level: string; body: Promise<unknown> } | null = null
+  let counting: { level: string; body: Promise<StorageReport> } | null = null
   router.get('/system/storage', async (_req, res) => {
     const level = content.viewerLevel()
     if (storage && storage.level === level && Date.now() - storage.at < 60_000) {
@@ -65,7 +66,7 @@ export function createSystemRouter(s: Services): Router {
       return null
     }
   }
-  async function countStorage() {
+  async function countStorage(): Promise<StorageReport> {
     const games = []
     for (const g of db.allGames().filter((x) => !content.hides(x))) {
       const folders = await readdir(join(cfg.gamesDir, g.id), { withFileTypes: true }).catch(() => [])
@@ -85,7 +86,7 @@ export function createSystemRouter(s: Services): Router {
     const orphanSizes = []
     for (const name of orphans) orphanSizes.push({ name, bytes: (await dirSize(join(cfg.gamesDir, name))).bytes })
     const enginesOut = installed.map((e) => ({ version: e.version, bytes: e.bytes, used: used.has(e.version) }))
-    const body = {
+    const body: StorageReport = {
       games,
       engines: enginesOut,
       orphans: orphanSizes,
@@ -137,11 +138,10 @@ export function createSystemRouter(s: Services): Router {
       orphans,
       purging: purger.pending(),
       paths: { games: cfg.gamesDir, archives: cfg.archivesDir, data: cfg.dataDir },
-      deleteArchives: !keepDownloads(cfg, db),
       keepDownloads: keepDownloads(cfg, db),
       keepDownloadsLocked: cfg.keepDownloadsLocked,
       busy: jobs.isBusy(),
-    })
+    } satisfies SystemInfo)
   })
 
   /** Removes engines no installed game uses. */

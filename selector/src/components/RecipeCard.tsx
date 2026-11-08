@@ -3,13 +3,13 @@ import { Check, ExternalLink, Plus } from 'lucide-react'
 import { Frame } from '../lantern/art'
 import { Pill, TagPill } from '../lantern/controls'
 import { BetaBadge } from './ui'
-import type { Recipe } from '../lib/api'
+import type { CatalogGame } from '@shared/api'
 import { stateLabel, gameTags } from '../lib/tags'
 import { recipeLinks } from '../lib/links'
 import { useCatalog } from '../lib/queries'
 
 /** A catalog recipe, as the sheet a catalog tile opens: what it is, where to get it, how it installs. */
-export default function RecipeCard({ recipe: r }: { recipe: Recipe }) {
+export default function RecipeCard({ recipe: r }: { recipe: CatalogGame }) {
   const { data: catalog } = useCatalog()
   const latest = r.releases[0]
   const broken = latest?.status === 'broken'

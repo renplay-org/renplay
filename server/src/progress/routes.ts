@@ -4,6 +4,7 @@ import { toGame } from '../games/routes.js'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
 import { PLAY_STATUSES, type GameWithProgress } from './store.js'
+import type { HistoryGame, HistoryPage, HistorySession } from '../shared/api.js'
 
 /** The day of a time, in the person's own time zone when the browser sends it (else the server's). */
 function dayFormat(tz: unknown): (ms: number) => string {
@@ -135,7 +136,7 @@ export function createProgressRouter(s: Services): Router {
         return {
           day,
           seconds: sessions.reduce((n, s) => n + s.seconds, 0),
-          sessions: sessions.map((s) => {
+          sessions: sessions.map((s): HistorySession => {
             const row = visible.get(s.game)!
             return { game: s.game, title: title(row), nsfw: row.adult === 1, startedAt: s.started_at, endedAt: s.ended_at, seconds: s.seconds, icon: icon(row) }
           }),
@@ -143,12 +144,12 @@ export function createProgressRouter(s: Services): Router {
       }),
       games: [...perGame.entries()]
         .sort((a, b) => b[1].seconds - a[1].seconds)
-        .map(([id, g]) => {
+        .map(([id, g]): HistoryGame => {
           const row = visible.get(id)!
           return { id, title: title(row), nsfw: row.adult === 1, seconds: g.seconds, sessions: g.sessions, lastPlayedAt: g.last, rating: row.rating || null, playStatus: row.play_status || null, icon: icon(row) }
         }),
       next: oldest !== null && inRange.some((s) => s.started_at < oldest && !shown.includes(dayOf(s.started_at))) ? oldest : null,
-    })
+    } satisfies HistoryPage)
   })
 
   return router

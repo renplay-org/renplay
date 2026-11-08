@@ -9,7 +9,7 @@ import Sheet from '../lantern/Sheet'
 import RecipeCard from '../components/RecipeCard'
 import CatalogTags, { matchesTags, useTagPrefs } from '../components/CatalogTags'
 import { Button, Empty, Spinner, errorText } from '../components/ui'
-import type { Recipe } from '../lib/api'
+import type { CatalogGame } from '@shared/api'
 import { ago } from '../lib/format'
 import { post } from '../lib/api'
 import { useCatalog } from '../lib/queries'
@@ -19,7 +19,7 @@ import { matchesSearch, stateLabel } from '../lib/tags'
 const REQUEST_URL = 'https://renplay.org/catalog/request'
 
 /** One catalog entry: the grid tile with In your library and Free pills, opening the recipe sheet. */
-function RecipeTile({ recipe: r, onOpen }: { recipe: Recipe; onOpen: () => void }) {
+function RecipeTile({ recipe: r, onOpen }: { recipe: CatalogGame; onOpen: () => void }) {
   const extra = r.local ? (
     <span className="corner">
       <TagPill tone="dark">
@@ -56,7 +56,7 @@ export default function Catalog() {
   const [tagPrefs, setTagPrefs] = useTagPrefs()
   const [limit, setLimit] = useState(36)
   const [filter, setFilter] = useState('all')
-  const [sheetFor, setSheetFor] = useState<Recipe | null>(null)
+  const [sheetFor, setSheetFor] = useState<CatalogGame | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const admin = useAuth().data?.user.role === 'admin'
   useRoom({ game: null, quiet: true })

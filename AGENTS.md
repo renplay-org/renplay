@@ -70,7 +70,8 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/config.ts      Environment variables, read from the table in envvars.ts
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
   src/shared/        What the server and the library both use: the adult levels, the recipe format,
-                     the art types, the defaults. The library imports it as @shared. It imports
+                     the art types, the defaults, and every answer of the API (api.ts), which the
+                     server builds with `satisfies`. The library imports it as @shared. It imports
                      nothing outside itself (shared.test.ts), since the library builds from it
                      Each folder below is one part of the server, with its routes in routes.ts:
   src/accounts/      Sign-in: sessions, passwords and PINs, OIDC and LDAP, tokens, who may call what
@@ -103,7 +104,7 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. N
   src/lantern/       The 4.0 design system: Tile, Stage, the room, Sheet, controls, focus, travel
                      (tokens and styles in src/index.css)
   src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
-  src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
+  src/lib/           api.ts (fetching), queries.ts, display.ts (screen geometry), format.ts
 runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
 image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it)
 charts/renplay/    The Helm chart

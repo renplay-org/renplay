@@ -3,6 +3,7 @@ import { parseJson, type JobRow } from '../db.js'
 import type { Services } from '../services.js'
 import { HttpError, cleanRelPath } from '../util/paths.js'
 import { keepaliveToken } from './keepalive.js'
+import type { Job, JobsResponse } from '../shared/api.js'
 
 /** The job queue as people see it, and the keepalive request a running job holds open. */
 export function createJobsRouter(s: Services): Router {
@@ -58,7 +59,7 @@ export function createJobsRouter(s: Services): Router {
     const visible = content.viewerLevel() === 'off' ? db.listJobs(Number.MAX_SAFE_INTEGER, 0).filter((j) => !jobHidden(j)) : null
     const page = visible ? visible.slice(offset, offset + limit) : db.listJobs(limit, offset)
     res.json({
-      jobs: page.map((j) => ({
+      jobs: page.map((j): Job => ({
         id: j.id,
         type: j.type,
         game: j.game,
@@ -75,7 +76,7 @@ export function createJobsRouter(s: Services): Router {
       })),
       busy: visible ? visible.some((j) => j.status === 'running') : jobs.isBusy(),
       total: visible ? visible.length : db.countJobs(),
-    })
+    } satisfies JobsResponse)
   })
 
   /** The job, unless it belongs to a game that does not exist for this person. */
@@ -112,7 +113,7 @@ export function createJobsRouter(s: Services): Router {
   return router
 }
 
-function safeParams(s: string): unknown {
+function safeParams(s: string): Job['params'] {
   const p = parseJson<Record<string, any> | null>(s, null)
   if (!p) return null
   return { source: p.source, game: p.game, path: p.path, by: typeof p.by === 'number' ? p.by : undefined }

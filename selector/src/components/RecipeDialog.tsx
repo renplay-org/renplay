@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { Copy, Download } from 'lucide-react'
-import { api, type Game } from '../lib/api'
+import { api } from '../lib/api'
+import type { Game } from '@shared/api'
 import { Button, Modal, Spinner, useToast } from './ui'
+import type { DraftRecipe } from '@shared/api'
 
 /** A recipe for an installed game, filled in from the installation, to contribute to the catalog. */
 export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' | 'recipe'>; onClose: () => void }) {
   const toast = useToast()
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['recipe', game.id],
-    queryFn: () => api<{ yaml: string; sha256Pending: boolean; hashJob: string | null }>(`/api/games/${game.id}/recipe`),
+    queryFn: () => api<DraftRecipe>(`/api/games/${game.id}/recipe`),
     refetchInterval: (q) => (q.state.data?.sha256Pending ? 4000 : false),
   })
   const file = `${game.recipe?.id ?? game.id}.yaml`

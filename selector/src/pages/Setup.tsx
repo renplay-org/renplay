@@ -5,10 +5,11 @@ import AuthLayout, { authInput } from '../components/AuthLayout'
 import { Pill } from '../lantern/controls'
 import { errorText } from '../components/ui'
 import { api, post } from '../lib/api'
+import type { Providers } from '@shared/api'
 
 export default function Setup() {
   const [grant, setGrant] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ setup: boolean }>('/api/auth/providers') })
+  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<Providers>('/api/auth/providers') })
   if (providers.data && !providers.data.setup) return <Navigate to="/" replace />
   return (
     <AuthLayout wide>

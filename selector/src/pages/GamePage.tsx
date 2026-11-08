@@ -17,7 +17,8 @@ import FavoriteButton from '../components/FavoriteButton'
 import GameTags from '../components/GameTags'
 import SaveGallery from '../components/SaveGallery'
 import { BetaBadge, Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, Switch, errorText, useToast } from '../components/ui'
-import { api, del, post, slotName, type Game } from '../lib/api'
+import { api, del, post, slotName } from '../lib/api'
+import type { Game } from '@shared/api'
 import type { ArtKind } from '@shared/recipe'
 import ArtPicker from '../components/ArtPicker'
 import { ago, bytes, capitalize, duration, pct, timeZone } from '../lib/format'
@@ -26,6 +27,7 @@ import { useCatalog, useGame, useSaves } from '../lib/queries'
 
 import { useAuth } from '../lib/auth'
 import { phoneLabel, stateLabel } from '../lib/tags'
+import type { HistoryPage } from '@shared/api'
 
 type Tab = 'play' | 'saves' | 'walkthroughs' | 'files' | 'details' | 'manage'
 
@@ -290,16 +292,11 @@ const STATUS_OPTIONS = [
   { value: 'finished', label: 'Finished' },
 ] as const
 
-interface GameHistory {
-  totals: { seconds: number; sessions: number }
-  days: Array<{ day: string; sessions: Array<{ startedAt: number; seconds: number }> }>
-}
-
 /** Play: your progress, your status and rating, updates, and the last sessions of this game. */
 function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
   const qc = useQueryClient()
   const toast = useToast()
-  const history = useQuery({ queryKey: ['history', game.id], queryFn: () => api<GameHistory>(`/api/history?game=${encodeURIComponent(game.id)}&days=30&tz=${encodeURIComponent(timeZone())}`) })
+  const history = useQuery({ queryKey: ['history', game.id], queryFn: () => api<HistoryPage>(`/api/history?game=${encodeURIComponent(game.id)}&days=30&tz=${encodeURIComponent(timeZone())}`) })
   const sessions = (history.data?.days ?? []).flatMap((d) => d.sessions).slice(0, 4)
   const save = async (path: string, json: unknown) => {
     try {

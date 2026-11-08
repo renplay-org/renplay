@@ -1,4 +1,5 @@
 import { api, post } from './api'
+import type { UploadStarted } from '@shared/api'
 
 export interface UploadHandle {
   promise: Promise<string>
@@ -78,7 +79,7 @@ export function uploadArchive(file: File, onProgress: (sent: number, total: numb
       }
     }
     if (!id) {
-      const r = await post<{ id: string; chunkSize: number }>('/api/uploads', { name: file.name, size: file.size })
+      const r = await post<UploadStarted>('/api/uploads', { name: file.name, size: file.size })
       id = r.id
       chunk = r.chunkSize
       remember(file, id)

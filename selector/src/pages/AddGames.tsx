@@ -8,7 +8,8 @@ import { Frame, tintOf } from '../lantern/art'
 import { Pill, Bar, TagPill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { BetaBadge, Button, Confirm, Modal, Progress, Spinner, Switch, MenuItem, cx, errorText, useToast } from '../components/ui'
-import { del, post, type Archive, type ArchiveInfo, type Job } from '../lib/api'
+import { del, post } from '../lib/api'
+import type { Archive, ArchiveInfo, InspectResponse, Job } from '@shared/api'
 import { ago, bytes, pct } from '../lib/format'
 import { useArchives, useCatalog, useGames, useJobs, useSystem } from '../lib/queries'
 import { uploadArchive, type UploadHandle } from '../lib/upload'
@@ -132,7 +133,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   // Only zips can be looked into without unpacking them.
   useEffect(() => {
     if (a.info || !/\.zip$/i.test(a.name)) return
-    post<{ info: ArchiveInfo }>('/api/archives/inspect', { path: a.path })
+    post<InspectResponse>('/api/archives/inspect', { path: a.path })
       .then((r) => {
         setInfo(r.info)
         // So the row moves to its section.
@@ -151,7 +152,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
   const engine = info?.engine
   const foreign = engine && engine.family !== 'renpy' ? engine : null
   const unknown = info?.type === 'zip' && !info.layout && !engine
-  const blocked = !!a.blocked || (!a.installedAs && engine?.installable === false)
+  const blocked = !a.installedAs && engine?.installable === false
   const madeWith = foreign ? foreign.label : renpy && `Ren’Py ${renpy}`
   const meta = [bytes(a.size), madeWith, `Added ${ago(a.mtime)}`, title !== a.name && a.name].filter(Boolean).join(' · ')
   return (
@@ -176,7 +177,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
           {foreign && !blocked && <BetaBadge engine={foreign.family} />}
         </div>
         <div className="m">{meta}</div>
-        {blocked && (a.blocked ?? engine?.reason) && <p className="m amber">{a.blocked ?? engine?.reason}</p>}
+        {blocked && engine?.reason && <p className="m amber">{engine.reason}</p>}
         {!blocked && !job && engine?.warnings.map((w) => (
           <p key={w} className="m amber">
             {w}

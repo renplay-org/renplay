@@ -8,6 +8,7 @@ import { passwordHash, random } from '../accounts/passwords.js'
 import { parseAdultLevel } from '../shared/levels.js'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
+import type { People, PersonListed } from '../shared/api.js'
 
 /**
  * An admin's work with people: the list, adding, changing and removing them, merging two, and an
@@ -28,13 +29,13 @@ export function createPeopleRouter(s: Services): Router {
   }
 
   router.get('/users', async (_req, res) => {
-    const users = await Promise.all((db.raw.prepare('SELECT * FROM users').all() as unknown as User[]).map(async (u) => {
+    const users = await Promise.all((db.raw.prepare('SELECT * FROM users').all() as unknown as User[]).map(async (u): Promise<PersonListed> => {
       // Counts follow the admin's own level: an Off admin's counts leave hidden games' saves out.
       const store = saveStores.of(u.id), dirs = content.visibleSaveDirs(await store.listDirs())
       const files = await Promise.all(dirs.map((dir) => store.list(dir)))
       return { ...publicUser(u), games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === cfg.authUser, ...accounts.managed(u.id) }
     }))
-    res.json({ users, adultDefault: cfg.adultDefault })
+    res.json({ users, adultDefault: cfg.adultDefault } satisfies People)
   })
   router.post('/users', async (req, res) => {
     const login = validUsername(req.body?.username), display = validName(req.body?.name || login), encoded = await passwordHash(req.body?.password)

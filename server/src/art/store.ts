@@ -14,6 +14,7 @@ import { catalogHosts, fetchPublic } from '../util/net.js'
 import { readLocalFile } from '../recipes/local.js'
 import { ART_KINDS, type ArtKind, type CatalogImage } from '../shared/recipe.js'
 import type { ArtCredit, ArtFormat, ArtMade, ArtSet } from '../shared/art.js'
+import type { ArtCandidate } from '../shared/api.js'
 
 /**
  * The art system. A game has five formats in SteamGridDB's shapes. The catalog links
@@ -527,14 +528,14 @@ export class ArtStore {
    * Every candidate for one format, each made at the format's size by the same pipeline, so what
    * the picker shows is what the tile will be. For a person at Shown only.
    */
-  async candidates(subject: ArtSubject, kind: ArtKind, scope: number): Promise<Array<{ id: string; current: boolean; everyone: boolean; mine: boolean; inShape: boolean; width: number; height: number; source: string; credit: ArtCredit; upload: boolean; ownUpload: boolean; sharedUpload: boolean; preview: ArtFormat | null }>> {
+  async candidates(subject: ArtSubject, kind: ArtKind, scope: number): Promise<ArtCandidate[]> {
     const chosen = this.chosen(subject, scope)
     // For everyone: only what an admin chose for everyone, not the catalog default.
     const everyone = subject.game ? (this.db.raw.prepare('SELECT candidate FROM art_choices WHERE game = ? AND kind = ? AND scope = 0').get(subject.game, kind) as { candidate: string } | undefined)?.candidate : undefined
     const choice = subject.game ? (this.db.raw.prepare('SELECT candidate FROM art_choices WHERE game = ? AND kind = ? AND scope = ?').get(subject.game, kind, scope) as { candidate: string } | undefined)?.candidate : undefined
     // Made side by side (the making slots still limit how many at once), so one slow picture does
     // not hold up the list.
-    return Promise.all(subject.pictures.filter((x) => x.kind === kind).map(async (p) => {
+    return Promise.all(subject.pictures.filter((x) => x.kind === kind).map(async (p): Promise<ArtCandidate> => {
       const plan = planFormat(kind, { ...chosen, [kind]: p })
       let preview: ArtFormat | null = null
       if (plan && p.width > 0) {
