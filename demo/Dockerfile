@@ -2,8 +2,8 @@
 # recipes, adult games blurred, and RENPLAY_DEMO on. Everything is in the image: a host that starts
 # it fresh (Render's free plan, after 15 idle minutes or the demo's 4-hour stop) resets the demo.
 #
-#   sh deploy/demo/build-games.sh 8.5.3 deploy/demo/games
-#   docker build -f deploy/demo/Dockerfile --build-arg IMAGE=ghcr.io/renplay-org/renplay:4.3.1 deploy/demo
+#   sh demo/build-games.sh 8.5.3 demo/games
+#   docker build --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> demo
 ARG IMAGE=ghcr.io/renplay-org/renplay:latest
 
 FROM ${IMAGE} AS seed

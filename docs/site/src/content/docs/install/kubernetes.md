@@ -23,6 +23,8 @@ filesystem and no Linux capabilities. `/tmp` is a writable emptyDir. It never ch
 ownership as root. For another user, set `podSecurityContext.runAsUser`, `runAsGroup` and
 `fsGroup` to match the storage permissions.
 
+A complete example with NFS for games and an ingress with HTTPS is
+[deploy/kubernetes/values.yaml](https://github.com/renplay-org/renplay/blob/main/deploy/kubernetes/values.yaml).
 See the [chart values reference](https://github.com/renplay-org/renplay/tree/dev/charts/renplay).
 The chart version and app version match. The tag defaults to the app version, and a digest takes
 precedence. Release packages pin the app image digest. Use
@@ -128,51 +130,10 @@ the corresponding plain secret variables. See [Accounts and sign-in](/accounts/)
 
 ## Already using app-template
 
-You can keep using bjw-s app-template. The core values remain:
+You can keep using bjw-s app-template. These values run Renplay with app-template 5
+([deploy/kubernetes/app-template.yaml](https://github.com/renplay-org/renplay/blob/main/deploy/kubernetes/app-template.yaml)):
 
-```yaml
-controllers:
-  main:
-    strategy: Recreate
-    containers:
-      app:
-        image:
-          repository: ghcr.io/renplay-org/renplay
-          tag: __RENPLAY_VERSION__
-        securityContext:
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: [ALL]
-        probes:
-          readiness:
-            enabled: true
-            custom: true
-            spec:
-              httpGet: {path: /api/health, port: 8080}
-defaultPodOptions:
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-    runAsGroup: 1000
-    fsGroup: 1000
-service:
-  app:
-    controller: main
-    ports:
-      http:
-        port: 8080
-persistence:
-  data:
-    existingClaim: renplay-data
-    globalMounts:
-      - path: /data
-  games:
-    existingClaim: renplay-games
-    globalMounts:
-      - path: /games
-  tmp:
-    type: emptyDir
+```yaml file=deploy/kubernetes/app-template.yaml
 ```
 
 Add a downloads mount only when you want it separate. Existing `/games/_archives` mounts and

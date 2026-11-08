@@ -1,11 +1,20 @@
+# The image needs server/, selector/, runtime/ and image/ only.
 **/node_modules
 **/dist
+**/*.tsbuildinfo
 .git
+.github
+.agents
+.claude
+charts
+deploy
+demo
+docs
+scripts
+tests
 data
 games
 saves
 *.md
-docker-compose.yml
-Makefile
+mise.toml
 .env
-**/*.tsbuildinfo

@@ -2,7 +2,7 @@
 # Builds the demo's games as normal PC downloads, from the official Ren'Py SDK:
 # The Question, without its music. The Ren'Py Tutorial cannot be distributed outside Ren'Py.
 #
-#   sh deploy/demo/build-games.sh <Ren'Py version> <out dir>
+#   sh demo/build-games.sh <Ren'Py version> <out dir>
 set -eu
 VERSION=$1
 OUT=$(cd "$2" && pwd)

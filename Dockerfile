@@ -29,7 +29,8 @@ COPY --from=build /src/server/node_modules /app/server/node_modules
 COPY --from=build /src/server/package.json /app/server/package.json
 COPY server/catalog.json /app/server/catalog.json
 COPY runtime /app/runtime
-COPY deploy/nginx.conf.template deploy/entrypoint.sh /app/deploy/
+# The image keeps its own files in /app/deploy, where they have always been.
+COPY image/nginx.conf.template image/entrypoint.sh /app/deploy/
 RUN chmod +x /app/deploy/entrypoint.sh
 
 ENV NODE_ENV=production \

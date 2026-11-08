@@ -45,8 +45,8 @@ it fresh.
 To try it locally:
 
 ```sh
-sh deploy/demo/build-games.sh 8.5.3 deploy/demo/games
-docker build -f deploy/demo/Dockerfile --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> -t renplay-demo deploy/demo
+sh demo/build-games.sh 8.5.3 demo/games
+docker build --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> -t renplay-demo demo
 docker run --rm -p 8080:8080 --memory 512m --cpus 0.1 renplay-demo
 ```
 

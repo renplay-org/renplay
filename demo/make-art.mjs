@@ -1,7 +1,7 @@
 // Makes The Question's art for the demo's recipe from the game's own pictures (MIT, like Ren'Py):
 // a 600x900 poster, a 1920x620 background and a logo. Run once, with sharp from the server:
 //
-//   node deploy/demo/make-art.mjs <the_question/game/images> deploy/demo/recipes/art/the-question
+//   node demo/make-art.mjs <the_question/game/images> demo/recipes/art/the-question
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 
@@ -9,7 +9,7 @@ const require = createRequire(new URL('../../server/package.json', import.meta.u
 const sharp = require('sharp')
 const [images, out] = process.argv.slice(2)
 if (!images || !out) {
-  console.error('Usage: node deploy/demo/make-art.mjs <the_question/game/images> <out dir>')
+  console.error('Usage: node demo/make-art.mjs <the_question/game/images> <out dir>')
   process.exit(1)
 }
 const bg = join(images, 'bg meadow.jpg')

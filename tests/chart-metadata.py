@@ -7,7 +7,7 @@ import tempfile
 import unittest
 import yaml
 
-SCRIPT = Path(__file__).with_name('package-chart.py').resolve()
+SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'package-chart.py'
 
 
 class PackageChartTest(unittest.TestCase):
