@@ -62,7 +62,7 @@ export interface SaveLimits {
   files: number
 }
 
-export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer = 'https://sync.renpy.org', limits: SaveLimits = { file: 64 << 20, total: Infinity, files: Infinity }): Router {
+export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer: string, limits: SaveLimits): Router {
   const router = Router({ caseSensitive: true, strict: true })
   // What the saves and their history take, counted again at most every 5 seconds.
   let used: { at: number; size: Promise<{ bytes: number; files: number }> } | null = null
