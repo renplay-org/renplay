@@ -1,7 +1,6 @@
 import { Router } from 'express'
-import type { Accounts } from '../auth.js'
-import type { Catalog } from '../catalog.js'
-import type { Db, GameRow, GameWithProgress } from '../db.js'
+import type { GameRow, GameWithProgress } from '../db.js'
+import type { Services } from '../services.js'
 
 interface SessionRow {
   game: string
@@ -31,7 +30,8 @@ function dayFormat(tz: unknown): (ms: number) => string {
  * per game with ratings and statuses. Only games in the library that the person may see count:
  * a hidden game's sessions stay stored and come back with the level.
  */
-export function createHistoryRouter(db: Db, catalog: Catalog, accounts: Accounts): Router {
+export function createHistoryRouter(s: Services): Router {
+  const { db, catalog, accounts } = s
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/', (req, res) => {

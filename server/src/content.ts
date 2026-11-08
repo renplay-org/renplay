@@ -62,9 +62,11 @@ const KEY = 'adult_level'
  * shows everything until the admin chooses.
  */
 export class ContentMode {
+  /** `adultSaveDirs` lists the save folders adult recipes name: the catalog knows them (services.ts). */
   constructor(
     private readonly cfg: Config,
     private readonly db: Db,
+    private readonly adultSaveDirs: () => Iterable<string> = () => [],
   ) {}
 
   /** The server's configuration decides; Settings cannot change it. */
@@ -116,9 +118,6 @@ export class ContentMode {
     }
     return false
   }
-
-  /** The save folders adult recipes name, known to the catalog (it sets this). */
-  adultSaveDirs: () => Iterable<string> = () => []
 
   /**
    * The save folders this person may see, out of `dirs`. Off leaves out every folder of an adult

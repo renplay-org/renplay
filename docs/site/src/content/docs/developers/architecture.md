@@ -16,6 +16,14 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
                         └─ /api/…                  node server on 127.0.0.1:3000
 ```
 
+## The server
+
+`services.ts` makes the server's parts once at start: the database, the adult level rules
+(`content.ts`), accounts, the catalog with its art cache, jobs, builds, engines and save backups.
+Every router and job gets that one object. The person a request is for comes from the request
+itself (`accounts-context.ts`), so `services.saves` is always the saves of whoever is asking.
+Modules below the routes, like the install pipeline, take only the parts they use.
+
 ## Storage
 
 | Path | Contents |

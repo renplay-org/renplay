@@ -1,13 +1,11 @@
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
-import type { Builds } from '../builds.js'
-import type { ContentMode } from '../content.js'
-import type { Db, GameRow } from '../db.js'
-import type { JobManager } from '../jobs.js'
+import type { GameRow } from '../db.js'
 import { Overlays } from '../mods.js'
 import { baseFiles, readBaseFile } from '../pipeline/applymods.js'
 import { isZip, readZipEntries } from '../saves/savefile.js'
 import { HttpError, assertSlug, cleanRelPath } from '../util/paths.js'
+import type { Services } from '../services.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 256 << 20, files: 500 } })
 const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|css|js)$/i
@@ -17,7 +15,8 @@ type BaseIndex = Map<string, { size: number; where: 'zip' | 'pack' }>
 /** Pictures and videos of a game, which the file browser does not send below Shown. */
 const PICTURE_EXT = /\.(?:jpe?g|png|webp|gif|avif|bmp|tga|svg|mp4|webm|ogv|mkv|avi|mov|m4v)$/i
 
-export function createFilesRouter(db: Db, builds: Builds, overlays: Overlays, jobs: JobManager, content: ContentMode): Router {
+export function createFilesRouter(s: Services): Router {
+  const { db, builds, overlays, jobs, content } = s
   const router = Router({ caseSensitive: true, strict: true })
   const cache = new Map<string, { key: string; files: BaseIndex }>()
 

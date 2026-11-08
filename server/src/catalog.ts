@@ -209,8 +209,6 @@ export class Catalog {
   /** Adult recipes of a blocked install, reduced by stub(): enough to refuse their archives and hide their games. */
   private adult = new Map<string, Recipe>()
   vocabulary: Vocabulary = {}
-  /** The art cache, set by the app. Without it (in tests of the catalog alone) nothing is made. */
-  art: ArtStore | null = null
   private fetchedAt = 0
   /** Problems of the last refresh. An error about one recipe names it, so a person who may not see that game does not see the error either. */
   private errors: Array<{ text: string; recipe?: string }> = []
@@ -219,9 +217,13 @@ export class Catalog {
   constructor(
     private readonly cfg: Config,
     private readonly db: Db,
-    readonly content: ContentMode = new ContentMode(cfg, db),
-  ) {
-    content.adultSaveDirs = () => [...this.adult.values(), ...[...this.recipes.values()].filter((r) => r.nsfw === true)].map((r) => r.saveDir ?? '').filter(Boolean)
+    readonly content: ContentMode,
+    readonly art: ArtStore,
+  ) {}
+
+  /** The save folders adult recipes name, for ContentMode. */
+  adultSaveDirs(): string[] {
+    return [...this.adult.values(), ...[...this.recipes.values()].filter((r) => r.nsfw === true)].map((r) => r.saveDir ?? '').filter(Boolean)
   }
 
   async init(): Promise<void> {
@@ -413,7 +415,7 @@ export class Catalog {
   /** The catalog pictures of a recipe, as the art cache takes them. */
   pictures(recipe: Recipe): ReturnType<typeof catalogPictures> {
     const pictures = catalogPictures(recipe.art, recipe._base ?? this.cfg.catalogUrls[0])
-    return this.art ? this.art.complete(pictures) : pictures
+    return this.art.complete(pictures)
   }
 
   /**
@@ -427,7 +429,7 @@ export class Catalog {
       const adult = g.adult === 1 || recipe?.nsfw === true || this.adult.has(g.recipe_id)
       // At Off an adult game's pictures are not made at all.
       if (adult && this.content.level === 'off') continue
-      const uploads = this.art ? (this.db.raw.prepare('SELECT DISTINCT scope FROM art_uploads WHERE game = ?').all(g.id) as Array<{ scope: number }>).flatMap((r) => this.art!.uploads(g.id, r.scope)) : []
+      const uploads = (this.db.raw.prepare('SELECT DISTINCT scope FROM art_uploads WHERE game = ?').all(g.id) as Array<{ scope: number }>).flatMap((r) => this.art.uploads(g.id, r.scope))
       const unique = [...new Map(uploads.map((u) => [`${u.id}:${u.kind}`, u])).values()]
       subjects.push({ game: g.id, recipe: g.recipe_id || null, adult, pictures: [...(recipe ? this.pictures(recipe) : []), ...unique] })
     }
@@ -437,23 +439,22 @@ export class Catalog {
   /** A library game's pictures for this person: the catalog's and the uploads they may choose. */
   gameSubject(row: GameRow): ArtSubject {
     const recipe = row.recipe_id ? this.recipes.get(row.recipe_id) : undefined
-    const uploads = this.art ? this.art.uploads(row.id, viewer()?.user.id ?? 0) : []
+    const uploads = this.art.uploads(row.id, viewer()?.user.id ?? 0)
     return { game: row.id, recipe: row.recipe_id || null, adult: row.adult === 1 || recipe?.nsfw === true, pictures: [...(recipe ? this.pictures(recipe) : []), ...uploads] }
   }
 
   /** A library game's formats as this person sees them. */
   gameArt(row: GameRow): ArtSet {
-    return this.art ? this.art.forSubject(this.gameSubject(row)) : {}
+    return this.art.forSubject(this.gameSubject(row))
   }
 
   /** A catalog recipe's formats (its defaults) as this person sees them. */
   recipeArt(recipe: Recipe): ArtSet {
-    return this.art ? this.art.forSubject({ game: null, adult: recipe.nsfw === true, pictures: this.pictures(recipe) }, { scope: 0 }) : {}
+    return this.art.forSubject({ game: null, adult: recipe.nsfw === true, pictures: this.pictures(recipe) }, { scope: 0 })
   }
 
   /** Makes the pictures every page needs, and forgets the ones nothing uses. */
   async syncArt(): Promise<void> {
-    if (!this.art) return
     for (const text of await this.art.sync(this.artSubjects())) this.errors.push({ text, recipe: text.match(/^[a-z]+ of ([a-z0-9][a-z0-9._-]*) \(/)?.[1] })
   }
 

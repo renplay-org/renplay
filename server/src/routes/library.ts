@@ -4,24 +4,17 @@ import { basename, join, relative } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
 import { archiveIdentity, publishUpload } from '../archive-origin.js'
-import { installedRelease, type Catalog } from '../catalog.js'
-import type { Config } from '../config.js'
-import { parseJson, type Db, type GameSource } from '../db.js'
-import type { JobManager } from '../jobs.js'
+import { installedRelease } from '../catalog.js'
+import { parseJson, type GameSource } from '../db.js'
 import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
 import { exists, newId } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
 import { viewer } from '../accounts-context.js'
+import type { Services } from '../services.js'
 
 const ARCHIVE_RE = /\.(zip|7z|rar|tar|tgz|tar\.(gz|bz2|xz|zst))$/i
 const CHUNK = 32 << 20
 
-export interface LibraryDeps {
-  cfg: Config
-  db: Db
-  jobs: JobManager
-  catalog: Catalog
-}
 
 async function listArchiveFiles(root: string): Promise<Array<{ rel: string; size: number; mtimeMs: number }>> {
   const out: Array<{ rel: string; size: number; mtimeMs: number }> = []
@@ -46,7 +39,7 @@ async function listArchiveFiles(root: string): Promise<Array<{ rel: string; size
   return out.sort((a, b) => b.mtimeMs - a.mtimeMs)
 }
 
-export function createLibraryRouter(deps: LibraryDeps): Router {
+export function createLibraryRouter(deps: Services): Router {
   const { cfg, db, jobs, catalog } = deps
   const router = Router({ caseSensitive: true, strict: true })
 

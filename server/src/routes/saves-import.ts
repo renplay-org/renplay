@@ -1,12 +1,9 @@
 import { Router } from 'express'
 import { readFile } from 'node:fs/promises'
-import type { Catalog } from '../catalog.js'
-import type { ContentMode } from '../content.js'
-import type { Db } from '../db.js'
 import { saveImport } from '../saves/import-upload.js'
 import { isRenpySave } from '../saves/savefile.js'
-import type { SaveStore } from '../saves/store.js'
 import { HttpError, cleanRelPath, isSaveDirName } from '../util/paths.js'
+import type { Services } from '../services.js'
 
 /** What a computer's Ren'Py folder may bring: saves and persistent data at a save folder's top. */
 const importable = (name: string) => !name.includes('/') && (name.endsWith('.save') || name === 'persistent')
@@ -17,7 +14,9 @@ const importable = (name: string) => !name.includes('/') && (name.endsWith('.sav
  * the files that change something. The newer copy of each takes the slot and the older one goes to
  * History, as with two devices. Folders of games not in the library are kept for when they are added.
  */
-export function createSavesImportRouter(store: () => SaveStore, db: Db, content: ContentMode, catalog: Catalog): Router {
+export function createSavesImportRouter(s: Services): Router {
+  const { db, content, catalog } = s
+  const store = () => s.saves
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/', async (_req, res) => {
