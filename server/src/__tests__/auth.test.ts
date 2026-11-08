@@ -333,6 +333,9 @@ describe('accounts authentication and security', () => {
       ['post', '/api/games/safe/art/upload?kind=grid', undefined],
       ['post', '/api/saves/safe/sync', { tz: 'UTC' }],
     ] as const) await (request(a.app) as any)[method](path).set(site).set('Cookie', guest).send(body).expect(403)
+    // No other way in: not even the admin's password works in a demo.
+    await request(a.app).post('/api/auth/login').set(site).send({ username: 'admin', password: 'correct password' }).expect(403)
+    await request(a.app).post('/api/auth/setup/verify').set(site).send({ code: 'X' }).expect(403)
     // Admin pages stay closed, as for any player.
     await request(a.app).get('/api/system').set('Cookie', guest).expect(403)
     await request(a.app).post('/api/imports').set(site).set('Cookie', guest).send({}).expect(403)

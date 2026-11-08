@@ -13,6 +13,7 @@ import type { Recipe } from '../lib/api'
 import { ago } from '../lib/format'
 import { post } from '../lib/api'
 import { useCatalog } from '../lib/queries'
+import { useAuth } from '../lib/auth'
 import { matchesSearch, stateLabel } from '../lib/tags'
 
 const REQUEST_URL = 'https://renplay.org/catalog/request'
@@ -57,6 +58,7 @@ export default function Catalog() {
   const [filter, setFilter] = useState('all')
   const [sheetFor, setSheetFor] = useState<Recipe | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const admin = useAuth().data?.user.role === 'admin'
   useRoom({ game: null, quiet: true })
   if (isLoading) return <Spinner />
   if (error || !data)
@@ -81,7 +83,8 @@ export default function Catalog() {
           </p>
         </div>
         <div className="actions">
-          <Button size="sm" loading={refreshing} icon={<RefreshCw />} onClick={async () => {
+          {/* Refreshing the catalog is for admins. */}
+          {admin && <Button size="sm" loading={refreshing} icon={<RefreshCw />} onClick={async () => {
             setRefreshing(true)
             try {
               await post('/api/catalog/refresh')
@@ -92,7 +95,7 @@ export default function Catalog() {
             }
           }}>
             Refresh
-          </Button>
+          </Button>}
           <Pill variant="s" size="sm" href={REQUEST_URL} target="_blank" rel="noreferrer" icon={<ExternalLink />}>
             Request a game
           </Pill>

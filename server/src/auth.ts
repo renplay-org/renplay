@@ -514,6 +514,10 @@ export class Accounts {
   router(): Router {
     const r = Router({ caseSensitive: true, strict: true })
     r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.cfg.authLocal && this.unclaimed && !this.cfg.demo, local: this.cfg.authLocal || !!this.cfg.ldapUrl, oidc: this.cfg.oidcIssuer ? this.cfg.oidcName : null, ldap: !!this.cfg.ldapUrl, demo: this.cfg.demo }))
+    // In a demo the guest is the only way in: no password, setup code, single sign-on or directory.
+    if (this.cfg.demo) {
+      r.use((req, _res, next) => next(/^\/auth\/(login|setup(\/verify)?|oidc\/(start|callback))$/.test(req.path) ? new HttpError(403, 'The demo signs you in with Try the demo') : undefined))
+    }
     /** Try the demo: a session as the shared guest, no password. Only in a demo. */
     r.post('/auth/demo', (req, res) => {
       const guest = this.demoGuest()

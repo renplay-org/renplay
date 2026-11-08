@@ -89,7 +89,7 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. N
   src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
   src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
 runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
-deploy/            nginx.conf.template and entrypoint.sh for the container
+deploy/            nginx.conf.template and entrypoint.sh for the container, demo/ the public demo's image
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
 ```
