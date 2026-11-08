@@ -12,6 +12,11 @@ import type { SaveStore } from '../saves/store.js'
 import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
 
 /** Where a web game's localStorage and IndexedDB are kept, in its save folder. */
+// Game pages play only inside Renplay's own player: another site cannot frame them to trick people
+// into clicks. Checked in Chromium and WebKit, sandboxed pages too. The library stays embeddable
+// (dashboards frame it).
+const FRAME_ANCESTORS = "frame-ancestors 'self'"
+
 export const HTML_STORAGE = 'localStorage.json'
 export const HTML_IDB = 'indexedDB.json'
 
@@ -66,6 +71,7 @@ export function createPlayRouter(
       legacySaveOwner: accounts?.legacySaveOwner ?? null,
     })
     res.setHeader('Cache-Control', 'private, no-store')
+    res.setHeader('Content-Security-Policy', FRAME_ANCESTORS)
     res.type('html').send(html)
   })
 
@@ -131,7 +137,7 @@ export function createPlayRouter(
       // Sandbox every pack response, independent of MIME, suffixes or browser sniffing.
       // This follows direct navigations, secondary pages and popups too.
       // Never allow-same-origin or popup escape: game scripts must not gain account cookies.
-      res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms')
+      res.setHeader('Content-Security-Policy', `sandbox allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms; ${FRAME_ANCESTORS}`)
     }
     if (/\.html?$/i.test(name)) {
       const game = db.getGame(id)

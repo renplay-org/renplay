@@ -377,6 +377,8 @@ describe('the levels on every route', () => {
     // The game itself still plays: the page renders with the engine's presplash, and its files stream.
     const page = await request(app.app).get('/g/adult/b1/').expect(200)
     expect(page.text).toContain('/engine/8.5.3/web-presplash.jpg')
+    // Only Renplay's own player may frame a game page.
+    expect(page.headers['content-security-policy']).toBe("frame-ancestors 'self'")
     await request(app.app).get('/g/adult/b1/game.zip').expect(200)
     await request(app.app).get('/g/adult/b1/game/images/a.png').expect(200)
     await request(app.app).get('/api/auth/check').set('X-Original-URI', '/g/adult/b1/game.zip').expect(204)
