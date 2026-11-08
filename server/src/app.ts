@@ -16,11 +16,12 @@ import type { EngineStore } from './engines.js'
 import type { JobManager } from './jobs/manager.js'
 import { createArtRouter } from './art/routes.js'
 import { createCatalogRouter } from './catalog/routes.js'
+import { createDefaultsRouter } from './defaults/routes.js'
 import { createJobsRouter } from './jobs/routes.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
 import { createProgressRouter } from './progress/routes.js'
-import { createContentRouter } from './routes/content.js'
+import { createContentRouter } from './content/routes.js'
 import { createLibraryRouter } from './routes/library.js'
 import { createPlayRouter } from './routes/play.js'
 import { createSavesRouter } from './saves/routes.js'
@@ -147,9 +148,10 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   })
   if (opts.startJobs !== false) backups.start()
   app.use('/api', createSystemRouter(services))
+  app.use('/api', createDefaultsRouter(services))
   app.use('/api', createJobsRouter(services))
   app.use('/api', createMetricsRouter(services))
-  app.use('/api/content', createContentRouter(services))
+  app.use('/api', createContentRouter(services))
   app.use('/api', createSavesRouter(services))
   app.use('/api/games', createFilesRouter(services))
   app.use('/api/games', createGamesRouter(services))

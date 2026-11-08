@@ -9,7 +9,7 @@ import { ArtStore } from '../art/store.js'
 import { Catalog } from '../catalog/catalog.js'
 import { installedRelease, normalizeRecipe } from '../recipes/recipe.js'
 import { loadConfig, type Config } from '../config.js'
-import { ContentMode } from '../content.js'
+import { ContentMode } from '../content/mode.js'
 import { Db } from '../db.js'
 
 /** A catalog with its content mode and art cache, as the server makes it (services.ts). */

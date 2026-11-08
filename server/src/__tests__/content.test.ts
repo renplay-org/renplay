@@ -7,9 +7,10 @@ import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
 import { ArtStore } from '../art/store.js'
-import { Catalog } from '../catalog/catalog.js'
+import { Catalog, sfwIndexUrl } from '../catalog/catalog.js'
 import { loadConfig } from '../config.js'
-import { ContentMode, lowestLevel, parseAdultLevel, sfwIndexUrl } from '../content.js'
+import { ContentMode } from '../content/mode.js'
+import { lowestLevel, parseAdultLevel } from '../content/levels.js'
 import { Db } from '../db.js'
 
 const ENV = ['RENPLAY_ADULT_GAMES', 'RENPLAY_CATALOG_URLS', 'RENPLAY_ENGINES_URL', 'DATA_DIR', 'GAMES_DIR']
