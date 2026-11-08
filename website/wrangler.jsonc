@@ -1,6 +1,6 @@
 // The website at https://renplay.org, served by Cloudflare as static files.
-// `sh build.sh` copies the public files into dist/;
-// .github/workflows/deploy.yml deploys it on every push to main.
+// `sh build.sh` copies the public files into dist/. .github/workflows/sites.yml deploys it with
+// each release, or by hand.
 {
   "name": "renplay-website",
   "compatibility_date": "2026-11-01",

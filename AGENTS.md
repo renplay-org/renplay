@@ -15,10 +15,10 @@ user-visible change.
 
 | Repository | What |
 |---|---|
-| `renplay` (this one) | The app: server, library UI, in-game runtime, container image |
+| `renplay` (this one) | The app (server, library UI, in-game runtime, container image), its chart, the docs, the website (renplay.org) and the demo |
 | `catalog` | Curated recipes and art, published as `https://catalog.renplay.org/index.v4.json` (schema 4) |
 | `engines` | Official Ren'Py web engines repackaged per version, index at `https://engines.renplay.org/index.json` |
-| `website` | The website, https://renplay.org |
+| `website` | Archived: the website moved into this repository's `website/`, with its history |
 | `.github` | Organization profile and the default `FUNDING.yml` (Ko-fi) |
 
 ## Product rules
@@ -96,8 +96,10 @@ deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kub
 demo/              The public demo's image (demo.renplay.org, on Render)
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
+website/           renplay.org: plain HTML and CSS (home, catalog browser), _redirects for the stable
+                     addresses (/docs, /github, /demo...), www/ the www.renplay.org redirect
 tests/             The image's install contract, the chart's tests, the deploy/ examples
-scripts/           Repo checks (writing rule, built library), release.mjs, package-chart.py
+scripts/           Repo checks (writing rule, built library, website links), release.mjs, package-chart.py
 mise.toml          Pinned tools and every task, locally and in CI
 ```
 
@@ -210,7 +212,7 @@ test file. Screenshots need `npx playwright install chromium webkit` once.
   Upgrades are tested from the newest release only: nobody runs 2.x or 3.x.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
-  `sites.yml` (the docs, with each release or by hand), `demo.yml` (the demo, with each release or
+  `sites.yml` (the docs and the website, with each release or by hand), `demo.yml` (the demo, with each release or
   by hand). Actions are pinned by commit SHA, Dependabot keeps them and the npm and Docker
   dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
 - **Releases:** see the `release` skill. A `release-X.Y.Z` branch from `dev` bumps

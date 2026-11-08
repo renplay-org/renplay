@@ -1,4 +1,4 @@
-// Redirects www.renplay.org to renplay.org. Deployed with the website (.github/workflows/deploy.yml).
+// Redirects www.renplay.org to renplay.org. Deployed with the website (.github/workflows/sites.yml).
 {
   "name": "renplay-www",
   "main": "worker.js",
