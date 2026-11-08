@@ -16,6 +16,10 @@ release notes say what).
 - **Refresh** on the Catalog page shows only to admins, who are the only ones it works for.
 - The library no longer shows **Added this week** above **All games** when the two hold the same games.
 
+### Changed
+
+- The `edge` image is no longer built from every change. The Renplay Team builds one when a change needs trying on a server. Use a released version.
+
 ## [4.3.1] - 2026-11-08
 
 The docs describe Renplay 4.0 to 4.3, with new screenshots, and **Import from a computer** is on

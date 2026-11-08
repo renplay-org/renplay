@@ -51,7 +51,8 @@ Pull requests are squash-merged.
 
 ## Releases and deployment
 
-`dev` is built into the `edge` image on every merge. Releases are cut from `dev` when a set of
+Pull requests run CI, and a pull request merges when it is green. An `edge` image of any branch can be
+built by hand (the **Edge image** workflow). Releases are cut from `dev` when a set of
 changes is done and tested on a running instance, at least every few weeks while there is
 something to release; fixes can ship as patch releases any time. Versions follow SemVer: minor for
 features, patch for fixes, major when upgrading needs action from you (the changelog says what).
