@@ -1,0 +1,9 @@
+// Redirects www.renplay.org to renplay.org. Deployed with the website (.github/workflows/sites.yml).
+{
+  "name": "renplay-www",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-01",
+  "routes": [{ "pattern": "www.renplay.org", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}

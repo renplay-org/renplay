@@ -3,6 +3,9 @@ title: Quick start
 description: Run Renplay, add a game and play it.
 ---
 
+To see Renplay before you install it, [try the demo](https://renplay.org/demo): one game to play,
+the whole catalog, and saves that last until the demo starts fresh.
+
 ## Run it
 
 Renplay is one container. Give it a folder for games and one for data:

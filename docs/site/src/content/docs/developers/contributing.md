@@ -52,6 +52,13 @@ Image examples use a `RENPLAY_VERSION` token wrapped in double underscores in th
 `remark-version.mjs` plugin replaces it with `server/package.json`’s version at build time, including
 inside code blocks, so copyable commands always match the release.
 
+## The website
+
+renplay.org is in `website/` of the repository: plain HTML and CSS, with no build step beyond
+copying the files. `mise run website` shows it on `http://localhost:5190`, and `mise run
+check:website` checks every link and picture in it. The docs and the website go live with each
+release.
+
 ## Product rules
 
 These decide most review comments:

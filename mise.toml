@@ -37,6 +37,10 @@ description = "The docs on http://localhost:4321"
 dir = "docs/site"
 run = "npm run dev"
 
+[tasks.website]
+description = "The website on http://localhost:5190 (its _redirects work only on Cloudflare)"
+run = ["sh website/build.sh", "python -m http.server --directory website/dist 5190"]
+
 [tasks.test]
 description = "The server's tests"
 dir = "server"
@@ -51,7 +55,7 @@ run = "npm run screenshots --"
 
 [tasks.check]
 description = "Everything CI checks, except the image"
-depends = ["check:server", "check:runtime", "check:copy", "check:ui", "check:docs", "check:chart", "check:workflows", "check:examples"]
+depends = ["check:server", "check:runtime", "check:copy", "check:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples"]
 
 [tasks."check:server"]
 description = "Server type check and tests"
@@ -75,6 +79,10 @@ run = ["npx tsc -b --noEmit", "npm run build", "node ../scripts/check-dist.mjs"]
 description = "Docs build, with the configuration page and every link checked"
 dir = "docs/site"
 run = ["npm run check:config", "npm run build"]
+
+[tasks."check:website"]
+description = "Website build, with every local link and picture checked"
+run = ["sh website/build.sh", "node scripts/check-website.mjs"]
 
 [tasks."check:chart"]
 description = "Chart lint and tests, and its values reference up to date"
