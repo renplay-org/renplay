@@ -1,0 +1,15 @@
+# Stable addresses. The app and the docs link here, so moving GitHub or Ko-fi is one line here,
+# never a Renplay release.
+/github                https://github.com/renplay-org/renplay 302
+/github/catalog        https://github.com/renplay-org/catalog 302
+/github/engines        https://github.com/renplay-org/engines 302
+/releases              https://github.com/renplay-org/renplay/releases 302
+/issues                https://github.com/renplay-org/renplay/issues 302
+/discussions           https://github.com/renplay-org/renplay/discussions 302
+/support               https://ko-fi.com/janpuc 302
+/catalog/request       /catalog#request 302
+/install               /#install 302
+/demo                  https://demo.renplay.org 302
+/docs                  https://docs.renplay.org 302
+/docs/*                https://docs.renplay.org/:splat 302
+/catalog.html          /catalog 301

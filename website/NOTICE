@@ -1,0 +1,5 @@
+The license covers this website's code and text. Game art in screenshots and
+covers belongs to the games' developers and is not covered by it.
+
+js/thumbhash.js is the decoding half of ThumbHash by Evan Wallace
+(https://github.com/evanw/thumbhash), under the MIT license, Copyright (c) 2023 Evan Wallace.

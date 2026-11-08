@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Renplay · Catalog</title>
+  <meta name="description" content="Ren’Py games tested in Renplay: where to get them, which download works, and how to add them.">
+  <meta property="og:title" content="Renplay · Catalog">
+  <meta property="og:description" content="Ren’Py games tested in Renplay, and where to get them.">
+  <meta property="og:image" content="https://renplay.org/img/og.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#0a0a0f">
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/site.css">
+  <style>
+    .page-head { padding: 64px 0 24px; }
+    .page-head h1 { font-size: clamp(38px, 6vw, 64px); margin: 10px 0 0; max-width: none; }
+    .page-head .lead { margin-top: 14px; }
+    .bar { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: center; margin: 18px 0 0; }
+    .search { flex: 1 1 280px; position: relative; }
+    .search input { width: 100%; height: 46px; border-radius: 14px; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); font: inherit; font-size: 16px; padding: 0 16px 0 44px; outline: none; transition: border-color .2s, background .2s; }
+    .search input:focus { border-color: rgb(255 158 192 / .5); background: rgb(255 255 255 / .07); }
+    .search svg { position: absolute; left: 15px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--faint); }
+    .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 13px; background: rgb(255 255 255 / .05); border: 1px solid var(--line); }
+    .seg button { font: inherit; font-size: 15px; font-weight: 600; min-height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: none; color: var(--dim); cursor: pointer; transition: background .2s, color .2s; }
+    .seg button[aria-pressed="true"] { background: rgb(255 255 255 / .12); color: var(--fg); }
+    .seg button:focus-visible, .chip-btn:focus-visible, .game:focus-visible .art { outline: 2px solid rgb(255 158 192 / .7); outline-offset: 2px; }
+    .view { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; margin: 28px 0 0; color: var(--faint); font-size: 14px; }
+    .states { margin-top: 12px; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .chip-btn { font: inherit; font-size: 14px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: rgb(255 255 255 / .04); color: var(--dim); cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
+    .chip-btn:hover { color: var(--fg); }
+    .chip-btn[aria-pressed="true"] { background: rgb(255 158 192 / .16); border-color: rgb(255 158 192 / .5); color: #fff; }
+    .link-btn { font: inherit; font-size: 14px; color: var(--dim); background: none; border: 0; padding: 8px 4px; min-height: 36px; text-decoration: underline; cursor: pointer; }
+    .count { color: var(--faint); font-size: 14px; }
+    .count-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 22px 0 14px; }
+    .count-row .link-btn { margin-left: auto; }
+    .more { text-align: center; margin-top: 34px; }
+
+    .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 26px 20px; }
+    .game { display: block; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+    .game .art { border-radius: 18px; border: 1px solid var(--line); transition: transform .3s, border-color .3s, box-shadow .3s; }
+    .game:hover .art, .game:focus-visible .art { transform: translateY(-4px); border-color: rgb(255 158 192 / .35); box-shadow: 0 24px 60px -24px rgb(0 0 0 / .9); }
+    .game:focus-visible { outline: none; }
+    .game h3 { margin: 12px 2px 0; font-size: 17px; letter-spacing: -.01em; line-height: 1.25; }
+    .game .meta { margin: 3px 2px 0; color: var(--dim); font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .art { position: relative; aspect-ratio: 2 / 3; background: #15151c; overflow: hidden; }
+    .art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    /* A cover of another shape, whole on its own colour, as the app shows it. */
+    .art img.whole { object-fit: contain; }
+    .art.blurred .tile-title { background: linear-gradient(180deg, transparent 40%, rgb(10 10 15 / .55)); }
+    .art .tile-title { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 8% 9%; font-weight: 800; font-size: clamp(20px, 2.1vw, 26px); line-height: 1.12; letter-spacing: -.02em; text-wrap: balance; text-shadow: 0 2px 14px rgb(0 0 0 / .45); }
+    .art .tag18 { position: absolute; top: 10px; right: 10px; padding: 2px 8px; border-radius: 8px; background: rgb(0 0 0 / .5); border: 1px solid rgb(255 255 255 / .16); font-size: 12px; font-weight: 700; backdrop-filter: blur(6px); }
+    .free { color: #6ee7b7; font-weight: 600; }
+    .empty { grid-column: 1 / -1; padding: 60px 20px; text-align: center; color: var(--dim); border: 1px dashed var(--line); border-radius: 20px; }
+
+    /* Detail sheet and request dialog */
+    dialog { border: 1px solid var(--line); border-radius: 26px; background: #0e0e14; color: var(--fg); padding: 0; width: min(880px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); box-shadow: 0 50px 140px -30px rgb(0 0 0 / .95); }
+    dialog::backdrop { background: rgb(4 4 8 / .72); backdrop-filter: blur(6px); }
+    dialog[open] { animation: pop .3s cubic-bezier(.2,.7,.2,1); }
+    @keyframes pop { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+    .sheet { display: grid; grid-template-columns: 300px 1fr; gap: 28px; padding: 28px; }
+    .sheet .art { border-radius: 16px; border: 1px solid var(--line); }
+    .close:focus { outline: none; }
+    .close:focus-visible { outline: 2px solid rgb(255 158 192 / .7); outline-offset: 2px; }
+    .close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: rgb(255 255 255 / .06); color: var(--fg); font-size: 20px; cursor: pointer; display: grid; place-items: center; z-index: 2; }
+    .sheet h2 { font-size: 30px; margin: 0; padding-right: 40px; }
+    .sheet .by { color: var(--dim); margin-top: 4px; }
+    .summary { color: var(--dim); font-size: 15px; margin: 14px 0 0; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .chips span { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / .06); border: 1px solid var(--line); color: var(--dim); }
+    .actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .sheet h4 { margin: 26px 0 10px; font-size: 13px; color: var(--faint); font-weight: 650; letter-spacing: .02em; }
+    .releases { display: grid; gap: 8px; }
+    .rel { padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / .035); border: 1px solid var(--line); }
+    .rel .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .rel b { font-size: 15px; }
+    .rel .when { color: var(--faint); font-size: 13px; }
+    .st { font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
+    .st.broken { color: #fca5a5; border-color: rgb(252 165 165 / .3); background: rgb(252 165 165 / .08); }
+    .rel .file { margin-top: 6px; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); overflow-wrap: anywhere; }
+    .rel .notes { margin-top: 6px; font-size: 14px; color: var(--dim); }
+    .how { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: h; color: var(--dim); font-size: 15px; }
+    .how li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; }
+    .how li::before { counter-increment: h; content: counter(h); width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: linear-gradient(180deg, #f6609a, #d62a68); }
+    .how b { color: var(--fg); font-weight: 600; }
+    .recipe-link { display: inline-block; margin-top: 18px; color: var(--faint); font-size: 14px; }
+
+    .req { padding: 30px; max-width: 560px; }
+    .req h2 { font-size: 28px; margin: 0; padding-right: 40px; }
+    .req p { color: var(--dim); font-size: 15px; }
+    .field { display: grid; gap: 6px; margin-top: 14px; }
+    .field span { font-size: 14px; color: var(--dim); }
+    .field input { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); font: inherit; font-size: 16px; padding: 0 14px; outline: none; }
+    .field input:focus { border-color: rgb(255 158 192 / .5); }
+    .req .note { margin-top: 18px; padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / .04); border: 1px solid var(--line); font-size: 14px; color: var(--dim); }
+    .req .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .request { margin-top: 64px; }
+    @media (max-width: 760px) {
+      .sheet { grid-template-columns: 1fr; padding: 20px; gap: 18px; }
+      .sheet .art { max-width: 320px; }
+      dialog { border-radius: 22px; }
+      .req { padding: 22px; }
+      .games { grid-template-columns: repeat(2, 1fr); gap: 20px 12px; }
+      .game h3 { font-size: 15px; }
+      .game .meta { font-size: 13px; }
+      .art .tile-title { font-size: 17px; }
+      .seg button { padding: 0 14px; }
+    }
+  </style>
+</head>
+<body>
+<div class="grain"></div>
+<nav id="nav">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.svg" alt="">Renplay</a>
+    <div class="links" id="nav-links">
+      <a href="/#why">Why</a>
+      <a href="/#how">How it works</a>
+      <a href="/#phones">Phones</a>
+      <a href="/#install">Install</a>
+      <a href="/catalog" aria-current="page">Catalog</a>
+      <a href="/#faq">FAQ</a>
+      <a class="in-menu" href="/docs">Docs</a>
+      <a class="in-menu" href="/github">GitHub</a>
+      <a class="in-menu" href="/support">Support</a>
+    </div>
+    <div class="right">
+      <a class="btn sm" href="/github" aria-label="Renplay on GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <span class="lbl">GitHub</span>
+      </a>
+      <a class="btn sm" href="/support" aria-label="Support Renplay on Ko-fi">
+        <svg viewBox="0 0 24 24" fill="#ff9ec0" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.6 2.9 5 6.3 5c2.1 0 3.5 1.2 4.2 2.4h3c.7-1.2 2.1-2.4 4.2-2.4 3.4 0 5.4 3.6 3.9 6.8C19.5 16.4 12 21 12 21Z"/></svg>
+        <span class="lbl">Support</span>
+      </a>
+      <a class="btn sm bar-catalog" href="/catalog">Catalog</a>
+      <a class="btn sm" href="/docs">Docs</a>
+      <a class="btn sm primary" href="/#install">Install</a>
+      <button class="btn sm menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</nav>
+<main class="wrap">
+  <header class="page-head">
+    <p class="eyebrow">The catalog</p>
+    <h1>Games that work in Renplay.</h1>
+    <p class="lead">Every game here was installed and played in Renplay. Get it from its developer on itch.io, Patreon or F95zone, add the download, and Renplay picks up the art and the right settings by itself. Most other Ren’Py games work too.</p>
+    <div class="view">
+      <div class="seg" role="group" aria-label="Which games to list">
+        <button type="button" id="v-sfw" aria-pressed="true">Safe for work</button>
+        <button type="button" id="v-all" aria-pressed="false">All games</button>
+      </div>
+      <span id="view-note">Adult games are hidden.</span>
+    </div>
+  </header>
+
+  <div class="bar">
+    <label class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search by title, developer or tag" autocomplete="off" aria-label="Search the catalog">
+    </label>
+  </div>
+  <div class="chip-row states" id="states" role="group" aria-label="Game state"></div>
+  <div class="chip-row" id="tags" role="group" aria-label="Tags"></div>
+
+  <div class="count-row">
+    <span class="count" id="count" aria-live="polite"></span>
+    <button class="link-btn" type="button" id="covers" hidden></button>
+  </div>
+
+  <div class="games" id="games"><div class="empty">Loading the catalog</div></div>
+  <div class="more" id="more" hidden><button class="btn" type="button" id="more-btn">Show more</button></div>
+
+  <section class="request">
+    <div class="band">
+      <div>
+        <p class="eyebrow">Missing a game?</p>
+        <h2>Ask for it, or add it yourself.</h2>
+        <p>Tell us the game and where its developer publishes it. Got it working already? A recipe is a short text file, and Renplay fills most of it in for you.</p>
+      </div>
+      <div class="actions">
+        <button class="btn primary" data-request>Request a game</button>
+        <a class="btn" href="https://github.com/renplay-org/catalog/blob/main/CONTRIBUTING.md">Add a game yourself</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="detail" aria-label="Game details"><button class="close" aria-label="Close" data-close>×</button><div id="detail-body"></div></dialog>
+
+<dialog id="age">
+  <form class="req" id="age-form" method="dialog">
+    <h2>Are you 18 or older?</h2>
+    <p>The full catalog lists adult games. Their covers stay blurred until you choose to show them.</p>
+    <div class="row">
+      <button class="btn primary" type="submit" value="yes">Yes, I’m 18 or older</button>
+      <button class="btn" type="submit" value="no">No, stay safe for work</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="request">
+  <button class="close" aria-label="Close" data-close>×</button>
+  <form class="req" id="req-form" method="dialog">
+    <h2>Request a game</h2>
+    <p>Requests are public issues on GitHub, where the catalog lives. Fill this in, then GitHub opens the full request with your answers.</p>
+    <label class="field"><span>Game</span><input name="game" required placeholder="Title as the developer writes it"></label>
+    <label class="field"><span>Version</span><input name="version" placeholder="0.9.23 or Chapter 4"></label>
+    <label class="field"><span>Official page</span><input name="page" type="url" required placeholder="https://developer.itch.io/game"></label>
+    <div class="note">GitHub asks you to sign in to send it. No account yet? <a href="https://github.com/signup" target="_blank" rel="noopener">Making one</a> is free and takes a minute.</div>
+    <div class="row">
+      <button class="btn primary" type="submit">Continue on GitHub</button>
+      <button class="btn" type="button" data-close>Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <a class="brand" href="/"><img src="/logo.svg" alt="" style="width:26px;height:26px;border-radius:8px">Renplay</a>
+      <a href="/">Website</a>
+      <a href="/docs">Docs</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/demo">Try the demo</a>
+      <a href="/github">GitHub</a>
+      <a href="/releases">Release notes</a>
+      <a href="/catalog#request" data-request>Request a game</a>
+      <a href="/support">Support</a>
+    </div>
+    <small>Renplay and its catalog are made by the Renplay Team. Covers are linked from where the catalog found them, such as the developers’ pages, Steam and SteamGridDB, and belong to their makers. The catalog never hosts game files: get games from their developers.</small>
+  </div>
+</footer>
+
+<script src="/js/thumbhash.js"></script>
+<script>
+  { // Phone menu
+    const nav = document.getElementById('nav'), menu = nav.querySelector('.menu')
+    const set = (open) => { nav.classList.toggle('open', open); menu.setAttribute('aria-expanded', String(open)) }
+    menu.addEventListener('click', () => set(!nav.classList.contains('open')))
+    nav.querySelectorAll('.links a').forEach((a) => a.addEventListener('click', () => set(false)))
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false) })
+  }
+  const BASE = 'https://catalog.renplay.org/'
+  const REPO = 'https://github.com/renplay-org/catalog'
+  const LINKS = { itch: 'Itch.io', steam: 'Steam', patreon: 'Patreon', subscribestar: 'SubscribeStar', website: 'Website', f95: 'F95zone', discord: 'Discord', walkthrough: 'Guide' }
+  const STORES = ['itch', 'steam', 'patreon', 'subscribestar', 'website']
+  // Engines by the names players know from F95zone.
+  const ENGINES = { renpy: 'Ren’Py', html: 'HTML' }
+  const STATES = ['ongoing', 'completed', 'on-hold', 'abandoned']
+  const AGE = 'renplay-site:18'
+  const STEP = 30, MAX_CHIPS = 8
+  const $ = (id) => document.getElementById(id)
+  const $games = $('games'), $q = $('q')
+  let games = [], vocab = {}
+  // The view starts safe for work every time. Covers of adult games stay hidden until asked, per visit.
+  const ui = { all: false, covers: false, state: '', tags: new Set(), moreTags: false, limit: STEP }
+  let opened = null
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+  const hue = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0)
+  const gb = (n) => (n ? `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)} GB` : '')
+  const day = (d) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '')
+  const stateLabel = (s) => cap(String(s).replace(/[-_]/g, ' '))
+  /** The newest release that works, the one to recommend. */
+  const working = (g) => (g.releases ?? []).find((r) => r.status === 'verified' || r.status === 'playable')
+  /** Tag ids to show: the vocabulary's labels, without the adult content group. */
+  const shownTags = (g) => (g.tagIds ?? []).filter((t) => vocab[t] && vocab[t].group !== 'content')
+  const label = (t) => vocab[t]?.label ?? t
+  /** The poster: the recipe's default grid picture, else its first grid, else any picture (catalog schema 4). */
+  const poster = (g) => (g.art ?? []).find((a) => a.kind === 'grid' && a.default) ?? (g.art ?? []).find((a) => a.kind === 'grid') ?? (g.art ?? [])[0]
+  const coverUrl = (g) => { const p = poster(g); return p?.url ? new URL(p.url, BASE).href : '' }
+  /** An adult cover stays hidden unless the visitor asked, per visit. */
+  const hides = (g) => g.nsfw && !ui.covers
+  /** A hidden cover is drawn as Renplay draws it at Blurred: a soft blur of its colours (ThumbHash), never the picture. */
+  const blurOf = (g) => {
+    const p = poster(g)
+    try {
+      return p?.thumbhash ? thumbHashToDataURL(Uint8Array.from(atob(p.thumbhash), (c) => c.charCodeAt(0))) : ''
+    } catch { return '' }
+  }
+  const listed = () => (ui.all ? games : games.filter((g) => !g.nsfw))
+
+  function art(g) {
+    const cover = coverUrl(g)
+    const blur = cover && hides(g) ? blurOf(g) : ''
+    if (blur) return `<div class="art blurred"><img src="${blur}" alt=""><div class="tile-title">${esc(g.title)}</div><span class="tag18">18+</span></div>`
+    if (!cover || hides(g)) {
+      const h = hue(g.title)
+      return `<div class="art"><div class="tile-title" style="background:radial-gradient(130% 120% at 0% 0%, hsl(${h} 45% 34%), hsl(${(h + 35) % 360} 40% 16%) 55%, hsl(${(h + 60) % 360} 30% 8%))">${esc(g.title)}</div>${g.nsfw ? '<span class="tag18">18+</span>' : ''}</div>`
+    }
+    const p = poster(g)
+    const whole = p?.width && p?.height && Math.abs(p.width / p.height - 2 / 3) > 0.04
+    const tint = /^#[0-9a-f]{3,8}$/i.test(p?.tint ?? '') ? p.tint : ''
+    return `<div class="art"${whole && tint ? ` style="background:radial-gradient(120% 90% at 50% 40%, ${tint}, #0a0a0f)"` : ''}><img src="${esc(cover)}" alt="" loading="lazy" referrerpolicy="no-referrer"${whole ? ' class="whole"' : ''}>${g.nsfw ? '<span class="tag18">18+</span>' : ''}</div>`
+  }
+
+  function card(g, i) {
+    return `<button class="game" data-i="${i}">
+      ${art(g)}
+      <h3>${esc(g.title)}</h3>
+      <div class="meta">${dots([g.developer && esc(g.developer), g.state && esc(stateLabel(g.state)), g.free && '<span class="free">Free</span>'])}</div>
+    </button>`
+  }
+
+  function detail(g) {
+    const rel = working(g)
+    // Only web addresses become links: a recipe's link is never a script.
+    const links = Object.keys(LINKS).filter((k) => /^https?:\/\//i.test(g.links?.[k] ?? ''))
+    const store = STORES.find((k) => links.includes(k))
+    const file = rel?.archives?.[0]
+    const releases = (g.releases ?? []).map((r) => `<div class="rel">
+        <div class="top"><b>${esc(r.version)}</b>${r.status === 'broken' ? '<span class="st broken">Does not work</span>' : ''}${r.date ? `<span class="when">${day(r.date)}</span>` : ''}</div>
+        ${(r.archives ?? []).map((a) => `<div class="file">${esc(a.name)}${a.size ? ` · ${gb(a.size)}` : ''}</div>`).join('')}
+        ${r.verified?.notes ? `<div class="notes">${esc(r.verified.notes)}</div>` : ''}
+      </div>`).join('')
+    const tags = shownTags(g)
+    return `<div class="sheet">
+      <div>${art(g)}</div>
+      <div>
+        <h2>${esc(g.title)}</h2>
+        <div class="by">${[g.developer && `By ${esc(g.developer)}`, g.state && esc(stateLabel(g.state)), ENGINES[g.engine ?? 'renpy'] ?? esc(g.engine), g.free && '<span class="free">Free</span>'].filter(Boolean).join(' · ')}</div>
+        ${g.summary ? `<p class="summary">${esc(g.summary)}</p>` : ''}
+        ${tags.length ? `<div class="chips">${tags.map((t) => `<span>${esc(label(t))}</span>`).join('')}</div>` : ''}
+        <div class="actions-row">
+          ${store ? `<a class="btn primary sm" href="${esc(g.links[store])}" target="_blank" rel="noopener">Get it on ${LINKS[store]}</a>` : ''}
+          ${links.filter((k) => k !== store).map((k) => `<a class="btn sm" href="${esc(g.links[k])}" target="_blank" rel="noopener">${LINKS[k]}</a>`).join('')}
+        </div>
+        <h4>Play it in Renplay</h4>
+        <ol class="how">
+          <li><span>Download ${file ? `<b>${esc(file.name)}</b>` : 'the PC version'} from ${store ? LINKS[store] : 'the developer'}.</span></li>
+          <li><span>In Renplay, open <b>Add games</b> and upload it, or copy it into your archives folder.</span></li>
+          <li><span>Press <b>Install</b>. Renplay recognizes the download and uses the art and settings from here.</span></li>
+        </ol>
+        <h4>Versions</h4>
+        <div class="releases">${releases}</div>
+        <a class="recipe-link" href="${REPO}/blob/main/recipes/${esc(g.id)}.yaml" target="_blank" rel="noopener">View the recipe on GitHub</a>
+      </div>
+    </div>`
+  }
+
+  /** Parts joined with a dot that never wraps away from the part after it. */
+  const dots = (parts) => parts.filter(Boolean).map((x, i) => `<span style="white-space:nowrap">${i ? '· ' : ''}${x}</span>`).join(' ')
+  const pressed = (on) => `aria-pressed="${on}"`
+
+  function render() {
+    const q = $q.value.trim().toLowerCase()
+    const base = listed()
+    $('v-sfw').setAttribute('aria-pressed', String(!ui.all))
+    $('v-all').setAttribute('aria-pressed', String(ui.all))
+    $('view-note').textContent = ui.all ? 'Adult games are listed. Their covers are blurred until you show them.' : 'Adult games are hidden.'
+    const covers = $('covers')
+    covers.hidden = !(ui.all && base.some(hides) || ui.covers)
+    covers.textContent = ui.covers ? 'Hide covers' : 'Show covers'
+
+    // State filter: only states that have games in this view.
+    const present = STATES.filter((s) => base.some((g) => g.state === s))
+    if (ui.state && !present.includes(ui.state)) ui.state = ''
+    $('states').innerHTML = present.length > 1
+      ? [['', 'Any state'], ...present.map((s) => [s, stateLabel(s)])].map(([v, l]) => `<button class="chip-btn" type="button" data-state="${v}" ${pressed(ui.state === v)}>${l}</button>`).join('')
+      : ''
+
+    // Tag chips: play and story tags that two or more games share.
+    const count = {}
+    for (const g of base) for (const t of shownTags(g)) if (['play', 'story'].includes(vocab[t].group)) count[t] = (count[t] ?? 0) + 1
+    const common = Object.keys(count).filter((t) => count[t] >= 2).sort((a, b) => count[b] - count[a] || label(a).localeCompare(label(b)))
+    for (const t of [...ui.tags]) if (!common.includes(t)) ui.tags.delete(t)
+    const chips = ui.moreTags ? common : common.slice(0, MAX_CHIPS)
+    $('tags').innerHTML = chips.map((t) => `<button class="chip-btn" type="button" data-tag="${esc(t)}" ${pressed(ui.tags.has(t))}>${esc(label(t))}</button>`).join('')
+      + (common.length > MAX_CHIPS ? `<button class="chip-btn" type="button" data-more-tags>${ui.moreTags ? 'Fewer' : 'More'}</button>` : '')
+
+    const shown = base.filter((g) =>
+      (!ui.state || g.state === ui.state) &&
+      [...ui.tags].every((t) => g.tagIds?.includes(t)) &&
+      (!q || [g.title, g.developer, ...shownTags(g).map(label)].some((s) => s && s.toLowerCase().includes(q))))
+    const part = shown.slice(0, ui.limit)
+    $('count').textContent = `${shown.length} ${shown.length === 1 ? 'game' : 'games'}`
+    $games.innerHTML = part.length
+      ? part.map((g) => card(g, games.indexOf(g))).join('')
+      : `<div class="empty">No games match. <a href="#" data-request>Request one</a>.</div>`
+    $('more').hidden = shown.length <= part.length
+    if ($('detail').open && opened) $('detail-body').innerHTML = detail(opened)
+  }
+  const reset = () => { ui.limit = STEP; render() }
+
+  function setAll(on) {
+    ui.all = on
+    if (!on) ui.covers = false
+    reset()
+  }
+  const open = (g) => { opened = g; $('detail-body').innerHTML = detail(g); $('detail').showModal() }
+
+  // Only games that work are listed.
+  fetch(BASE + 'index.v4.json')
+    .then((r) => r.json())
+    .then((idx) => {
+      vocab = idx.vocabulary ?? {}
+      games = (idx.games ?? []).filter(working).sort((a, b) => a.title.localeCompare(b.title))
+      render()
+      const g = games.find((x) => x.id === location.hash.slice(1))
+      if (g && listed().includes(g)) open(g)
+    })
+    .catch(() => ($games.innerHTML = `<div class="empty">The catalog could not be loaded. It is also on <a href="${REPO}">GitHub</a>.</div>`))
+
+  $q.addEventListener('input', reset)
+  $('v-sfw').addEventListener('click', () => setAll(false))
+  $('v-all').addEventListener('click', () => { if (localStorage.getItem(AGE) === '1') setAll(true); else $('age').showModal() })
+  $('age-form').addEventListener('submit', (e) => {
+    if (e.submitter?.value === 'yes') { localStorage.setItem(AGE, '1'); setAll(true) }
+  })
+  $('covers').addEventListener('click', () => { ui.covers = !ui.covers; render() })
+  $('more-btn').addEventListener('click', () => { ui.limit += STEP; render() })
+  $('states').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-state]')
+    if (b) { ui.state = b.dataset.state; reset() }
+  })
+  $('tags').addEventListener('click', (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    if ('moreTags' in b.dataset) ui.moreTags = !ui.moreTags
+    else if (b.dataset.tag) ui.tags.has(b.dataset.tag) ? ui.tags.delete(b.dataset.tag) : ui.tags.add(b.dataset.tag)
+    reset()
+  })
+  $games.addEventListener('click', (e) => {
+    const b = e.target.closest('.game')
+    if (!b) return
+    open(games[+b.dataset.i])
+    if (e.detail) document.activeElement?.blur()
+  })
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-request]')) { e.preventDefault(); $('request').showModal(); $('request').querySelector('input').focus() }
+    if (e.target.closest('[data-close]')) e.target.closest('dialog').close()
+  })
+  // Click outside a dialog closes it.
+  document.querySelectorAll('dialog').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close() }))
+  if (location.hash === '#request') $('request').showModal()
+  // Hand the request over to GitHub's form, filled in.
+  $('req-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const f = new FormData(e.target)
+    const u = new URL(REPO + '/issues/new')
+    u.searchParams.set('template', 'request-game.yml')
+    u.searchParams.set('title', `Request: ${f.get('game')}${f.get('version') ? ` ${f.get('version')}` : ''}`)
+    for (const k of ['game', 'version', 'page']) if (f.get(k)) u.searchParams.set(k, f.get(k))
+    window.open(u, '_blank', 'noopener')
+    $('request').close()
+  })
+</script>
+</body>
+</html>
