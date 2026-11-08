@@ -1,4 +1,4 @@
-import { viewers } from '../accounts-context.js'
+import { viewers } from '../accounts/context.js'
 import type { Config } from '../config.js'
 import { parseJson, type Db, type JobRow } from '../db.js'
 import { newId } from '../util/fsx.js'

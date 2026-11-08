@@ -21,7 +21,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 `services.ts` makes the server's parts once at start: the database, the adult level rules
 (`content/mode.ts`), accounts, the catalog with its art cache, jobs, builds, engines and save backups.
 Every router and job gets that one object. The person a request is for comes from the request
-itself (`accounts-context.ts`), so `services.saves` is always the saves of whoever is asking.
+itself (`accounts/context.ts`), so `services.saves` is always the saves of whoever is asking.
 Modules below the routes, like the install pipeline, take only the parts they use.
 
 ## Storage
@@ -295,7 +295,7 @@ At Off adult games are left out where the data enters and where it leaves:
 
 ## People on a shared browser
 
-**PINs** (`auth.ts`). A person's PIN is hashed with scrypt like a password (`users.pin_hash`). Each
+**PINs** (`accounts/accounts.ts`). A person's PIN is hashed with scrypt like a password (`users.pin_hash`). Each
 browser has a `renplay_device` cookie of its own, stored hashed, that outlives sign-out, and every
 sign-in records the person against it (`device_people`). **Who is playing?** lists and switches to
 only those people. A switch counts its try before the PIN is checked, so tries sent at once cannot

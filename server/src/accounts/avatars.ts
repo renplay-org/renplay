@@ -5,7 +5,7 @@ import { isIP } from 'node:net'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import sharp from 'sharp'
-import { HttpError } from './util/paths.js'
+import { HttpError } from '../util/paths.js'
 
 export const AVATAR_LIMIT = 2 << 20
 /** No private, loopback, link-local, multicast or IPv4-mapped addresses in provider pictures. */

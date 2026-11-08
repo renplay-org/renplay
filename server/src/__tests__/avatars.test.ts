@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 import request from 'supertest'
 import { afterEach, describe, expect, it } from 'vitest'
-import { fetchAvatar, publicAvatarAddress, storeAvatar } from '../avatars.js'
+import { fetchAvatar, publicAvatarAddress, storeAvatar } from '../accounts/avatars.js'
 import { signInFixture, site } from './sign-in-fixture.js'
 
 let app: Awaited<ReturnType<typeof signInFixture>>

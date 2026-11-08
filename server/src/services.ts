@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashArchive } from './archive-origin.js'
 import { ArtStore } from './art/store.js'
-import { Accounts } from './auth.js'
+import { Accounts } from './accounts/accounts.js'
 import { SaveBackups } from './saves/backups.js'
 import { Builds } from './builds.js'
 import { Catalog } from './catalog/catalog.js'
@@ -65,7 +65,7 @@ export async function createServices(cfg: Config): Promise<Services> {
   const progress = new ProgressStore(db)
   const saveStores = new SaveStores(cfg, db)
   const art = new ArtStore(cfg, db, content)
-  const accounts = new Accounts(db, cfg, content, progress, saveStores, art)
+  const accounts = new Accounts(db, cfg, content, saveStores)
   try {
     await accounts.init()
   } catch (error) {

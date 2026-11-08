@@ -5,8 +5,9 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
-import { playerRoute, type Accounts } from './auth.js'
-import { viewer } from './accounts-context.js'
+import { type Accounts } from './accounts/accounts.js'
+import { playerRoute } from './accounts/access.js'
+import { viewer } from './accounts/context.js'
 import type { SaveBackups } from './saves/backups.js'
 import type { Builds } from './builds.js'
 import type { Catalog } from './catalog/catalog.js'
@@ -20,6 +21,7 @@ import { createDefaultsRouter } from './defaults/routes.js'
 import { createJobsRouter } from './jobs/routes.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
+import { createPeopleRouter } from './people/routes.js'
 import { createProgressRouter } from './progress/routes.js'
 import { createContentRouter } from './content/routes.js'
 import { createLibraryRouter } from './routes/library.js'
@@ -87,6 +89,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use(accounts.middleware)
   app.use(express.json({ limit: '2mb' }))
   app.use('/api', accounts.router())
+  app.use('/api', createPeopleRouter(services))
   const checkStatic = (path: string) => {
     const game = path.match(/^\/g\/([^/]+)\//)?.[1]
     if (game && (!db.getGame(game) || content.hides(db.getGame(game)))) throw new HttpError(404, 'Game not found')

@@ -69,6 +69,9 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/services.ts    The server's parts, made once at start and given to every router and job
   src/config.ts      Environment variables (all documented in README.md)
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
+  src/accounts/      Sign-in: sessions, passwords and PINs, OIDC and LDAP, tokens, who may call what
+                     (access.ts), a person's own settings
+  src/people/        An admin's work with people: adding, changing, removing, merging, the owner
   src/content/       The adult levels (levels.ts), what each person may see (mode.ts), their routes
   src/recipes/       The recipe format (recipe.ts, read by everything) and Your recipes (local.ts)
   src/catalog/       Catalog index: recipe matching, linking games to recipes, updates, its routes
