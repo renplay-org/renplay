@@ -1,4 +1,4 @@
-import type { GameState, Vocabulary } from './api'
+import type { GameState, Vocabulary } from '@shared/recipe'
 import { capitalize } from './format'
 
 type Tagged = { tags?: string[]; tagIds?: string[]; content?: string[] }

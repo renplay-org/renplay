@@ -44,7 +44,8 @@ import {
   type Insets,
 } from '../lib/display'
 import { ago } from '../lib/format'
-import { useDefaults, useGame, useSaves, type Defaults } from '../lib/queries'
+import { useDefaults, useGame, useSaves } from '../lib/queries'
+import type { Defaults } from '@shared/defaults'
 import { queueHtmlSave, uploadHtmlSave, replayHtmlSaves } from '../lib/html-save-queue'
 import { keptGame, useOnline } from '../lib/offline'
 import { setGameHasPad } from '../lib/gamepad'

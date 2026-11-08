@@ -12,7 +12,8 @@ import { exists, writeFileAtomic } from '../util/fsx.js'
 import { HttpError } from '../util/paths.js'
 import { catalogHosts, fetchPublic } from '../util/net.js'
 import { readLocalFile } from '../recipes/local.js'
-import { ART_KINDS, type ArtKind, type CatalogImage } from '../recipes/recipe.js'
+import { ART_KINDS, type ArtKind, type CatalogImage } from '../shared/recipe.js'
+import type { ArtCredit, ArtFormat, ArtMade, ArtSet } from '../shared/art.js'
 
 /**
  * The art system. A game has five formats in SteamGridDB's shapes. The catalog links
@@ -40,8 +41,6 @@ export const MAX_ENLARGE = 2.25
 /** The icon cut from a grid: this share of the grid's short side. */
 const ICON_SHARE = 0.62
 
-export type Credit = { by: string; byUrl?: string; asset?: string } | { store: 'Steam' | 'itch.io' } | { renplay: true } | { developer: true } | { upload: true }
-
 /** One picture that can fill a format: from the catalog or uploaded. */
 export interface Picture {
   /** The original's sha256, or a hash of its address when the catalog gives none. */
@@ -59,14 +58,13 @@ export interface Picture {
   /** The sha256 to check a download against. */
   sha256: string | null
   source: string
-  credit: Credit
+  credit: ArtCredit
   upload: boolean
   default: boolean
 }
 
-export type Made = null | 'crop' | 'composed' | 'glow' | 'whole'
 type Mode = 'resize' | 'crop' | 'cut' | 'poster' | 'across' | 'glow' | 'whole'
-const MADE: Record<Mode, Made> = { resize: null, crop: 'crop', cut: 'crop', poster: 'composed', across: 'composed', glow: 'glow', whole: 'whole' }
+const MADE: Record<Mode, ArtMade> = { resize: null, crop: 'crop', cut: 'crop', poster: 'composed', across: 'composed', glow: 'glow', whole: 'whole' }
 
 export interface Plan {
   kind: ArtKind
@@ -74,20 +72,6 @@ export interface Plan {
   source: Picture
 }
 
-/** A format as the API sends it. Below Shown an adult game's formats carry only `thumbhash` and `tint`. */
-export interface ArtOut {
-  url1x: string | null
-  url2x: string | null
-  width: number
-  height: number
-  thumbhash: string | null
-  tint: string | null
-  made: Made
-  source: string
-  credit: Credit
-  dark?: boolean
-}
-export type ArtSet = Partial<Record<ArtKind, ArtOut | { thumbhash: string | null; tint: string | null }>>
 
 interface MadeRow {
   key: string
@@ -361,7 +345,7 @@ const MAX_UPLOADS = 10
 /** Uploads up to this many pixels are taken and scaled down to what the making allows. */
 const UPLOAD_PIXELS = 4 * MAX_IMAGE_PIXELS
 
-function creditOf(img: CatalogImage): Credit {
+function creditOf(img: CatalogImage): ArtCredit {
   const https = (u: unknown) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : undefined)
   if (img.source === 'sgdb' && img.by) return { by: img.by, byUrl: https(img.byUrl), asset: https(img.asset) }
   if (img.source === 'steam') return { store: 'Steam' }
@@ -543,7 +527,7 @@ export class ArtStore {
    * Every candidate for one format, each made at the format's size by the same pipeline, so what
    * the picker shows is what the tile will be. For a person at Shown only.
    */
-  async candidates(subject: ArtSubject, kind: ArtKind, scope: number): Promise<Array<{ id: string; current: boolean; everyone: boolean; mine: boolean; inShape: boolean; width: number; height: number; source: string; credit: Credit; upload: boolean; ownUpload: boolean; sharedUpload: boolean; preview: ArtOut | null }>> {
+  async candidates(subject: ArtSubject, kind: ArtKind, scope: number): Promise<Array<{ id: string; current: boolean; everyone: boolean; mine: boolean; inShape: boolean; width: number; height: number; source: string; credit: ArtCredit; upload: boolean; ownUpload: boolean; sharedUpload: boolean; preview: ArtFormat | null }>> {
     const chosen = this.chosen(subject, scope)
     // For everyone: only what an admin chose for everyone, not the catalog default.
     const everyone = subject.game ? (this.db.raw.prepare('SELECT candidate FROM art_choices WHERE game = ? AND kind = ? AND scope = 0').get(subject.game, kind) as { candidate: string } | undefined)?.candidate : undefined
@@ -552,7 +536,7 @@ export class ArtStore {
     // not hold up the list.
     return Promise.all(subject.pictures.filter((x) => x.kind === kind).map(async (p) => {
       const plan = planFormat(kind, { ...chosen, [kind]: p })
-      let preview: ArtOut | null = null
+      let preview: ArtFormat | null = null
       if (plan && p.width > 0) {
         const row = await this.ensure(plan, subject.adult).catch(() => null)
         if (row) preview = { url1x: `/api/art/${row.file1x}`, url2x: `/api/art/${row.file2x}`, width: row.width, height: row.height, thumbhash: row.thumbhash, tint: row.tint, made: MADE[plan.mode], source: p.source, credit: p.credit }

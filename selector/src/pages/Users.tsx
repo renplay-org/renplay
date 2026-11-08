@@ -6,7 +6,8 @@ import Avatar from '../components/Avatar'
 import { Button, Modal, Spinner, accountInput, errorText, useToast } from '../components/ui'
 import { Pill, TagPill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
-import { adultLabels, adultLevels, isLevel, type AdultLevel } from '../lib/adult'
+import { adultLabels } from '../lib/adult'
+import { ADULT_LEVELS, parseAdultLevel, type AdultLevel } from '@shared/levels'
 import { api, del, post, put } from '../lib/api'
 import { useAuth, type Account } from '../lib/auth'
 import { useGames } from '../lib/queries'
@@ -26,8 +27,8 @@ export default function Users() {
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   useRoom({ game: null, quiet: true })
   const all = users.data?.users ?? []
-  const ceilingOf = (user: User): AdultLevel => isLevel(user.adult_ceiling) ? user.adult_ceiling : users.data?.adultDefault ?? 'off'
-  const choiceOf = (user: User): AdultLevel => isLevel(user.adult_choice) ? user.adult_choice : ceilingOf(user)
+  const ceilingOf = (user: User): AdultLevel => parseAdultLevel(user.adult_ceiling) ?? users.data?.adultDefault ?? 'off'
+  const choiceOf = (user: User): AdultLevel => parseAdultLevel(user.adult_choice) ?? ceilingOf(user)
   const lastAdmin = (user: User) => user.role === 'admin' && !user.disabled && all.filter((u) => u.role === 'admin' && !u.disabled).length === 1
   const open = (action: Action, user?: User) => { setMenu(null); setError(''); setDialog({ action, user }) }
   const run = async (fn: () => Promise<unknown>) => {
@@ -146,7 +147,7 @@ export default function Users() {
             {(dialog.action === 'add' || dialog.action === 'edit') && (
               <>
                 <label className="field"><span>Role</span><select aria-label="Role" name="role" defaultValue={dialog.user?.role || 'player'} disabled={!!dialog.user && (lastAdmin(dialog.user) || dialog.user.roleManaged)} className={accountInput}><option value="player">Player</option><option value="admin">Admin</option></select></label>
-                <label className="field"><span>Adult games, at most</span><select aria-label="Adult games, at most" name="adultCeiling" disabled={dialog.user?.adultManaged} defaultValue={dialog.user ? ceilingOf(dialog.user) : users.data?.adultDefault ?? 'off'} className={accountInput}>{adultLevels.map((level) => <option key={level} value={level}>{adultLabels[level]}</option>)}</select></label>
+                <label className="field"><span>Adult games, at most</span><select aria-label="Adult games, at most" name="adultCeiling" disabled={dialog.user?.adultManaged} defaultValue={dialog.user ? ceilingOf(dialog.user) : users.data?.adultDefault ?? 'off'} className={accountInput}>{ADULT_LEVELS.map((level) => <option key={level} value={level}>{adultLabels[level]}</option>)}</select></label>
                 {dialog.action === 'edit' && <label className="row" style={{ minHeight: 44 }}><input name="disabled" type="checkbox" defaultChecked={!!dialog.user?.disabled} disabled={!!dialog.user && lastAdmin(dialog.user)} style={{ width: 20, height: 20 }} />Disabled</label>}
                 {dialog.user && lastAdmin(dialog.user) && <p className="small muted">Users cannot demote or disable the last enabled admin. Provider sign-in can still revoke its grant.</p>}
                 {(dialog.user?.roleManaged || dialog.user?.adultManaged) && <p className="small muted">Locked permissions are set by the sign-in provider at every sign-in.</p>}

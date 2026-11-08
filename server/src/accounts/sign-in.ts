@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs'
 import { Client } from 'ldapts'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 import type { Config } from '../config.js'
-import { groupCeiling, type AdultLevel } from '../content/levels.js'
+import { groupCeiling } from '../content/levels.js'
+import type { AdultLevel } from '../shared/levels.js'
 import { HttpError } from '../util/paths.js'
 
 export interface ExternalIdentity {

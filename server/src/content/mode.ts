@@ -2,7 +2,7 @@ import { viewer } from '../accounts/context.js'
 import type { Config } from '../config.js'
 import type { Db, GameRow } from '../db.js'
 import { HttpError, assertSlug } from '../util/paths.js'
-import { lowestLevel, parseAdultLevel, type AdultLevel } from './levels.js'
+import { lowestLevel, parseAdultLevel, type AdultLevel } from '../shared/levels.js'
 
 const KEY = 'adult_level'
 

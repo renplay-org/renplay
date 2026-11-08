@@ -3,7 +3,7 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, extname, sep } from 'node:path'
 import sharp from 'sharp'
 import YAML from 'yaml'
-import { normalizeRecipe, type CatalogImage, type Recipe, type Vocabulary } from './recipe.js'
+import { normalizeRecipe, type CatalogImage, type Recipe, type Vocabulary } from '../shared/recipe.js'
 import { MAX_IMAGE_PIXELS } from '../pipeline/image-memory.js'
 import { cleanRelPath, safeJoin } from '../util/paths.js'
 

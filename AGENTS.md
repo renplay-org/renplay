@@ -69,6 +69,9 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/services.ts    The server's parts, made once at start and given to every router and job
   src/config.ts      Environment variables, read from the table in envvars.ts
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
+  src/shared/        What the server and the library both use: the adult levels, the recipe format,
+                     the art types, the defaults. The library imports it as @shared. It imports
+                     nothing outside itself (shared.test.ts), since the library builds from it
                      Each folder below is one part of the server, with its routes in routes.ts:
   src/accounts/      Sign-in: sessions, passwords and PINs, OIDC and LDAP, tokens, who may call what
                      (access.ts), a person's own settings
@@ -83,7 +86,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/saves/         Everyone's saves: the store with history (store.ts), each person's store, notes
                      and pins (stores.ts), import, sync codes, backups. savefile.ts reads Ren'Py
                      save metadata
-  src/recipes/       The recipe format (recipe.ts, read by everything) and Your recipes (local.ts)
+  src/recipes/       Your recipes (local.ts), read from the recipes folder
   src/catalog/       Catalog index: recipe matching, linking games to recipes, updates
   src/art/           The art cache (store.ts): five formats per game, the making order, choices,
                      uploads

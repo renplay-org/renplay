@@ -93,4 +93,4 @@ releases:
 `saveDir` keeps its name. What it means depends on the engine: Ren'Py's `config.save_directory`, or
 a SugarCube story's save id. The catalog still publishes schema 2 as `index.json` for Renplay 2.5
 and older (Ren'Py games only) and schema 3 as `index.v3.json` for Renplay 2.6 to 3.x.
-`normalizeRecipe` in `recipes/recipe.ts` reads all of them.
+`normalizeRecipe` in `shared/recipe.ts` reads all of them.

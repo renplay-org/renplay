@@ -1,7 +1,7 @@
-import type { AdultLevel } from './adult'
+import type { ArtSet } from '@shared/art'
+import type { AdultLevel } from '@shared/levels'
+import type { GameState, Vocabulary } from '@shared/recipe'
 import { deviceLevel } from './device'
-export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
-export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
 
 /** A catalog source and what it gave the person asking. */
 export interface CatalogSource {
@@ -23,29 +23,6 @@ export interface JobsResponse {
   busy: boolean
   total: number
 }
-
-export type ArtKind = 'grid' | 'wide' | 'hero' | 'logo' | 'icon'
-/** Where a picture came from: a SteamGridDB author, a store, Renplay, the developer or an upload. */
-export type ArtCredit = { by: string; byUrl?: string; asset?: string } | { store: 'Steam' | 'itch.io' } | { renplay: true } | { developer: true } | { upload: true }
-/**
- * One format, made by the server. Below Shown an adult game's formats carry only `thumbhash` and
- * `tint`: no address. A format not made yet has its source's hash and no address for a moment.
- */
-export interface ArtFormat {
-  url1x?: string | null
-  url2x?: string | null
-  width?: number
-  height?: number
-  thumbhash: string | null
-  tint: string | null
-  /** How it was made: null for real art in the shape. */
-  made?: null | 'crop' | 'composed' | 'glow' | 'whole'
-  source?: string
-  credit?: ArtCredit
-  /** A dark logo, inverted on ink. */
-  dark?: boolean
-}
-export type ArtSet = Partial<Record<ArtKind, ArtFormat>>
 
 export interface Game {
   id: string

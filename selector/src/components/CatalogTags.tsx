@@ -2,7 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Chip, Pill } from '../lantern/controls'
 import Sheet from '../lantern/Sheet'
-import { api, put, type Vocabulary } from '../lib/api'
+import { api, put } from '../lib/api'
+import type { Vocabulary } from '@shared/recipe'
 import { gameTags } from '../lib/tags'
 
 export interface TagPrefs {

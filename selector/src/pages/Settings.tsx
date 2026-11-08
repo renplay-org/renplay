@@ -13,8 +13,10 @@ import { api, del, post, put, type CatalogSource, type SystemInfo } from '../lib
 import { setLighterBackground, useLighterBackground } from '../lib/backdrop'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
-import { adultLabels, adultLevels, type AdultLevel } from '../lib/adult'
-import { useCatalog, useContent, useDefaults, useGames, useSetInstallationLevel, useSystem, type Defaults } from '../lib/queries'
+import { adultLabels } from '../lib/adult'
+import { ADULT_LEVELS, type AdultLevel } from '@shared/levels'
+import { useCatalog, useContent, useDefaults, useGames, useSetInstallationLevel, useSystem } from '../lib/queries'
+import type { Defaults } from '@shared/defaults'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
   if (!disk) return null
@@ -181,7 +183,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
                           ? undefined
                           : (level) => {
                               if (level === content.installation.level) return
-                              if (adultLevels.indexOf(level) > adultLevels.indexOf(content.installation.level)) setRaiseTo(level)
+                              if (ADULT_LEVELS.indexOf(level) > ADULT_LEVELS.indexOf(content.installation.level)) setRaiseTo(level)
                               else void run(() => setInstallationLevel(level), 'Adult games level saved')
                             }
                       }

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { thumbHashToDataURL } from 'thumbhash'
-import type { ArtCredit, ArtFormat, ArtKind, ArtSet } from '../lib/api'
+import type { ArtCredit, ArtFormat, ArtSet } from '@shared/art'
+import type { ArtKind } from '@shared/recipe'
 import { useAdultView } from '../lib/adult'
 
 /** A game (or recipe) as the art system needs it. */
