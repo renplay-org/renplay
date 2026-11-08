@@ -38,7 +38,7 @@ Default: `/data`
 
 </div>
 
-Saves and their history, the library database, mods, covers and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.
+Saves and their history, the library database, mods, game art and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.
 
 </div>
 
@@ -341,7 +341,7 @@ Default: `1`
 
 </div>
 
-Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly; never trust arbitrary forwarded headers.
+Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly. Never trust arbitrary forwarded headers.
 
 </div>
 
@@ -652,7 +652,7 @@ Default: `displayName`
 
 </div>
 
-Directory display-name attribute; falls back to cn, then username.
+Directory display-name attribute. Falls back to cn, then username.
 
 </div>
 
@@ -871,7 +871,7 @@ How much the server logs. `error`: errors only. `warn`: also warnings and reques
 
 | Folder | What is in it |
 |---|---|
-| `/data` | Saves and their history, accounts, the SQLite library, mods, covers, walkthroughs. **Local disk only. Back this up.** |
+| `/data` | Saves and their history, accounts, the SQLite library, mods, game art, walkthroughs. **Local disk only. Back this up.** |
 | `/downloads` | Optional downloads and drop folder. Used when it exists and is writable, or when selected with `ARCHIVES_DIR`. Downloads are kept by default. `RENPLAY_KEEP_DOWNLOADS=false` deletes only unchanged completed uploads after a successful install. Files copied in are never deleted automatically. |
 | `/games/_archives` | Downloads when no usable `/downloads` exists. Existing files are never moved. |
 | `/games` (the rest) | Installed games, engines and scratch space. Scratch stays on this filesystem for atomic installs. Rebuilding requires the original downloads. |

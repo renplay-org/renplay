@@ -35,7 +35,7 @@ export const ENV_VARS: readonly EnvVar[] = [
   { name: 'RENPLAY_LDAP_BASE_DN', group: 'Server', kind: 'text', fallback: '', description: 'Base DN under which user entries are searched.' },
   { name: 'RENPLAY_LDAP_USER_FILTER', group: 'Server', kind: 'text', fallback: '(&(objectClass=person)(uid={username}))', description: 'User search filter. Every {username} is escaped before substitution. Exactly one entry must match.' },
   { name: 'RENPLAY_LDAP_USERNAME_ATTRIBUTE', group: 'Server', kind: 'text', fallback: 'uid', description: 'Directory attribute for the username.' },
-  { name: 'RENPLAY_LDAP_NAME_ATTRIBUTE', group: 'Server', kind: 'text', fallback: 'displayName', description: 'Directory display-name attribute; falls back to cn, then username.' },
+  { name: 'RENPLAY_LDAP_NAME_ATTRIBUTE', group: 'Server', kind: 'text', fallback: 'displayName', description: 'Directory display-name attribute. Falls back to cn, then username.' },
   { name: 'RENPLAY_LDAP_EMAIL_ATTRIBUTE', group: 'Server', kind: 'text', fallback: 'mail', description: 'Directory email attribute. LDAP email never grants admin access through RENPLAY_ADMINS.' },
   { name: 'RENPLAY_LDAP_PHOTO_ATTRIBUTE', group: 'Server', kind: 'text', fallback: 'jpegPhoto', description: 'Directory binary photo attribute, copied locally at sign-in.' },
   { name: 'RENPLAY_LDAP_ADMIN_FILTER', group: 'Server', kind: 'text', fallback: '', description: 'Filter evaluated against the authenticated user entry, such as memberOf=cn=renplay-admins,ou=groups,dc=example,dc=org. Provider grants follow membership at each LDAP sign-in, even for the last admin. Admin access assigned in Users is kept.' },
@@ -50,7 +50,7 @@ export const ENV_VARS: readonly EnvVar[] = [
   { name: 'RENPLAY_ADMIN_PASSWORD', group: 'Server', kind: 'text', fallback: '', shown: 'not set', description: 'Initial owner password (at least 10 characters). Only used while the owner is unclaimed. Prefer RENPLAY_ADMIN_PASSWORD_FILE.' },
   { name: 'RENPLAY_ADMIN_PASSWORD_FILE', group: 'Server', kind: 'text', fallback: '', shown: 'not set', description: 'Read the initial owner password from this secret file. Set this or RENPLAY_ADMIN_PASSWORD, not both.' },
   { name: 'RENPLAY_PUBLIC_URL', group: 'Behind a proxy', kind: 'text', fallback: '', shown: 'not set', description: 'Public address, such as https://play.example.org. Used to check request origins and secure cookies. Plain HTTP works too, but HTTPS protects passwords and saves in transit.' },
-  { name: 'RENPLAY_TRUSTED_HOPS', group: 'Behind a proxy', kind: 'number', fallback: 1, description: 'Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly; never trust arbitrary forwarded headers.' },
+  { name: 'RENPLAY_TRUSTED_HOPS', group: 'Behind a proxy', kind: 'number', fallback: 1, description: 'Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly. Never trust arbitrary forwarded headers.' },
   { name: 'RENPLAY_ADULT_DEFAULT', group: 'Games and catalog', kind: 'choice', fallback: 'off', description: 'Ceiling and starting choice of adult games for newly created accounts: off, blurred or shown (allow and block work as before). The first admin always starts at shown. Admins can change the ceiling per account in Users.' },
   {
     name: 'PORT',
@@ -72,7 +72,7 @@ export const ENV_VARS: readonly EnvVar[] = [
     group: 'Folders',
     kind: 'text',
     fallback: '/data',
-    description: 'Saves and their history, the library database, mods, covers and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.',
+    description: 'Saves and their history, the library database, mods, game art and walkthroughs. Use a local disk, never a network share: SQLite needs local filesystem locking. Back this up.',
   },
   {
     name: 'ARCHIVES_DIR',

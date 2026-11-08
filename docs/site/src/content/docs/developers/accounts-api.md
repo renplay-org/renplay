@@ -11,7 +11,7 @@ See [Accounts](/accounts/) for provider configuration.
 ## Authenticate scripts
 
 Use a cookie jar to sign in, then issue a personal access token. Replace the example address and
-credentials. Keep tokens private; the server only stores their hashes and returns a token once.
+credentials. Keep tokens private. The server only stores their hashes and returns a token once.
 
 ```sh
 base=http://localhost:8080
@@ -31,7 +31,7 @@ all work. Bearer tokens bypass CSRF checks.
 ## Endpoints
 
 All paths below start with `/api`. Management endpoints require an admin; `/me` is personal.
-Passwords must have 10–1024 characters; usernames use 2–64 ASCII letters, numbers, dots, dashes or
+Passwords must have 10 to 1024 characters. Usernames use 2 to 64 ASCII letters, numbers, dots, dashes or
 underscores and are case-insensitive. API paths, unlike usernames, are case-sensitive and have
 no trailing slash (including `/api/auth/check`). Repeated slashes and encoded path separators
 are rejected rather than matched differently by authorization and routing.
@@ -42,13 +42,13 @@ are rejected rather than matched differently by authorization and routing.
 | `POST /auth/setup/verify` | `{ code }` → `{ grant }`; public, ten attempts per boot |
 | `POST /auth/setup` | `{ grant, username, name, password }`; claims owner and sets a cookie |
 | `POST /auth/login` | `{ username, password }`; rate limited per address and account |
-| `GET /auth/oidc/start` | Starts sign-in; sets a ten-minute httpOnly state cookie and redirects to the provider |
-| `GET /auth/oidc/callback` | Single-use state plus bound cookie; exchanges code with PKCE, verifies ID token, sets a session and redirects home |
+| `GET /auth/oidc/start` | Starts sign-in. Sets a ten-minute httpOnly state cookie and redirects to the provider |
+| `GET /auth/oidc/callback` | Single-use state plus bound cookie. Exchanges code with PKCE, verifies ID token, sets a session and redirects home |
 | `GET /me/identities` | Linked `{ provider, subject, name, available, removable }` methods. Availability reflects current configuration and reserved usernames. Removability checks the methods usable after unlinking. Never includes passwords |
 | `POST /me/identities/oidc` | Returns `{ url }`. Linking rechecks the initiating session or token in live storage after the provider exchange |
 | `POST /me/identities/ldap` | `{ username, password }`. Verifies credentials and rechecks the initiating session or token before linking |
 | `DELETE /me/identities` | `{ provider, subject }`. Keeps a usable method, removes current grants from that identity and ends other sessions. Admin access assigned in Users is kept |
-| `POST /me/avatar` | Raw JPEG, PNG or WebP, up to 2 MiB and 16 megapixels; returns `{ avatar }` filename |
+| `POST /me/avatar` | Raw JPEG, PNG or WebP, up to 2 MiB and 16 megapixels. Returns `{ avatar }` filename |
 | `GET /avatars/:file` | Authenticated WebP; private/no-store |
 | `POST /auth/logout` | Revokes the current cookie session |
 | `GET /me` | `{ user, auth, unclaimed, hasPassword }` |
@@ -57,6 +57,10 @@ are rejected rather than matched differently by authorization and routing.
 | `POST /me/claim-owner` | Admin only, while unclaimed. Atomically reserves ownership before copying saves with history, moving identities and archiving the old folder. Competing claims return 409 before copying. A failed or interrupted claim can be retried |
 | `GET /me/adult` | `{ installation: { level, fixed, chosen }, ceiling: { level, managed }, choice, effective }`. Levels are `off`, `blurred` or `shown`. `managed` is `group` when a sign-in group sets the ceiling. `effective` is the lowest of the three |
 | `PUT /me/adult` | `{ level }`, at or below the account's ceiling, else 409 |
+| `PUT /me/pin` | `{ pin }` with 4 to 8 digits, or `""` to clear it. Refused for admins, with sign-in off, and for access tokens |
+| `GET /auth/switch` | `{ people }`: the people who signed in on this browser before (its `renplay_device` cookie), not admins, with a PIN |
+| `POST /auth/switch` | `{ user, pin }`. Ends this session and starts one as that person. Every refusal is the same 403 after the same wait. Five wrong PINs lock that person for 15 minutes (429) |
+| `GET /me/tags` | `{ include, exclude, source }`: the person's catalog tags, or the admin's defaults until they choose (`source` is `you`, `admin` or `default`). `PUT` with `{ include, exclude }` |
 | `GET /me/sessions` | `{ sessions }`, including `current` and creation, touch and expiry times |
 | `DELETE /me/sessions` | Ends every session except this one |
 | `DELETE /me/sessions/:id` | Ends that session |
@@ -68,7 +72,7 @@ are rejected rather than matched differently by authorization and routing.
 | `PUT /users/:id` | `{ name?, role?, disabled?, adultCeiling? }`. The ceiling is refused with 409 when a sign-in group sets it |
 | `POST /users/:id/password` | `{ password }`; ends all target sessions |
 | `DELETE /users/:id` | Archives the folder, removes credentials and personal rows |
-| `POST /users/:id/saves/copy` | `{ target: userId, game?: gameId }`; one game includes its verification keys; omitting game copies all folders and shared data |
+| `POST /users/:id/saves/copy` | `{ target: userId, game?: gameId }`. One game includes its verification keys. Omitting game copies all folders and shared data |
 | `POST /users/:id/merge` | `{ target: userId }`; copies saves, combines progress, archives the source |
 | `GET /users/:id/saves/export` | Whole save-folder zip, including shared keys and HTML storage |
 | `POST /users/:id/saves/import` | Multipart `file`: zip whose entries are `<save folder>/<file>`; overwrites keep target history |
@@ -76,7 +80,7 @@ are rejected rather than matched differently by authorization and routing.
 
 The last enabled admin cannot be disabled, demoted or removed. The owner and `RENPLAY_AUTH_USER`
 account cannot be removed or merged away. Removal disables the account and drains accepted writes
-before archiving its folder; stale requests cannot recreate it. Concurrent removals still keep an
+before archiving its folder. Stale requests cannot recreate it. Concurrent removals still keep an
 enabled admin. Save exports are current files, not a replacement for a backup of save history. Merges keep the latest timestamps and the larger play-time value rather
 than double-counting copied progress.
 
@@ -98,17 +102,23 @@ These are open to players and change only the person asking.
 | `POST /saves/:id/sync` | Sends this person's saves of the game to the Ren'Py sync server, encrypted as Ren'Py's Upload Sync does, and returns `{ code, saves, expiresAt }`. 409 while Sync codes are off |
 | `POST /saves/:id/sync/download` | `{ code }`. Fetches and decrypts a code's saves and writes them with the conflict rule. The persistent data goes to the `sync` folder, where Ren'Py merges it. Returns `{ added, replaced, kept, same }` |
 | `GET /saves-import` | `{ dirs, games, catalog }`: this person's save files by folder, and the games each folder belongs to |
+| `GET /defaults` | Defaults for everyone: `{ tagsExclude, lighterBackground, textSize, rollback, skip }`, `null` where Renplay's own default applies |
+| `GET /widget` | A short summary for dashboards: games, installed, installing, minutes played today, the last games played. See [Dashboards](/guides/dashboards/) |
+| `GET /games/:id/offline` | What a browser keeps to play a Ren’Py game offline: `{ id, build, page, bytes, files: [{ url, bytes }] }`. 404 where the game is hidden |
 | `POST /saves-import` | Multipart `meta` (a JSON list of `{ path, mtime }`) and `files` in the same order. Paths are `<save folder>/<file>` or `tokens/security_keys.txt`. Returns `{ added, replaced, kept, same, keys, skipped }` |
 
 Admins also have `POST /games/:id/walkthroughs`, `PUT` and `DELETE /games/:id/walkthroughs/:file`,
 the save backups: `GET /system/backups`, `POST /system/backups` (back up now) and
-`GET /system/backups/:name`, and `PUT /system/sync` with `{ on }` for Sync codes.
+`GET /system/backups/:name`, `PUT /system/sync` with `{ on }` for Sync codes, `PUT /defaults` for
+Defaults for everyone, `GET /metrics` (Prometheus text, also at `/metrics`), and the storage view:
+`GET /system/storage` (counted at most once a minute) and `POST /system/storage/refresh`.
 
 ## Route permissions
 
 Players can list games and the permitted catalog, play, read walkthroughs, change their own
 favourites, Finished, status, rating, Not now, art choices, last played and play time, read their
-play history, and use their own save, name, note, pin, history, import, copy and export endpoints.
+play history, tags, the defaults and the widget, set their PIN and switch on a shared browser, keep
+games offline, and use their own save, name, note, pin, history, import, copy and export endpoints.
 Install progress remains visible on cards, read only.
 
 Only admins can install, reinstall, uninstall, use archives or uploads, browse or change game
@@ -138,7 +148,7 @@ Unsent changes wait for their owner to return. A newer server file does not disc
 write: sending it preserves the previous server copy in history. The player can resume the
 queue after signing in to the original account. HTML snapshots are durably queued at the trusted
 parent origin in IndexedDB (`renplay-html-queue`), keyed by user, game and path. A returning
-owner's queue syncs before loading the HTML page with server-side storage; successful writes
+owner's queue syncs before loading the HTML page with server-side storage. Successful writes
 remove only the matching snapshot. The opaque-origin runtime waits for a durable-storage
 acknowledgement before clearing its localStorage dirty flag.
 
@@ -151,7 +161,7 @@ refreshes every five seconds and is invalidated immediately for in-process revoc
 disabled and the adult games levels are read live. Passwords use salted scrypt from `node:crypto`, stored as
 `scrypt$1$131072$8$1$<salt>$<key>` (`N=131072`, `r=8`, `p=1`, 256 MiB `maxmem`). Legacy
 `salt:key` hashes still verify at their original work factor and upgrade after a successful
-sign-in; concurrent password resets cannot be overwritten by an upgrade.
+sign-in. Concurrent password resets cannot be overwritten by an upgrade.
 
 Save imports spool multipart files to a private temporary folder, process one uploaded file at
 a time, and clean up on success or failure. Personal and admin imports share a two-request
@@ -160,13 +170,13 @@ per request, with bounded multipart fields and parts. Zip limits are 2,048 entri
 expanded entry and 128 MiB total expansion. All directory entries are validated before any
 content stream opens, including entries that will not be imported. Traversal, duplicate paths,
 links and special files are refused. Limit errors return 413 (multipart per-file errors return
-400); a busy import budget returns 429.
+400). A busy import budget returns 429.
 
 ## nginx and sandboxed games
 
 `auth_request` is inherited at server level by static covers, walkthroughs and build files. The UI,
 its assets, public engine and runtime stay open. Proxied game and API routes turn it off and check
-permissions in Node. Health is public; keepalive requires a random per-boot bearer secret used only
+permissions in Node. Health is public. Keepalive requires a random per-boot bearer secret used only
 by the job runner. `RENPLAY_TRUSTED_HOPS` replaces unrestricted proxy trust.
 
 Each protected static location captures nginx's decoded, slash-merged, dot-normalized `$uri`
@@ -176,18 +186,18 @@ a second time and denies malformed or unrecognized resources before checking gam
 403), while ordinary application routes keep their 404 response. Successful static checks are
 cached for **60 seconds**, keyed by cookie, bearer and URI. Revocation and permission changes therefore take up to a minute for nginx-served static
 files. Proxied requests and signed HTML URLs are revoked immediately by the application. Browsers
-must not cache protected static responses; public engines remain immutable.
+must not cache protected static responses. Public engines remain immutable.
 
 Sandboxed HTML frames have an opaque origin and no cookie. Their URL is
 `/g/<game>/<build>/s/<session-hash>.<HMAC>/game/<entry>`. The per-boot HMAC covers the live session,
 game and build. Every request verifies that session (or access token) and uses its user's save
 store for the entry page. Relative URLs continue to work. Sign-out, disabling the account, token
-revocation and restart invalidate these URLs; they do not expire midway through a live session.
+revocation and restart invalidate these URLs. They do not expire midway through a live session.
 The middleware sets an explicit verified-capability flag; URL query text cannot stand in for a
 verified signature. Every HTML page (also SVG/XML documents) in an HTML game's asset pack sends
 a response-level CSP `sandbox` without `allow-same-origin` or popup escape. The iframe uses the
 same restrictions. Popups may open, but inherit the opaque-origin sandbox, even outside the
-player. A browser may refuse a popup as it normally would; no exception grants it account access.
+player. A browser may refuse a popup as it normally would. No exception grants it account access.
 
 ## Unowned browser save recovery
 

@@ -1,6 +1,6 @@
 ---
 title: Playing
-description: Play on phones and computers, install the home-screen app, and move saves to and from desktop Ren’Py.
+description: Play on phones and computers, offline and with a controller, install the home-screen app, and move saves to and from desktop Ren’Py.
 ---
 
 ## Find a game
@@ -13,16 +13,36 @@ Search follows your adult games level, as the library does.
 
 ## On a computer
 
-Open the game and press **Play**. The game paces itself to your display and fills the screen.
-The **Renplay** pill at the top left (or **Esc**, or a swipe from the left edge on a phone) opens
-the player menu: **Saves** to load one, **Guide** for the game's walkthroughs, and **Options** for
-sound, full screen, the display, the text size and Ren'Py's own accessibility menu. Under **For you
-in this game**, **Rollback**, **Skip** and the **Developer console** turn those on even where the
-game turns them off. They are kept with the game's saves, so they follow you to every device, and
-the game's files do not change. **Save now** makes a quick
-save, and **Save and exit** saves and goes back to the library. Walkthroughs open in a window
-beside the game that you can move, resize and see through, or below it on a phone held upright.
-**Up next** on the library home opens your latest save straight away.
+Open the game and press **Resume** (or **Play** the first time). **Resume** opens your latest save,
+and the game's own menu is a tap away for a new game or another save. **Up next** on the library
+home resumes straight away.
+
+While the game loads, one bar shows how far it is, from the engine to the game's first screen.
+**Game page**, **Sound** and **Full screen** sit at the top, so you can leave, mute or go full
+screen before it starts.
+
+The game paces itself to your display. Two quiet things sit over it: the **Renplay** pill at the
+top left and, beside it, **Full screen**. Both are lit for the first seconds of a game. The pill (or
+**Esc**, or a swipe from the left edge on a phone) opens the player menu:
+
+![The player menu open over a game, with its saves](../../../assets/desktop-player-drawer.webp)
+
+- **Sound**, **Full screen** and close at its top.
+- **Saves** to load one, **Guide** for the game's walkthroughs, and **Options** for the display,
+  the text size and Ren'Py's own accessibility menu.
+- Under **For you in this game**, **Rollback**, **Skip** and the **Developer console** turn those
+  on even where the game turns them off. They are kept with the game's saves, so they follow you
+  to every device, and the game's files do not change. An admin can set Rollback, Skip and the text
+  size for everyone who has not chosen ([Defaults for everyone](/accounts/#defaults-for-everyone)).
+- **Save now** makes a quick save, **Save and exit** saves and goes back to the library, and
+  **Save and go to the main menu** starts the game again at its main menu.
+
+**Options → Scaling** decides how the game meets a screen of another shape. **Fit** shows the whole
+game in its own shape with bars around it. **Fill** has no bars at the sides: it crops the edges of a
+game wider than the screen, and never the top or bottom, where games keep their dialogue.
+
+Walkthroughs open in a window beside the game that you can move, resize and see through, or below
+it on a phone held upright.
 
 ## Up next, status and ratings
 
@@ -42,8 +62,9 @@ own history.
 
 ![The library on a phone](../../../assets/phone-library.webp)
 
-Open Renplay in the phone’s browser and hold the phone sideways. The game fills the screen around
-the camera cutout. Every screen works with touch only.
+Open Renplay in the phone’s browser. **Resume** and **Play** come right under a game's title, on the
+first screen, held upright or sideways. Hold the phone sideways to play: the game fills the screen
+around the camera cutout. Every screen works with touch only.
 
 ### iPhone and iPad: add it to the Home Screen
 
@@ -57,10 +78,42 @@ The player explains this itself where a fullscreen button would not work.
 
 ### Android
 
-Use the fullscreen button in the player.
+Use **Full screen** beside the **Renplay** pill.
 
 Serve Renplay over HTTPS so the browser can cache the game and the home-screen app works. See
 [Reverse proxy and HTTPS](/install/reverse-proxy/).
+
+## Play offline
+
+A Ren’Py game can be kept in a browser and played with no network: on a plane, on a train, or
+wherever the server is out of reach.
+
+1. Open the game's page while you have a network.
+2. Under **Play**, choose **Keep offline**. The game downloads into this browser, with its engine
+   and every file it streams. Keep the page open until it says **Kept in this browser**. A stopped
+   download continues where it was.
+3. With no network, open Renplay as usual. The library says it is offline, and kept games play.
+
+Saves made offline wait on the device. The player says how many are waiting, and sends them when the
+network is back, with the usual rule when another device saved too. **Update offline copy**
+appears when the game gets a new version, and the old copy keeps playing until then. **Remove
+offline copy** frees the space. Your saves are never part of it.
+
+- **Room:** a game is often several gigabytes. Renplay checks there is room before it starts, and
+  asks the browser to keep the data.
+- **iPhone and iPad:** keep games from Renplay on the Home Screen, not a Safari tab: Safari clears
+  what a tab keeps after a week without a visit.
+- **Shared browsers:** a kept copy belongs to the browser. Offline, a game opens for whoever is
+  signed in there, with their own saves, and only if they opened it online before.
+- Renplay must be served over HTTPS (or on `localhost`) for a browser to keep games.
+
+## With a controller
+
+A controller works everywhere in Renplay. The d-pad or left stick moves between tiles and buttons,
+**A** presses and **B** closes sheets and menus. In a game the controller plays through Ren’Py’s
+own buttons: **A** advances and chooses, the d-pad moves through menus, the shoulder buttons roll
+back and forward, and **B** opens the game's menu. The **Menu** button (Start) opens the player
+menu instead, and closes it again.
 
 ## Saves and history
 
@@ -79,11 +132,12 @@ Serve Renplay over HTTPS so the browser can cache the game and the home-screen a
 
 ## Export to desktop Ren’Py, and import from it
 
-Export a game’s saves from its page, or all of them in **Settings**. Put the files in the desktop
+Export a game’s saves from its page (**Export all** under **Saves**), or all of yours from
+**Account** (**Export all my saves**). Put the files in the desktop
 game’s save folder and it loads them.
 
-To bring saves the other way, open **Settings** on the computer where you played and choose
-**Import from a computer**. Renplay shows where Ren’Py keeps saves on that system
+To bring saves the other way, open **Account** on the computer where you played and choose
+**Import from a computer** (admins also find it in **Settings**). Renplay shows where Ren’Py keeps saves on that system
 (`~/Library/RenPy` on a Mac, `%APPDATA%\RenPy` on Windows, `~/.renpy` on Linux). Choose that
 folder, or a zip of it, and a preview lists each game's saves as new, newer or older than the
 server's copy before anything is written. Older copies never replace newer ones: they are kept in

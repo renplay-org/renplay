@@ -56,7 +56,7 @@ are not included in this stage.
 
 - Some gateways remove `Accept-Encoding` or decode gzip on the way. Renplay already serves the
   Ren’Py engine as pre-compressed files for that reason.
-- HTTP/3 can drop long downloads through some gateways. The player resumes by itself; see
+- HTTP/3 can drop long downloads through some gateways. The player resumes by itself. See
   [Troubleshooting](/troubleshooting/#downloads-stop-with-a-network-error-http3).
 - Scale-to-zero proxies: see `RENPLAY_KEEPALIVE_URL` in [Configuration](/configuration/).
 

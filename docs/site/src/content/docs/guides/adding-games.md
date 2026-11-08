@@ -24,7 +24,7 @@ engine that does not run in a browser.
 
 ## What happens during an install
 
-Press **Install**. A background job runs, and **Settings** → **Activity** shows its log.
+Press **Install**. A background job runs, and **Activity** (in the header, and in the account menu) shows its log.
 
 1. Renplay reads the archive in place, without unpacking it to disk, and finds the game and its
    Ren’Py version.
@@ -33,9 +33,9 @@ Press **Install**. A background job runs, and **Settings** → **Activity** show
 3. It picks the engine and downloads it on the first install (about 16 MB), checking its checksum.
 4. It splits Ren’Py’s `.rpa` archives and converts PNG and JPEG images to WebP under the same
    names. The game’s code is never run.
-5. Files the game streams (images, audio, video) go into one `assets.pack`; what the engine needs
+5. Files the game streams (images, audio, video) go into one `assets.pack`. What the engine needs
    at the start goes into `game.zip`.
-6. The finished build appears at once. Installed builds never change; an update makes a new one.
+6. The finished build appears at once. Installed builds never change: an update makes a new one.
 7. Downloads are kept by default. Turning off **Keep downloads** in Settings, or setting
    `RENPLAY_KEEP_DOWNLOADS=false`, deletes only uploads through Renplay after a successful install.
    Files you copied into the drop folder are never automatically deleted. A failed install
@@ -50,8 +50,14 @@ A big game takes minutes, mostly for image conversion. You can leave the page.
 - **Reinstall** from the kept archive makes a fresh build, and saves stay.
 - **Updates.** When the catalog lists a newer tested release than the one you have, Renplay says
   so. Download the new file and add it the same way.
-- **Mods.** Open a game’s files to edit scripts in the browser or upload a mod. Your changes live
-  next to the game, not inside it, and survive updates.
+- **Mods.** A Ren’Py game's **Mods and files** tab (admins) starts with what your mods change: **Install
+  mod zip** adds a mod as it comes, **Apply changes** builds a new version of the game with your
+  mods, and **Remove all mods** goes back to the original. Below, the game's files, folder by
+  folder: open a script to edit it in the browser, or use **+** for a new file or an upload. Files
+  from the game are read-only originals. What you add, edit or hide is kept apart as your mod layer
+  and survives updates.
+- **Not finished installing.** An install that failed or was interrupted shows on the library
+  home with **Retry**, and **Dismiss** for one that cannot finish.
 
 ## Several games and sequels
 

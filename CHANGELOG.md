@@ -7,6 +7,11 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- **Import from a computer** is on every person's **Account** page, next to **Export all my saves**. It was only in the admin's **Settings**.
+- The docs cover Renplay 4.0 to 4.3: offline play, controllers, Who is playing, Defaults for everyone, Your recipes, the adult games choice, the player's new controls and a new **Dashboards** page for Prometheus and Homepage.
+
 ## [4.3.0] - 2026-11-08
 
 Renplay 4.3 is a polish release. The player loads with one honest progress bar and lets you mute,
