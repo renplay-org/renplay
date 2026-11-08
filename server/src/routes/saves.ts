@@ -71,11 +71,7 @@ export function createSavesRouter(s: Services): Router {
     return u.size
   }
 
-  const game = (req: Request): GameRow => {
-    const g = db.getGame(assertSlug(req.params.id))
-    if (!g || content.hides(g)) throw new HttpError(404, 'Game not found')
-    return g
-  }
+  const game = (req: Request): GameRow => content.game(req.params.id)
   const allowedDir = (dir: string): boolean => {
     if (dir === 'tokens' || dir === 'persistent') return true
     const games = db.allGames().filter((g) => g.save_dir === dir)

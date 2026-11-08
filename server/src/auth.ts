@@ -5,8 +5,8 @@ import express, { Router, type Request, type Response } from 'express'
 import type { Config } from './config.js'
 import { lowestLevel, parseAdultLevel, type AdultLevel, type ContentMode } from './content.js'
 import type { Db, GameRow } from './db.js'
-import type { SQLInputValue } from 'node:sqlite'
-import { NO_PROGRESS, parseJson, type GameWithProgress, type Progress } from './db.js'
+import { parseJson } from './db.js'
+import type { ProgressStore } from './progress/store.js'
 import { viewer, viewers, type User, type Viewer } from './accounts-context.js'
 import { SaveStore, SHARED_DIRS } from './saves/store.js'
 import { readZipEntries } from './saves/savefile.js'
@@ -133,7 +133,7 @@ export class Accounts {
   private readonly limits = new Map<string, { count: number; until: number }>()
   private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
   private dummyPassword = ''
-  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode) {
+  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly progress: ProgressStore) {
     // A demo needs its guest, so sign-in is always on there.
     this.enabled = cfg.demo || (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
@@ -343,15 +343,6 @@ export class Accounts {
     if (tokenUser) { const user = this.user(tokenUser.user_id); return user.disabled ? null : { user, session, bearer: true } }
     return this.session(session)
   }
-  progress(row: GameRow): GameWithProgress {
-    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ? AND game = ?').get(this.current().id, row.id) as Partial<Progress> | undefined
-    return { ...row, ...NO_PROGRESS, ...u }
-  }
-  setProgress(game: string, patch: Partial<Progress>): void {
-    const id = this.current().id
-    this.db.raw.prepare('INSERT OR IGNORE INTO user_games (user_id, game) VALUES (?, ?)').run(id, game)
-    for (const [key, value] of Object.entries(patch)) this.db.raw.prepare(`UPDATE user_games SET ${key} = ? WHERE user_id = ? AND game = ?`).run(value as SQLInputValue, id, game)
-  }
   private guardLastAdmin(target: User, patch: { role?: string; disabled?: boolean }, removing = false): void {
     if (target.role !== 'admin' || target.disabled || (!removing && patch.role !== 'player' && patch.disabled !== true)) return
     const { n } = this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }
@@ -394,40 +385,16 @@ export class Accounts {
     }
     return copied
   }
-  private mergeProgress(from: number, to: number): void {
-    this.db.raw.prepare(`INSERT INTO user_games (user_id, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at)
-      SELECT ?, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ?
-      ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time),
-        play_status = CASE WHEN user_games.play_status = '' THEN excluded.play_status ELSE user_games.play_status END, rating = MAX(user_games.rating, excluded.rating), not_now_at = MAX(user_games.not_now_at, excluded.not_now_at)`).run(to, from)
-    // Finished stays in step with finished_at: a game either account finished is finished.
-    this.db.raw.prepare("UPDATE user_games SET play_status = 'finished' WHERE user_id = ? AND finished_at IS NOT NULL AND finished_at != '' AND play_status != 'finished'").run(to)
-    this.db.raw.prepare("UPDATE user_games SET finished_at = ? WHERE user_id = ? AND play_status = 'finished' AND (finished_at IS NULL OR finished_at = '')").run(new Date().toISOString(), to)
-    // The play history moves with the person, and their names, notes and pins of saves where the
-    // other person has none for the same file.
-    this.db.raw.prepare('UPDATE play_sessions SET user_id = ? WHERE user_id = ?').run(to, from)
+  /** Gives one person's progress, save names and art choices to another. */
+  private mergeData(from: number, to: number): void {
+    this.progress.merge(from, to)
+    // Their names, notes and pins of saves where the other person has none for the same file.
     this.db.raw.prepare('INSERT OR IGNORE INTO save_meta (user_id, save_dir, file, title, note, pinned_at) SELECT ?, save_dir, file, title, note, pinned_at FROM save_meta WHERE user_id = ?').run(to, from)
     // Their art choices and uploads too, where the other person has none for the same game and format.
     this.db.raw.prepare('INSERT OR IGNORE INTO art_uploads (id, game, kind, scope, width, height, focal, thumbhash, tint, created_at) SELECT id, game, kind, ?, width, height, focal, thumbhash, tint, created_at FROM art_uploads WHERE scope = ?').run(to, from)
     this.db.raw.prepare('INSERT OR IGNORE INTO art_choices (game, kind, scope, candidate) SELECT game, kind, ?, candidate FROM art_choices WHERE scope = ?').run(to, from)
   }
 
-  /**
-   * Records played seconds as a session (one that ended in the last ten minutes goes on, else a new
-   * one starts) and returns the seconds counted.
-   */
-  addPlayTime(game: string, seconds: number, now = Date.now()): number {
-    const id = this.current().id
-    const last = this.db.raw.prepare('SELECT id, ended_at FROM play_sessions WHERE user_id = ? AND game = ? AND ended_at >= ? ORDER BY ended_at DESC LIMIT 1').get(id, game, now - 10 * 60_000) as { id: number; ended_at: number } | undefined
-    // A session grows by at most the time that passed since its last report (and a little slack), so
-    // two open windows or a repeated report never count more time than there was.
-    if (last) {
-      const counted = Math.max(0, Math.min(seconds, Math.ceil((now - last.ended_at) / 1000) + 5))
-      this.db.raw.prepare('UPDATE play_sessions SET ended_at = ?, seconds = seconds + ? WHERE id = ?').run(now, counted, last.id)
-      return counted
-    }
-    this.db.raw.prepare('INSERT INTO play_sessions (user_id, game, started_at, ended_at, seconds) VALUES (?, ?, ?, ?, ?)').run(id, game, now - seconds * 1000, now, seconds)
-    return seconds
-  }
   private managed(id: number) {
     const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)
     const oidc = identities.some(i => i.provider === this.providers.oidcProvider), ldap = identities.some(i => i.provider === this.providers.ldapProvider)
@@ -844,7 +811,8 @@ export class Accounts {
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
           this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
-          for (const table of ['sessions', 'tokens', 'identities', 'user_games', 'play_sessions', 'save_meta', 'device_people']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
+          for (const table of ['sessions', 'tokens', 'identities', 'save_meta', 'device_people']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
+          this.progress.forget(id)
           // Their own art choices and uploads. Choices for everyone stay.
           for (const table of ['art_choices', 'art_uploads']) this.db.raw.prepare(`DELETE FROM ${table} WHERE scope = ?`).run(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
@@ -884,7 +852,7 @@ export class Accounts {
           this.requireLiveLink(u.id, session, bearer)
           const now = this.db.raw.prepare('SELECT * FROM users WHERE id = ?').get(u.id) as unknown as User | undefined
           if (!now || now.disabled || now.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
-          this.mergeProgress(u.id, 1)
+          this.mergeData(u.id, 1)
           this.db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
           this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(now.username, now.name, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject)
           this.writeLevels(1, { ceiling: parseAdultLevel(now.adult_ceiling) ?? this.cfg.adultDefault, choice: parseAdultLevel(now.adult_choice) ?? this.cfg.adultDefault })
@@ -905,13 +873,12 @@ export class Accounts {
       if (id === 1 || id === this.cfg.authUser) throw new HttpError(409, 'The no-sign-in account must stay')
       this.guardLastAdmin(this.user(id), {}, true)
       const copied = await this.copy(id, target)
-      this.mergeProgress(id, target)
+      this.mergeData(id, target)
       await remove(id); res.json({ copied })
     })
     r.delete('/users/:id', async (req, res) => { await remove(Number(req.params.id)); res.json({ ok: true }) })
     r.post('/games/:id/safe', (req, res) => {
-      const g = this.db.getGame(req.params.id)
-      if (!g || this.content.hides(g)) throw new HttpError(404, 'Game not found')
+      const g = this.content.game(req.params.id)
       if (g.recipe_id) throw new HttpError(409, 'Only games without a recipe can be marked safe')
       if (typeof req.body?.safe !== 'boolean') throw new HttpError(400, 'Safe must be a boolean')
       if (req.body.safe) this.db.raw.prepare('INSERT OR IGNORE INTO safe_games VALUES (?)').run(g.id)

@@ -189,7 +189,8 @@ then 48 at a time. Catalog pages reveal 30 at a time. Tag chips count games, inc
 and story tags shared by at least two games, and use the catalog vocabulary for labels.
 
 Each person's progress (favourite, status, rating, play time, last played) lives in `user_games`,
-independently of builds.
+independently of builds, and their play sessions in `play_sessions`. Both belong to
+`progress/store.ts`, and their routes to `progress/routes.ts`.
 `PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
 Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
 its timestamp. Uninstall keeps it. Forgetting the library entry removes it.

@@ -4,7 +4,7 @@ import type { GameRow } from '../db.js'
 import { Overlays } from '../mods.js'
 import { baseFiles, readBaseFile } from '../pipeline/applymods.js'
 import { isZip, readZipEntries } from '../saves/savefile.js'
-import { HttpError, assertSlug, cleanRelPath } from '../util/paths.js'
+import { HttpError, cleanRelPath } from '../util/paths.js'
 import type { Services } from '../services.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 256 << 20, files: 500 } })
@@ -16,13 +16,12 @@ type BaseIndex = Map<string, { size: number; where: 'zip' | 'pack' }>
 const PICTURE_EXT = /\.(?:jpe?g|png|webp|gif|avif|bmp|tga|svg|mp4|webm|ogv|mkv|avi|mov|m4v)$/i
 
 export function createFilesRouter(s: Services): Router {
-  const { db, builds, overlays, jobs, content } = s
+  const { builds, overlays, jobs, content } = s
   const router = Router({ caseSensitive: true, strict: true })
   const cache = new Map<string, { key: string; files: BaseIndex }>()
 
   const game = (req: Request): GameRow => {
-    const g = db.getGame(assertSlug(req.params.id))
-    if (!g || content.hides(g)) throw new HttpError(404, 'Game not found')
+    const g = content.game(req.params.id)
     if (g.status !== 'installed') throw new HttpError(409, 'Install the game to browse its files')
     if (g.family && g.family !== 'renpy') throw new HttpError(409, 'Files and mods are for Ren’Py games')
     return g

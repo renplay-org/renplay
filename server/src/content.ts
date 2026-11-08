@@ -1,7 +1,7 @@
 import { viewer } from './accounts-context.js'
 import type { Config } from './config.js'
 import type { Db, GameRow } from './db.js'
-import { HttpError } from './util/paths.js'
+import { HttpError, assertSlug } from './util/paths.js'
 
 /**
  * The three adult levels, ordered so each one shows more than the previous.
@@ -133,6 +133,13 @@ export class ContentMode {
     const restricted = this.hides({ adult: 0, recipe_id: '' })
     const claimed = new Set(games.map((g) => g.save_dir).filter(Boolean))
     return [...dirs].filter((d) => !hidden.has(d) && (!restricted || claimed.has(d)))
+  }
+
+  /** A library game as this person may see it, by its id from a request. */
+  game(id: unknown): GameRow {
+    const g = this.db.getGame(assertSlug(id))
+    if (!g || this.hides(g)) throw new HttpError(404, 'Game not found')
+    return g
   }
 
   /** Off: the game does not exist for this person. */

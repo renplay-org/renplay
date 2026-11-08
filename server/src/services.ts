@@ -13,6 +13,7 @@ import { ContentMode } from './content.js'
 import { Db } from './db.js'
 import { EngineStore } from './engines.js'
 import { JobManager } from './jobs/manager.js'
+import { ProgressStore } from './progress/store.js'
 import { Overlays } from './mods.js'
 import { applyMods } from './pipeline/applymods.js'
 import { runImport } from './pipeline/import.js'
@@ -39,6 +40,7 @@ export interface Services {
   version: string
   content: ContentMode
   accounts: Accounts
+  progress: ProgressStore
   /** The signed-in person's saves. */
   readonly saves: SaveStore
   purger: Purger
@@ -57,7 +59,8 @@ export async function createServices(cfg: Config): Promise<Services> {
   // The content mode asks the catalog which save folders are adult; the catalog needs the content mode.
   let catalog: Catalog | null = null
   const content = new ContentMode(cfg, db, () => catalog?.adultSaveDirs() ?? [])
-  const accounts = new Accounts(db, cfg, content)
+  const progress = new ProgressStore(db)
+  const accounts = new Accounts(db, cfg, content, progress)
   try {
     await accounts.init()
   } catch (error) {
@@ -74,6 +77,7 @@ export async function createServices(cfg: Config): Promise<Services> {
     version: packageVersion(),
     content,
     accounts,
+    progress,
     get saves() {
       return accounts.store()
     },
