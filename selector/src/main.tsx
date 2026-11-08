@@ -10,6 +10,7 @@ import Setup from './pages/Setup'
 import { AuthGuard } from './lib/auth'
 import './index.css'
 import { installGamepad } from './lib/gamepad'
+import { keptGames, refreshShell } from './lib/offline'
 
 const GamePage = lazy(() => import('./pages/GamePage'))
 const Player = lazy(() => import('./pages/Player'))
@@ -38,6 +39,8 @@ globalThis.caches
   ?.keys()
   .then((keys) => keys.filter((k) => !k.startsWith('renplay-')).forEach((k) => void caches.delete(k)))
   .catch(() => {})
+// With a game kept offline, the library's own files follow each new version of Renplay.
+if (navigator.onLine && Object.keys(keptGames()).length) setTimeout(() => void refreshShell().catch(() => {}), 5_000)
 
 const fallback = (
   <div className="flex h-[60vh] items-center justify-center">

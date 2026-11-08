@@ -9,7 +9,8 @@ const proxy = Object.fromEntries(['/api', '/g/', '/engine', '/renplay/runtime.js
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  build: { outDir: 'dist', target: 'es2022', chunkSizeWarningLimit: 700 },
+  // The list of the build's files lets a kept game keep every page of the library (lib/offline.ts).
+  build: { outDir: 'dist', target: 'es2022', chunkSizeWarningLimit: 700, manifest: 'asset-manifest.json' },
   // The port the docs, the screenshots and the ui-check skill use.
   server: { port: 5199, proxy },
   // The built library (npm run build, then vite preview), as the container serves it: offline play is checked there.
