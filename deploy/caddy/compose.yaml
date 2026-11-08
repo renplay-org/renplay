@@ -9,7 +9,7 @@
 # Caddy gets the certificate by itself. Ports 80 and 443 must reach this server.
 services:
   renplay:
-    image: ghcr.io/renplay-org/renplay:4.3.1
+    image: ghcr.io/renplay-org/renplay:4.4.0
     container_name: renplay
     restart: unless-stopped
     environment:
