@@ -1,6 +1,6 @@
 """Takes the music out of a copy of The Question: its one track has no clear license.
 
-    python3 -I deploy/demo/patch-the-question.py <copy of the_question>
+    python3 -I demo/patch-the-question.py <copy of the_question>
 """
 import pathlib
 import sys

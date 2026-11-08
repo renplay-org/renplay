@@ -91,7 +91,7 @@ jobs:
       - name: Package and publish the chart
         run: |
           pip install --quiet PyYAML==6.0.2
-          python3 deploy/package-chart.py "$VERSION" "$IMAGE_DIGEST"
+          python3 scripts/package-chart.py "$VERSION" "$IMAGE_DIGEST"
           helm lint charts/renplay --strict
           helm package charts/renplay --version "$VERSION" --app-version "$VERSION"
           helm push "renplay-${VERSION}.tgz" oci://ghcr.io/renplay-org/charts

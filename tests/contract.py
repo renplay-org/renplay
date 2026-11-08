@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Container contract tests, shared by CI and local Docker (Python standard library only).
 
-Usage: python3 deploy/test-contract.py renplay:contract [users|smoke|upgrade|upgrade32|all] [--downloads]
+Usage: python3 tests/contract.py renplay:contract [users|smoke|upgrade|upgrade32|all] [--downloads]
 The fixture engine is deliberately data-only: this tests native install/HTTP paths,
 not Ren'Py execution in a browser. No game or engine downloads are needed.
 """

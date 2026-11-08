@@ -1,0 +1,3 @@
+renplay.example.com {
+	reverse_proxy renplay:8080
+}

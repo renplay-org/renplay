@@ -9,6 +9,7 @@ release notes say what).
 
 ### Added
 
+- Ready-to-copy files for running Renplay in the repository's `deploy` folder: Docker Compose, Compose with Caddy for HTTPS, an nginx site, Helm chart values and bjw-s app-template values. The docs show the same files, and every release pins them to its version.
 - `RENPLAY_DEMO=on` runs Renplay as a public demo. The sign-in page offers **Try the demo**, a shared guest who can play, save, rate and keep games offline, but cannot upload, install, change the account or see Settings, and no other sign-in works. Its saves are limited, so nobody can fill the demo's disk. A banner says it is a demo. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.
 
 ### Fixed

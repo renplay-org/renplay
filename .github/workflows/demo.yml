@@ -1,6 +1,6 @@
 name: Demo
 
-# The public demo at demo.renplay.org (deploy/demo): built with each release (release.yml) or by hand,
+# The public demo at demo.renplay.org (demo/): built with each release (release.yml) or by hand,
 # tried, pushed as ghcr.io/renplay-org/renplay:demo, and Render told to start it. The demo runs on
 # Render's free plan, never on the maintainers' own servers.
 
@@ -52,8 +52,8 @@ jobs:
 
       - name: The demo's games
         run: |
-          mkdir -p deploy/demo/games
-          sh deploy/demo/build-games.sh "$RENPY" deploy/demo/games
+          mkdir -p demo/games
+          sh demo/build-games.sh "$RENPY" demo/games
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -65,7 +65,7 @@ jobs:
 
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: deploy/demo
+          context: demo
           platforms: linux/amd64
           build-args: IMAGE=ghcr.io/renplay-org/renplay:${{ steps.version.outputs.version }}
           load: true

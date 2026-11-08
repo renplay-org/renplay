@@ -89,9 +89,16 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. N
   src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
   src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
 runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
-deploy/            nginx.conf.template and entrypoint.sh for the container, demo/ the public demo's image
+image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it)
+charts/renplay/    The Helm chart
+deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
+                     these files (a code block marked file=deploy/<path>), CI checks them (tests/examples.sh)
+demo/              The public demo's image (demo.renplay.org, on Render)
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
+tests/             The image's install contract, the chart's tests, the deploy/ examples
+scripts/           Repo checks (writing rule, built library), release.mjs, package-chart.py
+mise.toml          Pinned tools and every task, locally and in CI
 ```
 
 ## How it fits together
@@ -161,32 +168,22 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
 
 ## Commands
 
+`mise.toml` pins the tools and holds every task. CI runs the same tasks.
+
 ```sh
-# Server
-cd server && npm ci
-npx tsc -p .            # type check and build to dist/
-npx vitest run          # tests (fixtures in src/__tests__)
-
-# UI
-cd selector && npm ci
-npx tsc -b --noEmit     # type check
-npm run build           # production build to selector/dist
-
-# Run locally (two terminals)
-cd server && DATA_DIR=/tmp/rp/data GAMES_DIR=/tmp/rp/games PORT=3999 \
-  RENPLAY_RUNTIME_PATH=$PWD/../runtime/renplay-runtime.js node dist/index.js
-cd selector && npm run dev                                   # http://localhost:5199
-cd selector && RENPLAY_BACKEND=https://renplay.example npm run dev   # UI against a deployed server
-
-# Container
-docker build -t renplay:dev . && docker run -p 8080:8080 -v $PWD/games:/games -v $PWD/data:/data renplay:dev
-
-# Screenshots (phone and desktop) of a running instance, read-only; --sfw for anything published
-cd server && npx playwright install chromium webkit && npm run screenshots -- http://localhost:5199 /tmp/shots --sfw
+mise install && mise run install    # tools and npm packages
+mise run dev                        # server on :3999 (data in /tmp/rp) and library on http://localhost:5199
+RENPLAY_BACKEND=https://renplay.example mise run dev:ui   # library against a deployed server
+mise run check                      # everything CI checks, or one part: check:server, check:ui,
+                                    # check:docs, check:chart, check:copy, check:workflows, check:examples
+mise run test                       # server tests only
+mise run image && mise run contract # the image as renplay:dev, its install contract, deploy/compose.yaml
+mise run screenshots http://localhost:5199 /tmp/shots --sfw   # phone and desktop, read-only
+mise run release 4.4.0              # a release branch's versions and changelog (release skill)
 ```
 
-`node --check runtime/renplay-runtime.js` checks the runtime's syntax. CI runs all of the above
-except screenshots.
+Inside `server/`: `npx tsc -p .` builds to `dist/`, `npx vitest run src/__tests__/x.test.ts` runs one
+test file. Screenshots need `npx playwright install chromium webkit` once.
 
 ## Definition of done
 

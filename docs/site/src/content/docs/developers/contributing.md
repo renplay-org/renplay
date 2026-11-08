@@ -16,24 +16,21 @@ Thanks for helping with Renplay. Pick what fits:
 
 ## Development setup
 
-You need Node 24 and, for the container, Docker.
+You need [mise](https://mise.jdx.dev) and, for the image, Docker. mise installs the pinned tools
+(Node 24, Python, Helm and the linters) and runs the tasks in `mise.toml`, the same ones CI runs.
 
 ```sh
-# Server: type check, tests, build
-cd server && npm ci && npx tsc -p . && npx vitest run
-
-# Run it
-DATA_DIR=/tmp/rp/data GAMES_DIR=/tmp/rp/games PORT=3999 \
-  RENPLAY_RUNTIME_PATH=$PWD/../runtime/renplay-runtime.js node dist/index.js
-
-# UI with hot reload, proxying the API to :3999 (http://localhost:5199)
-cd selector && npm ci && npm run dev
-# …or against a deployed Renplay
-RENPLAY_BACKEND=https://renplay.example npm run dev
+mise install          # the tools
+mise run install      # the npm packages
+mise run dev          # the server on port 3999 and the library on http://localhost:5199
+mise run check        # everything CI checks
+mise tasks            # every task: test, docs, image, contract, screenshots, release
 ```
 
-Put a game’s PC zip into `/tmp/rp/games/_archives/` and install it from the UI. `make test` runs the
-server tests and the UI type check; `make dev` runs the container with `./games` and `./data`.
+`RENPLAY_BACKEND=https://renplay.example mise run dev:ui` runs the library against a deployed
+Renplay. Without mise, each task is a plain npm or node command you can read in `mise.toml`.
+
+Put a game’s PC zip into `/tmp/rp/games/_archives/` and install it from the library.
 
 Read [How Renplay works](/developers/architecture/) for how the pieces fit together. The repository’s
 `AGENTS.md` lists the product rules and lessons learned, and is useful for humans too.

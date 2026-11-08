@@ -5,19 +5,10 @@ description: Run Renplay with Docker or Docker Compose.
 
 ## Docker Compose
 
-Create a folder for Renplay, and in it a `compose.yaml`:
+Create a folder for Renplay, and in it a `compose.yaml` (or download
+[deploy/compose.yaml](https://github.com/renplay-org/renplay/blob/main/deploy/compose.yaml)):
 
-```yaml
-services:
-  renplay:
-    image: ghcr.io/renplay-org/renplay:__RENPLAY_VERSION__
-    container_name: renplay
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./games:/games
-      - ./data:/data
+```yaml file=deploy/compose.yaml
 ```
 
 Then:
