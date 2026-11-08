@@ -25,6 +25,8 @@ The game paces itself to your display. Two quiet things sit over it: the **Renpl
 top left and, beside it, **Full screen**. Both are lit for the first seconds of a game. The pill (or
 **Esc**, or a swipe from the left edge on a phone) opens the player menu:
 
+![The player menu open over a game, with its saves](../../../assets/desktop-player-drawer.webp)
+
 - **Sound**, **Full screen** and close at its top.
 - **Saves** to load one, **Guide** for the game's walkthroughs, and **Options** for the display,
   the text size and Ren'Py's own accessibility menu.

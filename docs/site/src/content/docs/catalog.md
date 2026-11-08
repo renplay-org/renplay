@@ -7,6 +7,8 @@ The catalog is a public list of **recipes**. A recipe says which download of a g
 browser and how to build it. It is published at `https://catalog.renplay.org/index.v4.json` and the
 source is the [catalog repository](https://renplay.org/github/catalog).
 
+![The Catalog page, with adult games blurred](../../assets/desktop-catalog.webp)
+
 Everything about a game that Renplay shows comes from its recipe: title, developer, tags, links,
 summary and development state. You cannot edit these in Renplay, so every install shows the same
 things. The recipe also gives the game's **art**, which you can change for yourself, and an admin
