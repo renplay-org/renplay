@@ -1165,7 +1165,7 @@
 
   /*
    * Downloads game.zip so that a dropped connection (seen with HTTP/3 through
-   * the gateway) resumes where it stopped instead of leaving the engine
+   * some gateways) resumes where it stopped instead of leaving the engine
    * waiting forever. Builds never change, so a byte range is safe to append.
    */
   function downloadGameZip(url, init) {

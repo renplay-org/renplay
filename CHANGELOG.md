@@ -7,6 +7,12 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.5.1] - 2026-11-08
+
+### Fixed
+
+- The player shows **Syncing** only when saves take more than a few seconds to reach the server, instead of at every save. Saves waiting on the device while it is offline still show at once.
+
 ## [4.5.0] - 2026-11-08
 
 ### Fixed
@@ -597,7 +603,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.5.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.5.1...dev
+[4.5.1]: https://github.com/renplay-org/renplay/compare/v4.5.0...v4.5.1
 [4.5.0]: https://github.com/renplay-org/renplay/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/renplay-org/renplay/compare/v4.3.1...v4.4.0
 [4.3.1]: https://github.com/renplay-org/renplay/compare/v4.3.0...v4.3.1

@@ -11,8 +11,7 @@ versions or changelog do not match; `release.yml` does the tagging and publishin
 ## 1. Check that dev is ready
 
 - The last pull requests into `dev` were green in CI, and what changed has been tried on a running
-  instance (for the reference deployment: run the **Edge image** workflow on `dev` and pin the
-  `edge@sha256:…` digest it prints).
+  instance (run the **Edge image** workflow on `dev` and pin the `edge@sha256:…` digest it prints).
 - `CHANGELOG.md` has entries under `## [Unreleased]` for every user-visible change since the last
   release (`git log vLAST..origin/dev --oneline`). Write missing ones for users, not developers.
 
@@ -69,7 +68,6 @@ drop them.
 
 ## 6. Deployment
 
-Prepare the change that pins `ghcr.io/renplay-org/renplay:X.Y.Z@sha256:<digest>` in the deployment
-(for the reference deployment: the HelmRelease in the home-ops repository; Renovate usually opens
-this PR by itself). Applying it is the maintainer's decision. After it rolls out, check
+Prepare the change that pins `ghcr.io/renplay-org/renplay:X.Y.Z@sha256:<digest>` in the deployment.
+Applying it is the maintainer's decision. After it rolls out, check
 `/api/system` reports version `X.Y.Z` and a game starts.
