@@ -17,7 +17,7 @@ renplay` shows the server. When you report a problem, attach the job log.
   `RENPLAY_ENGINES_URL`. Check that the server can reach `engines.renplay.org`. Older Renplay
   versions use addresses that no longer exist: [upgrade](/upgrading/).
 - **“Cannot be installed.”** The reason is shown in Add games. Engines that need a desktop
-  (RPG Maker XP, Wolf RPG, Unity PC builds) cannot run in a browser. See [Engines](/engines/).
+  (RPG Maker XP, Wolf RPG and other programs made for one system) cannot run in a browser. See [Engines](/engines/).
 
 ## A game will not start
 
