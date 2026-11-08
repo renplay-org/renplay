@@ -66,7 +66,9 @@ export async function toGame(game: GameRow, deps: Services): Promise<Game> {
           latestFile = f
         }
       }
-    } catch {}
+    } catch {
+      // A game whose saves cannot be read shows without its latest save.
+    }
   }
   const mods = await deps.overlays.summary(row.id)
   const recipe = row.recipe_id ? deps.catalog.recipe(row.recipe_id) : null

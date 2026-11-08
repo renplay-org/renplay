@@ -42,6 +42,7 @@ export function useTagPrefs(): [TagPrefs, (next: TagPrefs) => void] {
     setLocal(next)
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
+      // The demo refuses it and an offline browser cannot send it: then the choice lasts this visit.
       void put<TagPrefsAnswer>('/api/me/tags', next).then((saved) => qc.setQueryData(['me-tags'], saved)).catch(() => {})
     }, 600)
   }

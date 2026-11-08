@@ -486,6 +486,7 @@ export class ArtStore {
       const plan = planFormat(kind, chosen)
       // A catalog image without its size is measured when it is downloaded.
       if (plan && plan.source.width > 0 && plan.source.height > 0) out[kind] = plan
+      // In the background: a page never waits for a picture, and sync reports what could not be made.
       else if (plan) void this.measure(plan.source, subject.adult).catch(() => {})
     }
     return out
@@ -507,6 +508,7 @@ export class ArtStore {
         out[kind] = { thumbhash: row?.thumbhash ?? plan.source.thumbhash, tint: row?.tint ?? plan.source.tint }
         continue
       }
+      // As above: made in the background, reported by sync.
       if (!row) void this.ensure(plan, subject.adult).catch(() => {})
       out[kind] = {
         url1x: row ? `/api/art/${row.file1x}` : null,

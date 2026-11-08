@@ -45,6 +45,7 @@ export function useFullscreen(shellRef: RefObject<HTMLElement | null>, fsMode: R
       }
       setFullscreen(on)
       send({ type: 'renplay:fullscreen-state', value: on })
+      // The browser gives the page its full screen size a moment after the event.
       setTimeout(() => setCoversNotch(on && fullscreenCoversNotch()), 250)
       send({ type: 'renplay:focus' })
     }
