@@ -12,7 +12,7 @@ import type { Config } from './config.js'
 import { ContentMode } from './content.js'
 import { Db } from './db.js'
 import { EngineStore } from './engines.js'
-import { JobManager } from './jobs.js'
+import { JobManager } from './jobs/manager.js'
 import { Overlays } from './mods.js'
 import { applyMods } from './pipeline/applymods.js'
 import { runImport } from './pipeline/import.js'
@@ -86,8 +86,8 @@ export async function createServices(cfg: Config): Promise<Services> {
     catalog,
     backups: new SaveBackups(cfg, db),
   }
-  s.jobs.register('import', (ctx) => runImport(ctx, s))
-  s.jobs.register('apply-mods', (ctx) => applyMods(ctx, s))
-  s.jobs.register('hash-archive', (ctx) => hashArchive(ctx, s))
+  s.jobs.register('import', 'Install', (ctx) => runImport(ctx, s))
+  s.jobs.register('apply-mods', 'Mod build', (ctx) => applyMods(ctx, s))
+  s.jobs.register('hash-archive', 'Checksum', (ctx) => hashArchive(ctx, s))
   return s
 }

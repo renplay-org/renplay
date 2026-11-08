@@ -10,7 +10,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
 import { Db, type GameRow } from '../db.js'
-import { keepaliveToken, playerRoute } from '../auth.js'
+import { playerRoute } from '../auth.js'
+import { keepaliveToken } from '../jobs/keepalive.js'
 import { viewer, viewers } from '../accounts-context.js'
 import yazl from 'yazl'
 
@@ -417,7 +418,7 @@ describe('personal data and save moves', () => {
   it('runs shared background jobs outside the enqueuing account context', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin)
     let seen: unknown = 'not run'
-    a.jobs.register('account-context', async () => { await Promise.resolve(); seen = viewer() })
+    a.jobs.register('account-context', 'Test', async () => { await Promise.resolve(); seen = viewer() })
     viewers.run({ user: a.accounts.user(id), session: 'fixture', bearer: false }, () => a.jobs.enqueue('account-context', '', {}))
     await vi.waitFor(() => expect(a.db.listJobs()[0]!.status).toBe('done'))
     expect(seen).toBeUndefined()

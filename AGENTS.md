@@ -73,7 +73,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/art.ts         The art cache: five formats per game, the making order, choices, uploads
   src/engines.ts     Engine packs: index, download on demand, checksum, pruning
   src/builds.ts      Build folders /games/<id>/<build>/, build.json, caches
-  src/jobs.ts        Background job queue (installs, mod builds, hashing) with logs
+  src/jobs/          Background job queue (installs, mod builds, hashing), its logs, routes and keepalive
   src/mods.ts        The mod overlay (user files layered over a build)
   src/pipeline/      Install pipeline: archive.ts (zip/7z/rar reading), rpa.ts (RPA split, data-only
                      pickle in util/pickle.ts), project.ts (extraction), optimize.ts (WebP),

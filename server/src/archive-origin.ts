@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import type { Catalog } from './catalog.js'
 import type { Config } from './config.js'
 import { parseJson, type Db, type GameSource } from './db.js'
-import type { JobContext } from './jobs.js'
+import type { JobContext } from './jobs/manager.js'
 import { sha256File } from './util/fsx.js'
 import { cleanRelPath, safeJoin } from './util/paths.js'
 

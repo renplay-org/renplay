@@ -1,4 +1,4 @@
-import type { JobContext } from '../jobs.js'
+import type { JobContext } from '../jobs/manager.js'
 import { Limiter } from '../util/limit.js'
 import { readAll, type ArchiveSource } from './archive.js'
 import { MAX_IMAGE_BYTES } from './image-memory.js'

@@ -1,4 +1,4 @@
-import { DEFAULTS_KEY, keepaliveToken, readDefaults, type Defaults } from '../auth.js'
+import { DEFAULTS_KEY, readDefaults, type Defaults } from '../auth.js'
 import { SYNC_SETTING, syncCodesOn } from './saves.js'
 import { keepDownloads } from '../downloads.js'
 import { readdir, stat, statfs } from 'node:fs/promises'
@@ -34,22 +34,6 @@ export function createSystemRouter(s: Services): Router {
    * pod alive. Headers go out immediately: proxies give up on responses whose
    * headers take longer than their header timeout, but stream bodies fine.
    */
-  router.get('/keepalive', (req, res) => {
-    if (req.get('authorization') !== `Bearer ${keepaliveToken}`) throw new HttpError(401, 'Invalid keepalive token')
-    const hold = Math.min(150, Math.max(0, Number(req.query['hold']) || 0))
-    res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' })
-    res.flushHeaders()
-    const tick = setInterval(() => res.write('.'), 10_000)
-    const done = setTimeout(() => {
-      clearInterval(tick)
-      res.end(jobs.isBusy() ? 'busy\n' : 'idle\n')
-    }, hold * 1000)
-    req.on('close', () => {
-      clearInterval(tick)
-      clearTimeout(done)
-    })
-  })
-
   // ---- defaults for everyone -------------------------------------------------------
 
   router.get('/defaults', (_req, res) => {
@@ -231,84 +215,5 @@ export function createSystemRouter(s: Services): Router {
     res.json({ engines: (await engines.available(true)).map((e) => e.version) })
   })
 
-  // ---- jobs ---------------------------------------------------------------
-
-  router.get('/jobs', (req, res) => {
-    const pageNumber = (value: unknown, fallback: number): number => {
-      if (typeof value !== 'string' || !/^\d+$/.test(value)) return fallback
-      const n = Number(value)
-      return Number.isSafeInteger(n) ? n : fallback
-    }
-    const limit = Math.max(1, Math.min(200, pageNumber(req.query['limit'], 30)))
-    const offset = pageNumber(req.query['offset'], 0)
-    // Off: hidden jobs are left out before paging, so pages, the total and busy only count what this person may see.
-    const visible = content.viewerLevel() === 'off' ? db.listJobs(Number.MAX_SAFE_INTEGER, 0).filter((j) => !catalog.jobHidden(j)) : null
-    const page = visible ? visible.slice(offset, offset + limit) : db.listJobs(limit, offset)
-    res.json({
-      jobs: page.map((j) => ({
-        id: j.id,
-        type: j.type,
-        game: j.game,
-        status: j.status,
-        stage: j.stage,
-        progress: j.progress,
-        message: j.message,
-        error: j.error || null,
-        params: safeParams(j.params),
-        result: j.status === 'done' ? safeJson(j.result) : null,
-        createdAt: j.created_at,
-        startedAt: j.started_at || null,
-        finishedAt: j.finished_at || null,
-      })),
-      busy: visible ? visible.some((j) => j.status === 'running') : jobs.isBusy(),
-      total: visible ? visible.length : db.countJobs(),
-    })
-  })
-
-  /** The job, unless it belongs to a game that does not exist for this person. */
-  const visibleJob = (id: string) => {
-    const j = db.getJob(id)
-    if (!j || catalog.jobHidden(j)) throw new HttpError(404, 'Job not found')
-    return j
-  }
-
-  router.get('/jobs/:id/log', (req, res) => {
-    const j = visibleJob(req.params.id)
-    res.type('text/plain').send(jobs.getLog(j.id))
-  })
-
-  router.post('/jobs/:id/cancel', (req, res) => {
-    visibleJob(req.params.id)
-    if (!jobs.cancel(req.params.id)) throw new HttpError(409, 'Job is not running or queued')
-    res.json({ ok: true })
-  })
-
-  router.post('/jobs/:id/retry', (req, res) => {
-    visibleJob(req.params.id)
-    const id = jobs.retry(req.params.id)
-    if (!id) throw new HttpError(409, 'Job cannot be retried')
-    res.json({ jobId: id })
-  })
-
-  router.delete('/jobs', (_req, res) => {
-    // An admin at Off clears what they can see. The jobs about hidden games stay.
-    jobs.clearFinished(content.viewerLevel() === 'off' ? (j) => catalog.jobHidden(j) : undefined)
-    res.json({ ok: true })
-  })
-
   return router
-}
-
-function safeJson(s: string): unknown {
-  try {
-    return JSON.parse(s)
-  } catch {
-    return null
-  }
-}
-
-function safeParams(s: string): unknown {
-  const p = safeJson(s) as Record<string, any> | null
-  if (!p) return null
-  return { source: p.source, game: p.game, path: p.path, by: typeof p.by === 'number' ? p.by : undefined }
 }

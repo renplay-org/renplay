@@ -24,7 +24,6 @@ const scrypt = (password: string, salt: string, N: number) => new Promise<Buffer
 const hash = (s: string) => createHash('sha256').update(s).digest('hex')
 const random = () => randomBytes(32).toString('base64url')
 const DAYS30 = 30 * 86400_000
-export const keepaliveToken = random()
 
 /**
  * Defaults for everyone: what a person starts with until they choose. Each value is null when the
