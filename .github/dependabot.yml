@@ -1,0 +1,43 @@
+# Weekly, into dev, grouped so a week's updates are one pull request per ecosystem. A new version
+# waits a week before it is proposed (cooldown), so a bad release is usually pulled before it reaches
+# us. Security updates come at once, outside this schedule.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directories: [/server, /selector, /docs/site]
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope

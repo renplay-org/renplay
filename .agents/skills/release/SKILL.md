@@ -10,8 +10,9 @@ versions or changelog do not match; `release.yml` does the tagging and publishin
 
 ## 1. Check that dev is ready
 
-- `dev` is green in CI and its latest `edge` image has been tried on a running instance (ideally
-  the reference deployment, pinned to the `edge@sha256:…` digest).
+- The last pull requests into `dev` were green in CI, and what changed has been tried on a running
+  instance (for the reference deployment: run the **Edge image** workflow on `dev` and pin the
+  `edge@sha256:…` digest it prints).
 - `CHANGELOG.md` has entries under `## [Unreleased]` for every user-visible change since the last
   release (`git log vLAST..origin/dev --oneline`). Write missing ones for users, not developers.
 
@@ -54,7 +55,7 @@ The maintainer squash-merges with the subject `Release X.Y.Z (#N)`. Agents do no
 ## 5. Check what was published
 
 ```sh
-gh run list --repo renplay-org/renplay --branch main --limit 1          # Release workflow passed
+gh run list --repo renplay-org/renplay --branch main --workflow release.yml --limit 1  # passed: image, chart, release, docs, demo
 gh release view vX.Y.Z --repo renplay-org/renplay                        # notes = changelog section
 docker buildx imagetools inspect ghcr.io/renplay-org/renplay:X.Y.Z       # image exists; note the digest
 helm show chart oci://ghcr.io/renplay-org/charts/renplay --version X.Y.Z # chart version matches

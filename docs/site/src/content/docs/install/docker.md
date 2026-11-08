@@ -36,8 +36,8 @@ Open `http://<your server>:8080`.
   [releases](https://renplay.org/releases)) instead of `latest`, so an upgrade
   happens when you decide. See [Upgrading](/upgrading/).
 - The same image is on Docker Hub as `renplay/renplay`.
-- `ghcr.io/renplay-org/renplay:edge` is built from every change on the `dev` branch. It is for
-  trying things, not for a library you care about.
+- `ghcr.io/renplay-org/renplay:edge` is an unreleased build the Renplay Team makes now and then to
+  try a change. It is not for a library you care about.
 
 ## Plain Docker
 

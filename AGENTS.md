@@ -204,14 +204,21 @@ except screenshots.
   branch from `dev` (`feat-…`, `fix-…`), open a pull request against `dev`, squash-merge.
 - **Commits and PR titles:** Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`, `chore:`).
   The body says why, and what was tested.
-- **CI** (`.github/workflows/ci.yml`): type checks, tests, UI build, and a container image per
-  `dev` push, tagged `edge` and the commit sha.
+- **CI** (`.github/workflows/ci.yml`) runs on pull requests into `dev` and `main`, and the
+  rulesets require it: `check` (type checks, tests, the interface, docs, chart and workflow lint),
+  `Install contract (amd64, arm64)` (the image from a build cache, the contract, the chart on kind),
+  and `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
+- **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
+  release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
+  `sites.yml` (the docs, with each release or by hand), `demo.yml` (the demo, with each release or
+  by hand). Actions are pinned by commit SHA, Dependabot keeps them and the npm and Docker
+  dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
 - **Releases:** see the `release` skill. A `release-X.Y.Z` branch from `dev` bumps
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated
   `## [X.Y.Z] - YYYY-MM-DD` section, and is squash-merged into `main`. CI checks versions and the
-  changelog; `release.yml` then tags `vX.Y.Z`, publishes the GitHub release with that changelog
-  section, and pushes the image as `X.Y.Z` and `latest`. Afterwards `dev` fast-forwards to the
-  release branch. (`main` only gets squashed releases, so it never shares history with `dev`; the
+  changelog. `release.yml` then builds the image (`X.Y.Z` and `latest`, GHCR and Docker Hub),
+  publishes and signs the chart, tags `vX.Y.Z` with the changelog section as the GitHub release,
+  deploys the docs and rebuilds the demo. Afterwards `dev` fast-forwards to the release branch. (`main` only gets squashed releases, so it never shares history with `dev`; the
   release branch records it with `git merge -s ours`.)
 - **Cadence:** release when a coherent set of changes is done and verified on a running instance,
   at least every few weeks while there are changes; patch releases for fixes any time.
@@ -221,8 +228,9 @@ except screenshots.
 ## Deployment
 
 The reference deployment runs on Kubernetes (Flux) and pins a released image by tag and digest
-(`ghcr.io/renplay-org/renplay:X.Y.Z@sha256:…`); Renovate proposes new releases. To try a `dev`
-build there first, pin its `edge@sha256:…` digest temporarily, then pin the release. Data lives in
+(`ghcr.io/renplay-org/renplay:X.Y.Z@sha256:…`); Renovate proposes new releases. To try a build
+there first, run **Edge image** (`edge.yml`) on the branch, pin the `edge@sha256:…` digest it prints
+temporarily, then pin the release. Data lives in
 `/data` (a persistent volume, backed up); `/games` can be rebuilt from `/games/_archives`.
 
 Agents never push to `main`, merge releases, or change a deployment on their own; they prepare

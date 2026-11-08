@@ -1,28 +1,37 @@
 name: CI
 
-on:
-  push:
-    branches: [dev]
-  pull_request:
-    branches: [main, dev]
+# Every pull request into dev or main. Merging needs these checks green (the rulesets require them).
+# Pushes run nothing here: dev only receives what a pull request already tested, and main only
+# receives releases (release.yml).
 
-permissions:
-  packages: write
+on:
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # Pull requests into main are releases: from a release-X.Y.Z branch, with
-  # the versions and a dated CHANGELOG.md section for X.Y.Z.
+  # Pull requests into main are releases: from a release-X.Y.Z branch, with the versions and a dated
+  # CHANGELOG.md section for X.Y.Z.
   release-check:
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Versions and changelog
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
           V="${BRANCH#release-}"
-          V="${V#v}"
           if ! echo "$V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "Releases come from release-X.Y.Z branches, not $BRANCH"
             exit 1
@@ -34,55 +43,89 @@ jobs:
               exit 1
             fi
           done
+          if ! grep -qE "^version: $V$" charts/renplay/Chart.yaml || ! grep -qE "^appVersion: \"$V\"$" charts/renplay/Chart.yaml; then
+            echo "charts/renplay/Chart.yaml needs version and appVersion $V"
+            exit 1
+          fi
           if ! grep -qE "^## \[$V\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" CHANGELOG.md; then
             echo "CHANGELOG.md needs a '## [$V] - YYYY-MM-DD' section"
             exit 1
           fi
 
+  # The code, the docs, the chart and the workflows, in one job.
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            selector/package-lock.json
+            docs/site/package-lock.json
 
-      - name: Install server deps
-        run: npm ci
+      - name: Server
         working-directory: server
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npx vitest run
 
-      - name: Typecheck server
-        run: npx tsc --noEmit
-        working-directory: server
-
-      - name: Run server tests
-        run: npx vitest run
-        working-directory: server
-
-      - name: Check runtime script
+      - name: Runtime
         run: node --check runtime/renplay-runtime.js
 
       # No semicolons, em or en dashes, or ellipses in text people read (AGENTS.md).
-      - name: Check the writing rule
+      - name: Writing rule
         run: node scripts/check-copy.mjs --docs
 
-      - name: Install selector deps
-        run: npm ci
+      - name: Library interface
         working-directory: selector
+        run: |
+          npm ci
+          npx tsc -b --noEmit
+          npm run build
+          node ../scripts/check-dist.mjs
 
-      - name: Typecheck selector
-        run: npx tsc -b --noEmit
-        working-directory: selector
+      # The configuration page is generated from server/src/envvars.ts. The build fails on broken links.
+      - name: Docs
+        working-directory: docs/site
+        run: |
+          npm ci
+          npm run check:config
+          npm run build
 
-      - name: Build selector
-        run: npm run build
-        working-directory: selector
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.17.3
 
-      - name: Check the built library
-        run: node scripts/check-dist.mjs
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
 
-  install-contract:
+      - name: Chart
+        run: |
+          pip install --quiet PyYAML==6.0.2
+          helm lint charts/renplay --strict
+          python3 deploy/test-chart.py
+          python3 deploy/test-package-chart.py
+          docker run --rm -u "$(id -u)" -v "$PWD:/helm-docs" jnorwood/helm-docs:v1.14.2 --chart-search-root charts/renplay
+          git diff --exit-code -- charts/renplay/README.md
+
+      - name: Workflows
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+          pipx run zizmor==1.32.0 --persona regular --min-severity medium .github/workflows
+
+  # The image, built from the cache earlier runs filled, against the install contract on both
+  # architectures, and the chart installed on kind with it.
+  contract:
     name: Install contract (${{ matrix.arch }})
     strategy:
       fail-fast: false
@@ -93,16 +136,34 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The cache is written by pull requests from this repository. Dependabot's have a read-only
+      # token, so writing is allowed to fail.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           load: true
-          tags: renplay:contract
-          cache-from: type=gha,scope=contract-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=contract-${{ matrix.arch }}
+          tags: |
+            renplay:contract
+            ghcr.io/renplay-org/renplay:chart-test
+          cache-from: type=registry,ref=ghcr.io/renplay-org/renplay-cache:${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/renplay-org/renplay-cache:${{ matrix.arch }},mode=max,ignore-error=true
+
       - name: User IDs and read-only root filesystem
         run: python3 deploy/test-contract.py renplay:contract users
       - name: Native Ren'Py install and game HTTP smoke test
@@ -114,87 +175,18 @@ jobs:
       - name: Separate downloads mount
         run: python3 deploy/test-contract.py renplay:contract all --downloads
 
-  docs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm ci
-        working-directory: docs/site
-      - name: Generated configuration stays current
-        run: npm run gen && git diff --exit-code -- src/content/docs/configuration.md
-        working-directory: docs/site
-      - run: npm run build
-        working-directory: docs/site
-
-  helm:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: azure/setup-helm@v4.3.0
+      - if: matrix.arch == 'amd64'
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: v3.17.3
-      # chart-testing's YAML validator (yamale) still uses ast.Num, which Python 3.14 removed.
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - uses: helm/chart-testing-action@v2.7.0
-      - name: Lint and render the install contract
+
+      # kind comes with the runner image. The chart's own test pod checks the service answers.
+      - name: The chart on kind
+        if: matrix.arch == 'amd64'
         run: |
-          helm lint charts/renplay --strict
-          python3 deploy/test-chart.py
-          python3 deploy/test-package-chart.py
-          ct lint --config .github/ct.yaml --charts charts/renplay --lint-conf .github/chart-lint.yaml
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-      - name: Chart values reference stays current
-        run: |
-          go install github.com/norwoodj/helm-docs/cmd/helm-docs@v1.14.2
-          helm-docs --chart-search-root charts/renplay
-          git diff --exit-code -- charts/renplay/README.md
-      - uses: helm/kind-action@v1.12.0
-        with:
-          cluster_name: chart-testing
-      # Test the chart with the image built from this commit: a release bumps appVersion before
-      # its image exists, and the chart should be tested with the code it ships with.
-      - name: Build the image for the chart test
-        run: |
-          docker build -t ghcr.io/renplay-org/renplay:chart-test .
-          kind load docker-image ghcr.io/renplay-org/renplay:chart-test --name chart-testing
-      - name: Install and test on kind
-        run: ct install --config .github/ct.yaml --charts charts/renplay --helm-extra-set-args "--set=image.tag=chart-test --set=image.pullPolicy=Never"
-
-  build:
-    needs: [check, install-contract, docs, helm]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-qemu-action@v3
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'push' }}
-          tags: |
-            ghcr.io/${{ github.repository }}:edge
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          kind version
+          kind create cluster --name chart --wait 120s
+          kind load docker-image ghcr.io/renplay-org/renplay:chart-test --name chart
+          helm install renplay charts/renplay --namespace renplay --create-namespace \
+            --set image.tag=chart-test --set image.pullPolicy=Never --wait --timeout 5m
+          helm test renplay --namespace renplay --timeout 5m

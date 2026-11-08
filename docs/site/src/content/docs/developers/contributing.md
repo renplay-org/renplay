@@ -80,11 +80,13 @@ Pull requests are squash-merged.
 
 ## Releases
 
-`dev` is built into the `edge` image on every merge. A release is a `release-X.Y.Z` branch (versions
-bumped, `Unreleased` moved into a dated section of the changelog) squash-merged into `main`. CI
-checks the versions and the changelog, and the release workflow tags `vX.Y.Z`, publishes the GitHub
-release and pushes the image as `ghcr.io/renplay-org/renplay:X.Y.Z` and `:latest`. The docs deploy
-from `main`, so they describe the released version. The full procedure is in the repository’s
+Pull requests run CI, and a pull request merges when it is green. An `edge` image of any branch can be
+built by hand (the **Edge image** workflow). A release is a `release-X.Y.Z` branch (versions bumped,
+`Unreleased` moved into a dated section of the changelog) squash-merged into `main`. CI checks the
+versions and the changelog, and the release workflow builds the image as
+`ghcr.io/renplay-org/renplay:X.Y.Z` and `:latest`, publishes and signs the chart, tags `vX.Y.Z`
+with the GitHub release, deploys the docs and rebuilds the demo. The docs deploy with releases, so
+they describe the released version. The full procedure is in the repository’s
 `.agents/skills/release/SKILL.md`.
 
 ## The project
