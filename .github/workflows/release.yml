@@ -143,4 +143,4 @@ jobs:
     with:
       version: ${{ needs.version.outputs.version }}
     secrets:
-      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+      DEMO_DEPLOY_HOOK: ${{ secrets.DEMO_DEPLOY_HOOK }}

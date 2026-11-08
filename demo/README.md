@@ -1,7 +1,6 @@
 # The public demo
 
-[demo.renplay.org](https://demo.renplay.org) lets anyone try Renplay without installing it. It runs
-on Render.
+[demo.renplay.org](https://demo.renplay.org) lets anyone try Renplay without installing it.
 
 ## What a visitor gets
 
@@ -20,11 +19,10 @@ on Render.
 
 ## How it resets
 
-Everything is in the image: the installed game, its art, the catalog, the guest. Render's free plan
-starts a service again from its image after 15 minutes without visitors, with an empty disk. When
-visitors keep coming, the demo stops itself after 4 hours of running, once nobody has asked anything
-for a minute (health checks do not count), and at 4 hours and 15 minutes in any case. Render starts
-it fresh.
+Everything is in the image: the installed game, its art, the catalog, the guest. Every start from the
+image is a fresh demo with an empty disk. When visitors keep coming, the demo stops itself after 4
+hours of running, once nobody has asked anything for a minute (health checks do not count), and at
+4 hours and 15 minutes in any case, so it starts fresh again.
 
 ## How it is built
 
@@ -37,8 +35,8 @@ it fresh.
    throwaway admin installs the games with their recipes and makes their art. The admin's password
    is random and never kept, and a demo refuses every sign-in but the guest. The second stage copies
    `/data` and `/games` in and turns the demo on.
-3. The image is pushed as `ghcr.io/renplay-org/renplay:demo`, and the `RENDER_DEPLOY_HOOK` secret
-   tells Render to start the demo from it.
+3. The image is pushed as `ghcr.io/renplay-org/renplay:demo`, and the `DEMO_DEPLOY_HOOK` secret
+   starts the demo from it. The image listens on port 8080, with the health check `/api/health`.
 
 `make-art.mjs` made The Question's art from the game's own pictures. Run it again to change them.
 
@@ -47,15 +45,5 @@ To try it locally:
 ```sh
 sh demo/build-games.sh 8.5.3 demo/games
 docker build --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> -t renplay-demo demo
-docker run --rm -p 8080:8080 --memory 512m --cpus 0.1 renplay-demo
+docker run --rm -p 8080:8080 renplay-demo
 ```
-
-## Hosting
-
-The demo runs on Render as a web service from `ghcr.io/renplay-org/renplay:demo`, on port 8080 with
-the health check `/api/health`. Each visitor's address comes from Cloudflare's `CF-Connecting-IP`
-(Render's edge is Cloudflare), so the sign-in limit counts every visitor on their own.
-
-The service has 512 MB and 0.1 CPU, enough for serving a small game: the demo uses about 75 MB and
-starts in about half a minute. A cold start takes about a minute in all, with Render's own loading
-page meanwhile.
