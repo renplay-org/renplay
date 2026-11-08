@@ -1,5 +1,4 @@
 import { viewer } from './accounts-context.js'
-import { parseJson } from './db.js'
 import type { Config } from './config.js'
 import type { Db, GameRow } from './db.js'
 import { HttpError } from './util/paths.js'
@@ -12,7 +11,7 @@ import { HttpError } from './util/paths.js'
 export type AdultLevel = 'off' | 'blurred' | 'shown'
 export const ADULT_LEVELS: readonly AdultLevel[] = ['off', 'blurred', 'shown']
 
-/** Parses off/blurred/shown; with aliases, the 3.x spellings allow (shown) and block (off). */
+/** Parses off/blurred/shown; with aliases, also allow (shown) and block (off), which settings accept. */
 export function parseAdultLevel(value: unknown, aliases = false): AdultLevel | null {
   const v = typeof value === 'string' ? value.trim().toLowerCase() : ''
   if (v === 'off' || v === 'blurred' || v === 'shown') return v
@@ -54,33 +53,13 @@ export function groupCeiling(map: Record<string, AdultLevel>, groups: Iterable<s
 }
 
 const KEY = 'adult_level'
-/** The 3.x key, kept readable and in step so a downgrade to 3.2 keeps working. */
-const LEGACY_KEY = 'adult_games'
-
-/**
- * What a 3.2 server reads: access plus the old account picture preference. The installation's
- * level counts too, since 3.2 has no Blurred installation: a downgrade must not show more.
- */
-export function legacyMirror(ceiling: AdultLevel, choice: AdultLevel, installation: AdultLevel = 'shown'): { adultAccess: 0 | 1; adultPictures: 'show' | 'hide-pictures' | 'hide-games' } {
-  const effective = lowestLevel(ceiling, choice, installation)
-  return {
-    adultAccess: ceiling === 'off' ? 0 : 1,
-    adultPictures: effective === 'shown' ? 'show' : effective === 'blurred' ? 'hide-pictures' : 'hide-games',
-  }
-}
-
-/** The 3.2 install switch: blurred has no 3.2 equivalent and reads as allow there. */
-export function legacyInstallMirror(level: AdultLevel): 'allow' | 'block' {
-  return level === 'off' ? 'block' : 'allow'
-}
 
 /**
  * The installation's adult level and the per-request enforcement of the
  * effective level (the lowest of installation, the person's ceiling and the
  * person's choice). RENPLAY_ADULT_GAMES fixes the installation level;
- * otherwise the stored setting holds it. Libraries that answered the 3.x
- * first-run question read as shown/off through the legacy key; a fresh
- * install has no answer yet and shows everything until the admin chooses.
+ * otherwise the stored setting holds it. A fresh install has no answer yet and
+ * shows everything until the admin chooses.
  */
 export class ContentMode {
   constructor(
@@ -106,20 +85,6 @@ export class ContentMode {
   set(level: AdultLevel): void {
     if (this.locked) throw new HttpError(409, 'The server’s configuration sets this')
     this.db.setSetting(KEY, level)
-    this.db.setSetting(LEGACY_KEY, legacyInstallMirror(level))
-    this.refreshLegacyMirrors()
-  }
-
-  /** Rewrites every person's 3.2 columns from their levels and the installation's (on a change and at start). */
-  refreshLegacyMirrors(): void {
-    const rows = this.db.raw.prepare('SELECT id, adult_ceiling, adult_choice, adult_access, prefs FROM users').all() as unknown as Array<{ id: number; adult_ceiling: string; adult_choice: string; adult_access: number; prefs: string }>
-    const update = this.db.raw.prepare('UPDATE users SET adult_access = ?, prefs = ? WHERE id = ?')
-    for (const u of rows) {
-      const mirror = legacyMirror(this.ceilingOf(u), this.choiceOf(u), this.level)
-      const prefs = parseJson<Record<string, unknown>>(u.prefs, {})
-      if (u.adult_access === mirror.adultAccess && prefs['adultPictures'] === mirror.adultPictures) continue
-      update.run(mirror.adultAccess, JSON.stringify({ ...prefs, adultPictures: mirror.adultPictures }), u.id)
-    }
   }
 
   /** The person's ceiling: set by an admin, or recomputed from sign-in groups at each sign-in. */
@@ -139,7 +104,7 @@ export class ContentMode {
   }
 
   /** A game counts as adult from its recipe's flag. Games without a recipe count as adult for a
-   * person whose own layers hide adult games (like 3.x account restriction), while the
+   * person whose own layers hide adult games, while the
    * installation alone never hides them, so they can still be classified and marked safe. */
   private adult(game: Pick<GameRow, 'adult'> & Partial<Pick<GameRow, 'id' | 'recipe_id'>>): boolean {
     if (game.adult === 1) return true
@@ -192,10 +157,7 @@ export class ContentMode {
   }
 
   private stored(): AdultLevel | null {
-    const v = parseAdultLevel(this.db.getSetting<unknown>(KEY, null))
-    if (v) return v
-    // A 3.x setting: allow reads as shown, block as off, never asked stays unset.
-    return parseAdultLevel(this.db.getSetting<unknown>(LEGACY_KEY, null), true)
+    return parseAdultLevel(this.db.getSetting<unknown>(KEY, null))
   }
 }
 

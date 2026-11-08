@@ -60,7 +60,6 @@ export interface Game {
   art: ArtSet
   /** An adult game, per its recipe. */
   nsfw: boolean
-  walkthrough: string | null
   /** Walkthrough files, in order: PDFs, pictures and plain text. */
   walkthroughs: Array<{ file: string; title: string; kind: 'pdf' | 'image' | 'text'; size: number; addedAt: string; url: string }>
   status: 'installed' | 'not_installed' | 'installing'

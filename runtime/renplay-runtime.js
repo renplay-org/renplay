@@ -310,31 +310,8 @@
   }
 
   function idbAll() {
-    return idbTx('readwrite', function (s) {
-      var all = s.getAll()
-      all.onsuccess = function () {
-        all.result.forEach(function (entry) {
-          if (entry.userId != null) return
-          if (cfg.legacySaveOwner === cfg.userId) {
-            // Only the known pre-accounts owner may claim legacy entries, never overwrite a newer queue.
-            var existing = s.get(localKey(entry.path))
-            existing.onsuccess = function () {
-              if (existing.result) {
-                post('legacy-saves', { message: 'An older browser save was kept separately for recovery because this account already has a copy.' })
-                return
-              }
-              s.delete(entry.key)
-              entry.key = localKey(entry.path)
-              entry.userId = cfg.userId
-              s.put(entry)
-            }
-          } else {
-            console.warn('[renplay] Unowned browser saves were kept for recovery; their account is not known.')
-            post('legacy-saves', { message: 'Unowned browser saves were kept on this device. Their account is not known.' })
-          }
-        })
-      }
-      return all
+    return idbTx('readonly', function (s) {
+      return s.getAll()
     }).then(function (entries) {
       return entries.filter(function (entry) { return entry.userId === cfg.userId })
     }).catch(function () {

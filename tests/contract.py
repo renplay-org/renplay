@@ -219,7 +219,7 @@ def upgrade():
             db.close();
         """)
         lib.request('/api/games/story/favorite', {'on': True}, 'PUT')
-        lib.request('/api/games/story/finished', {'on': True}, 'PUT')
+        lib.request('/api/games/story/status', {'status': 'finished'}, 'PUT')
         lib.request('/api/games/story/play-time', {'seconds': 30}, 'POST')
         lib.request('/api/games/story/rating', {'rating': 4}, 'PUT')
         path = '/api/saves/story/file?path=Story-1/1-1-LT1.save'

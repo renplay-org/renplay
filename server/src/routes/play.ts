@@ -68,7 +68,6 @@ export function createPlayRouter(
       presplash: presplash ?? `/engine/${game.engine}/web-presplash.jpg`,
       runtimeVersion,
       userId: accounts ? accounts.current().id : viewer()?.user.id ?? 1,
-      legacySaveOwner: accounts?.legacySaveOwner ?? null,
     })
     res.setHeader('Cache-Control', 'private, no-store')
     res.setHeader('Content-Security-Policy', FRAME_ANCESTORS)
@@ -281,7 +280,6 @@ export interface PageOptions {
   presplash: string
   runtimeVersion: string
   userId?: number
-  legacySaveOwner?: number | null
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -290,7 +288,6 @@ export function renderPage(template: string, o: PageOptions): string {
   const config = {
     id: o.id,
     userId: o.userId ?? 1,
-    legacySaveOwner: o.legacySaveOwner ?? null,
     build: o.build,
     saveDir: o.saveDir,
     screen: o.screen,

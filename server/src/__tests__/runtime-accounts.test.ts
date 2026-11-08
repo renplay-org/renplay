@@ -70,17 +70,17 @@ describe('runtime account isolation', () => {
     await write('third'); retries[0]!()
     await vi.waitFor(() => expect(post.mock.calls.at(-1)![1].data).toContain('third'))
   })
-  it('retains A’s offline writes through B playing and restores them only when A returns; keeps ambiguous legacy entries', async () => {
+  it('retains A’s offline writes through B playing and restores them only when A returns, and leaves entries without an account alone', async () => {
     const window: any = {}
     runInNewContext(vendor, { window, structuredClone, setTimeout, clearTimeout, console, DOMException })
     const indexedDB = new window.__renplayIDB.IDBFactory()
     window.indexedDB = indexedDB
     const post = vi.fn()
-    const mirror = (id: number, legacySaveOwner: number | null = null) => new Function('window', 'indexedDB', 'cfg', 'post', 'console', section('  var dbPromise = null', '  // ---------------------------------------------------------------- helpers') + '\nreturn { idbPut, idbAll, idbMarkSynced, idbTx };')(window, indexedDB, { id: 'game', userId: id, legacySaveOwner }, post, { warn: vi.fn() })
+    const mirror = (id: number) => new Function('window', 'indexedDB', 'cfg', 'post', 'console', section('  var dbPromise = null', '  // ---------------------------------------------------------------- helpers') + '\nreturn { idbPut, idbAll, idbMarkSynced, idbTx };')(window, indexedDB, { id: 'game', userId: id }, post, { warn: vi.fn() })
     const a = mirror(1)
     await a.idbPut('Game/persistent', new Uint8Array([1]), 10, false)
     expect(await a.idbAll()).toMatchObject([{ key: '1:Game/persistent', userId: 1, synced: 0 }])
-    await a.idbTx('readwrite', (store: any) => store.put({ key: 'legacy/path', path: 'legacy/path', synced: 0 }))
+    await a.idbTx('readwrite', (store: any) => store.put({ key: 'older/path', path: 'older/path', synced: 0 }))
     const b = mirror(2)
     expect(await b.idbAll()).toEqual([])
     await b.idbPut('Game/persistent', new Uint8Array([2]), 11, false)
@@ -88,18 +88,12 @@ describe('runtime account isolation', () => {
     await b.idbMarkSynced('Game/persistent', 11)
     expect(await b.idbAll()).toMatchObject([{ synced: 1 }])
     expect(await mirror(1).idbAll()).toMatchObject([{ key: '1:Game/persistent', data: new Uint8Array([1]), synced: 0 }])
-    const all = await a.idbTx('readonly', (store: any) => store.getAll())
-    expect(all.some((entry: any) => entry.key === 'legacy/path')).toBe(true)
-    expect(post).toHaveBeenCalledWith('legacy-saves', expect.objectContaining({ message: expect.stringContaining('kept') }))
-    // A migrated single-user installation knows the legacy owner is 1, not the first arbitrary player.
-    expect(await mirror(2, 1).idbAll()).toHaveLength(1)
-    expect(await mirror(1, 1).idbAll()).toMatchObject([{ userId: 1 }, { key: '1:legacy/path', userId: 1, synced: 0 }])
-    await a.idbTx('readwrite', (store: any) => store.put({ key: 'Game/persistent', path: 'Game/persistent', data: new Uint8Array([3]), synced: 0 }))
-    expect((await mirror(1, 1).idbAll())[0].data).toEqual(new Uint8Array([1]))
-    const conflicting = await a.idbTx('readonly', (store: any) => store.get('Game/persistent'))
-    expect(conflicting).toMatchObject({ data: new Uint8Array([3]), synced: 0 })
-    expect(post).toHaveBeenCalledWith('legacy-saves', expect.objectContaining({ message: expect.stringContaining('separately') }))
+    // An entry without an account belongs to nobody here: it stays on the device as it was.
+    const older = (await a.idbTx('readonly', (store: any) => store.getAll())).find((entry: any) => entry.key === 'older/path')
+    expect(older).toEqual({ key: 'older/path', path: 'older/path', synced: 0 })
+    expect(post).not.toHaveBeenCalled()
   })
+
   it('treats 401 as signed out, keeps the failed upload under that user, and stops retries rather than uploading into another account', async () => {
     const post = vi.fn(), fetch = vi.fn(async (_input: unknown, _init: any) => new Response('{}', { status: 401 })), put = vi.fn(), mark = vi.fn()
     const state = { inflight: false, queue: new Map([['Game/persistent', { data: new Uint8Array([1]), mtime: 1 }]]), base: new Map(), unanswered: new Map(), online: true, failures: 0 }

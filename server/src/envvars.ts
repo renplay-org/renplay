@@ -91,22 +91,8 @@ export const ENV_VARS: readonly EnvVar[] = [
     shown: '`$GAMES_DIR/_renplay`',
     description: 'Engines and scratch space. Keep it on the same filesystem as `GAMES_DIR`.',
   },
-  {
-    name: 'SAVES_DIR',
-    group: 'Folders',
-    kind: 'text',
-    fallback: '',
-    shown: '`$DATA_DIR/saves`',
-    description: 'Where saves are stored, laid out like desktop Ren’Py does.',
-  },
-  {
-    name: 'SAVE_HISTORY_DIR',
-    group: 'Folders',
-    kind: 'text',
-    fallback: '',
-    shown: '`$DATA_DIR/save-history`',
-    description: 'Earlier versions of saves that were overwritten or deleted.',
-  },
+
+
   {
     name: 'OVERLAYS_DIR',
     group: 'Folders',

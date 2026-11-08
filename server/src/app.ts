@@ -72,7 +72,7 @@ export interface App {
 const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
 
 export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
-  const db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir })
+  const db = Db.open(cfg.dataDir)
   for (const d of [cfg.dataDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
   for (const d of [cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
 
@@ -89,8 +89,6 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   const catalog = new Catalog(cfg, db, content)
   const art = new ArtStore(cfg, db, content)
   catalog.art = art
-  // The 3.2 columns follow the levels, so a downgrade never shows more (the variable can change between starts).
-  content.refreshLegacyMirrors()
   await catalog.init()
 
   const deps = { cfg, db, builds, engines, overlays, catalog, get saves() { return accounts.store() }, accounts, jobs, version }

@@ -198,7 +198,7 @@ Configured admin groups or filters grant admin access, and adult groups set the 
 level of their members. `RENPLAY_OIDC_ADULT_GROUPS` and `RENPLAY_LDAP_ADULT_GROUPS` take
 `group=off|blurred|shown` pairs separated by commas. OIDC matches the groups claim exactly, LDAP the
 cn of the user's memberOf groups, ignoring case. A person in several groups gets the highest of
-their levels, and a person in none gets Off. The 3.x variables still work:
+their levels, and a person in none gets Off. The single-group variables work too:
 `RENPLAY_OIDC_ADULT_GROUP=name` means that group gets Shown, and a match of
 `RENPLAY_LDAP_ADULT_FILTER` gets Shown. Both are refreshed at every sign-in through that provider,
 including revocations. **Users** shows whether admin access
@@ -333,14 +333,4 @@ try again shortly if another import is using the available slots.
 ## Backups and rollback
 
 Back up all of `/data`, including `/data/users/` and `/data/users-removed/`. Each user folder has a
-`user.json` identifying its owner. The upgrade first backs up saves, save history and `library.db`
-under `/data/backups/pre-3.0/`, then moves the old folders under `/data/users/1/`. It leaves symlinks
-at the old paths, including custom `SAVES_DIR` and `SAVE_HISTORY_DIR` paths.
-
-The migration resumes after an interruption, and copies and verifies when the folders live on
-another volume. Conflicting files from an interrupted partial copy stay in the owner's
-`migration-conflicts/` folder. The filesystem must support symlinks. Otherwise startup stops rather
-than silently leaving an incompatible old layout. Keep your own backup as well.
-
-Renplay 2.10 can still use the old owner save paths through those symlinks. It cannot see other
-accounts. Do not run both versions at once. See [Upgrading](/upgrading/) for the general rollback rule.
+`user.json` identifying its owner. See [Upgrading](/upgrading/) for upgrades and going back.

@@ -126,24 +126,6 @@ describe('catalog', () => {
     db.close()
   })
 
-  it('upgrades a 2.1 database: drops the hand-edited columns, adds the engine family', () => {
-    const root = mkdtempSync(join(tmpdir(), 'renplay-db-'))
-    let db = Db.open(root)
-    // As 2.1 left it: without the 2.6 columns, with the hand-edited ones.
-    db.raw.exec('ALTER TABLE games DROP COLUMN adult; ALTER TABLE games DROP COLUMN finished_at; ALTER TABLE games DROP COLUMN play_time; ALTER TABLE games DROP COLUMN favorite_at; ALTER TABLE games DROP COLUMN family; ALTER TABLE games DROP COLUMN engine_label; ALTER TABLE games DROP COLUMN entry')
-    db.raw.exec("ALTER TABLE games ADD COLUMN save_dir_locked INTEGER NOT NULL DEFAULT 0; ALTER TABLE games ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'; ALTER TABLE games ADD COLUMN cover TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 1")
-    db.insertGame({ id: 'kept', title: 'Kept', status: 'installed' })
-    db.close()
-    db = Db.open(root)
-    const cols = (db.raw.prepare('PRAGMA table_info(games)').all() as Array<{ name: string }>).map((c) => c.name)
-    expect(cols).not.toContain('tags')
-    expect(cols).not.toContain('cover')
-    expect(cols).not.toContain('save_dir_locked')
-    expect(db.getGame('kept')).toMatchObject({ title: 'Kept', family: 'renpy', engine_label: '', entry: '' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
-    db.close()
-  })
-
   it('reads Your recipes: one takes the catalog recipe’s place, files are hashed, problems are named', async () => {
     const { cfg, db, catalog } = setup()
     const dir = cfg.recipesDir
@@ -228,22 +210,6 @@ describe('catalog', () => {
     expect(catalog.update(recipe, 'Ch4Up7Public', 'Example-Ch4Up7Public-pc.zip')?.version).toBe('0.9.24')
     expect(installedRelease(recipe, '0.9.23', 'unknown.zip')?.version).toBe('0.9.23')
     expect(installedRelease(recipe, 'v0.20_Pre-Alpha', 'unknown.zip')).toBeNull()
-    db.close()
-  })
-
-  it('upgrades v3 in place and reopens v5 without changing favourites', () => {
-    const root = mkdtempSync(join(tmpdir(), 'renplay-db-v3-'))
-    let db = Db.open(root)
-    db.raw.exec('ALTER TABLE games DROP COLUMN adult; ALTER TABLE games DROP COLUMN finished_at; ALTER TABLE games DROP COLUMN play_time; ALTER TABLE games DROP COLUMN favorite_at; PRAGMA user_version = 3')
-    db.insertGame({ id: 'kept', title: 'Kept', source: '{"archive":"game.zip"}' })
-    db.close()
-    db = Db.open(root)
-    expect(db.getGame('kept')).toMatchObject({ title: 'Kept', favorite_at: '', source: '{"archive":"game.zip"}' })
-    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 18 })
-    db.updateGame('kept', { favorite_at: '2026-11-04T12:00:00.000Z' })
-    db.close()
-    db = Db.open(root)
-    expect(db.getGame('kept')?.favorite_at).toBe('2026-11-04T12:00:00.000Z')
     db.close()
   })
 
