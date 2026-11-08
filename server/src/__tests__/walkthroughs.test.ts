@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp, type App } from '../app.js'
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
-import { walkthroughKind } from '../routes/games.js'
+import { walkthroughKind } from '../games/routes.js'
 
 describe('walkthrough files', () => {
   let root = ''

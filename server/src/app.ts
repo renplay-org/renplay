@@ -1,15 +1,12 @@
-import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { readFile, readdir } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
-import { type Accounts } from './accounts/accounts.js'
+import type { Accounts } from './accounts/accounts.js'
 import { playerRoute } from './accounts/access.js'
 import { viewer } from './accounts/context.js'
 import type { SaveBackups } from './saves/backups.js'
-import type { Builds } from './builds.js'
+import type { Builds } from './games/builds.js'
 import type { Catalog } from './catalog/catalog.js'
 import type { Config } from './config.js'
 import type { Db } from './db.js'
@@ -19,31 +16,21 @@ import { createArtRouter } from './art/routes.js'
 import { createCatalogRouter } from './catalog/routes.js'
 import { createDefaultsRouter } from './defaults/routes.js'
 import { createJobsRouter } from './jobs/routes.js'
-import { createFilesRouter } from './routes/files.js'
-import { createGamesRouter } from './routes/games.js'
+import { createFilesRouter } from './games/files.js'
+import { createGamesRouter } from './games/routes.js'
 import { createPeopleRouter } from './people/routes.js'
 import { createProgressRouter } from './progress/routes.js'
 import { createContentRouter } from './content/routes.js'
-import { createLibraryRouter } from './routes/library.js'
-import { createPlayRouter } from './routes/play.js'
+import { createLibraryRouter } from './library/routes.js'
+import { PRESPLASH, createPlayRouter } from './play/routes.js'
 import { createSavesRouter } from './saves/routes.js'
-import { createMetricsRouter } from './routes/metrics.js'
-import { createSystemRouter } from './routes/system.js'
+import { createMetricsRouter } from './system/metrics.js'
+import { createSystemRouter } from './system/routes.js'
 import type { SaveStore } from './saves/store.js'
-import { createServices, packageVersion, type Services } from './services.js'
+import { createServices, type Services } from './services.js'
 import { HttpError } from './util/paths.js'
 import type { Purger } from './util/purge.js'
 import { log } from './util/log.js'
-
-export { packageVersion }
-
-/** Version string for the injected runtime script, so browsers refetch it after upgrades. */
-function runtimeVersion(path: string | undefined): string {
-  try {
-    if (path) return createHash('sha1').update(readFileSync(path)).digest('hex').slice(0, 10)
-  } catch {}
-  return packageVersion()
-}
 
 export interface App {
   app: express.Express
@@ -60,9 +47,6 @@ export interface App {
   summary(): string[]
   close(): void
 }
-
-/** A build's presplash, at its top level: /g/<game>/<build>/web-presplash.jpg. */
-const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
 
 export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
   const services = await createServices(cfg)
@@ -122,33 +106,8 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     res.sendStatus(204)
   })
   app.use((req, _res, next) => { try { checkStatic(req.path); next() } catch (e) { next(e) } })
+  app.use(createPlayRouter(services, opts.runtimePath))
 
-  // The HTML games' runtime lives next to Ren'Py's (runtime/ in the repository and the image).
-  const htmlRuntimePath = resolve(dirname(opts.runtimePath ?? fileURLToPath(new URL('../../runtime/renplay-runtime.js', import.meta.url))), 'renplay-html.js')
-  let htmlRuntime: Promise<string> | null = null
-  // An in-memory IndexedDB goes first; the runtime installs it in place of the browser's.
-  const readHtmlRuntime = () =>
-    (htmlRuntime ??= Promise.all([readFile(join(dirname(htmlRuntimePath), 'vendor', 'fake-indexeddb.js'), 'utf-8'), readFile(htmlRuntimePath, 'utf-8')])
-      .then((parts) => parts.join('\n;\n').replace(/<\/script/gi, '<\\/script'))
-      .catch((e) => ((htmlRuntime = null), Promise.reject(e))))
-  app.use(createPlayRouter(services, { html: readHtmlRuntime, version: runtimeVersion(opts.runtimePath) }))
-  // Static fallbacks for development; nginx serves these paths in production.
-  // resolve(): sendFile refuses paths with "..", like the $PWD/../runtime one in AGENTS.md.
-  if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(resolve(opts.runtimePath!)))
-  app.use('/engine', express.static(cfg.enginesDir, { immutable: true, maxAge: '365d', setHeaders: gzipHeaders }))
-  // game.zip, caches and presplash of a build (mod builds fall back to their base).
-  app.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m([a-z0-9]+))?\/(.+)$/, (req, res, next) => {
-    const [game, base, mod, asset] = [req.params[0], req.params[1], req.params[2], req.params[3]] as string[]
-    if (asset.includes('..')) return next()
-    if (content.hides(db.getGame(game))) return next(new HttpError(404, 'Game not found'))
-    if (PRESPLASH.test(`/${asset}`) && content.blurs(db.getGame(game))) return next(new HttpError(404, 'Not found'))
-    const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
-    const tryNext = (i: number): void => {
-      if (i >= candidates.length) return next()
-      res.sendFile(candidates[i]!, { cacheControl: false }, (err) => (err ? tryNext(i + 1) : undefined))
-    }
-    tryNext(0)
-  })
   if (opts.startJobs !== false) backups.start()
   app.use('/api', createSystemRouter(services))
   app.use('/api', createDefaultsRouter(services))
@@ -156,17 +115,12 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use('/api', createMetricsRouter(services))
   app.use('/api', createContentRouter(services))
   app.use('/api', createSavesRouter(services))
-  app.use('/api/games', createFilesRouter(services))
-  app.use('/api/games', createGamesRouter(services))
+  app.use('/api', createFilesRouter(services))
+  app.use('/api', createGamesRouter(services))
   app.use('/api', createProgressRouter(services))
   app.use('/api', createLibraryRouter(services))
   app.use('/api', createCatalogRouter(services))
   app.use('/api', createArtRouter(services))
-  // Text walkthroughs are served as plain text, never sniffed as anything else.
-  app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false, setHeaders: (res, path) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff')
-    if (path.endsWith('.txt')) res.setHeader('Content-Type', 'text/plain; charset=utf-8')
-  } }))
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found')))
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
@@ -213,9 +167,4 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   }
 
   return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(1), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
-}
-
-/** Development server: serve *.gz engine files with their encoding, like nginx does. */
-function gzipHeaders(res: express.Response, path: string) {
-  if (path.endsWith('.wasm.gz')) res.setHeader('Content-Type', 'application/gzip')
 }

@@ -1,10 +1,10 @@
 import { SYNC_SETTING, syncCodesOn } from '../saves/sync.js'
-import { keepDownloads } from '../downloads.js'
+import { KEEP_DOWNLOADS, keepDownloads } from '../library/archives.js'
 import { readdir, stat, statfs } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
 import { parseJson } from '../db.js'
-import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
+import { cleanRelPath, safeJoin } from '../util/paths.js'
 import { dirSize } from '../util/fsx.js'
 import type { Services } from '../services.js'
 
@@ -122,7 +122,7 @@ export function createSystemRouter(s: Services): Router {
       sync: { on: syncCodesOn(db), server: cfg.syncServer, chosen: db.getSetting<unknown>(SYNC_SETTING, null) !== null },
       // Where each value comes from: a variable on the server, or the default. No values of secrets.
       setBy: Object.fromEntries(PROVENANCE.map((name) => [name, process.env[name]?.trim() ? 'server' : 'default'])),
-      keepDownloadsChosen: db.getSetting<unknown>('keep_downloads', null) !== null,
+      keepDownloadsChosen: db.getSetting<unknown>(KEEP_DOWNLOADS, null) !== null,
       engines: {
         installed: installed.map((e) => ({ ...e, usedBy: used.get(e.version) ?? [] })),
         available: available.map((e) => ({ version: e.version, renpy: e.renpy, bytes: Object.values(e.files).reduce((n, f) => n + f.size, 0) })),
@@ -142,13 +142,6 @@ export function createSystemRouter(s: Services): Router {
       keepDownloadsLocked: cfg.keepDownloadsLocked,
       busy: jobs.isBusy(),
     })
-  })
-
-  router.put('/system/downloads', (req, res) => {
-    if (cfg.keepDownloadsLocked) throw new HttpError(409, 'Download retention is set by the server configuration')
-    if (typeof req.body?.keepDownloads !== 'boolean') throw new HttpError(400, 'Keep downloads must be a boolean')
-    db.setSetting('keep_downloads', req.body.keepDownloads)
-    res.json({ ok: true })
   })
 
   /** Removes engines no installed game uses. */

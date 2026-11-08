@@ -1,7 +1,7 @@
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import type { GameRow } from '../db.js'
-import { Overlays } from '../mods.js'
+import { Overlays } from './mods.js'
 import { baseFiles, readBaseFile } from '../pipeline/applymods.js'
 import { isZip, readZipEntries } from '../saves/savefile.js'
 import { HttpError, cleanRelPath } from '../util/paths.js'
@@ -36,7 +36,7 @@ export function createFilesRouter(s: Services): Router {
     return files
   }
 
-  router.get('/:id/files', async (req, res) => {
+  router.get('/games/:id/files', async (req, res) => {
     const g = game(req)
     const dir = cleanRelPath(req.query['dir'] ?? 'game', { allowEmpty: true }) || 'game'
     const prefix = dir + '/'
@@ -73,7 +73,7 @@ export function createFilesRouter(s: Services): Router {
     })
   })
 
-  router.get('/:id/files/raw', async (req, res) => {
+  router.get('/games/:id/files/raw', async (req, res) => {
     const g = game(req)
     const path = Overlays.editablePath(req.query['path'])
     // Blurred: the game plays, but its pictures and videos are not sent on their own.
@@ -85,7 +85,7 @@ export function createFilesRouter(s: Services): Router {
     res.type(TEXT_EXT.test(path) ? 'text/plain; charset=utf-8' : 'application/octet-stream').send(data)
   })
 
-  router.put('/:id/files/raw', express.raw({ type: () => true, limit: '256mb' }), async (req, res) => {
+  router.put('/games/:id/files/raw', express.raw({ type: () => true, limit: '256mb' }), async (req, res) => {
     const g = game(req)
     const path = Overlays.editablePath(req.query['path'])
     if (!Buffer.isBuffer(req.body)) throw new HttpError(400, 'Expected file content')
@@ -93,7 +93,7 @@ export function createFilesRouter(s: Services): Router {
     res.json({ ok: true })
   })
 
-  router.delete('/:id/files/raw', async (req, res) => {
+  router.delete('/games/:id/files/raw', async (req, res) => {
     const g = game(req)
     const path = Overlays.editablePath(req.query['path'])
     const files = await base(g)
@@ -101,7 +101,7 @@ export function createFilesRouter(s: Services): Router {
     res.json({ ok: true })
   })
 
-  router.post('/:id/files/revert', async (req, res) => {
+  router.post('/games/:id/files/revert', async (req, res) => {
     const g = game(req)
     await overlays.revert(g.id, Overlays.editablePath(req.body?.path))
     res.json({ ok: true })
@@ -111,7 +111,7 @@ export function createFilesRouter(s: Services): Router {
    * Adds files to the overlay. Plain files go into `dir`; zip files are
    * unpacked there (a top-level "game/" folder in the zip is honoured).
    */
-  router.post('/:id/files/upload', async (req, res) => {
+  router.post('/games/:id/files/upload', async (req, res) => {
     // The game is checked before the upload is read, with the person's level. multer then runs
     // inside the handler: as route middleware it would lose the request's context (who is asking).
     const g = game(req)
@@ -159,14 +159,14 @@ export function createFilesRouter(s: Services): Router {
     res.json({ ok: true, written })
   })
 
-  router.post('/:id/files/apply', (req, res) => {
+  router.post('/games/:id/files/apply', (req, res) => {
     const g = game(req)
     if (jobs.activeFor(g.id)) throw new HttpError(409, 'A job is already running for this game')
     res.json({ jobId: jobs.enqueue('apply-mods', g.id, { game: g.id }) })
   })
 
   /** Drops all mods (moved aside, not deleted) and restores the original files. */
-  router.post('/:id/files/reset', async (req, res) => {
+  router.post('/games/:id/files/reset', async (req, res) => {
     const g = game(req)
     if (jobs.activeFor(g.id)) throw new HttpError(409, 'A job is already running for this game')
     await overlays.archive(g.id)

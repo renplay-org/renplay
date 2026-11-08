@@ -4,10 +4,10 @@ import { join } from 'node:path'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import yazl from 'yazl'
-import { archiveIdentity } from '../archive-origin.js'
+import { archiveIdentity } from '../library/archives.js'
 import { createApp, type App } from '../app.js'
 import { loadConfig } from '../config.js'
-import { renderPage } from '../routes/play.js'
+import { renderPage } from '../play/routes.js'
 import { cleanRelPath, safeJoin } from '../util/paths.js'
 
 function zipBuffer(entries: Record<string, Buffer | string>): Promise<Buffer> {

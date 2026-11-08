@@ -1,12 +1,18 @@
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { readFile, readdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
-import { Router } from 'express'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import express, { Router } from 'express'
 import { viewer } from '../accounts/context.js'
-import { BUILD_RE, baseOf } from '../builds.js'
+import { BUILD_RE, baseOf } from '../games/builds.js'
 import type { GameRow } from '../db.js'
 import { PackReader } from '../pipeline/pack.js'
 import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
 import type { Services } from '../services.js'
+
+/** A build's presplash, at its top level: /g/<game>/<build>/web-presplash.jpg. */
+export const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
 
 /** Where a web game's localStorage and IndexedDB are kept, in its save folder. */
 // Game pages play only inside Renplay's own player: another site cannot frame them to trick people
@@ -27,14 +33,21 @@ export function playPath(g: GameRow): string {
 }
 
 /**
- * Serves a game page: the engine's page template with renplay's runtime wired
- * in. Everything else under /g/ is static and served by nginx.
+ * Game pages: the engine's page template with Renplay's runtime wired in, the HTML games' runtime,
+ * and the files of a build and the engines. nginx serves the static files in production.
  */
-/** Game pages and their files, with the HTML games' runtime and the version of Ren'Py's, for its address. */
-export function createPlayRouter(s: Services, runtime: { html: () => Promise<string>; version: string }): Router {
-  const { db, builds, engines, content, accounts } = s
-  const runtimeVersion = runtime.version
+export function createPlayRouter(s: Services, runtimePath: string | undefined): Router {
+  const { cfg, db, builds, engines, content, accounts } = s
+  const runtimeVersion = versionOf(runtimePath, s.version)
   const router = Router({ caseSensitive: true, strict: true })
+  // The HTML games' runtime lives next to Ren'Py's (runtime/ in the repository and the image).
+  const htmlRuntimePath = resolve(dirname(runtimePath ?? fileURLToPath(new URL('../../../runtime/renplay-runtime.js', import.meta.url))), 'renplay-html.js')
+  let htmlRuntime: Promise<string> | null = null
+  // An in-memory IndexedDB goes first; the runtime installs it in place of the browser's.
+  const readHtmlRuntime = () =>
+    (htmlRuntime ??= Promise.all([readFile(join(dirname(htmlRuntimePath), 'vendor', 'fake-indexeddb.js'), 'utf-8'), readFile(htmlRuntimePath, 'utf-8')])
+      .then((parts) => parts.join('\n;\n').replace(/<\/script/gi, '<\\/script'))
+      .catch((e) => ((htmlRuntime = null), Promise.reject(e))))
 
   router.get(['/g/:id/:build/', '/g/:id/:build/index.html'], async (req, res) => {
     const id = assertSlug(req.params.id)
@@ -186,13 +199,30 @@ export function createPlayRouter(s: Services, runtime: { html: () => Promise<str
     const storage = (await stored(HTML_STORAGE)) ?? {}
     const idb = await stored(HTML_IDB)
     const cfg = JSON.stringify({ id: game.id, build: game.build, userId: viewer()?.user.id ?? 1, storage, idb }).replace(/</g, '\\u003c')
-    const inject = `<script>window.__renplay=${cfg};</script><script>${await runtime.html()}</script>`
+    const inject = `<script>window.__renplay=${cfg};</script><script>${await readHtmlRuntime()}</script>`
     const head = page.match(/<head\b[^>]*>/i)
     if (head) return page.slice(0, head.index! + head[0].length) + inject + page.slice(head.index! + head[0].length)
     const doctype = page.match(/^\s*<!doctype[^>]*>/i)
     return doctype ? doctype[0] + inject + page.slice(doctype[0].length) : inject + page
   }
 
+  // Static fallbacks for development; nginx serves these paths in production.
+  // resolve(): sendFile refuses paths with "..", like the $PWD/../runtime one in AGENTS.md.
+  if (runtimePath) router.get('/renplay/runtime.js', (_req, res) => res.sendFile(resolve(runtimePath!)))
+  router.use('/engine', express.static(cfg.enginesDir, { immutable: true, maxAge: '365d', setHeaders: gzipHeaders }))
+  // game.zip, caches and presplash of a build (mod builds fall back to their base).
+  router.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m([a-z0-9]+))?\/(.+)$/, (req, res, next) => {
+    const [game, base, mod, asset] = [req.params[0], req.params[1], req.params[2], req.params[3]] as string[]
+    if (asset.includes('..')) return next()
+    if (content.hides(db.getGame(game))) return next(new HttpError(404, 'Game not found'))
+    if (PRESPLASH.test(`/${asset}`) && content.blurs(db.getGame(game))) return next(new HttpError(404, 'Not found'))
+    const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
+    const tryNext = (i: number): void => {
+      if (i >= candidates.length) return next()
+      res.sendFile(candidates[i]!, { cacheControl: false }, (err) => (err ? tryNext(i + 1) : undefined))
+    }
+    tryNext(0)
+  })
   return router
 }
 
@@ -309,4 +339,17 @@ export function renderPage(template: string, o: PageOptions): string {
   // outline the whole game for it.
   out = out.replace(/<\/head>/i, '<style>#ContextContainer{display:none!important}#canvas,#canvas:focus,#canvas:focus-visible{outline:none!important}</style></head>')
   return out
+}
+
+/** Version string for the injected runtime script, so browsers refetch it after upgrades. */
+function versionOf(path: string | undefined, fallback: string): string {
+  try {
+    if (path) return createHash('sha1').update(readFileSync(path)).digest('hex').slice(0, 10)
+  } catch {}
+  return fallback
+}
+
+/** Development server: serve *.gz engine files with their encoding, like nginx does. */
+function gzipHeaders(res: express.Response, path: string) {
+  if (path.endsWith('.wasm.gz')) res.setHeader('Content-Type', 'application/gzip')
 }
