@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-bookworm-slim AS build
+FROM node:25-bookworm-slim AS build
 WORKDIR /src
 
 COPY selector/package.json selector/package-lock.json selector/
@@ -12,7 +12,7 @@ RUN cd selector && npm run build
 COPY server/ server/
 RUN cd server && npm run build && npm prune --omit=dev
 
-FROM node:24-bookworm-slim
+FROM node:25-bookworm-slim
 # nginx serves the games volume; libarchive-tools (bsdtar) unpacks 7z/rar
 # archives. Ren'Py engines come prebuilt from renplay-org/engines.
 # jemalloc avoids glibc retaining fragmented sharp/libvips image allocations.
