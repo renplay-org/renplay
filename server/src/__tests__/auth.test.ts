@@ -304,8 +304,9 @@ describe('accounts authentication and security', () => {
     const plain = await start()
     expect((await request(plain.app).get('/api/auth/providers').expect(200)).body.demo).toBe(false)
     await request(plain.app).post('/api/auth/demo').set(site).expect(404)
+    process.env['RENPLAY_DEMO'] = 'on'
     const cfg = config()
-    cfg.demo = true
+    delete process.env['RENPLAY_DEMO']
     cfg.auth = 'off'
     const a = await start(cfg)
     game(a)
