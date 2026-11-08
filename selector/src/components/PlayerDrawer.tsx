@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import { Frame } from '../lantern/art'
 import { Pill, Seg } from '../lantern/controls'
 import type { Game } from '@shared/api'
+import { isAppleTouch } from '../lib/platform'
 
 export type DrawerTab = 'saves' | 'guide' | 'options'
 type Walkthrough = Game['walkthroughs'][number]
@@ -204,7 +205,7 @@ function Reader({ w }: { w: Walkthrough }) {
       </div>
     )
   // iPhone and iPad Safari draw only a PDF's first page in a frame: there it opens in its own tab.
-  if (w.kind === 'pdf' && /iPhone|iPad|iPod/.test(navigator.userAgent + (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent) ? ' iPad' : '')))
+  if (w.kind === 'pdf' && isAppleTouch())
     return (
       <div className="gw-img stack" style={{ gap: 12, alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
         <p className="small muted">This browser shows only the first page of a PDF here.</p>

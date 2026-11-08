@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import { readZip } from '../lib/zipread'
 import { Button, Progress, Spinner, errorText, useToast } from '../components/ui'
 import type { SaveImportIndex } from '@shared/api'
+import { computerSystem, type ComputerSystem } from '../lib/platform'
 
 /** A file found in the chosen folder or zip, by its path from the Ren'Py folder. */
 interface Found {
@@ -16,19 +17,11 @@ interface Found {
   read: () => Promise<Blob>
 }
 
-type Computer = 'mac' | 'windows' | 'linux'
 
-const FOLDERS: Record<Computer, { name: string; path: string; how: string }> = {
+const FOLDERS: Record<ComputerSystem, { name: string; path: string; how: string }> = {
   mac: { name: 'a Mac', path: '~/Library/RenPy', how: 'In the folder window press Shift, Command and G, paste the path, then choose the folder.' },
   windows: { name: 'Windows', path: '%APPDATA%\\RenPy', how: 'Paste the path into the folder window’s address bar, then choose the folder.' },
   linux: { name: 'Linux', path: '~/.renpy', how: 'In the folder window press Control and L, paste the path, then choose the folder.' },
-}
-
-function computer(): Computer | null {
-  const ua = navigator.userAgent.toLowerCase()
-  if (/iphone|ipad|android/.test(ua) || (ua.includes('mac') && navigator.maxTouchPoints > 1)) return null
-  const p = (((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || ua) as string).toLowerCase()
-  return p.includes('mac') ? 'mac' : p.includes('win') ? 'windows' : p.includes('linux') ? 'linux' : null
 }
 
 /** Where a file goes: `<save folder>/<file>` for saves and persistent data, the save keys, or nothing. */
@@ -106,7 +99,7 @@ export default function ImportSaves() {
   useRoom({ game: null, quiet: true })
   const qc = useQueryClient()
   const toast = useToast()
-  const system = computer()
+  const system = computerSystem()
   const folder = system ? FOLDERS[system] : null
   const index = useQuery({ queryKey: ['saves-import'], queryFn: () => api<SaveImportIndex>('/api/saves-import') })
   const dirInput = useRef<HTMLInputElement>(null)
@@ -248,7 +241,7 @@ export default function ImportSaves() {
                   </div>
                   <p className="small muted">{folder.how}</p>
                   <p className="xs muted">
-                    {(Object.keys(FOLDERS) as Computer[])
+                    {(Object.keys(FOLDERS) as ComputerSystem[])
                       .filter((k) => k !== system)
                       .map((k) => `On ${FOLDERS[k].name.replace(/^a /, '')} the folder is ${FOLDERS[k].path}.`)
                       .join(' ')}

@@ -9,14 +9,13 @@ import type { CatalogGame } from '@shared/api'
 import RecipeCard from './RecipeCard'
 import { Frame } from '../lantern/art'
 import { Modal, cx } from './ui'
-
-export const applePlatform = () => /Mac|iPhone|iPad|iPod/.test(navigator.platform) || /iPhone|iPad/.test(navigator.userAgent)
+import { isApple } from '../lib/platform'
 
 export default function SearchPalette() {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'k' && (applePlatform() ? e.metaKey : e.ctrlKey)) {
+      if (e.key.toLowerCase() === 'k' && (isApple() ? e.metaKey : e.ctrlKey)) {
         e.preventDefault()
         setOpen((o) => !o)
       }
@@ -29,7 +28,7 @@ export default function SearchPalette() {
       <button aria-label="Search" onClick={() => setOpen(true)} className="search">
         <Search />
         <span className="lbl">Search</span>
-        <kbd>{applePlatform() ? '⌘K' : 'Ctrl K'}</kbd>
+        <kbd>{isApple() ? '⌘K' : 'Ctrl K'}</kbd>
       </button>
       <button aria-label="Search" onClick={() => setOpen(true)} className="ib hide-desk">
         <Search />
