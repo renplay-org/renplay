@@ -17,7 +17,7 @@ user-visible change.
 |---|---|
 | `renplay` (this one) | The app (server, library UI, in-game runtime, container image), its chart, the docs, the website (renplay.org) and the demo |
 | `catalog` | Curated recipes and art, published as `https://catalog.renplay.org/index.v4.json` (schema 4) |
-| `engines` | Official Ren'Py web engines repackaged per version, index at `https://engines.renplay.org/index.json` |
+| `engines` | Official Ren'Py web engines repackaged per version: kept as GitHub releases, served with their index from `https://engines.renplay.org` |
 | `website` | Archived: the website moved into this repository's `website/`, with its history |
 | `.github` | Organization profile and the default `FUNDING.yml` (Ko-fi) |
 
@@ -165,6 +165,10 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   sources out of `game.zip` when the `.rpyc` is there (`setSourcesAside`). Ren'Py's own Python 2
   fixer (`renpy.compat.fixes`) uses `tokenize`, which Python 3.12 makes fail on the very code it
   should fix; `webcompat.ts` retries from the error's position instead.
+- **GitHub release downloads can fail for hours.** On 2026-11-08 they answered 504 all morning: no
+  new install could fetch its engine, and CI steps that downloaded tools from releases failed. Engines
+  are served from engines.renplay.org now (the engines repository checks every file there before
+  its index names it), and CI downloads nothing from GitHub releases.
 - **iPhone Safari cannot make a page fullscreen.** Only a home-screen web app fills the screen;
   the player explains that instead of showing a broken button.
 
