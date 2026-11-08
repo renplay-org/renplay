@@ -1,8 +1,7 @@
 name: Demo
 
 # The public demo at demo.renplay.org (demo/): built with each release (release.yml) or by hand,
-# tried, pushed as ghcr.io/renplay-org/renplay:demo, and Render told to start it. The demo runs on
-# Render's free plan, never on the maintainers' own servers.
+# tried, pushed as ghcr.io/renplay-org/renplay:demo, and Render told to start it.
 
 on:
   workflow_call:

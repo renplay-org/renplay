@@ -2,8 +2,7 @@ name: Uptime
 
 # Renplay's public sites every 15 minutes, the demo hourly (more often would keep Render's free plan
 # awake). A site that is down gets one open issue with the label "uptime", closed when it is fine
-# again (scripts/uptime.mjs). Nothing public about Renplay runs on a maintainer's own servers, and
-# neither does this check.
+# again (scripts/uptime.mjs).
 
 on:
   schedule:
