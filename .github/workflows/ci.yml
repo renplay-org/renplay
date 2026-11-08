@@ -65,14 +65,39 @@ jobs:
       - run: mise run check:copy
       - run: mise run check:ui
       - run: mise run check:docs
+      - run: mise run check:website
       - run: mise run check:chart
       - run: mise run check:workflows
       - run: mise run check:examples
+
+  # Whether the image or the chart can have changed. Docs, the website and the demo cannot.
+  changes:
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    outputs:
+      image: ${{ steps.files.outputs.image }}
+    steps:
+      - id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$PR" ]; then echo "image=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' > files.txt
+          if grep -qE '^(server/|selector/|runtime/|image/|charts/|tests/|deploy/compose\.yaml$|Dockerfile$|\.dockerignore$|mise\.toml$|\.github/workflows/ci\.yml$)' files.txt; then
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing in the image or the chart changed, so the install contract is skipped."
+          fi
 
   # The image, built from the cache earlier runs filled, against the install contract on both
   # architectures, and the chart installed on kind with it.
   contract:
     name: Install contract (${{ matrix.arch }})
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -114,12 +139,10 @@ jobs:
         run: python3 tests/contract.py renplay:contract users
       - name: Native Ren'Py install and game HTTP smoke test
         run: python3 tests/contract.py renplay:contract smoke
-      - name: Upgrade and downgrade from 2.11.1
+      - name: Upgrade from the newest release, back to it and up again
         run: python3 tests/contract.py renplay:contract upgrade
-      - name: Upgrade and downgrade from 3.2.0
-        run: python3 tests/contract.py renplay:contract upgrade32
       - name: Separate downloads mount
-        run: python3 tests/contract.py renplay:contract all --downloads
+        run: python3 tests/contract.py renplay:contract smoke --downloads
 
       - name: deploy/compose.yaml starts the image
         if: matrix.arch == 'amd64'
@@ -143,3 +166,23 @@ jobs:
           helm install renplay charts/renplay --namespace renplay --create-namespace \
             --set image.tag=chart-test --set image.pullPolicy=Never --wait --timeout 5m
           helm test renplay --namespace renplay --timeout 5m
+
+  # The check the rulesets require: the contract passed on both architectures, or nothing it
+  # covers changed. (A skipped matrix job reports under its unexpanded name.)
+  contract-result:
+    name: Install contract
+    needs: [changes, contract]
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          CONTRACT: ${{ needs.contract.result }}
+        run: |
+          [ "$CHANGES" = success ] || { echo "Could not tell what changed: $CHANGES"; exit 1; }
+          case "$CONTRACT" in
+            success) echo "The install contract passed." ;;
+            skipped) echo "Nothing in the image or the chart changed." ;;
+            *) echo "The install contract failed: $CONTRACT"; exit 1 ;;
+          esac

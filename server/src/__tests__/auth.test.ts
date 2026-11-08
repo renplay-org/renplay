@@ -604,7 +604,7 @@ describe('adult access and signed game URLs', () => {
     for (const name of names) {
       const response = await request(a.app).get(url.replace('index.html', encodeURIComponent(name)))
       expect(response.status, name).toBe(200)
-      expect(response.headers['content-security-policy'], name).toBe('sandbox allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms')
+      expect(response.headers['content-security-policy'], name).toBe("sandbox allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms; frame-ancestors 'self'")
       expect(response.headers['x-content-type-options'], name).toBe('nosniff')
       if (['image #1.png', '100%.png', 'what?.png'].includes(name)) expect(response.body.toString(), name).toBe(page)
     }

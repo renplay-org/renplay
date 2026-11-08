@@ -1,8 +1,7 @@
 name: Demo
 
 # The public demo at demo.renplay.org (demo/): built with each release (release.yml) or by hand,
-# tried, pushed as ghcr.io/renplay-org/renplay:demo, and Render told to start it. The demo runs on
-# Render's free plan, never on the maintainers' own servers.
+# tried, pushed as ghcr.io/renplay-org/renplay:demo, and started from it (DEMO_DEPLOY_HOOK).
 
 on:
   workflow_call:
@@ -11,7 +10,7 @@ on:
         type: string
         required: true
     secrets:
-      RENDER_DEPLOY_HOOK:
+      DEMO_DEPLOY_HOOK:
         required: false
   workflow_dispatch:
     inputs:
@@ -87,8 +86,8 @@ jobs:
 
       - name: Start the demo from the new image
         env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          HOOK: ${{ secrets.DEMO_DEPLOY_HOOK }}
         run: |
-          if [ -z "$HOOK" ]; then echo "No RENDER_DEPLOY_HOOK secret, so Render is not told"; exit 0; fi
+          if [ -z "$HOOK" ]; then echo "No DEMO_DEPLOY_HOOK secret, so the demo is not restarted"; exit 0; fi
           curl -fsS -X POST "$HOOK" > /dev/null
-          echo "Render starts the demo from the new image"
+          echo "The demo starts from the new image"

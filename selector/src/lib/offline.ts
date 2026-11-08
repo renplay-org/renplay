@@ -77,10 +77,15 @@ export function offlineSupport(): 'ok' | 'browser' | 'home-screen' {
   return 'ok'
 }
 
-/** One form of each address, the service worker's too, so a file is found however it was encoded. The device's adult level is not part of it. */
+/**
+ * One form of each address, the service worker's too, so a file is found however it was encoded. The
+ * device's adult level is not part of it. A mod build streams its base build's files, so they are
+ * kept once for both, and changing mods downloads only the game itself again.
+ */
 function keyOf(url: string): string {
   const u = new URL(url, location.origin)
   const path = u.pathname
+    .replace(/^(\/g\/[^/]+\/[a-z0-9]+)\.m[a-z0-9]+(\/game\/)/, '$1$2')
     .split('/')
     .map((part) => {
       try {
@@ -153,12 +158,45 @@ async function download(url: string, signal: AbortSignal, onBytes: (n: number) =
   return new Response(body, { status: 200, headers })
 }
 
+/** One tab at a time keeps or removes a game: another tab's tidying would delete files this one is fetching. */
+async function alone<T>(id: string, run: () => Promise<T>): Promise<T> {
+  if (!navigator.locks) return run()
+  return navigator.locks.request(KEPT + id, { ifAvailable: true }, async (lock) => {
+    if (!lock) throw new Error('Another tab or window is keeping this game right now. Try again when it is done.')
+    return run()
+  })
+}
+
+/**
+ * The library's own files, from the build's list of them (asset-manifest.json): every page opens
+ * offline, also the ones not visited yet, and files of an older build go. Run when a game is kept,
+ * and at each start while one is, so a new version of Renplay is kept too.
+ */
+export async function refreshShell(signal?: AbortSignal): Promise<void> {
+  const shell = await caches.open(SHELL)
+  const index = await fetch('/', { cache: 'no-store', signal })
+  if (index.ok) await shell.put('/index.html', index)
+  for (const url of ['/favicon.svg', '/manifest.webmanifest', '/apple-touch-icon.png']) await shell.add(url).catch(() => {})
+  const res = await fetch('/asset-manifest.json', { cache: 'no-store', signal })
+  if (!res.ok) return
+  const chunks = Object.values((await res.json()) as Record<string, { file?: string; css?: string[]; assets?: string[] }>)
+  const wanted = new Set<string>()
+  for (const c of chunks) for (const f of [c.file, ...(c.css ?? []), ...(c.assets ?? [])]) if (f?.startsWith('assets/')) wanted.add(new URL(`/${f}`, location.origin).toString())
+  if (!wanted.size) return
+  for (const url of wanted) if (!(await shell.match(url, { ignoreVary: true }))) await shell.add(url).catch(() => {})
+  for (const req of await shell.keys()) if (new URL(req.url).pathname.startsWith('/assets/') && !wanted.has(req.url)) await shell.delete(req)
+}
+
 /**
  * Keeps a game in this browser: the library's own files, the game's page, engine, build and every
  * streamed file, its pictures and the answers the player reads. Files already kept are skipped, so a
  * stopped download continues where it was. An older build's files go once the new one is complete.
  */
-export async function keep(game: Game, signal: AbortSignal, onProgress: (done: number, total: number) => void): Promise<void> {
+export function keep(game: Game, signal: AbortSignal, onProgress: (done: number, total: number) => void): Promise<void> {
+  return alone(game.id, () => keepNow(game, signal, onProgress))
+}
+
+async function keepNow(game: Game, signal: AbortSignal, onProgress: (done: number, total: number) => void): Promise<void> {
   const m = await api<OfflineManifest>(`/api/games/${encodeURIComponent(game.id)}/offline`)
   const cache = await caches.open(KEPT + game.id)
   const zips = await caches.open(GAMEZIP)
@@ -181,16 +219,7 @@ export async function keep(game: Game, signal: AbortSignal, onProgress: (done: n
   }
 
   // The library's own files, so Renplay opens with no network.
-  await import('../pages/Player')
-  const shell = await caches.open(SHELL)
-  const index = await fetch('/', { cache: 'no-store', signal })
-  if (index.ok) await shell.put('/index.html', index)
-  for (const url of ['/favicon.svg', '/manifest.webmanifest', '/apple-touch-icon.png']) await shell.add(url).catch(() => {})
-  const loaded = performance.getEntriesByType('resource').map((e) => e.name)
-  for (const el of document.querySelectorAll<HTMLScriptElement | HTMLLinkElement>('script[src], link[href]')) loaded.push('src' in el ? el.src : el.href)
-  for (const url of new Set(loaded.filter((u) => new URL(u, location.origin).pathname.startsWith('/assets/')))) {
-    if (!(await shell.match(url))) await shell.add(url).catch(() => {})
-  }
+  await refreshShell(signal)
   // The answers the library and the player read.
   const answers = await caches.open(API)
   for (const url of ['/api/me', '/api/auth/providers', '/api/defaults', '/api/content', '/api/games', `/api/games/${encodeURIComponent(game.id)}`]) {
@@ -232,7 +261,11 @@ export async function keep(game: Game, signal: AbortSignal, onProgress: (done: n
 }
 
 /** Removes a kept game from this browser. Saves are not touched: they live in the game's own storage. */
-export async function removeKept(id: string): Promise<void> {
+export function removeKept(id: string): Promise<void> {
+  return alone(id, () => removeNow(id))
+}
+
+async function removeNow(id: string): Promise<void> {
   await caches.delete(KEPT + id)
   const zips = await caches.open(GAMEZIP)
   for (const req of await zips.keys()) if (req.url.includes(`/g/${id}/`)) await zips.delete(req)

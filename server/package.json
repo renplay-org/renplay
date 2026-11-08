@@ -1,7 +1,7 @@
 {
   "name": "renplay-server",
   "private": true,
-  "version": "4.4.0",
+  "version": "4.5.0",
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -11,12 +11,13 @@
     "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
-    "express": "^5.1.0",
+    "express": "^5.3.0",
     "jose": "^6.2.15",
     "ldapts": "^9.2.0",
     "multer": "^2.0.0",
     "sharp": "^0.35.5",
     "thumbhash": "^0.1.1",
+    "undici": "^7.30.2",
     "yaml": "^2.9.1",
     "yauzl": "^3.4.0",
     "yazl": "^3.3.1"
@@ -28,7 +29,7 @@
     "@types/supertest": "^7.2.1",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
-    "playwright": "^1.60.0",
+    "playwright": "^1.64.1",
     "supertest": "^7.3.1",
     "typescript": "^5.8.3",
     "vitest": "^4.1.7"

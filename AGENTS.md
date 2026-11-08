@@ -15,10 +15,10 @@ user-visible change.
 
 | Repository | What |
 |---|---|
-| `renplay` (this one) | The app: server, library UI, in-game runtime, container image |
+| `renplay` (this one) | The app (server, library UI, in-game runtime, container image), its chart, the docs, the website (renplay.org) and the demo |
 | `catalog` | Curated recipes and art, published as `https://catalog.renplay.org/index.v4.json` (schema 4) |
-| `engines` | Official Ren'Py web engines repackaged per version, index at `https://engines.renplay.org/index.json` |
-| `website` | The website, https://renplay.org |
+| `engines` | Official Ren'Py web engines repackaged per version: kept as GitHub releases, served with their index from `https://engines.renplay.org` |
+| `website` | Archived: the website moved into this repository's `website/`, with its history |
 | `.github` | Organization profile and the default `FUNDING.yml` (Ko-fi) |
 
 ## Product rules
@@ -93,11 +93,13 @@ image/             The image's own files: nginx.conf.template and entrypoint.sh 
 charts/renplay/    The Helm chart
 deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
                      these files (a code block marked file=deploy/<path>), CI checks them (tests/examples.sh)
-demo/              The public demo's image (demo.renplay.org, on Render)
+demo/              The public demo's image (demo.renplay.org)
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
+website/           renplay.org: plain HTML and CSS (home, catalog browser), _redirects for the stable
+                     addresses (/docs, /github, /demo...), www/ the www.renplay.org redirect
 tests/             The image's install contract, the chart's tests, the deploy/ examples
-scripts/           Repo checks (writing rule, built library), release.mjs, package-chart.py
+scripts/           Repo checks (writing rule, built library, website links), release.mjs, package-chart.py
 mise.toml          Pinned tools and every task, locally and in CI
 ```
 
@@ -163,6 +165,10 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   sources out of `game.zip` when the `.rpyc` is there (`setSourcesAside`). Ren'Py's own Python 2
   fixer (`renpy.compat.fixes`) uses `tokenize`, which Python 3.12 makes fail on the very code it
   should fix; `webcompat.ts` retries from the error's position instead.
+- **GitHub release downloads can fail for hours.** On 2026-11-08 they answered 504 all morning: no
+  new install could fetch its engine, and CI steps that downloaded tools from releases failed. Engines
+  are served from engines.renplay.org now (the engines repository checks every file there before
+  its index names it), and CI downloads nothing from GitHub releases.
 - **iPhone Safari cannot make a page fullscreen.** Only a home-screen web app fills the screen;
   the player explains that instead of showing a broken button.
 
@@ -202,14 +208,17 @@ test file. Screenshots need `npx playwright install chromium webkit` once.
 - **Commits and PR titles:** Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`, `chore:`).
   The body says why, and what was tested.
 - **CI** (`.github/workflows/ci.yml`) runs on pull requests into `dev` and `main`, and the
-  rulesets require it: `check` (type checks, tests, the interface, docs, chart and workflow lint),
-  `Install contract (amd64, arm64)` (the image from a build cache, the contract, the chart on kind),
-  and `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
+  rulesets require it: `check` (type checks, tests, the interface, docs, chart, workflow and
+  deploy/ examples lint), `Install contract` (on amd64 and arm64: the image from a build cache, users
+  and a read-only root, an install, the upgrade from the newest release and back, the chart on
+  kind, deploy/compose.yaml; skipped when nothing in the image or the chart changed), and
+  `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
+  Upgrades are tested from the newest release.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
-  `sites.yml` (the docs, with each release or by hand), `demo.yml` (the demo, with each release or
-  by hand). Actions are pinned by commit SHA, Dependabot keeps them and the npm and Docker
-  dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
+  `sites.yml` (the docs and the website, with each release or by hand), `demo.yml` (the demo, with each release or
+  by hand). Actions are pinned by commit SHA, Dependabot keeps them and the
+  npm and Docker dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
 - **Releases:** see the `release` skill. A `release-X.Y.Z` branch from `dev` bumps
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated
   `## [X.Y.Z] - YYYY-MM-DD` section, and is squash-merged into `main`. CI checks versions and the

@@ -10,7 +10,7 @@
   <a href="https://renplay.org/support"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/support-Ko--fi-fb7aa8?logo=kofi&logoColor=white"></a>
 </p>
 
-<p align="center"><a href="https://renplay.org/docs">Docs</a> · <a href="https://renplay.org">Website</a> · <a href="https://renplay.org/catalog">Catalog</a> · <a href="https://renplay.org/releases">Release notes</a> · <a href="https://renplay.org/support">Support</a></p>
+<p align="center"><a href="https://renplay.org/docs">Docs</a> · <a href="https://renplay.org">Website</a> · <a href="https://renplay.org/catalog">Catalog</a> · <a href="https://renplay.org/demo">Try the demo</a> · <a href="https://renplay.org/releases">Release notes</a> · <a href="https://renplay.org/support">Support</a></p>
 
 <p align="center"><img src="docs/screenshots/desktop-library.webp" alt="The Renplay library: the game in play on the stage, Up next below, adult games blurred" width="880"></p>
 
@@ -91,7 +91,7 @@ More in the docs: [Docker Compose](https://docs.renplay.org/install/docker/),
 [playing on your phone](https://docs.renplay.org/guides/playing/),
 [configuration](https://docs.renplay.org/configuration/) (every environment variable),
 [upgrading and backups](https://docs.renplay.org/upgrading/),
-[the 3.x stability contract](https://docs.renplay.org/stability/) and
+[the 4.x stability contract](https://docs.renplay.org/stability/) and
 [troubleshooting](https://docs.renplay.org/troubleshooting/).
 
 **Back up `/data` and keep it on local disk:** it holds your saves and their history, accounts,

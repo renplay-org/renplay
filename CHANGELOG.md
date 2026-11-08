@@ -7,6 +7,21 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-11-08
+
+### Fixed
+
+- With a game kept offline, every page of the library opens without a network, also pages that were never opened before, and the offline copy of the library follows each new version of Renplay.
+- Changing the mods of a game kept offline downloads only the game itself again, not all of its pictures and sounds.
+- Seeking in a video of a game kept offline reads only the part it needs, so long videos no longer fill a phone's memory.
+- Keeping the same game offline in two tabs at once no longer deletes the other tab's files. The second tab says the game is being kept elsewhere.
+
+### Security
+
+- After signing out, an answer that was still on its way can no longer put the previous person back into the library's offline copy.
+- Pictures and recipe files a catalog points to are fetched only from the address Renplay checked. A name that answers with a public address first and a local one a moment later can no longer make the server reach into its own network.
+- Game pages play only inside Renplay's own player. Another site can no longer show them in a frame to trick people into clicking. The library itself can still be embedded, in a dashboard for example.
+
 ## [4.4.0] - 2026-11-08
 
 ### Added
@@ -582,7 +597,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.4.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.5.0...dev
+[4.5.0]: https://github.com/renplay-org/renplay/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/renplay-org/renplay/compare/v4.3.1...v4.4.0
 [4.3.1]: https://github.com/renplay-org/renplay/compare/v4.3.0...v4.3.1
 [4.3.0]: https://github.com/renplay-org/renplay/compare/v4.2.0...v4.3.0

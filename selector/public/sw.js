@@ -44,14 +44,18 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'renplay:kept-changed') kept = null
 })
 
+/** Counts sign-ins, sign-outs and switches: an answer asked for before one is never kept after it. */
+let generation = 0
+
 /**
  * From the server, cached when it answers well. With a copy at hand, a server that does not answer in
  * time or answers with an error (a gateway's 502) counts as unreachable. The download goes on, and
  * its answer still updates the copy.
  */
 function network(req, save, hasCopy) {
+  const asked = generation
   const answered = fetch(req).then((res) => {
-    if (res.ok && save) save(res.clone()).catch(() => {})
+    if (res.ok && save && asked === generation) save(res.clone()).catch(() => {})
     return res
   })
   if (!hasCopy) return answered
@@ -64,9 +68,13 @@ function network(req, save, hasCopy) {
   ])
 }
 
-/** One form of each address, so a file is found however its name was encoded. The device's adult level is not part of it. */
+/**
+ * One form of each address, so a file is found however its name was encoded. The device's adult level
+ * is not part of it. A mod build streams its base build's files, so they are kept once for both.
+ */
 function keyOf(url) {
   const path = url.pathname
+    .replace(/^(\/g\/[^/]+\/[a-z0-9]+)\.m[a-z0-9]+(\/game\/)/, '$1$2')
     .split('/')
     .map((part) => {
       try {
@@ -89,6 +97,7 @@ self.addEventListener('fetch', (event) => {
   const path = url.pathname
   // Another person, or nobody: the last answers were someone else's.
   if ((req.method !== 'GET' && /^\/api\/auth\/(login|logout|switch)$/.test(path)) || (req.mode === 'navigate' && path.startsWith('/api/auth/'))) {
+    generation++
     event.waitUntil(caches.delete(API))
     return
   }
@@ -204,22 +213,58 @@ async function fromKept(req, url, id) {
   return range ? part(hit, range) : hit
 }
 
-/** A byte range of a kept file: videos seek with ranges, and a cache keeps whole files. */
+/**
+ * A byte range of a kept file: videos seek with ranges, and a cache keeps whole files. Only the range
+ * is read through, never the whole file at once: on a phone a video would not fit in memory.
+ */
 async function part(res, range) {
   const m = /^bytes=(\d*)-(\d*)$/.exec(range.trim())
   if (!m || (m[1] === '' && m[2] === '')) return res
-  const blob = await res.blob()
-  const size = blob.size
+  let size = Number(res.headers.get('content-length'))
+  let blob = null
+  if (!size || !res.body) {
+    blob = await res.blob()
+    size = blob.size
+  }
   const start = m[1] === '' ? Math.max(0, size - Number(m[2])) : Number(m[1])
   const end = m[1] === '' || m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1)
   if (start >= size || start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } })
-  return new Response(blob.slice(start, end + 1), {
+  return new Response(blob ? blob.slice(start, end + 1) : slice(res.body, start, end + 1), {
     status: 206,
     headers: {
       'Content-Type': res.headers.get('content-type') || 'application/octet-stream',
       'Content-Range': `bytes ${start}-${end}/${size}`,
       'Content-Length': String(end - start + 1),
       'Accept-Ranges': 'bytes',
+    },
+  })
+}
+
+/** The bytes from `from` up to `to` of a stream, read as they come and the rest left unread. */
+function slice(stream, from, to) {
+  const reader = stream.getReader()
+  let at = 0
+  return new ReadableStream({
+    async pull(controller) {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) {
+          controller.close()
+          return
+        }
+        const first = at
+        at += value.byteLength
+        if (at <= from) continue
+        controller.enqueue(value.subarray(Math.max(0, from - first), Math.min(value.byteLength, to - first)))
+        if (at >= to) {
+          controller.close()
+          reader.cancel().catch(() => {})
+        }
+        return
+      }
+    },
+    cancel(reason) {
+      return reader.cancel(reason)
     },
   })
 }
