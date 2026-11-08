@@ -26,8 +26,9 @@
   function post(type, data) {
     var msg = { type: 'renplay:' + type, game: cfg.id, userId: cfg.userId }
     if (data) for (var k in data) msg[k] = data[k]
-    // The player is the only window that listens; an opaque origin cannot name it.
-    parentWin.postMessage(msg, '*')
+    // Only the player, on Renplay's own address, may read it. A sandboxed page's own origin is
+    // opaque, but its address still names Renplay's.
+    parentWin.postMessage(msg, location.origin)
   }
 
   // ------------------------------------------------------------- storage

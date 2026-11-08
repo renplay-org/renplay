@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomInt } from 'node:crypto'
 import yazl from 'yazl'
 import { HttpError } from '../util/paths.js'
 import { secretboxDecrypt, secretboxEncrypt } from './hydrogen.js'
@@ -22,13 +22,12 @@ function sha256Rounds(data: Buffer, rounds: number): Buffer {
   return hashed
 }
 
+// Each character drawn on its own and evenly: a remainder of one large random number favours some.
 export function newSyncCode(): string {
-  let n = randomBytes(8).readBigUInt64LE()
   let code = ''
   for (let i = 0; i < 10; i++) {
     if (i === 5) code += '-'
-    code += DIGITS[Number(n % 36n)]
-    n /= 36n
+    code += DIGITS[randomInt(DIGITS.length)]
   }
   return code
 }

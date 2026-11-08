@@ -16,6 +16,11 @@ release notes say what).
 - **Refresh** on the Catalog page shows only to admins, who are the only ones it works for.
 - The library no longer shows **Added this week** above **All games** when the two hold the same games.
 
+### Security
+
+- An HTML game sends its messages to the player only on Renplay's own address, so another site that embeds the game cannot read them.
+- Sync codes use each of their 36 characters equally often.
+
 ### Changed
 
 - The `edge` image is no longer built from every change. The Renplay Team builds one when a change needs trying on a server. Use a released version.
