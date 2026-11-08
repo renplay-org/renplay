@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Security
+
+- Game pages play only inside Renplay's own player. Another site can no longer show them in a frame to trick people into clicking. The library itself can still be embedded, in a dashboard for example.
+
 ## [4.4.0] - 2026-11-08
 
 ### Added
