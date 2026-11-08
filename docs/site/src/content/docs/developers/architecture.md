@@ -158,8 +158,9 @@ unreachable.
 ## Saves
 
 `server/src/saves/store.ts` has one instance per account, under `/data/users/<id>/saves/`, laid out
-like desktop Ren'Py. Every overwrite and delete snapshots the previous version in that account's
-`save-history/`. Locks are shared across store instances. Metadata keys include the store root.
+like desktop Ren'Py. `saves/stores.ts` makes them and owns where they live, and the names, notes and
+pins people give their saves. Every overwrite and delete snapshots the previous version in that
+account's `save-history/`. Locks are shared across store instances. Metadata keys include the store root.
 Renplay never deletes saves on uninstall or reinstall. See [Accounts API](/developers/accounts-api/)
 for schema 7, migration, sessions, nginx protection and the request-local permission boundary.
 

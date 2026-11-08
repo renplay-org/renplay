@@ -2,9 +2,10 @@ import { createWriteStream } from 'node:fs'
 import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import yazl from 'yazl'
-import { log, size } from './util/log.js'
-import type { Config } from './config.js'
-import type { Db } from './db.js'
+import { log, size } from '../util/log.js'
+import type { Config } from '../config.js'
+import type { Db } from '../db.js'
+import type { SaveStores } from './stores.js'
 
 const DAY = 24 * 3600_000
 /** saves-YYYY-MM-DD-HHMMSS.zip, or HHMM as the first backups were named. */
@@ -48,6 +49,7 @@ export class SaveBackups {
   constructor(
     private readonly cfg: Config,
     private readonly db: Db,
+    private readonly saveStores: SaveStores,
   ) {}
 
   get dir(): string | null {
@@ -115,7 +117,7 @@ export class SaveBackups {
       const users = this.db.raw.prepare('SELECT id, username FROM users ORDER BY id').all() as Array<{ id: number; username: string }>
       let count = 0
       for (const u of users) {
-        const root = join(this.cfg.dataDir, 'users', String(u.id), 'saves')
+        const root = join(this.saveStores.folder(u.id), 'saves')
         for (const rel of await walk(root)) {
           const st = await stat(join(root, rel)).catch(() => null)
           if (!st) continue

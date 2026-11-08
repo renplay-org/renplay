@@ -28,7 +28,7 @@ describe('save backups', () => {
     app = await createApp(cfg, { startJobs: false })
     await app.saves.write('Story-1', '1-1-LT1.save', Buffer.from('owner save'))
     await request(app.app).post('/api/users').send({ username: 'second', name: 'Second', password: 'second-password-1' }).expect(201)
-    await app.accounts.store(2).write('Other-1', 'auto-1-LT1.save', Buffer.from('second save'))
+    await app.services.saveStores.of(2).write('Other-1', 'auto-1-LT1.save', Buffer.from('second save'))
   })
   afterAll(() => {
     app?.close()

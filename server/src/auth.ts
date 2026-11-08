@@ -8,10 +8,8 @@ import type { Db, GameRow } from './db.js'
 import { parseJson } from './db.js'
 import type { ProgressStore } from './progress/store.js'
 import { viewer, viewers, type User, type Viewer } from './accounts-context.js'
-import { SaveStore, SHARED_DIRS } from './saves/store.js'
-import { readZipEntries } from './saves/savefile.js'
-import { saveImport } from './saves/import-upload.js'
-import { HttpError, cleanRelPath, isSaveDirName } from './util/paths.js'
+import type { SaveStores } from './saves/stores.js'
+import { HttpError } from './util/paths.js'
 import { SignInProviders, signInRandom, type ExternalIdentity } from './sign-in-providers.js'
 import { fetchAvatar, storeAvatar } from './avatars.js'
 import { always, log } from './util/log.js'
@@ -128,12 +126,11 @@ export class Accounts {
   private attempts = 10
   private setupGrant = ''
   private readonly signingKey = random()
-  private readonly stores = new Map<number, SaveStore>()
   private readonly removing = new Set<number>()
   private readonly limits = new Map<string, { count: number; until: number }>()
   private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
   private dummyPassword = ''
-  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly progress: ProgressStore) {
+  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly progress: ProgressStore, private readonly saveStores: SaveStores) {
     // A demo needs its guest, so sign-in is always on there.
     this.enabled = cfg.demo || (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
@@ -149,19 +146,8 @@ export class Accounts {
     if (!user) throw new HttpError(401, 'Sign in to Renplay')
     return user
   }
-  store(id = this.current().id): SaveStore {
-    this.user(id)
-    let s = this.stores.get(id)
-    if (!s) {
-      const root = join(this.cfg.dataDir, 'users', String(id))
-      s = new SaveStore(join(root, 'saves'), join(root, 'save-history'), this.cfg.saveHistoryVersions)
-      s.pinned = (saveDir, rel) => !!this.db.raw.prepare("SELECT 1 FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ? AND pinned_at != ''").get(id, saveDir, rel)
-      this.stores.set(id, s)
-    }
-    return s
-  }
   async tag(u: User): Promise<void> {
-    const root = join(this.cfg.dataDir, 'users', String(u.id))
+    const root = this.saveStores.folder(u.id)
     await mkdir(root, { recursive: true })
     await writeFile(join(root, 'user.json'), JSON.stringify({ id: u.id, name: u.name, created: u.created_at }) + '\n')
   }
@@ -358,38 +344,10 @@ export class Accounts {
     this.db.raw.prepare('DELETE FROM device_people WHERE user_id = ? AND device != ?').run(id, keepDevice)
     this.invalidate()
   }
-  /**
-   * Copies saves between accounts. `visibleOnly` is for the admin's copy action, which copies what
-   * the admin may see. Merging and claiming the owner account move every save, always.
-   */
-  private async copy(from: number, to: number, game?: string, visibleOnly = false): Promise<number> {
-    if (from === to) throw new HttpError(400, 'Choose two different users')
-    this.user(from); this.user(to)
-    const source = this.store(from), target = this.store(to)
-    let dirs: string[]
-    if (game) {
-      const g = this.db.getGame(game)
-      if (!g?.save_dir || (visibleOnly && this.content.hides(g))) throw new HttpError(404, 'Game save folder not found')
-      dirs = [g.save_dir, 'tokens']
-    } else {
-      const all = await source.listDirs()
-      dirs = [...(visibleOnly ? this.content.visibleSaveDirs(all) : all), ...SHARED_DIRS]
-    }
-    let copied = 0
-    for (const dir of dirs) for (const file of await source.list(dir)) {
-      const data = await source.read(dir, file.name)
-      if (dir === 'tokens' && file.name === 'security_keys.txt') await target.mergeSecurityKeys(data.toString('utf-8'))
-      // A copy lands as copied. What it replaces stays in History for at least 30 days.
-      else await target.write(dir, file.name, data, { reason: 'user-copy', mtimeMs: file.mtimeMs })
-      copied++
-    }
-    return copied
-  }
   /** Gives one person's progress, save names and art choices to another. */
   private mergeData(from: number, to: number): void {
     this.progress.merge(from, to)
-    // Their names, notes and pins of saves where the other person has none for the same file.
-    this.db.raw.prepare('INSERT OR IGNORE INTO save_meta (user_id, save_dir, file, title, note, pinned_at) SELECT ?, save_dir, file, title, note, pinned_at FROM save_meta WHERE user_id = ?').run(to, from)
+    this.saveStores.mergeNotes(from, to)
     // Their art choices and uploads too, where the other person has none for the same game and format.
     this.db.raw.prepare('INSERT OR IGNORE INTO art_uploads (id, game, kind, scope, width, height, focal, thumbhash, tint, created_at) SELECT id, game, kind, ?, width, height, focal, thumbhash, tint, created_at FROM art_uploads WHERE scope = ?').run(to, from)
     this.db.raw.prepare('INSERT OR IGNORE INTO art_choices (game, kind, scope, candidate) SELECT game, kind, ?, candidate FROM art_choices WHERE scope = ?').run(to, from)
@@ -726,7 +684,7 @@ export class Accounts {
     r.get('/users', async (_req, res) => {
       const users = await Promise.all((this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]).map(async (u) => {
         // Counts follow the admin's own level: an Off admin's counts leave hidden games' saves out.
-        const store = this.store(u.id), dirs = this.content.visibleSaveDirs(await store.listDirs())
+        const store = this.saveStores.of(u.id), dirs = this.content.visibleSaveDirs(await store.listDirs())
         const files = await Promise.all(dirs.map((dir) => store.list(dir)))
         return { ...publicUser(u), games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser, ...this.managed(u.id) }
       }))
@@ -772,33 +730,12 @@ export class Accounts {
       this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, target.id)
       this.revoke(target.id); res.json({ ok: true })
     })
-    r.post('/users/:id/saves/copy', async (req, res) => res.json({ copied: await this.copy(Number(req.params.id), Number(req.body?.target), req.body?.game, true) }))
-    r.get('/users/:id/saves/export', async (req, res) => {
-      const id = this.user(Number(req.params.id)).id, store = this.store(id)
-      res.attachment(`renplay-user-${id}-saves.zip`).type('application/zip')
-      await store.exportZip(this.content.visibleSaveDirs(await store.listDirs()), res, { includeTokens: true })
-    })
-    r.post('/users/:id/saves/import', saveImport('file', async (req, res) => {
-      const target = this.store(this.user(Number(req.params.id)).id)
-      if (!req.file) throw new HttpError(400, 'Upload a save folder zip')
-      const entries = await readZipEntries(req.file.path, () => true, 128 << 20)
-      const files = [...entries].map(([path, data]) => {
-        const rel = cleanRelPath(path), slash = rel.indexOf('/'), dir = rel.slice(0, slash)
-        if (slash < 1 || !isSaveDirName(dir)) throw new HttpError(400, 'Zip entries must be inside save folders')
-        return { dir, file: rel.slice(slash + 1), data }
-      })
-      for (const f of files) {
-        if (f.dir === 'tokens' && f.file === 'security_keys.txt') await target.mergeSecurityKeys(f.data.toString('utf-8'))
-        else await target.write(f.dir, f.file, f.data, { reason: 'user-import' })
-      }
-      res.json({ imported: files.length })
-    }))
     const remove = async (id: number) => {
       const u = this.user(id)
       if (id === 1 || id === this.cfg.authUser) throw new HttpError(409, 'The no-sign-in account must stay')
       if (this.removing.has(id)) throw new HttpError(409, 'This account is being archived')
       this.guardLastAdmin(u, {}, true)
-      const store = this.store(id), source = join(this.cfg.dataDir, 'users', String(id))
+      const store = this.saveStores.of(id), source = this.saveStores.folder(id)
       const destination = join(this.cfg.dataDir, 'users-removed', `${id}-${Date.now()}`)
       this.removing.add(id)
       // Reserve the removal synchronously: two concurrent removals cannot both pass the last-admin check.
@@ -811,8 +748,9 @@ export class Accounts {
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
           this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
-          for (const table of ['sessions', 'tokens', 'identities', 'save_meta', 'device_people']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
+          for (const table of ['sessions', 'tokens', 'identities', 'device_people']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
           this.progress.forget(id)
+          this.saveStores.forget(id)
           // Their own art choices and uploads. Choices for everyone stay.
           for (const table of ['art_choices', 'art_uploads']) this.db.raw.prepare(`DELETE FROM ${table} WHERE scope = ?`).run(id)
           this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
@@ -822,7 +760,7 @@ export class Accounts {
           await rename(destination, source)
           throw error
         }
-        this.invalidate(); this.stores.delete(id)
+        this.invalidate()
       } catch (error) {
         this.db.raw.prepare('UPDATE users SET disabled = ? WHERE id = ?').run(u.disabled, id)
         store.resumeWrites()
@@ -843,7 +781,7 @@ export class Accounts {
         this.db.raw.exec('COMMIT')
       } catch (error) { this.db.raw.exec('ROLLBACK'); throw error }
       try {
-        await this.copy(u.id, 1)
+        await this.saveStores.copy(u.id, 1)
         this.db.raw.exec('BEGIN IMMEDIATE')
         try {
           // The copy can take a while. Check again that the claimant is still signed in, enabled
@@ -872,7 +810,7 @@ export class Accounts {
       const id = Number(req.params.id), target = Number(req.body?.target)
       if (id === 1 || id === this.cfg.authUser) throw new HttpError(409, 'The no-sign-in account must stay')
       this.guardLastAdmin(this.user(id), {}, true)
-      const copied = await this.copy(id, target)
+      const copied = await this.saveStores.copy(id, target)
       this.mergeData(id, target)
       await remove(id); res.json({ copied })
     })

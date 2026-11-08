@@ -1,64 +1,23 @@
-import express, { Router, type Request, type RequestHandler } from 'express'
+import express, { Router, type Request } from 'express'
 import { readFile } from 'node:fs/promises'
-import sharp from 'sharp'
-import { rgbaToThumbHash } from 'thumbhash'
-import { saveImport } from '../saves/import-upload.js'
-import { viewer } from '../accounts-context.js'
-import type { Db, GameRow } from '../db.js'
-import { readSaveMeta, readSaveScreenshot, slotInfo } from '../saves/savefile.js'
-import type { SaveStore } from '../saves/store.js'
+import { saveImport } from './import-upload.js'
+import type { GameRow } from '../db.js'
+import { readSaveScreenshot, readZipEntries, slotInfo } from './savefile.js'
+import { cachedSaveMeta, cachedSceneHash } from './cache.js'
+import { createSavesImportRouter } from './import-routes.js'
+import { SHARED_DIRS } from './store.js'
 import type { Services } from '../services.js'
-import { downloadSync, uploadSync } from '../saves/sync.js'
+import { SYNC_SETTING, downloadSync, syncCodesOn, uploadSync } from './sync.js'
 import { dirSize, sha1 } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/paths.js'
 
-/** Metadata cache shared with the library, keyed by store/dir/name/mtime/size. */
-const metaCache = new Map<string, Awaited<ReturnType<typeof readSaveMeta>>>()
 
-export async function cachedSaveMeta(store: SaveStore, dir: string, file: { name: string; mtimeMs: number; size: number }) {
-  const key = `${store.root}/${dir}/${file.name}/${file.mtimeMs}/${file.size}`
-  let meta = metaCache.get(key)
-  if (meta === undefined) {
-    meta = await readSaveMeta(await store.read(dir, file.name))
-    metaCache.set(key, meta)
-    if (metaCache.size > 5000) metaCache.delete(metaCache.keys().next().value!)
-  }
-  return meta
-}
-
-/** Scene hashes (thumbhash) of save pictures, keyed like the metadata. */
-const hashCache = new Map<string, string | null>()
-
-/**
- * A save picture as a thumbhash: a few dozen bytes that draw only a soft blur of its colours. Sent at
- * the Blurred level instead of the picture, the way art below Shown carries only its hash.
- */
-export async function cachedSceneHash(store: SaveStore, dir: string, file: { name: string; mtimeMs: number; size: number }): Promise<string | null> {
-  const key = `${store.root}/${dir}/${file.name}/${file.mtimeMs}/${file.size}`
-  let hash = hashCache.get(key)
-  if (hash === undefined) {
-    hash = null
-    try {
-      const png = await readSaveScreenshot(await store.read(dir, file.name))
-      if (png) {
-        const { data, info } = await sharp(png).resize(100, 100, { fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-        hash = Buffer.from(rgbaToThumbHash(info.width, info.height, data)).toString('base64')
-      }
-    } catch {}
-    hashCache.set(key, hash)
-    if (hashCache.size > 5000) hashCache.delete(hashCache.keys().next().value!)
-  }
-  return hash
-}
-
-/** Sync codes are off until an admin turns them on: saves leave the server only then, and only when someone asks. */
-export const syncCodesOn = (db: Db): boolean => db.getSetting<boolean>(SYNC_SETTING, false) === true
-export const SYNC_SETTING = 'renpy_sync'
-
-export function createSavesRouter(s: Services): Router {
-  const { db, content } = s
+/** A person's saves of one game, at /api/saves/<game>. */
+function gameSaves(s: Services): Router {
+  const { db, content, saveStores } = s
   const { syncServer, saveLimits: limits } = s.cfg
   const router = Router({ caseSensitive: true, strict: true })
+  const me = () => s.accounts.current().id
   // What each person's saves and their history take, counted again at most every 5 seconds.
   const used = new Map<string, { at: number; size: Promise<{ bytes: number; files: number }> }>()
   const usedSize = () => {
@@ -77,10 +36,6 @@ export function createSavesRouter(s: Services): Router {
     const games = db.allGames().filter((g) => g.save_dir === dir)
     // Restricted users may not discover an unclassified folder through another game's runtime.
     return games.length ? games.some((g) => !content.hides(g)) : !content.hides({ adult: 0, recipe_id: '' })
-  }
-  /** A deleted save's name, note and pin go with it, so a new save in the slot starts clean. */
-  const forgetMeta = (dir: string, file: string) => {
-    db.raw.prepare('DELETE FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').run(viewer()?.user.id ?? 1, dir, file)
   }
 
   const requireSaveDir = (g: GameRow): string => {
@@ -175,7 +130,7 @@ export function createSavesRouter(s: Services): Router {
       res.status(409).json({ conflict: 'kept', mtime: (await s.saves.stat(dir, name))?.mtimeMs ?? 0 })
       return
     }
-    if (removed && name.endsWith('.save') && !name.includes('/')) forgetMeta(dir, name)
+    if (removed && name.endsWith('.save') && !name.includes('/')) saveStores.dropNote(me(), dir, name)
     res.json({ ok: true })
   })
 
@@ -209,8 +164,7 @@ export function createSavesRouter(s: Services): Router {
       return
     }
     const files = await s.saves.list(g.save_dir)
-    const user = viewer()?.user.id ?? 1
-    const notes = new Map((db.raw.prepare('SELECT file, title, note, pinned_at FROM save_meta WHERE user_id = ? AND save_dir = ?').all(user, g.save_dir) as Array<{ file: string; title: string; note: string; pinned_at: string }>).map((r) => [r.file, r]))
+    const notes = saveStores.notes(me(), g.save_dir)
     const slots = []
     const other = []
     for (const f of files) {
@@ -234,7 +188,7 @@ export function createSavesRouter(s: Services): Router {
         gameVersion: meta?.gameVersion,
         runtime: meta?.runtime,
         // Blurred: the save's picture is the adult game's art and never leaves the server.
-        screenshot: meta?.hasScreenshot && !content.blurs(g) ? `/api/saves/${g.id}/screenshot?user=${viewer()?.user.id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
+        screenshot: meta?.hasScreenshot && !content.blurs(g) ? `/api/saves/${g.id}/screenshot?user=${me()}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
         screenshotHash: meta?.hasScreenshot && content.blurs(g) ? await cachedSceneHash(s.saves, g.save_dir, f) : null,
         valid: !!meta,
         title: notes.get(f.name)?.title || null,
@@ -278,15 +232,14 @@ export function createSavesRouter(s: Services): Router {
       if (b[key] !== undefined && (typeof b[key] !== 'string' || b[key].length > max)) throw new HttpError(400, `The ${key === 'title' ? 'name' : 'note'} is text of up to ${max} characters`)
     }
     if (b.pinned !== undefined && typeof b.pinned !== 'boolean') throw new HttpError(400, 'Pinned must be true or false')
-    const user = viewer()?.user.id ?? 1
-    const row = (db.raw.prepare('SELECT title, note, pinned_at FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').get(user, saveDir, file) as { title: string; note: string; pinned_at: string } | undefined) ?? { title: '', note: '', pinned_at: '' }
+    const user = me()
+    const row = saveStores.note(user, saveDir, file)
     const next = {
       title: b.title !== undefined ? b.title.trim() : row.title,
       note: b.note !== undefined ? b.note.trim() : row.note,
       pinned_at: b.pinned === undefined ? row.pinned_at : b.pinned ? row.pinned_at || new Date().toISOString() : '',
     }
-    if (!next.title && !next.note && !next.pinned_at) db.raw.prepare('DELETE FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').run(user, saveDir, file)
-    else db.raw.prepare('INSERT INTO save_meta (user_id, save_dir, file, title, note, pinned_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (user_id, save_dir, file) DO UPDATE SET title = excluded.title, note = excluded.note, pinned_at = excluded.pinned_at').run(user, saveDir, file, next.title, next.note, next.pinned_at)
+    saveStores.setNote(user, saveDir, file, next)
     res.json({ ok: true, title: next.title || null, note: next.note || null, pinnedAt: next.pinned_at || null })
   })
 
@@ -296,7 +249,7 @@ export function createSavesRouter(s: Services): Router {
     const name = cleanRelPath(req.query['file'])
     const png = await readSaveScreenshot(await s.saves.read(requireSaveDir(g), name))
     if (!png) throw new HttpError(404, 'No screenshot')
-    if (req.query['user'] !== undefined && req.query['user'] !== String(viewer()?.user.id ?? 1)) throw new HttpError(404, 'Screenshot not found')
+    if (req.query['user'] !== undefined && req.query['user'] !== String(me())) throw new HttpError(404, 'Screenshot not found')
     res.setHeader('Cache-Control', 'private, no-store')
     res.type('png').send(png)
   })
@@ -314,7 +267,7 @@ export function createSavesRouter(s: Services): Router {
     const file = cleanRelPath(req.query['file'])
     const ok = await s.saves.remove(requireSaveDir(g), file, 'user-delete')
     if (!ok) throw new HttpError(404, 'Save not found')
-    forgetMeta(requireSaveDir(g), file)
+    saveStores.dropNote(me(), requireSaveDir(g), file)
     res.json({ ok: true })
   })
 
@@ -367,17 +320,79 @@ export function createSavesRouter(s: Services): Router {
   return router
 }
 
-/** All save folders (including ones without a game) as one zip. */
-export function createSavesExportAll(s: Services): RequestHandler {
-  const { db, content } = s
-  return (_req, res, next) => {
-    void (async () => {
-      const store = s.saves
-      // The export is of what this person may see. Hidden games' saves stay where they are.
-      const dirs = new Set(content.visibleSaveDirs([...await store.listDirs(), ...db.allGames().map((g) => g.save_dir).filter(Boolean)]))
-      res.attachment(`renplay-saves-${new Date().toISOString().slice(0, 10)}.zip`)
-      res.type('application/zip')
-      await store.exportZip([...dirs], res, { includeTokens: true })
-    })().catch(next)
-  }
+/**
+ * Every saves route: a person's saves of each game, the guided import and the export of all of
+ * them, an admin's copy, export and import of a person's saves, sync codes and the save backups.
+ */
+export function createSavesRouter(s: Services): Router {
+  const { db, content, saveStores, backups } = s
+  const router = Router({ caseSensitive: true, strict: true })
+  router.use('/saves', gameSaves(s))
+  router.use('/saves-import', createSavesImportRouter(s))
+
+  /** All save folders (including ones without a game) as one zip. */
+  router.get('/saves-export', async (_req, res) => {
+    const store = s.saves
+    // The export is of what this person may see. Hidden games' saves stay where they are.
+    const dirs = new Set(content.visibleSaveDirs([...await store.listDirs(), ...db.allGames().map((g) => g.save_dir).filter(Boolean)]))
+    res.attachment(`renplay-saves-${new Date().toISOString().slice(0, 10)}.zip`)
+    res.type('application/zip')
+    await store.exportZip([...dirs], res, { includeTokens: true })
+  })
+
+  // An admin's actions on a person's saves. The copy takes what the admin may see.
+  router.post('/users/:id/saves/copy', async (req, res) => {
+    const from = Number(req.params.id), to = Number(req.body?.target), game = req.body?.game
+    let dirs: string[]
+    if (game) {
+      const g = db.getGame(game)
+      if (!g?.save_dir || content.hides(g)) throw new HttpError(404, 'Game save folder not found')
+      dirs = [g.save_dir, 'tokens']
+    } else {
+      dirs = [...content.visibleSaveDirs(await saveStores.of(from).listDirs()), ...SHARED_DIRS]
+    }
+    res.json({ copied: await saveStores.copy(from, to, dirs) })
+  })
+  router.get('/users/:id/saves/export', async (req, res) => {
+    const id = Number(req.params.id), store = saveStores.of(id)
+    res.attachment(`renplay-user-${id}-saves.zip`).type('application/zip')
+    await store.exportZip(content.visibleSaveDirs(await store.listDirs()), res, { includeTokens: true })
+  })
+  router.post('/users/:id/saves/import', saveImport('file', async (req, res) => {
+    const target = saveStores.of(Number(req.params.id))
+    if (!req.file) throw new HttpError(400, 'Upload a save folder zip')
+    const entries = await readZipEntries(req.file.path, () => true, 128 << 20)
+    const files = [...entries].map(([path, data]) => {
+      const rel = cleanRelPath(path), slash = rel.indexOf('/'), dir = rel.slice(0, slash)
+      if (slash < 1 || !isSaveDirName(dir)) throw new HttpError(400, 'Zip entries must be inside save folders')
+      return { dir, file: rel.slice(slash + 1), data }
+    })
+    for (const f of files) {
+      if (f.dir === 'tokens' && f.file === 'security_keys.txt') await target.mergeSecurityKeys(f.data.toString('utf-8'))
+      else await target.write(f.dir, f.file, f.data, { reason: 'user-import' })
+    }
+    res.json({ imported: files.length })
+  }))
+
+  router.put('/system/sync', (req, res) => {
+    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'Expected { on: true or false }')
+    db.setSetting(SYNC_SETTING, req.body.on)
+    res.json({ on: req.body.on })
+  })
+
+  router.get('/system/backups', async (_req, res) => {
+    res.json(await backups.info())
+  })
+  router.post('/system/backups', async (_req, res) => {
+    if (!backups.dir) throw new HttpError(409, 'Save backups are off. Set RENPLAY_BACKUP_DIR to a folder to turn them on.')
+    const name = await backups.run()
+    res.json({ ok: true, name, ...(await backups.info()) })
+  })
+  router.get('/system/backups/:name', (req, res, next) => {
+    const path = backups.path(req.params.name)
+    if (!path) throw new HttpError(404, 'Backup not found')
+    res.download(path, req.params.name, (err) => err && next(new HttpError(404, 'Backup not found')))
+  })
+
+  return router
 }

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { hashArchive } from './archive-origin.js'
 import { ArtStore } from './art.js'
 import { Accounts } from './auth.js'
-import { SaveBackups } from './backups.js'
+import { SaveBackups } from './saves/backups.js'
 import { Builds } from './builds.js'
 import { Catalog } from './catalog.js'
 import type { Config } from './config.js'
@@ -18,6 +18,7 @@ import { Overlays } from './mods.js'
 import { applyMods } from './pipeline/applymods.js'
 import { runImport } from './pipeline/import.js'
 import type { SaveStore } from './saves/store.js'
+import { SaveStores } from './saves/stores.js'
 import { Purger } from './util/purge.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -43,6 +44,8 @@ export interface Services {
   progress: ProgressStore
   /** The signed-in person's saves. */
   readonly saves: SaveStore
+  /** Everyone's saves, with their notes. */
+  saveStores: SaveStores
   purger: Purger
   jobs: JobManager
   builds: Builds
@@ -60,7 +63,8 @@ export async function createServices(cfg: Config): Promise<Services> {
   let catalog: Catalog | null = null
   const content = new ContentMode(cfg, db, () => catalog?.adultSaveDirs() ?? [])
   const progress = new ProgressStore(db)
-  const accounts = new Accounts(db, cfg, content, progress)
+  const saveStores = new SaveStores(cfg, db)
+  const accounts = new Accounts(db, cfg, content, progress, saveStores)
   try {
     await accounts.init()
   } catch (error) {
@@ -79,7 +83,7 @@ export async function createServices(cfg: Config): Promise<Services> {
     accounts,
     progress,
     get saves() {
-      return accounts.store()
+      return saveStores.of(accounts.current().id)
     },
     purger,
     jobs: new JobManager(db, cfg),
@@ -88,7 +92,8 @@ export async function createServices(cfg: Config): Promise<Services> {
     overlays: new Overlays(cfg),
     art,
     catalog,
-    backups: new SaveBackups(cfg, db),
+    saveStores,
+    backups: new SaveBackups(cfg, db, saveStores),
   }
   s.jobs.register('import', 'Install', (ctx) => runImport(ctx, s))
   s.jobs.register('apply-mods', 'Mod build', (ctx) => applyMods(ctx, s))

@@ -4,6 +4,11 @@ import { HttpError } from '../util/paths.js'
 import { secretboxDecrypt, secretboxEncrypt } from './hydrogen.js'
 import { readSaveMeta, readZipEntries } from './savefile.js'
 import type { SaveStore } from './store.js'
+import type { Db } from '../db.js'
+
+/** Sync codes are off until an admin turns them on: saves leave the server only then, and only when someone asks. */
+export const syncCodesOn = (db: Db): boolean => db.getSetting<boolean>(SYNC_SETTING, false) === true
+export const SYNC_SETTING = 'renpy_sync'
 
 /*
  * Ren'Py Sync, as renpy/common/00sync.rpy does it (Ren'Py 8.1 and newer): a code like ABCDE-12345,

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { readFile } from 'node:fs/promises'
-import { saveImport } from '../saves/import-upload.js'
-import { isRenpySave } from '../saves/savefile.js'
+import { saveImport } from './import-upload.js'
+import { isRenpySave } from './savefile.js'
 import { HttpError, cleanRelPath, isSaveDirName } from '../util/paths.js'
 import type { Services } from '../services.js'
 

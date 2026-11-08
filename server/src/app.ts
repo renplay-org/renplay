@@ -7,7 +7,7 @@ import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
 import { playerRoute, type Accounts } from './auth.js'
 import { viewer } from './accounts-context.js'
-import type { SaveBackups } from './backups.js'
+import type { SaveBackups } from './saves/backups.js'
 import type { Builds } from './builds.js'
 import type { Catalog } from './catalog.js'
 import type { Config } from './config.js'
@@ -21,8 +21,7 @@ import { createProgressRouter } from './progress/routes.js'
 import { createContentRouter } from './routes/content.js'
 import { createLibraryRouter } from './routes/library.js'
 import { createPlayRouter } from './routes/play.js'
-import { createSavesExportAll, createSavesRouter } from './routes/saves.js'
-import { createSavesImportRouter } from './routes/saves-import.js'
+import { createSavesRouter } from './saves/routes.js'
 import { createMetricsRouter } from './routes/metrics.js'
 import { createSystemRouter } from './routes/system.js'
 import type { SaveStore } from './saves/store.js'
@@ -149,9 +148,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use('/api', createJobsRouter(services))
   app.use('/api', createMetricsRouter(services))
   app.use('/api/content', createContentRouter(services))
-  app.get('/api/saves-export', createSavesExportAll(services))
-  app.use('/api/saves-import', createSavesImportRouter(services))
-  app.use('/api/saves', createSavesRouter(services))
+  app.use('/api', createSavesRouter(services))
   app.use('/api/games', createFilesRouter(services))
   app.use('/api/games', createGamesRouter(services))
   app.use('/api', createProgressRouter(services))
@@ -211,7 +208,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     ]
   }
 
-  return { app, services, db, jobs, builds, engines, saves: accounts.store(1), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
+  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(1), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
 }
 
 /** Development server: serve *.gz engine files with their encoding, like nginx does. */
