@@ -3,8 +3,8 @@ title: Troubleshooting
 description: Fixes for games that will not start, slow menus, downloads that stop and more.
 ---
 
-First look at the logs: **Settings** → **Activity** shows every install job with its log, and
-`docker logs renplay` shows the server. When you report a problem, attach the job log.
+First look at the logs: **Activity** shows every install job with its log, and `docker logs
+renplay` shows the server. When you report a problem, attach the job log.
 
 ## An install fails
 
@@ -22,7 +22,7 @@ First look at the logs: **Settings** → **Activity** shows every install job wi
 ## A game will not start
 
 1. Reload the page and try again. The first start of a big game downloads `game.zip` and can take
-   a while; the player shows its progress.
+   a while. The loading screen shows how far it is.
 2. Open the game’s page in another browser. If it works there, clear site data for Renplay in the
    first one.
 3. Look at the game’s log for a Python error: the player menu’s **Options** has **Download the game’s log**.
@@ -66,6 +66,18 @@ after 8 failures. If it keeps happening, turn HTTP/3 off on your proxy or gatewa
 
 Safari on iPhone cannot show any web page full screen. Add Renplay to the Home Screen and open it
 from there. See [Playing](/guides/playing/#iphone-and-ipad-add-it-to-the-home-screen).
+
+## A game will not play offline
+
+- **Keep offline** needs Renplay over HTTPS (or `localhost`): browsers keep nothing for a plain
+  `http://` address. See [Reverse proxy and HTTPS](/install/reverse-proxy/).
+- **"This browser has room for less than the game needs."** The browser gives each site a share of the disk. Free
+  space on the device, or remove another game's offline copy.
+- **iPhone and iPad** keep games only for Renplay on the Home Screen. A Safari tab loses them after a
+  week without a visit.
+- **"Open this game once with a network"** means the person signed in on this browser has not opened
+  the game online here yet. A kept copy plays for each person only after they opened it once.
+- A game that got a new version keeps playing its old copy until **Update offline copy**.
 
 ## Network storage is slow
 

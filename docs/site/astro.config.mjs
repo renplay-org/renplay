@@ -77,7 +77,7 @@ export default defineConfig({
             'install/other-platforms',
           ],
         },
-        { label: 'Guides', items: ['guides/adding-games', 'guides/playing'] },
+        { label: 'Guides', items: ['guides/adding-games', 'guides/playing', 'guides/dashboards'] },
         'accounts',
         'configuration',
         'upgrading',

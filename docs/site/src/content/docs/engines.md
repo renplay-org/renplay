@@ -21,7 +21,7 @@ itch.io they are the in-browser versions), so the catalog and the website leave 
 | Godot 4 web builds | yes | yes (2.9) | The developer's single-threaded web export (on itch.io, the version that plays in the browser). Tested with a Godot 4.7.1 game. Threaded web builds need SharedArrayBuffer, which the sandbox cannot give |
 | Godot 4 PC builds | yes | planned | Godot's own web template loads a PC `.pck` (tried), but games with native plugins (GDExtension) or C# cannot run in browsers |
 | Unity WebGL builds | yes | yes (2.9) | The developer's WebGL build, served as it is. Tested with a Unity 6 game |
-| Unity PC builds | yes | never | Compiled for one system; a browser cannot run them |
+| Unity PC builds | yes | never | Compiled for one system. A browser cannot run them |
 | RPG Maker XP, VX, VX Ace; Wolf RPG; Kirikiri; GameMaker; Unreal | yes | never | Windows (or PC) programs |
 | Flash (`.swf`) | yes | maybe | [Ruffle](https://ruffle.rs) plays many Flash games in a browser |
 
@@ -34,7 +34,7 @@ made it, and the reason when it cannot be installed.
 ## Ren'Py 7 games
 
 Renplay builds games made with Ren'Py 7 (and older) on the Ren'Py 8 engine, which loads their
-compiled scripts. A game that starts has no Python 2 syntax left to trip on; what can still fail
+compiled scripts. A game that starts has no Python 2 syntax left to trip on. What can still fail
 is Python 2 behaviour, such as `xrange`, `iteritems` or `unicode`, or sorting numbers together
 with text. If such a game stops with a Python error, check the [catalog](/catalog/) for a note, and
 see [Troubleshooting](/troubleshooting/#a-renpy-7-game-stops-with-a-python-error).
@@ -46,13 +46,13 @@ of the game's major version. See [Configuration](/configuration/).
 
 This part is for developers.
 
-Each engine needs four things; everything else (library, covers, the player's toolbar, saves
+Each engine needs four things. Everything else (library, covers, the player's toolbar, saves
 panel, fullscreen, mute, wake lock, phones) is shared.
 
 1. **Detect** (`family.ts`): family, version, the folder the game lives in, its start file.
 2. **Build**: put the game's files into a build (`assets.pack` and its index, as for Ren'Py), so
    they are served with byte ranges and long caching. Converting images to WebP works for any
-   engine that loads images by name; streaming on demand works only where the engine fetches
+   engine that loads images by name. Streaming on demand works only where the engine fetches
    files itself (HTML games do; Godot and Unity load one big pack).
 3. **Runtime**: a small script in the game's frame that tells the player when the game is ready,
    keeps its saves on the server, and handles mute. Ren'Py's is `runtime/renplay-runtime.js`.
@@ -85,13 +85,13 @@ An opaque origin has no `localStorage` or IndexedDB either, so the runtime provi
   (`runtime/vendor/fake-indexeddb.js`, bundled by `runtime/vendor/build.sh`), restores the stored
   databases before the game's scripts run (IndexedDB serves a database's open requests in order,
   so the game's wait for these), and after every write sends a snapshot (`indexedDB.json` in the
-  save folder; binary data, dates and the like keep their type). Unity's download cache
+  save folder. Binary data, dates and the like keep their type). Unity's download cache
   (`UnityCache`) is refused, so the game fetches again instead of holding it in memory.
-- Cache Storage (`window.caches`) throws in a sandboxed frame; the runtime makes it absent, which
+- Cache Storage (`window.caches`) throws in a sandboxed frame. The runtime makes it absent, which
   loaders such as Unity's treat as no caching.
 
 Ren'Py games can also run JavaScript (Ren'Py's `emscripten` module), so moving them into the same
-sandbox is worth doing later; their saves already go through the runtime.
+sandbox is worth doing later. Their saves already go through the runtime.
 
 ## Catalog schema 3
 
@@ -106,30 +106,30 @@ releases:
     runtime: 4.6.2     # per release, instead of the recipe's (optional)
 ```
 
-`saveDir` keeps its name; what it means depends on the engine (Ren'Py's `config.save_directory`, a
+`saveDir` keeps its name. What it means depends on the engine (Ren'Py's `config.save_directory`, a
 Godot project's `user://` folder name, a SugarCube story's save id). The catalog still publishes
 schema 2 as `index.json` for Renplay 2.5 and older: Ren'Py games only, with the runtime as
 `engine` and a release's `madeWith` and `runtime` as `renpy` and `engine`. `normalizeRecipe` in
 `catalog.ts` reads both.
 
 The engines repository will list other runtimes (Godot's web export templates, one per version)
-with a `family` field; entries without one are Ren'Py.
+with a `family` field. Entries without one are Ren'Py.
 
 ## Plan
 
 1. **Recognize** (done in 2.6): detection, schema 3, Add games lists other engines with reasons.
 2. **HTML** (done in 2.6 for Twine): `pipeline/html.ts` packs the game's folder (images as WebP
-   under their own names); the page is served from the pack with `runtime/renplay-html.js` and the
-   stored `localStorage` (`<save folder>/localStorage.json`) inlined first; the player sandboxes the
+   under their own names). The page is served from the pack with `runtime/renplay-html.js` and the
+   stored `localStorage` (`<save folder>/localStorage.json`) inlined first. The player sandboxes the
    frame and stores what the runtime sends. Tested with a SugarCube 2.36.1 game: plays in
    Chromium and WebKit, a save made in one browser loads in another, the game cannot reach
    Renplay's API. Next: an RPG Maker MV or MZ game (MZ keeps saves with localforage, which falls
    back to `localStorage` when IndexedDB is missing).
 3. **Godot 4** (web builds done in 2.9): a single-threaded web export is a page with the engine
-   (`<name>.wasm`, `<name>.js`) and the pack (`<name>.pck`); it installs like an HTML game, and
+   (`<name>.wasm`, `<name>.js`) and the pack (`<name>.pck`). It installs like an HTML game, and
    the IndexedDB stand-in keeps `user://`. Tested with a Godot 4.7.1 game: plays, and its
    settings saved in one browser load in another. Threaded web exports need cross-origin
-   isolation (SharedArrayBuffer), which the sandboxed frame does not have; they are refused with
+   isolation (SharedArrayBuffer), which the sandboxed frame does not have. They are refused with
    that reason. PC builds are planned, as follows.
 
    PC builds: the single-threaded web template per version, picked from the pack header.
@@ -139,7 +139,7 @@ with a `family` field; entries without one are Ren'Py.
    it is. That game cannot run, though: its core is a native plugin (`phone_core`, class
    `KpsPhoneCore`) with no web build, and the start crashes without it. The whole pack is held in
    memory (1.3 GB of JavaScript heap for a 1.2 GB pack), so big packs will not fit on phones.
-   Needs a Godot game without native plugins to finish this phase; detection already warns
+   Needs a Godot game without native plugins to finish this phase. Detection already warns
    about plugins and C#. `web_dlink_nothreads_release` loads GDExtensions, but only ones
    compiled for the web, which games do not ship.
 

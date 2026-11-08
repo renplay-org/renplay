@@ -3,7 +3,7 @@
 // the interface, the docs, server messages and logs, and the changelog's Unreleased section. Code
 // is left alone: only strings and text that read as sentences are checked.
 // Usage: node scripts/check-copy.mjs [--docs] (exits 1 and lists each place that breaks the rule).
-// The docs are checked with --docs, which CI adds once the docs follow the rule.
+// The docs are checked with --docs, as CI does.
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 

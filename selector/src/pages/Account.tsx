@@ -158,8 +158,9 @@ export default function Account() {
         </AccountSection>
         <AccountSection title="Your saves">
           <p className="small muted">Export current saves for the games you can see, including shared keys and HTML game data, as one zip. Hidden games’ saves and save history stay on the server.</p>
-          <div>
+          <div className="actions">
             <Button size="sm" href="/api/saves-export">Export all my saves</Button>
+            <Button size="sm" to="/import-saves">Import from a computer</Button>
           </div>
         </AccountSection>
       </div>

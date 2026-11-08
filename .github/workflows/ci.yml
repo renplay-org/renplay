@@ -65,7 +65,7 @@ jobs:
 
       # No semicolons, em or en dashes, or ellipses in text people read (AGENTS.md).
       - name: Check the writing rule
-        run: node scripts/check-copy.mjs
+        run: node scripts/check-copy.mjs --docs
 
       - name: Install selector deps
         run: npm ci

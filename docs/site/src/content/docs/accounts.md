@@ -5,7 +5,7 @@ description: Sign-in, separate saves, shared libraries and moving between accoun
 
 Renplay supports local accounts, OpenID Connect (OIDC) and LDAP. Everyone shares the games, but saves, save history, favourites,
 Finished, play time and last played belong to each person. HTML games' stored progress is separate
-too. Admins manage games and users; players play and manage their own saves.
+too. Admins manage games and users. Players play and manage their own saves.
 
 ## First start
 
@@ -34,14 +34,14 @@ individual sessions or everywhere else. Changing your password ends your other s
 
 **Access tokens** creates named tokens for scripts. Copy a new token immediately: it is only shown
 once. Revoke it from the same list when it is no longer needed. **Your saves → Export all my saves**
-downloads current save folders for games you can see as one zip; hidden saves and history stay on
+downloads current save folders for games you can see as one zip. Hidden saves and history stay on
 the server.
 
 The account menu also has **Sign out**. If sign-in ends during play, the player asks you to sign in in another
 tab. Return and press **Continue** to sync without losing the scene. Use the same account that
 started that game. A shared browser never uploads another account's queued saves. Unsent Ren'Py
 and HTML saves stay on that device under their owner's account until the same account returns.
-HTML games sync a returning account's pending changes before opening again; connect and retry
+HTML games sync a returning account's pending changes before opening again. Connect and retry
 if that sync fails. Do not clear browser storage while changes are waiting to sync.
 
 Browser saves from before accounts are attributed only to the known owner of an upgraded
@@ -49,7 +49,7 @@ single-user installation, never to an arbitrary player. If their owner cannot be
 Renplay keeps them and shows a notice. Ask an admin to recover those files on the same device;
 [developer recovery notes](/developers/accounts-api/#unowned-browser-save-recovery) explain how.
 
-Use HTTPS outside a trusted local network. Cookies are httpOnly and SameSite=Lax; they also have
+Use HTTPS outside a trusted local network. Cookies are httpOnly and SameSite=Lax. They also have
 `Secure` over HTTPS, but work on plain HTTP for local NAS installs. Set `RENPLAY_PUBLIC_URL` to
 your HTTPS address when a proxy terminates HTTPS. See [Reverse proxy and HTTPS](/install/reverse-proxy/).
 
@@ -60,7 +60,7 @@ users and reset their passwords in **Users**. Password changes end the other ses
 
 Set `RENPLAY_AUTH_LOCAL=false` to disable local password authentication when another provider is
 configured. With OIDC only, this hides the password form. LDAP still uses the directory password
-form. Renplay checks OIDC discovery and the LDAP service bind at startup; invalid provider settings
+form. Renplay checks OIDC discovery and the LDAP service bind at startup. Invalid provider settings
 stop startup rather than leaving an unusable sign-in page. SSO-only configurations must also set
 an admin group, filter or `RENPLAY_ADMINS`.
 
@@ -76,7 +76,7 @@ Set `RENPLAY_PUBLIC_URL` to your Renplay address, not the provider's. Renplay di
 from the issuer, requests `openid profile email groups`, and uses the authorization code flow with
 PKCE (S256), state and nonce. The signed identity token must match the issuer, client and request.
 The issuer, authorization, token and key endpoints require HTTPS (loopback HTTP is allowed for local
-tests). Keep the client secret in a secret file where possible; do not put it in a public compose file.
+tests). Keep the client secret in a secret file where possible. Do not put it in a public compose file.
 
 ```sh
 RENPLAY_PUBLIC_URL=https://play.example.org
@@ -105,7 +105,7 @@ and is never removed by provider sign-in.
 Create an OIDC client, set the exact callback above, and copy its client id and secret. Use Pocket
 ID's published issuer URL (normally its root address) as `RENPLAY_OIDC_ISSUER`. Add the two groups
 to Pocket ID and assign people to them. Ensure they are present as strings in the ID token's
-`groups` array; use their exact values in the two Renplay group settings. The button name can be
+`groups` array. Use their exact values in the two Renplay group settings. The button name can be
 `Pocket ID` as in the example.
 
 ### Authentik
@@ -181,7 +181,7 @@ Attribute settings are `RENPLAY_LDAP_USERNAME_ATTRIBUTE=uid`,
 `RENPLAY_LDAP_EMAIL_ATTRIBUTE=mail` and `RENPLAY_LDAP_PHOTO_ATTRIBUTE=jpegPhoto`.
 `{username}` is escaped wherever it appears in the user filter. Exactly one entry must match.
 The identity uses `entryUUID`, falling back to the entry DN if the directory does not supply it.
-Changing the directory URL or base DN creates a different provider; link it explicitly again.
+Changing the directory URL or base DN creates a different provider. Link it explicitly again.
 LDAP emails do not carry OIDC's verification proof, so use usernames, not emails, in
 `RENPLAY_ADMINS` for directory admins.
 
@@ -242,7 +242,7 @@ working remaining sign-in methods.
 Upload a JPEG, PNG or WebP up to 2 MiB in **Account**, preview a square crop, adjust its zoom and
 save. Images are limited to 16 megapixels and stored as content-addressed 256 px WebP files under
 `/data/avatars/`. Pictures have the same sign-in protection as the library. Otherwise Renplay copies
-OIDC `picture` or LDAP `jpegPhoto` at sign-in; it never hotlinks the provider. Remote pictures must
+OIDC `picture` or LDAP `jpegPhoto` at sign-in. It never hotlinks the provider. Remote pictures must
 use HTTPS on port 443, cannot redirect or access private network addresses, and have a 2 MiB cap.
 Unavailable or invalid provider pictures do not prevent sign-in. Your own upload takes precedence
 over later provider pictures. Without a picture, Renplay uses initials on the accent gradient.
@@ -258,14 +258,52 @@ trusted network or behind your own authentication. Disabling sign-in is not a wa
 
 ## Adult games
 
-Adult games have three levels, Off, Blurred and Shown, set in four layers that only narrow: the
-installation, each person's account (set by an admin in **Users**, or by a sign-in group), the
-person's own choice, and the device. New people start at `RENPLAY_ADULT_DEFAULT`, Off unless you
-set it. The first admin starts at Shown unless a sign-in group says otherwise.
+Adult games have three levels, Off, Blurred and Shown. Each person chooses one on their **Account**
+page, under **Adult games**, within the limits above them: the installation's **Highest level for
+everyone** in **Settings**, and the highest level an admin sets for that person in **Users** (or a
+sign-in group sets). A browser can show less still, for a shared screen. New people start at
+`RENPLAY_ADULT_DEFAULT`, Off unless you set it. The first admin starts at Shown unless a sign-in
+group says otherwise.
 
-**Account → Adult games** shows the four rows and says what you see and why. Games with no recipe
-count as adult for a person at Off until an admin marks them safe.
+Games with no recipe count as adult for a person at Off until an admin marks them safe.
 See [Adult games](/start-here/adult-games/).
+
+## Who is playing: switching on a shared device
+
+On a tablet or a computer the family shares, switching person with a full sign-in each time is slow.
+**Who is playing?** in the account menu switches the browser to another person with their PIN.
+
+- Each person sets a PIN of 4 to 8 digits on their **Account** page, under **Switching on a shared
+  device**.
+- Only people who signed in on that browser before appear. The server keeps that list for each
+  browser, so a PIN never works on a browser the person never used.
+- Admins have no PIN: an admin account always needs its full sign-in.
+- Five wrong PINs lock switching to that person for 15 minutes.
+- Switching signs the previous person out of that browser.
+- Signing out everywhere, changing your password, unlinking a sign-in or an admin's password reset
+  removes your PIN, and other browsers forget you.
+
+PINs need sign-in to be on. They are hashed like passwords and never leave the server.
+
+## Defaults for everyone
+
+**Settings → Defaults for everyone** (admins) sets what people start with until they choose their
+own:
+
+- **Tags left out on the Catalog page**: games with these tags are hidden in the catalog.
+- **Lighter background**: a plain background instead of the game's art behind each screen, for
+  browsers where nobody chose.
+- **Text size in games**: Ren’Py's text size where the person has not chosen one in the player's
+  Options.
+- **Rollback in games** and **Skip in games**: on even where a game turns them off.
+
+Each person can still change these for themselves. Where a value is the admin's default, it says
+**Set by the admin for everyone**.
+
+## Where a setting comes from
+
+**Settings** says beside each value where it comes from: Renplay's default, a choice made in
+**Settings**, or a variable set on the server, which then cannot be changed there.
 
 ## Users
 
@@ -275,8 +313,8 @@ of current save files (including persistent and HTML storage, excluding shared k
 Users cannot demote, disable or remove the last enabled admin. Add another admin first.
 Provider sign-in can still revoke the last provider-managed admin grant as described above.
 
-Use each user's actions for **Copy saves…**, **Merge into another user…**, **Export save folder**,
-**Import a save folder** or **Remove user…**. **Moving saves** also opens copy and import tools.
+Use each user's actions for **Copy saves**, **Merge into another user**, **Export save folder**,
+**Import a save folder** or **Remove user**. **Moving saves** also opens copy and import tools.
 The [Accounts API](/developers/accounts-api/) offers the same operations for scripts.
 
 With sign-in off, **Account** explains which account everyone uses. **Users** still works for
@@ -301,7 +339,7 @@ at the old paths, including custom `SAVES_DIR` and `SAVE_HISTORY_DIR` paths.
 
 The migration resumes after an interruption, and copies and verifies when the folders live on
 another volume. Conflicting files from an interrupted partial copy stay in the owner's
-`migration-conflicts/` folder. The filesystem must support symlinks; otherwise startup stops rather
+`migration-conflicts/` folder. The filesystem must support symlinks. Otherwise startup stops rather
 than silently leaving an incompatible old layout. Keep your own backup as well.
 
 Renplay 2.10 can still use the old owner save paths through those symlinks. It cannot see other

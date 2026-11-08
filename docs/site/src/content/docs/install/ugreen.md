@@ -24,7 +24,7 @@ The names of the screens differ between versions of the system, so these steps s
 settings are the same as in [Docker and Docker Compose](/install/docker/), which also lists the
 options.
 
-Keep `/data` on local disk and in your NAS backups; its SQLite database must not be on a
+Keep `/data` on local disk and in your NAS backups. Its SQLite database must not be on a
 network share. `/games` holds installed games, engines and scratch space. Optionally mount a
 separate downloads share at `/downloads`. Without it, downloads stay in `/games/_archives`.
 Deleting `/data` loses saves. Deleting `/games` also loses downloads stored inside it. Games can

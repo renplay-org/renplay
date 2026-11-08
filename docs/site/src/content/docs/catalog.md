@@ -28,18 +28,20 @@ Pictures come from Steam, itch.io, SteamGridDB (credited to their author), the d
 Renplay Team. Renplay downloads each one once, checks it against the catalog's checksum, and keeps
 it in its own data folder, so art keeps working when those sites are down. A format the recipe does
 not have is made from the others: a crop around the part that matters, a composition (a poster on a
-soft background, for example), or the picture whole on a glow of its own colours. Made pictures
-never contain text.
+soft background, for example), or the picture whole on a glow of its own colours. A crop from a
+picture of another format never enlarges it more than about twice: a small store header becomes a
+glow of its colours rather than a blurry background. Made pictures never contain text.
 
 The game page says where its art came from. SteamGridDB art names its author, linked to the
 picture's page.
 
-**Change art** on a game's page (or **Details → Art**) opens the art picker, one format at a time.
+**Change art** on a game's page (or **Details**, under the art) opens the art picker, one format at a time.
 Every choice is shown as it will look in place. Your choice changes only what you see. An admin
 can choose for everyone, which beats the catalog's default, and each person's own choice still wins
 for them. **Use the default** goes back. You can upload your own picture: the sizes above work
 best, and another size is accepted with a warning and cropped around the point you tap. Uploads stay
-on your server. Pictures of adult games below Shown cannot be changed.
+on your server. Pictures of adult games below Shown cannot be changed. The picker
+lists your uploads with **Delete**, up to ten pictures of each format per game.
 
 ## How matching works
 
@@ -68,7 +70,30 @@ When a newer working release than yours is listed, Renplay says an update exists
 in the recipe, because people still have those files.
 
 The catalog refreshes every 6 hours, or press **Refresh** in **Settings** → **Catalog**. You can use
-your own indexes with `RENPLAY_CATALOG_URLS`; see [Configuration](/configuration/).
+your own indexes with `RENPLAY_CATALOG_URLS`. See [Configuration](/configuration/).
+
+## Tags
+
+Tags on the **Catalog** page can be included or left out: a tap includes a tag (only games that have
+it), the next leaves it out (games that have it are hidden), the next clears it. **All tags** lists
+every tag by group, with how many games have it. Your choices are kept with your account, on every
+device. An admin can set the tags left out for everyone who has not chosen
+([Defaults for everyone](/accounts/#defaults-for-everyone)).
+
+## Your recipes
+
+A folder of recipe files on your server is read as one more catalog: `/data/recipes`, or the folder
+in `RENPLAY_RECIPES_DIR`. Use it to fix a game's recipe or add one without waiting for the catalog.
+
+- Files are in the catalog's own format, one per game: `<id>.yaml`, the id matching the file's
+  name. Files whose names start with `_` or `.` are skipped, so `_template.yaml` can sit there.
+- A recipe with the id of a catalog recipe takes its place.
+- Art and patches can be files in the folder: `art: [{ kind: grid, file: art/my-game/grid.png }]`,
+  patches under `patches/<id>/`. Recipe files are read up to 1 MB, pictures up to 16 MB and patches
+  up to 64 MB, and nothing outside the folder is followed.
+- A recipe without an `nsfw` line counts as an adult game.
+- **Settings → Catalog** lists each source, the catalog and Your recipes, with its recipes and any
+  problems: a file that is not valid YAML, an unknown tag, a picture that could not be read.
 
 ## Request a game
 

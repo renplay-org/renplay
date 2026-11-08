@@ -341,7 +341,7 @@ Default: `1`
 
 </div>
 
-Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly; never trust arbitrary forwarded headers.
+Trusted proxy hops for client addresses and HTTPS detection. The included nginx is one hop. Use 0 when exposing Node directly. Never trust arbitrary forwarded headers.
 
 </div>
 
@@ -652,7 +652,7 @@ Default: `displayName`
 
 </div>
 
-Directory display-name attribute; falls back to cn, then username.
+Directory display-name attribute. Falls back to cn, then username.
 
 </div>
 
