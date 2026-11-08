@@ -132,15 +132,15 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
 
 ## Lessons that shaped the code
 
-- **Network storage hates small files.** Creating a file on the NFS games share costs 100–250 ms,
+- **Network storage hates small files.** Creating a file on an NFS share costs 100–250 ms,
   so builds keep streamed assets in one pack (four files per build), and deletions run as a
   `nice rm -rf` child process (`util/purge.ts`), because `fs.rm` on NFS starved Node's thread pool
   and stalled the API.
 - **Never shadow browser globals in the runtime.** A variable named `caches` broke Cache Storage;
   the runtime's own is `pyCaches`.
-- **Proxies change bodies.** The deployment's gateway strips `Accept-Encoding` and a scale-to-zero
-  proxy gunzips, so the engine is served as `.gz` files and decoded with `DecompressionStream`.
-- **HTTP/3 drops long downloads** through the gateway (`ERR_QUIC_PROTOCOL_ERROR`); the runtime
+- **Proxies change bodies.** Some gateways strip `Accept-Encoding` and some scale-to-zero
+  proxies gunzip, so the engine is served as `.gz` files and decoded with `DecompressionStream`.
+- **HTTP/3 drops long downloads** through some gateways (`ERR_QUIC_PROTOCOL_ERROR`); the runtime
   resumes `game.zip` with Range requests and shows an error with a retry button after 8 failures.
 - **Ren'Py recompiles old games' scripts** on the newer web engine on every start (17 s for Pale
   Carnations); the runtime stores the recompiled `.rpyc` files with the build.
@@ -233,11 +233,9 @@ test file. Screenshots need `npx playwright install chromium webkit` once.
 
 ## Deployment
 
-The reference deployment runs on Kubernetes (Flux) and pins a released image by tag and digest
-(`ghcr.io/renplay-org/renplay:X.Y.Z@sha256:…`); Renovate proposes new releases. To try a build
-there first, run **Edge image** (`edge.yml`) on the branch, pin the `edge@sha256:…` digest it prints
-temporarily, then pin the release. Data lives in
-`/data` (a persistent volume, backed up); `/games` can be rebuilt from `/games/_archives`.
+Releases are deployed by the maintainers, pinned by tag and digest
+(`ghcr.io/renplay-org/renplay:X.Y.Z@sha256:…`). To try a build on a server first, run **Edge image**
+(`edge.yml`) on the branch and pin the `edge@sha256:…` digest it prints.
 
 Agents never push to `main`, merge releases, or change a deployment on their own; they prepare
 branches and pull requests and say what is left to do.

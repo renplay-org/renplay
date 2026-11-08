@@ -26,8 +26,8 @@ http {
   server_tokens off;
   keepalive_requests 10000;
 
-  # Game assets live on NFS: keep file metadata and descriptors cached and do
-  # reads in a thread pool so a slow NAS never blocks the event loop.
+  # Game assets often live on NFS: keep file metadata and descriptors cached and
+  # do reads in a thread pool so a slow NAS never blocks the event loop.
   aio threads;
   # Short-lived: open handles keep deleted files alive on NFS.
   open_file_cache max=200000 inactive=2m;
