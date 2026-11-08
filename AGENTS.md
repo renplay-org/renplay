@@ -213,13 +213,13 @@ test file. Screenshots need `npx playwright install chromium webkit` once.
   and a read-only root, an install, the upgrade from the newest release and back, the chart on
   kind, deploy/compose.yaml; skipped when nothing in the image or the chart changed), and
   `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
-  Upgrades are tested from the newest release only: nobody runs 2.x or 3.x.
+  Upgrades are tested from the newest release.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
   `sites.yml` (the docs and the website, with each release or by hand), `demo.yml` (the demo, with each release or
   by hand), `uptime.yml` (the public sites every 15 minutes, the demo hourly: an open issue labelled
-  `uptime` per site that is down). Nothing public runs on a maintainer's own servers. Actions are pinned by commit SHA, Dependabot keeps them and the npm and Docker
-  dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
+  `uptime` per site that is down). Actions are pinned by commit SHA, Dependabot keeps them and the
+  npm and Docker dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
 - **Releases:** see the `release` skill. A `release-X.Y.Z` branch from `dev` bumps
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated
   `## [X.Y.Z] - YYYY-MM-DD` section, and is squash-merged into `main`. CI checks versions and the

@@ -16,7 +16,7 @@ import { readLocalFile } from './recipes-local.js'
 /**
  * The art system (DESIGN 0.4). A game has five formats in SteamGridDB's shapes. The catalog links
  * pictures, a person or an admin may choose another one or upload their own, and this module makes
- * every format from what there is, in Jan's order: real art in the shape, a crop at the focal
+ * every format from what there is, in this order: real art in the shape, a crop at the focal
  * point, a composition, the picture whole on its glow. Everything it serves is made here, cached by
  * content in the data folder, and served by the instance itself. Made pictures contain no text: the
  * interface draws the logo or the title where a composition leaves room for it.

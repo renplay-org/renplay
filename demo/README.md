@@ -1,7 +1,7 @@
 # The public demo
 
 [demo.renplay.org](https://demo.renplay.org) lets anyone try Renplay without installing it. It runs
-on Render's free plan, never on a maintainer's own servers.
+on Render.
 
 ## What a visitor gets
 
@@ -50,23 +50,12 @@ docker build --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> -t renplay-
 docker run --rm -p 8080:8080 --memory 512m --cpus 0.1 renplay-demo
 ```
 
-## Render
+## Hosting
 
-Once, by a maintainer:
+The demo runs on Render as a web service from `ghcr.io/renplay-org/renplay:demo`, on port 8080 with
+the health check `/api/health`. Each visitor's address comes from Cloudflare's `CF-Connecting-IP`
+(Render's edge is Cloudflare), so the sign-in limit counts every visitor on their own.
 
-1. A free Render account and workspace, without a payment method: Render then suspends the demo for
-   the rest of a month rather than charge for it.
-2. **New → Web Service → Existing image**: `ghcr.io/renplay-org/renplay:demo`, instance type
-   **Free**. Environment variable `PORT=8080` (Render sends visitors to that port). Health check path
-   `/api/health`.
-3. **Settings → Custom domains**: `demo.renplay.org`. In the renplay-org Cloudflare DNS, a CNAME
-   `demo` to the service's `onrender.com` address, DNS only (Render makes the certificate).
-4. **Settings → Deploy hook**: copy the URL into the renplay-org/renplay secret `RENDER_DEPLOY_HOOK`.
-5. Once it runs, check that each visitor has their own address: from one address, the eleventh
-   **Try the demo** within a minute is refused, and another address still gets in. The demo takes
-   the address from Cloudflare's `CF-Connecting-IP` (Render's edge is Cloudflare), not by counting
-   Render's proxies.
-
-The free plan gives 512 MB and 0.1 CPU, enough for serving a small game: the demo uses about 75 MB
-and starts in about half a minute. A cold start takes about a minute in all, with Render's own
-loading page meanwhile.
+The service has 512 MB and 0.1 CPU, enough for serving a small game: the demo uses about 75 MB and
+starts in about half a minute. A cold start takes about a minute in all, with Render's own loading
+page meanwhile.
