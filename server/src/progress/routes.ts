@@ -1,15 +1,10 @@
 import { Router } from 'express'
-import type { GameRow, GameWithProgress } from '../db.js'
+import type { GameRow } from '../db.js'
+import { toGame } from '../routes/games.js'
 import type { Services } from '../services.js'
+import { HttpError } from '../util/paths.js'
+import { PLAY_STATUSES, type GameWithProgress } from './store.js'
 
-interface SessionRow {
-  game: string
-  started_at: number
-  ended_at: number
-  seconds: number
-}
-
-/** The local calendar day of a moment, as YYYY-MM-DD (the server's time zone, TZ). */
 /** The day of a time, in the person's own time zone when the browser sends it (else the server's). */
 function dayFormat(tz: unknown): (ms: number) => string {
   let format: Intl.DateTimeFormat | null = null
@@ -25,17 +20,70 @@ function dayFormat(tz: unknown): (ms: number) => string {
   }
 }
 
-/**
- * Play history (DESIGN round 2, 4.7): the person's totals, their sessions by day, and the time
- * per game with ratings and statuses. Only games in the library that the person may see count:
- * a hidden game's sessions stay stored and come back with the level.
- */
-export function createHistoryRouter(s: Services): Router {
-  const { db, catalog, accounts } = s
+/** A person's progress with each game, and their play history. */
+export function createProgressRouter(s: Services): Router {
+  const { db, catalog, accounts, content, progress } = s
   const router = Router({ caseSensitive: true, strict: true })
+  const me = () => accounts.current().id
+  /** The changed game, as the library shows it. */
+  const answer = async (g: GameRow) => ({ ok: true, game: await toGame(db.getGame(g.id)!, s) })
 
-  router.get('/', (req, res) => {
-    const user = accounts.current().id
+  router.put('/games/:id/favorite', async (req, res) => {
+    const g = content.game(req.params.id)
+    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
+    progress.setFavorite(me(), g, req.body.on)
+    res.json(await answer(g))
+  })
+
+  router.put('/games/:id/status', async (req, res) => {
+    const g = content.game(req.params.id)
+    const status = req.body?.status ?? ''
+    if (!PLAY_STATUSES.includes(status)) throw new HttpError(400, 'Status must be playing, stalled, dropped, finished or empty')
+    progress.setStatus(me(), g, status)
+    res.json(await answer(g))
+  })
+
+  router.put('/games/:id/rating', async (req, res) => {
+    const g = content.game(req.params.id)
+    const rating = req.body?.rating ?? 0
+    if (!Number.isInteger(rating) || rating < 0 || rating > 5) throw new HttpError(400, 'Rating must be a whole number from 0 to 5')
+    progress.set(me(), g.id, { rating })
+    res.json(await answer(g))
+  })
+
+  // Not now: the game leaves Up next until it is played again. DELETE undoes it.
+  router.post('/games/:id/not-now', async (req, res) => {
+    const g = content.game(req.params.id)
+    progress.set(me(), g.id, { not_now_at: new Date().toISOString() })
+    res.json(await answer(g))
+  })
+  router.delete('/games/:id/not-now', async (req, res) => {
+    const g = content.game(req.params.id)
+    progress.set(me(), g.id, { not_now_at: '' })
+    res.json(await answer(g))
+  })
+
+  // The player reports visible, running time in seconds, in bounded increments.
+  router.post('/games/:id/play-time', (req, res) => {
+    const g = content.game(req.params.id)
+    const seconds = req.body?.seconds
+    if (!Number.isInteger(seconds) || seconds < 1 || seconds > 60) throw new HttpError(400, 'Seconds must be an integer from 1 to 60')
+    progress.addPlayTime(me(), g, seconds)
+    res.json({ ok: true })
+  })
+
+  router.post('/games/:id/played', (req, res) => {
+    progress.set(me(), content.game(req.params.id).id, { last_played_at: new Date().toISOString() })
+    res.json({ ok: true })
+  })
+
+  /**
+   * Play history: the person's totals, their sessions by day, and the time per game with ratings
+   * and statuses. Only games in the library that the person may see count: a hidden game's
+   * sessions stay stored and come back with the level.
+   */
+  router.get('/history', (req, res) => {
+    const user = me()
     const dayOf = dayFormat(req.query['tz'])
     const days = Math.max(1, Math.min(90, Number.parseInt(String(req.query['days'] ?? '14'), 10) || 14))
     const before = Number.parseInt(String(req.query['before'] ?? ''), 10)
@@ -43,14 +91,14 @@ export function createHistoryRouter(s: Services): Router {
     const seen = (id: string): GameWithProgress | null => {
       if (visible.has(id)) return visible.get(id)!
       const row = db.getGame(id)
-      if (!row || catalog.content.hides(row)) return null
-      const withProgress = accounts.progress(row)
+      if (!row || content.hides(row)) return null
+      const withProgress = progress.of(user, row)
       visible.set(id, withProgress)
       return withProgress
     }
     // ?game= narrows the history to one game, for its game page.
     const only = typeof req.query['game'] === 'string' ? req.query['game'] : null
-    const all = (db.raw.prepare('SELECT game, started_at, ended_at, seconds FROM play_sessions WHERE user_id = ? ORDER BY ended_at DESC').all(user) as unknown as SessionRow[]).filter((s) => (!only || s.game === only) && seen(s.game))
+    const all = progress.sessions(user).filter((s) => (!only || s.game === only) && seen(s.game))
     const title = (row: GameRow) => (row.recipe_id ? catalog.recipe(row.recipe_id)?.title : undefined) ?? row.title
     const icon = (row: GameRow) => catalog.gameArt(row).icon ?? null
 

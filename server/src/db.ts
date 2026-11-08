@@ -59,25 +59,6 @@ export interface GameRow {
   updated_at: string
 }
 
-/** One person's progress with a game (user_games). */
-export interface Progress {
-  favorite_at: string
-  /** When the status became finished, '' otherwise. */
-  finished_at: string
-  last_played_at: string
-  play_time: number
-  /** playing, stalled, dropped, finished, or '' when not set. */
-  play_status: string
-  /** 1 to 5, or 0 for none. */
-  rating: number
-  /** When the person said Not now: the game leaves Up next until it is played again. */
-  not_now_at: string
-}
-
-export const NO_PROGRESS: Progress = { favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, play_status: '', rating: 0, not_now_at: '' }
-
-export type GameWithProgress = GameRow & Progress
-
 export interface JobRow {
   id: string
   type: string

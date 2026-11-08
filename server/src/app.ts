@@ -17,7 +17,7 @@ import type { JobManager } from './jobs/manager.js'
 import { createJobsRouter } from './jobs/routes.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
-import { createHistoryRouter } from './routes/history.js'
+import { createProgressRouter } from './progress/routes.js'
 import { createContentRouter } from './routes/content.js'
 import { createLibraryRouter } from './routes/library.js'
 import { createPlayRouter } from './routes/play.js'
@@ -154,7 +154,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use('/api/saves', createSavesRouter(services))
   app.use('/api/games', createFilesRouter(services))
   app.use('/api/games', createGamesRouter(services))
-  app.use('/api/history', createHistoryRouter(services))
+  app.use('/api', createProgressRouter(services))
   app.use('/api', createLibraryRouter(services))
   // Made pictures are named by their content, so they never change: browsers keep them.
   app.get('/api/art/:file', (req, res, next) => {

@@ -75,6 +75,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/builds.ts      Build folders /games/<id>/<build>/, build.json, caches
   src/jobs/          Background job queue (installs, mod builds, hashing), its logs, routes and keepalive
   src/mods.ts        The mod overlay (user files layered over a build)
+  src/progress/      Each person's progress with each game and their play history, with its routes
   src/pipeline/      Install pipeline: archive.ts (zip/7z/rar reading), rpa.ts (RPA split, data-only
                      pickle in util/pickle.ts), project.ts (extraction), optimize.ts (WebP),
                      progressive.ts (what streams), pack.ts (asset packs), assemble.ts (game.zip),
@@ -86,7 +87,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
 selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. No tests; type-checked.
   src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
   src/lantern/       The 4.0 design system: Tile, Stage, the room, Sheet, controls, focus, travel
-                     (tokens and styles in src/index.css, the reference prototype in renplay-plans)
+                     (tokens and styles in src/index.css)
   src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
   src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
 runtime/           renplay-runtime.js: plain ES5-style script injected into every game page

@@ -12,7 +12,7 @@ import { playPath } from './play.js'
 import { cachedSaveMeta, cachedSceneHash } from './saves.js'
 import { slotInfo } from '../saves/savefile.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
-import { HttpError, assertSlug, cleanRelPath, safeJoin } from '../util/paths.js'
+import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
 import type { Services } from '../services.js'
 
 /** What a walkthrough file is, from its first bytes (and its name for text), or null. */
@@ -47,7 +47,7 @@ export const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json
 
 
 export async function toGame(game: GameRow, deps: Services) {
-  const row = deps.accounts.progress(game)
+  const row = deps.progress.of(deps.accounts.current().id, game)
   const source = parseJson<GameSource>(row.source, {})
   const job = deps.jobs.activeFor(row.id)
   let latestSave: { file: string; label: string; name: string; ctime: number; runtime: number | undefined; screenshot: string | null; screenshotHash?: string | null } | null = null
@@ -152,11 +152,7 @@ export function createGamesRouter(deps: Services): Router {
   const { cfg, db, jobs, builds } = deps
   const router = Router({ caseSensitive: true, strict: true })
 
-  const get = (req: Request): GameRow => {
-    const g = db.getGame(assertSlug(req.params.id))
-    if (!g || deps.catalog.content.hides(g)) throw new HttpError(404, 'Game not found')
-    return g
-  }
+  const get = (req: Request): GameRow => deps.content.game(req.params.id)
 
   router.get('/', async (_req, res) => {
     res.json({ games: await Promise.all(db.allGames().filter((r) => !deps.catalog.content.hides(r)).map((r) => toGame(r, deps))) })
@@ -252,65 +248,6 @@ export function createGamesRouter(deps: Services): Router {
     const subject = deps.catalog.gameSubject(g)
     await deps.art.ready(subject, scope)
     res.json({ art: deps.art.forSubject(subject) })
-  })
-
-  router.put('/:id/favorite', async (req, res) => {
-    const g = get(req)
-    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
-    const patch = { favorite_at: req.body.on ? deps.accounts.progress(g).favorite_at || new Date().toISOString() : '' }
-    deps.accounts.setProgress(g.id, patch)
-    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
-  })
-
-  /** finished_at is when the status became finished. */
-  const setStatus = (g: GameRow, status: string) => {
-    const previous = deps.accounts.progress(g).finished_at
-    const patch = { play_status: status, finished_at: status === 'finished' ? previous || new Date().toISOString() : '' }
-    deps.accounts.setProgress(g.id, patch)
-  }
-
-  router.put('/:id/status', async (req, res) => {
-    const g = get(req)
-    const status = req.body?.status ?? ''
-    if (!['', 'playing', 'stalled', 'dropped', 'finished'].includes(status)) throw new HttpError(400, 'Status must be playing, stalled, dropped, finished or empty')
-    setStatus(g, status)
-    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
-  })
-
-  router.put('/:id/rating', async (req, res) => {
-    const g = get(req)
-    const rating = req.body?.rating ?? 0
-    if (!Number.isInteger(rating) || rating < 0 || rating > 5) throw new HttpError(400, 'Rating must be a whole number from 0 to 5')
-    deps.accounts.setProgress(g.id, { rating })
-    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
-  })
-
-  // Not now: the game leaves Up next until it is played again. DELETE undoes it.
-  router.post('/:id/not-now', async (req, res) => {
-    const g = get(req)
-    deps.accounts.setProgress(g.id, { not_now_at: new Date().toISOString() })
-    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
-  })
-  router.delete('/:id/not-now', async (req, res) => {
-    const g = get(req)
-    deps.accounts.setProgress(g.id, { not_now_at: '' })
-    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
-  })
-
-  // The player reports visible, running time in seconds, in bounded increments.
-  router.post('/:id/play-time', (req, res) => {
-    const g = get(req)
-    const seconds = req.body?.seconds
-    if (!Number.isInteger(seconds) || seconds < 1 || seconds > 60) throw new HttpError(400, 'Seconds must be an integer from 1 to 60')
-    const counted = deps.accounts.addPlayTime(g.id, seconds)
-    if (counted) deps.accounts.setProgress(g.id, { play_time: deps.accounts.progress(g).play_time + counted })
-    res.json({ ok: true })
-  })
-
-  router.post('/:id/played', (req, res) => {
-    const id = get(req).id, patch = { last_played_at: new Date().toISOString() }
-    deps.accounts.setProgress(id, patch)
-    res.json({ ok: true })
   })
 
   /** Uninstalls (files go, saves and mods stay); `forget=1` also removes the library entry. */
