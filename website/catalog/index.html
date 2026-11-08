@@ -9,7 +9,7 @@
   <meta property="og:description" content="Ren’Py games tested in Renplay, and where to get them.">
   <meta property="og:image" content="https://renplay.org/img/og.jpg">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="theme-color" content="#07070a">
+  <meta name="theme-color" content="#0a0a0f">
   <link rel="icon" href="/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/site.css">
   <style>
@@ -19,18 +19,18 @@
     .bar { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: center; margin: 18px 0 0; }
     .search { flex: 1 1 280px; position: relative; }
     .search input { width: 100%; height: 46px; border-radius: 14px; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); font: inherit; font-size: 16px; padding: 0 16px 0 44px; outline: none; transition: border-color .2s, background .2s; }
-    .search input:focus { border-color: rgb(251 122 168 / .5); background: rgb(255 255 255 / .07); }
+    .search input:focus { border-color: rgb(255 158 192 / .5); background: rgb(255 255 255 / .07); }
     .search svg { position: absolute; left: 15px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--faint); }
     .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 13px; background: rgb(255 255 255 / .05); border: 1px solid var(--line); }
     .seg button { font: inherit; font-size: 15px; font-weight: 600; min-height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: none; color: var(--dim); cursor: pointer; transition: background .2s, color .2s; }
     .seg button[aria-pressed="true"] { background: rgb(255 255 255 / .12); color: var(--fg); }
-    .seg button:focus-visible, .chip-btn:focus-visible, .game:focus-visible .art { outline: 2px solid rgb(251 122 168 / .7); outline-offset: 2px; }
+    .seg button:focus-visible, .chip-btn:focus-visible, .game:focus-visible .art { outline: 2px solid rgb(255 158 192 / .7); outline-offset: 2px; }
     .view { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; margin: 28px 0 0; color: var(--faint); font-size: 14px; }
     .states { margin-top: 12px; }
     .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .chip-btn { font: inherit; font-size: 14px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: rgb(255 255 255 / .04); color: var(--dim); cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
     .chip-btn:hover { color: var(--fg); }
-    .chip-btn[aria-pressed="true"] { background: rgb(251 122 168 / .16); border-color: rgb(251 122 168 / .5); color: #fff; }
+    .chip-btn[aria-pressed="true"] { background: rgb(255 158 192 / .16); border-color: rgb(255 158 192 / .5); color: #fff; }
     .link-btn { font: inherit; font-size: 14px; color: var(--dim); background: none; border: 0; padding: 8px 4px; min-height: 36px; text-decoration: underline; cursor: pointer; }
     .count { color: var(--faint); font-size: 14px; }
     .count-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 22px 0 14px; }
@@ -40,13 +40,16 @@
     .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 26px 20px; }
     .game { display: block; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
     .game .art { border-radius: 18px; border: 1px solid var(--line); transition: transform .3s, border-color .3s, box-shadow .3s; }
-    .game:hover .art, .game:focus-visible .art { transform: translateY(-4px); border-color: rgb(251 122 168 / .35); box-shadow: 0 24px 60px -24px rgb(0 0 0 / .9); }
+    .game:hover .art, .game:focus-visible .art { transform: translateY(-4px); border-color: rgb(255 158 192 / .35); box-shadow: 0 24px 60px -24px rgb(0 0 0 / .9); }
     .game:focus-visible { outline: none; }
     .game h3 { margin: 12px 2px 0; font-size: 17px; letter-spacing: -.01em; line-height: 1.25; }
     .game .meta { margin: 3px 2px 0; color: var(--dim); font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-    .art { position: relative; aspect-ratio: 63 / 50; background: #15151c; overflow: hidden; }
+    .art { position: relative; aspect-ratio: 2 / 3; background: #15151c; overflow: hidden; }
     .art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    /* A cover of another shape, whole on its own colour, as the app shows it. */
+    .art img.whole { object-fit: contain; }
+    .art.blurred .tile-title { background: linear-gradient(180deg, transparent 40%, rgb(10 10 15 / .55)); }
     .art .tile-title { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 8% 9%; font-weight: 800; font-size: clamp(20px, 2.1vw, 26px); line-height: 1.12; letter-spacing: -.02em; text-wrap: balance; text-shadow: 0 2px 14px rgb(0 0 0 / .45); }
     .art .tag18 { position: absolute; top: 10px; right: 10px; padding: 2px 8px; border-radius: 8px; background: rgb(0 0 0 / .5); border: 1px solid rgb(255 255 255 / .16); font-size: 12px; font-weight: 700; backdrop-filter: blur(6px); }
     .free { color: #6ee7b7; font-weight: 600; }
@@ -60,7 +63,7 @@
     .sheet { display: grid; grid-template-columns: 300px 1fr; gap: 28px; padding: 28px; }
     .sheet .art { border-radius: 16px; border: 1px solid var(--line); }
     .close:focus { outline: none; }
-    .close:focus-visible { outline: 2px solid rgb(251 122 168 / .7); outline-offset: 2px; }
+    .close:focus-visible { outline: 2px solid rgb(255 158 192 / .7); outline-offset: 2px; }
     .close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: rgb(255 255 255 / .06); color: var(--fg); font-size: 20px; cursor: pointer; display: grid; place-items: center; z-index: 2; }
     .sheet h2 { font-size: 30px; margin: 0; padding-right: 40px; }
     .sheet .by { color: var(--dim); margin-top: 4px; }
@@ -80,7 +83,7 @@
     .rel .notes { margin-top: 6px; font-size: 14px; color: var(--dim); }
     .how { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: h; color: var(--dim); font-size: 15px; }
     .how li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; }
-    .how li::before { counter-increment: h; content: counter(h); width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: linear-gradient(180deg, #f6609a, #e0306f); }
+    .how li::before { counter-increment: h; content: counter(h); width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: linear-gradient(180deg, #f6609a, #d62a68); }
     .how b { color: var(--fg); font-weight: 600; }
     .recipe-link { display: inline-block; margin-top: 18px; color: var(--faint); font-size: 14px; }
 
@@ -90,7 +93,7 @@
     .field { display: grid; gap: 6px; margin-top: 14px; }
     .field span { font-size: 14px; color: var(--dim); }
     .field input { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); font: inherit; font-size: 16px; padding: 0 14px; outline: none; }
-    .field input:focus { border-color: rgb(251 122 168 / .5); }
+    .field input:focus { border-color: rgb(255 158 192 / .5); }
     .req .note { margin-top: 18px; padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / .04); border: 1px solid var(--line); font-size: 14px; color: var(--dim); }
     .req .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
     .request { margin-top: 64px; }
@@ -129,7 +132,7 @@
         <span class="lbl">GitHub</span>
       </a>
       <a class="btn sm" href="/support" aria-label="Support Renplay on Ko-fi">
-        <svg viewBox="0 0 24 24" fill="#fb7aa8" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.6 2.9 5 6.3 5c2.1 0 3.5 1.2 4.2 2.4h3c.7-1.2 2.1-2.4 4.2-2.4 3.4 0 5.4 3.6 3.9 6.8C19.5 16.4 12 21 12 21Z"/></svg>
+        <svg viewBox="0 0 24 24" fill="#ff9ec0" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.6 2.9 5 6.3 5c2.1 0 3.5 1.2 4.2 2.4h3c.7-1.2 2.1-2.4 4.2-2.4 3.4 0 5.4 3.6 3.9 6.8C19.5 16.4 12 21 12 21Z"/></svg>
         <span class="lbl">Support</span>
       </a>
       <a class="btn sm bar-catalog" href="/catalog">Catalog</a>
@@ -145,7 +148,7 @@
   <header class="page-head">
     <p class="eyebrow">The catalog</p>
     <h1>Games that work in Renplay.</h1>
-    <p class="lead">Every game here was installed and played in Renplay. Get it from its developer on itch.io, Patreon or F95zone, add the download, and Renplay picks up the cover and the right settings by itself. Most other Ren’Py games work too.</p>
+    <p class="lead">Every game here was installed and played in Renplay. Get it from its developer on itch.io, Patreon or F95zone, add the download, and Renplay picks up the art and the right settings by itself. Most other Ren’Py games work too.</p>
     <div class="view">
       <div class="seg" role="group" aria-label="Which games to list">
         <button type="button" id="v-sfw" aria-pressed="true">Safe for work</button>
@@ -169,7 +172,7 @@
     <button class="link-btn" type="button" id="covers" hidden></button>
   </div>
 
-  <div class="games" id="games"><div class="empty">Loading the catalog…</div></div>
+  <div class="games" id="games"><div class="empty">Loading the catalog</div></div>
   <div class="more" id="more" hidden><button class="btn" type="button" id="more-btn">Show more</button></div>
 
   <section class="request">
@@ -192,7 +195,7 @@
 <dialog id="age">
   <form class="req" id="age-form" method="dialog">
     <h2>Are you 18 or older?</h2>
-    <p>The full catalog lists adult games. Their covers stay hidden behind title cards until you choose to show them.</p>
+    <p>The full catalog lists adult games. Their covers stay blurred until you choose to show them.</p>
     <div class="row">
       <button class="btn primary" type="submit" value="yes">Yes, I’m 18 or older</button>
       <button class="btn" type="submit" value="no">No, stay safe for work</button>
@@ -206,7 +209,7 @@
     <h2>Request a game</h2>
     <p>Requests are public issues on GitHub, where the catalog lives. Fill this in, then GitHub opens the full request with your answers.</p>
     <label class="field"><span>Game</span><input name="game" required placeholder="Title as the developer writes it"></label>
-    <label class="field"><span>Version</span><input name="version" placeholder="0.9.23, Chapter 4…"></label>
+    <label class="field"><span>Version</span><input name="version" placeholder="0.9.23 or Chapter 4"></label>
     <label class="field"><span>Official page</span><input name="page" type="url" required placeholder="https://developer.itch.io/game"></label>
     <div class="note">GitHub asks you to sign in to send it. No account yet? <a href="https://github.com/signup" target="_blank" rel="noopener">Making one</a> is free and takes a minute.</div>
     <div class="row">
@@ -228,10 +231,11 @@
       <a href="/catalog#request" data-request>Request a game</a>
       <a href="/support">Support</a>
     </div>
-    <small>Renplay and its catalog are made by the Renplay Team. Covers are loaded from the developers’ own pages and belong to them. The catalog never hosts game files: get games from their developers.</small>
+    <small>Renplay and its catalog are made by the Renplay Team. Covers are linked from where the catalog found them, such as the developers’ pages, Steam and SteamGridDB, and belong to their makers. The catalog never hosts game files: get games from their developers.</small>
   </div>
 </footer>
 
+<script src="/js/thumbhash.js"></script>
 <script>
   { // Phone menu
     const nav = document.getElementById('nav'), menu = nav.querySelector('.menu')
@@ -267,18 +271,32 @@
   /** Tag ids to show: the vocabulary's labels, without the adult content group. */
   const shownTags = (g) => (g.tagIds ?? []).filter((t) => vocab[t] && vocab[t].group !== 'content')
   const label = (t) => vocab[t]?.label ?? t
-  const coverUrl = (g) => { const c = typeof g.cover === 'string' ? g.cover : g.cover?.url; return c ? new URL(c, BASE).href : '' }
-  /** An adult cover stays hidden unless the catalog marks it as a title treatment or the visitor asked. */
-  const hides = (g) => g.nsfw && !g.cover?.sfw && !ui.covers
+  /** The poster: the recipe's default grid picture, else its first grid, else any picture (catalog schema 4). */
+  const poster = (g) => (g.art ?? []).find((a) => a.kind === 'grid' && a.default) ?? (g.art ?? []).find((a) => a.kind === 'grid') ?? (g.art ?? [])[0]
+  const coverUrl = (g) => { const p = poster(g); return p?.url ? new URL(p.url, BASE).href : '' }
+  /** An adult cover stays hidden unless the visitor asked, per visit. */
+  const hides = (g) => g.nsfw && !ui.covers
+  /** A hidden cover is drawn as Renplay draws it at Blurred: a soft blur of its colours (ThumbHash), never the picture. */
+  const blurOf = (g) => {
+    const p = poster(g)
+    try {
+      return p?.thumbhash ? thumbHashToDataURL(Uint8Array.from(atob(p.thumbhash), (c) => c.charCodeAt(0))) : ''
+    } catch { return '' }
+  }
   const listed = () => (ui.all ? games : games.filter((g) => !g.nsfw))
 
   function art(g) {
     const cover = coverUrl(g)
+    const blur = cover && hides(g) ? blurOf(g) : ''
+    if (blur) return `<div class="art blurred"><img src="${blur}" alt=""><div class="tile-title">${esc(g.title)}</div><span class="tag18">18+</span></div>`
     if (!cover || hides(g)) {
       const h = hue(g.title)
       return `<div class="art"><div class="tile-title" style="background:radial-gradient(130% 120% at 0% 0%, hsl(${h} 45% 34%), hsl(${(h + 35) % 360} 40% 16%) 55%, hsl(${(h + 60) % 360} 30% 8%))">${esc(g.title)}</div>${g.nsfw ? '<span class="tag18">18+</span>' : ''}</div>`
     }
-    return `<div class="art"><img src="${esc(cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">${g.nsfw ? '<span class="tag18">18+</span>' : ''}</div>`
+    const p = poster(g)
+    const whole = p?.width && p?.height && Math.abs(p.width / p.height - 2 / 3) > 0.04
+    const tint = /^#[0-9a-f]{3,8}$/i.test(p?.tint ?? '') ? p.tint : ''
+    return `<div class="art"${whole && tint ? ` style="background:radial-gradient(120% 90% at 50% 40%, ${tint}, #0a0a0f)"` : ''}><img src="${esc(cover)}" alt="" loading="lazy" referrerpolicy="no-referrer"${whole ? ' class="whole"' : ''}>${g.nsfw ? '<span class="tag18">18+</span>' : ''}</div>`
   }
 
   function card(g, i) {
@@ -291,8 +309,9 @@
 
   function detail(g) {
     const rel = working(g)
-    const links = Object.keys(LINKS).filter((k) => g.links?.[k])
-    const store = STORES.find((k) => g.links?.[k])
+    // Only web addresses become links: a recipe's link is never a script.
+    const links = Object.keys(LINKS).filter((k) => /^https?:\/\//i.test(g.links?.[k] ?? ''))
+    const store = STORES.find((k) => links.includes(k))
     const file = rel?.archives?.[0]
     const releases = (g.releases ?? []).map((r) => `<div class="rel">
         <div class="top"><b>${esc(r.version)}</b>${r.status === 'broken' ? '<span class="st broken">Does not work</span>' : ''}${r.date ? `<span class="when">${day(r.date)}</span>` : ''}</div>
@@ -315,7 +334,7 @@
         <ol class="how">
           <li><span>Download ${file ? `<b>${esc(file.name)}</b>` : 'the PC version'} from ${store ? LINKS[store] : 'the developer'}.</span></li>
           <li><span>In Renplay, open <b>Add games</b> and upload it, or copy it into your archives folder.</span></li>
-          <li><span>Press <b>Install</b>. Renplay recognizes the download and uses the cover and settings from here.</span></li>
+          <li><span>Press <b>Install</b>. Renplay recognizes the download and uses the art and settings from here.</span></li>
         </ol>
         <h4>Versions</h4>
         <div class="releases">${releases}</div>
@@ -333,7 +352,7 @@
     const base = listed()
     $('v-sfw').setAttribute('aria-pressed', String(!ui.all))
     $('v-all').setAttribute('aria-pressed', String(ui.all))
-    $('view-note').textContent = ui.all ? 'Adult games are listed. Their covers are hidden until you show them.' : 'Adult games are hidden.'
+    $('view-note').textContent = ui.all ? 'Adult games are listed. Their covers are blurred until you show them.' : 'Adult games are hidden.'
     const covers = $('covers')
     covers.hidden = !(ui.all && base.some(hides) || ui.covers)
     covers.textContent = ui.covers ? 'Hide covers' : 'Show covers'
@@ -376,7 +395,7 @@
   const open = (g) => { opened = g; $('detail-body').innerHTML = detail(g); $('detail').showModal() }
 
   // Only games that work are listed.
-  fetch(BASE + 'index.v3.json')
+  fetch(BASE + 'index.v4.json')
     .then((r) => r.json())
     .then((idx) => {
       vocab = idx.vocabulary ?? {}
