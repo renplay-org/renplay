@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- The player shows **Syncing** only when saves take more than a few seconds to reach the server, instead of at every save. Saves waiting on the device while it is offline still show at once.
+
 ## [4.5.0] - 2026-11-08
 
 ### Fixed

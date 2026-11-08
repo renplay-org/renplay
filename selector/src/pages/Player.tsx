@@ -95,6 +95,7 @@ export default function Player() {
   const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [sync, setSync] = useState({ pending: 0, online: true, lastSync: 0 })
+  const slowSync = useSlow(sync.pending > 0, SLOW_SYNC)
   const [drawer, setDrawer] = useState<DrawerTab | null>(null)
   const [guide, setGuide] = useState<string | null>(null)
   const [savingNow, setSavingNow] = useState(false)
@@ -649,7 +650,7 @@ export default function Player() {
           )}
         </div>
       )}
-      {ready && (sync.pending > 0 || !sync.online) && (
+      {ready && ((sync.pending > 0 && slowSync) || !sync.online) && (
         <span className={cx('rp-sync', !sync.online && 'amber')} role="status" style={sandboxed ? { top: 14 + Math.max(insets.top, pad.top), left: 10 + insets.left } : { top: 14 + Math.max(insets.top, pad.top), right: 10 + insets.right }}>
           {!sync.online ? <CloudOff /> : <RefreshCw className="animate-spin" />}
           {!sync.online ? `Offline, ${sync.pending} ${sync.pending === 1 ? 'save' : 'saves'} waiting` : 'Syncing'}
@@ -978,6 +979,23 @@ function EscapeHint({ held, top }: { held: boolean; top: number }) {
       </div>
     </div>
   )
+}
+
+/** Saves usually reach the server within a second. The Syncing sign shows only when one takes longer than this. */
+const SLOW_SYNC = 5_000
+
+/** True once `on` has stayed true for `ms`, and false again as soon as it is false. */
+function useSlow(on: boolean, ms: number): boolean {
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    if (!on) {
+      setSlow(false)
+      return
+    }
+    const timer = setTimeout(() => setSlow(true), ms)
+    return () => clearTimeout(timer)
+  }, [on, ms])
+  return slow
 }
 
 function SyncBadge({ sync }: { sync: { pending: number; online: boolean; lastSync: number } }) {
