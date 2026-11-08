@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashArchive } from './archive-origin.js'
-import { ArtStore } from './art.js'
+import { ArtStore } from './art/store.js'
 import { Accounts } from './auth.js'
 import { SaveBackups } from './saves/backups.js'
 import { Builds } from './builds.js'
@@ -64,7 +64,8 @@ export async function createServices(cfg: Config): Promise<Services> {
   const content = new ContentMode(cfg, db, () => catalog?.adultSaveDirs() ?? [])
   const progress = new ProgressStore(db)
   const saveStores = new SaveStores(cfg, db)
-  const accounts = new Accounts(db, cfg, content, progress, saveStores)
+  const art = new ArtStore(cfg, db, content)
+  const accounts = new Accounts(db, cfg, content, progress, saveStores, art)
   try {
     await accounts.init()
   } catch (error) {
@@ -72,7 +73,6 @@ export async function createServices(cfg: Config): Promise<Services> {
     throw error
   }
   const purger = new Purger(cfg.purgeDir)
-  const art = new ArtStore(cfg, db, content)
   catalog = new Catalog(cfg, db, content, art)
   await catalog.init()
   const s: Services = {

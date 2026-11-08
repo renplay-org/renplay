@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
 import { viewer } from '../accounts-context.js'
-import { ART_KINDS, installedRelease, type ArtKind } from '../recipes/recipe.js'
+import { installedRelease } from '../recipes/recipe.js'
 import { parseJson, type GameRow, type GameSource } from '../db.js'
 import { playPath } from './play.js'
 import { cachedSaveMeta, cachedSceneHash } from '../saves/cache.js'
@@ -156,94 +156,6 @@ export function createGamesRouter(deps: Services): Router {
 
   router.get('/:id', async (req, res) => {
     res.json({ game: await toGame(get(req), deps) })
-  })
-
-  // ---- art: choices and uploads ------------------------------------
-
-  /** The game, when this person may see its pictures: below Shown an adult game's art does not exist. */
-  const withArt = (req: Request): GameRow => {
-    const g = get(req)
-    if (deps.catalog.content.blurs(g)) throw new HttpError(404, 'Not found')
-    return g
-  }
-  const kindOf = (value: unknown): ArtKind => {
-    if (typeof value !== 'string' || !ART_KINDS.includes(value as ArtKind)) throw new HttpError(400, 'Choose grid, wide, hero, logo or icon')
-    return value as ArtKind
-  }
-  /** Me: this person's own view. Everyone: the admin's default for the instance. */
-  const scopeOf = (value: unknown): number => {
-    const v = viewer()
-    if (value === 'everyone') {
-      if (v && v.user.role !== 'admin') throw new HttpError(403, 'Only an admin can choose art for everyone')
-      return 0
-    }
-    if (value !== undefined && value !== 'me') throw new HttpError(400, 'Scope must be me or everyone')
-    return v?.user.id ?? 0
-  }
-
-  router.get('/:id/art', async (req, res) => {
-    const g = withArt(req)
-    const subject = deps.catalog.gameSubject(g)
-    const scope = scopeOf(undefined)
-    if (req.query['kind'] === undefined) {
-      res.json({ art: deps.art.forSubject(subject), counts: Object.fromEntries(ART_KINDS.map((k) => [k, subject.pictures.filter((p) => p.kind === k).length])) })
-      return
-    }
-    const kind = kindOf(req.query['kind'])
-    res.json({ kind, candidates: await deps.art.candidates(subject, kind, scope) })
-  })
-
-  router.put('/:id/art', async (req, res) => {
-    const g = withArt(req)
-    const kind = kindOf(req.body?.kind)
-    const scope = scopeOf(req.body?.scope)
-    const subject = deps.catalog.gameSubject(g)
-    const picture = subject.pictures.find((p) => p.kind === kind && p.id === req.body?.candidate)
-    if (!picture) throw new HttpError(404, 'That picture is not a choice for this game')
-    // For everyone: a catalog picture or one uploaded for everyone. A personal upload is not on the others' lists.
-    if (scope === 0 && picture.upload && !deps.art.isShared(picture.id, g.id))
-      throw new HttpError(409, 'Upload this picture for everyone first, then choose it for everyone.')
-    deps.art.choose(g.id, kind, req.body.candidate, scope)
-    await deps.art.ready(subject, scope)
-    res.json({ art: deps.art.forSubject(subject) })
-  })
-
-  router.delete('/:id/art', async (req, res) => {
-    const g = withArt(req)
-    const kind = kindOf(req.query['kind'])
-    const scope = scopeOf(req.query['scope'])
-    deps.art.clearChoice(g.id, kind, scope)
-    const subject = deps.catalog.gameSubject(g)
-    await deps.art.ready(subject, scope)
-    res.json({ art: deps.art.forSubject(subject) })
-  })
-
-  router.post('/:id/art/upload', express.raw({ type: () => true, limit: '16mb' }), async (req, res) => {
-    const g = withArt(req)
-    const kind = kindOf(req.query['kind'])
-    const scope = scopeOf(req.query['scope'])
-    const focalText = typeof req.query['focal'] === 'string' ? req.query['focal'] : ''
-    const focal = /^(0(\.\d+)?|1(\.0+)?),(0(\.\d+)?|1(\.0+)?)$/.test(focalText) ? (focalText.split(',').map(Number) as [number, number]) : null
-    if (focalText && !focal) throw new HttpError(400, 'The focal point is two numbers from 0 to 1, like 0.5,0.3')
-    if (!Buffer.isBuffer(req.body) || !req.body.length) throw new HttpError(400, 'No picture uploaded')
-    const { id, warning } = await deps.art.upload(g.id, kind, req.body, focal, scope)
-    // An upload is made to be used: it becomes the choice at the scope it was uploaded for.
-    deps.art.choose(g.id, kind, id, scope)
-    const subject = deps.catalog.gameSubject(g)
-    await deps.art.ready(subject, scope)
-    res.json({ id, warning, art: deps.art.forSubject(subject) })
-  })
-
-  /** Deletes one's own upload (scope me), or an admin's upload for everyone (scope everyone). */
-  router.delete('/:id/art/uploads/:upload', async (req, res) => {
-    const g = withArt(req)
-    const kind = kindOf(req.query['kind'])
-    const scope = scopeOf(req.query['scope'])
-    if (!/^[0-9a-f]{64}$/.test(req.params.upload)) throw new HttpError(404, 'Picture not found')
-    if (!deps.art.removeUpload(g.id, kind, req.params.upload, scope)) throw new HttpError(404, 'Picture not found')
-    const subject = deps.catalog.gameSubject(g)
-    await deps.art.ready(subject, scope)
-    res.json({ art: deps.art.forSubject(subject) })
   })
 
   /** Uninstalls (files go, saves and mods stay); `forget=1` also removes the library entry. */

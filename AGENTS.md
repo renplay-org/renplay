@@ -71,7 +71,8 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
   src/recipes/       The recipe format (recipe.ts, read by everything) and Your recipes (local.ts)
   src/catalog/       Catalog index: recipe matching, linking games to recipes, updates, its routes
-  src/art.ts         The art cache: five formats per game, the making order, choices, uploads
+  src/art/           The art cache (store.ts): five formats per game, the making order, choices,
+                     uploads, and its routes
   src/engines.ts     Engine packs: index, download on demand, checksum, pruning
   src/builds.ts      Build folders /games/<id>/<build>/, build.json, caches
   src/jobs/          Background job queue (installs, mod builds, hashing), its logs, routes and keepalive
@@ -132,7 +133,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   restores compiled caches (bytecode and recompiled `.rpyc`), and talks to the player UI through
   `postMessage` (`renplay:*` messages).
 - **Catalog:** fetched every 6 hours or on demand. Games link to recipes by id, archive or save
-  folder (`Catalog.link`). The art cache (`art.ts`) downloads each picture once and makes every
+  folder (`Catalog.link`). The art cache (`art/store.ts`) downloads each picture once and makes every
   format into `/data/art` under content-hashed names.
 
 ## Lessons that shaped the code

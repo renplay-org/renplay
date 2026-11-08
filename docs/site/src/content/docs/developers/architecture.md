@@ -39,7 +39,7 @@ Modules below the routes, like the install pipeline, take only the parts they us
 | `/data/saves/`, `/data/save-history/` | Compatibility symlinks to owner 1's folders |
 | `/data/users-removed/` | Archived removed accounts. Never automatically purged |
 | `/data/overlays/<id>/` | Mods: the user's files layered over a game |
-| `/data/art/` | The art cache: made pictures by content hash, originals in `src/` (`art.ts`) |
+| `/data/art/` | The art cache: made pictures by content hash, originals in `src/` (`art/store.ts`) |
 | `/data/walkthroughs/` | Walkthrough PDFs |
 
 `/data` is what to back up. Everything in `/games` except `_archives` can be rebuilt (from the
@@ -237,7 +237,7 @@ clamped to 1 to 200) and `offset` (default 0). Invalid or unsafe integers use th
 Jobs sort active first, then newest first, with the id breaking timestamp ties. Offset pages
 reflect the current queue. Running jobs can move between pages as their status changes.
 
-**Art** (`art.ts`). A game has five formats: grid 600x900, wide 920x430, hero 1920x620, a logo and
+**Art** (`art/store.ts`). A game has five formats: grid 600x900, wide 920x430, hero 1920x620, a logo and
 a square icon. For each, the chosen picture is a person's choice, else the admin's for everyone
 (`art_choices`, scope 0), else the catalog's default. `planFormat` decides how a format is made:
 real art in the shape is resized. Another shape is cropped around its focal point when the recipe

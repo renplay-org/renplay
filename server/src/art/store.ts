@@ -3,16 +3,16 @@ import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { rgbaToThumbHash } from 'thumbhash'
-import { viewer } from './accounts-context.js'
-import type { Config } from './config.js'
-import type { ContentMode } from './content.js'
-import type { Db } from './db.js'
-import { MAX_IMAGE_PIXELS, PixelBudget } from './pipeline/image-memory.js'
-import { exists, writeFileAtomic } from './util/fsx.js'
-import { HttpError } from './util/paths.js'
-import { catalogHosts, fetchPublic } from './util/net.js'
-import { readLocalFile } from './recipes/local.js'
-import { ART_KINDS, type ArtKind, type CatalogImage } from './recipes/recipe.js'
+import { viewer } from '../accounts-context.js'
+import type { Config } from '../config.js'
+import type { ContentMode } from '../content.js'
+import type { Db } from '../db.js'
+import { MAX_IMAGE_PIXELS, PixelBudget } from '../pipeline/image-memory.js'
+import { exists, writeFileAtomic } from '../util/fsx.js'
+import { HttpError } from '../util/paths.js'
+import { catalogHosts, fetchPublic } from '../util/net.js'
+import { readLocalFile } from '../recipes/local.js'
+import { ART_KINDS, type ArtKind, type CatalogImage } from '../recipes/recipe.js'
 
 /**
  * The art system. A game has five formats in SteamGridDB's shapes. The catalog links
@@ -452,6 +452,12 @@ export class ArtStore {
     this.db.raw.prepare('DELETE FROM art_uploads WHERE scope = ?').run(id)
   }
 
+  /** Gives one person's choices and uploads to another, where the other has none for the same game and format. */
+  mergePerson(from: number, to: number): void {
+    this.db.raw.prepare('INSERT OR IGNORE INTO art_uploads (id, game, kind, scope, width, height, focal, thumbhash, tint, created_at) SELECT id, game, kind, ?, width, height, focal, thumbhash, tint, created_at FROM art_uploads WHERE scope = ?').run(to, from)
+    this.db.raw.prepare('INSERT OR IGNORE INTO art_choices (game, kind, scope, candidate) SELECT game, kind, ?, candidate FROM art_choices WHERE scope = ?').run(to, from)
+  }
+
   /** True when an upload was made for everyone. */
   isShared(id: string, game: string): boolean {
     return !!this.db.raw.prepare('SELECT 1 FROM art_uploads WHERE id = ? AND game = ? AND scope = 0').get(id, game)
@@ -464,6 +470,13 @@ export class ArtStore {
       focal: u.focal ? (JSON.parse(u.focal) as [number, number]) : null, dark: false, sha256: u.id, source: 'upload',
       credit: { upload: true }, upload: true, default: false,
     }))
+  }
+
+  /** Every upload of a game, for everyone and by each person, each once. */
+  allUploads(game: string): Picture[] {
+    const scopes = this.db.raw.prepare('SELECT DISTINCT scope FROM art_uploads WHERE game = ?').all(game) as Array<{ scope: number }>
+    const uploads = scopes.flatMap((r) => this.uploads(game, r.scope))
+    return [...new Map(uploads.map((u) => [`${u.id}:${u.kind}`, u])).values()]
   }
 
   /** The chosen picture of each format: the person's choice, the admin's choice for everyone, the catalog's default. */

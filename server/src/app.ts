@@ -14,6 +14,7 @@ import type { Config } from './config.js'
 import type { Db } from './db.js'
 import type { EngineStore } from './engines.js'
 import type { JobManager } from './jobs/manager.js'
+import { createArtRouter } from './art/routes.js'
 import { createCatalogRouter } from './catalog/routes.js'
 import { createJobsRouter } from './jobs/routes.js'
 import { createFilesRouter } from './routes/files.js'
@@ -155,11 +156,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use('/api', createProgressRouter(services))
   app.use('/api', createLibraryRouter(services))
   app.use('/api', createCatalogRouter(services))
-  // Made pictures are named by their content, so they never change: browsers keep them.
-  app.get('/api/art/:file', (req, res, next) => {
-    if (!art.canRead(req.params.file)) return next(new HttpError(404, 'Not found'))
-    res.sendFile(art.file(req.params.file), { headers: { 'Cache-Control': 'private, max-age=31536000, immutable', 'Content-Type': 'image/webp', 'X-Content-Type-Options': 'nosniff' } }, (err) => err && next(new HttpError(404, 'Not found')))
-  })
+  app.use('/api', createArtRouter(services))
   // Text walkthroughs are served as plain text, never sniffed as anything else.
   app.use('/api/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false, setHeaders: (res, path) => {
     res.setHeader('X-Content-Type-Options', 'nosniff')
