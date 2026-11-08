@@ -1,0 +1,52 @@
+name: Uptime
+
+# Renplay's public sites every 15 minutes, the demo hourly (more often would keep Render's free plan
+# awake). A site that is down gets one open issue with the label "uptime", closed when it is fine
+# again (scripts/uptime.mjs). Nothing public about Renplay runs on a maintainer's own servers, and
+# neither does this check.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+    - cron: '7 * * * *'
+  workflow_dispatch:
+    inputs:
+      test:
+        description: Open and close a test issue, to check the alerts work
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/uptime.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCHEDULE: ${{ github.event.schedule }}
+          TEST: ${{ inputs.test }}
+        run: |
+          if [ "$TEST" = true ]; then what=--test
+          elif [ "$SCHEDULE" = '7 * * * *' ]; then what=--demo
+          elif [ -n "$SCHEDULE" ]; then what=
+          else what=--all
+          fi
+          node scripts/uptime.mjs $what

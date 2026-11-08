@@ -217,7 +217,8 @@ test file. Screenshots need `npx playwright install chromium webkit` once.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
   `sites.yml` (the docs and the website, with each release or by hand), `demo.yml` (the demo, with each release or
-  by hand). Actions are pinned by commit SHA, Dependabot keeps them and the npm and Docker
+  by hand), `uptime.yml` (the public sites every 15 minutes, the demo hourly: an open issue labelled
+  `uptime` per site that is down). Nothing public runs on a maintainer's own servers. Actions are pinned by commit SHA, Dependabot keeps them and the npm and Docker
   dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
 - **Releases:** see the `release` skill. A `release-X.Y.Z` branch from `dev` bumps
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated
