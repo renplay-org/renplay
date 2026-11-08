@@ -93,7 +93,7 @@ image/             The image's own files: nginx.conf.template and entrypoint.sh 
 charts/renplay/    The Helm chart
 deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
                      these files (a code block marked file=deploy/<path>), CI checks them (tests/examples.sh)
-demo/              The public demo's image (demo.renplay.org, on Render)
+demo/              The public demo's image (demo.renplay.org)
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
 website/           renplay.org: plain HTML and CSS (home, catalog browser), _redirects for the stable
@@ -217,8 +217,7 @@ test file. Screenshots need `npx playwright install chromium webkit` once.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
   `sites.yml` (the docs and the website, with each release or by hand), `demo.yml` (the demo, with each release or
-  by hand), `uptime.yml` (the public sites every 15 minutes, the demo hourly: an open issue labelled
-  `uptime` per site that is down). Actions are pinned by commit SHA, Dependabot keeps them and the
+  by hand). Actions are pinned by commit SHA, Dependabot keeps them and the
   npm and Docker dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
 - **Releases:** see the `release` skill. A `release-X.Y.Z` branch from `dev` bumps
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated

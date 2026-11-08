@@ -1,6 +1,6 @@
 # The public demo at demo.renplay.org: Renplay with free games installed, their recipes in Your
-# recipes, adult games blurred, and RENPLAY_DEMO on. Everything is in the image: a host that starts
-# it fresh (Render's free plan, after 15 idle minutes or the demo's 4-hour stop) resets the demo.
+# recipes, adult games blurred, and RENPLAY_DEMO on. Everything is in the image, so every start
+# from it (after the demo's 4-hour stop, for one) is a fresh demo.
 #
 #   sh demo/build-games.sh 8.5.3 demo/games
 #   docker build --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> demo
@@ -19,11 +19,9 @@ ENV RENPLAY_ADULT_GAMES=blurred \
 RUN cd /games/_archives && node /tmp/seed.mjs *.zip
 
 FROM ${IMAGE}
-# One nginx worker: the free plan has 0.1 CPU and 512 MB, whatever cores the host shows.
-# Each visitor's own address: Render's edge is Cloudflare, which puts it in CF-Connecting-IP and
-# replaces any a visitor sends. Render's proxies in between are several and change, so counting
-# hops gave the sign-in limit one shared address for many visitors. nginx takes the address from
-# the header and logs it, and Renplay trusts nginx alone (RENPLAY_TRUSTED_HOPS=1 below).
+# One nginx worker, whatever cores the host shows. Each visitor's own address comes from the
+# CF-Connecting-IP header: nginx takes it and logs it, and Renplay trusts nginx alone
+# (RENPLAY_TRUSTED_HOPS=1 below), so the sign-in limit counts every visitor on their own.
 USER 0:0
 RUN sed -i -e 's/^worker_processes auto;/worker_processes 1;/' \
       -e 's|^  include /etc/nginx/mime.types;|&\n  real_ip_header CF-Connecting-IP;\n  set_real_ip_from 0.0.0.0/0;\n  set_real_ip_from ::/0;|' \
