@@ -26,7 +26,6 @@ describe('environment variables', () => {
       expect(cfg.port).toBe(3000)
       expect(cfg.gamesDir).toBe('/games')
       expect(cfg.archivesDir).toBe('/games/_archives')
-      expect(cfg.savesDir).toBe('/data/saves')
       expect(cfg.keepDownloads).toBe(true)
       expect(cfg.keepDownloadsLocked).toBe(false)
       expect(cfg.imageQuality).toBe(88)

@@ -22,10 +22,10 @@ describe('walkthrough files', () => {
     process.env['RENPLAY_ENGINES_URL'] = 'http://127.0.0.1:9/none'
     const cfg = loadConfig()
     dir = cfg.walkthroughsDir
-    // A 3.x library with one PDF walkthrough: the migration makes it the first file.
+    // A game with one PDF walkthrough.
     const db = Db.open(cfg.dataDir)
-    db.raw.exec('DROP TABLE walkthroughs; PRAGMA user_version = 14')
-    db.insertGame({ id: 'story', title: 'Story', status: 'installed', walkthrough: 'story-old.pdf' })
+    db.insertGame({ id: 'story', title: 'Story', status: 'installed' })
+    db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at, position) VALUES ('story-old.pdf', 'story', 'Walkthrough', 'pdf', '2026-01-01', 0)").run()
     db.close()
     app = await createApp(cfg, { startJobs: false })
   })
@@ -37,10 +37,6 @@ describe('walkthrough files', () => {
 
   const files = async () => (await request(app.app).get('/api/games/story').expect(200)).body.game.walkthroughs as Array<{ file: string; title: string; kind: string }>
 
-  it('turns a 3.x walkthrough into the first file of the list', async () => {
-    expect(await files()).toEqual([expect.objectContaining({ file: 'story-old.pdf', title: 'Walkthrough', kind: 'pdf' })])
-  })
-
   it('takes PDFs, pictures and plain text, and refuses HTML and anything else', () => {
     expect(walkthroughKind(Buffer.from('%PDF-1.7 x'))).toEqual({ kind: 'pdf', ext: 'pdf' })
     expect(walkthroughKind(Buffer.from([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]))).toEqual({ kind: 'image', ext: 'png' })
@@ -50,7 +46,7 @@ describe('walkthrough files', () => {
     expect(walkthroughKind(Buffer.from('MZ binary'), 'guide.exe')).toBeNull()
   })
 
-  it('adds, renames, orders and removes files, keeping games.walkthrough the first one for 3.x', async () => {
+  it('adds, renames, orders and removes files', async () => {
     const added = (await request(app.app).post('/api/games/story/walkthroughs').attach('file', Buffer.from('Route A: be kind.'), 'Routes and endings.md').expect(200)).body.game.walkthroughs
     expect(added.map((w: { title: string; kind: string }) => [w.title, w.kind])).toEqual([['Walkthrough', 'pdf'], ['Routes and endings', 'text']])
     const text = added[1]
@@ -62,13 +58,11 @@ describe('walkthrough files', () => {
     await request(app.app).put(`/api/games/story/walkthroughs/${text.file}`).send({ title: 'Endings' }).expect(200)
     await request(app.app).put(`/api/games/story/walkthroughs/${text.file}`).send({ position: 0 }).expect(200)
     expect((await files()).map((w) => w.title)).toEqual(['Endings', 'Walkthrough'])
-    expect(app.db.getGame('story')!.walkthrough).toBe(text.file)
     await request(app.app).put(`/api/games/story/walkthroughs/${text.file}`).send({ title: '  ' }).expect(400)
 
     await request(app.app).delete(`/api/games/story/walkthroughs/${text.file}`).expect(200)
     expect(existsSync(join(dir, text.file))).toBe(false)
     expect((await files()).map((w) => w.file)).toEqual(['story-old.pdf'])
-    expect(app.db.getGame('story')!.walkthrough).toBe('story-old.pdf')
     await request(app.app).delete('/api/games/story/walkthroughs/not-there.pdf').expect(404)
   })
 })

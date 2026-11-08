@@ -55,16 +55,10 @@ describe('HTTP API', () => {
     process.env['RENPLAY_ENGINES_URL'] = 'http://127.0.0.1:9/none'
     // A leftover database of renplay 2.0 is dropped.
     mkdirSync(join(root, 'data'), { recursive: true })
-    writeFileSync(join(root, 'data', 'renplay.db'), 'old')
     app = await createApp(loadConfig(), { startJobs: false })
     app.db.insertGame({ id: 'fixture-game', title: 'Fixture Game', status: 'installed', engine: '8.5.3', build: 'b1', save_dir: 'MyGame-1234567890', screen_w: 1920, screen_h: 1080 })
   })
   afterAll(() => app?.close())
-
-  it('replaced the old database', () => {
-    expect(() => readFileSync(join(root, 'data', 'renplay.db'))).toThrow()
-    expect(readFileSync(join(root, 'data', 'library.db')).length).toBeGreaterThan(0)
-  })
 
   it('lists games by id with their play URL', async () => {
     const res = await request(app.app).get('/api/games').expect(200)
@@ -113,16 +107,15 @@ describe('HTTP API', () => {
     expect(app.db.getGame('favorite-game')).toBeNull()
   })
 
-  it('stores finished state and measured play time without changing saves', async () => {
+  it('stores when a game was finished and measured play time without changing saves', async () => {
     app.db.insertGame({ id: 'progress-game', title: 'Progress', save_dir: 'Progress-123' })
     const path = '/api/games/progress-game'
-    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
     expect((await request(app.app).get(path)).body.game).toMatchObject({ playTime: 0, finishedAt: null, latestSave: null })
-    for (const on of [undefined, 'true', 1]) await request(app.app).put(`${path}/finished`).send({ on }).expect(400)
-    await request(app.app).put('/api/games/missing/finished').send({ on: true }).expect(404)
-    const timestamp = (await request(app.app).put(`${path}/finished`).send({ on: true }).expect(200)).body.game.finishedAt
+    for (const status of ['done', 1, true]) await request(app.app).put(`${path}/status`).send({ status }).expect(400)
+    await request(app.app).put('/api/games/missing/status').send({ status: 'finished' }).expect(404)
+    const timestamp = (await request(app.app).put(`${path}/status`).send({ status: 'finished' }).expect(200)).body.game.finishedAt
     expect(new Date(timestamp).toISOString()).toBe(timestamp)
-    expect((await request(app.app).put(`${path}/finished`).send({ on: true })).body.game.finishedAt).toBe(timestamp)
+    expect((await request(app.app).put(`${path}/status`).send({ status: 'finished' })).body.game.finishedAt).toBe(timestamp)
     for (const seconds of [-1, 0, 61, 1.5, '10', null]) await request(app.app).post(`${path}/play-time`).send({ seconds }).expect(400)
     await request(app.app).post('/api/games/missing/play-time').send({ seconds: 10 }).expect(404)
     await request(app.app).post(`${path}/play-time`).send({ seconds: 15 }).expect(200)
@@ -130,7 +123,7 @@ describe('HTTP API', () => {
     app.db.raw.prepare('UPDATE play_sessions SET started_at = started_at - 10000, ended_at = ended_at - 10000').run()
     await request(app.app).post(`${path}/play-time`).send({ seconds: 10 }).expect(200)
     expect((await request(app.app).delete(path).expect(200)).body.game).toMatchObject({ playTime: 25, finishedAt: timestamp })
-    expect((await request(app.app).put(`${path}/finished`).send({ on: false })).body.game.finishedAt).toBeNull()
+    expect((await request(app.app).put(`${path}/status`).send({ status: 'stalled' })).body.game).toMatchObject({ playStatus: 'stalled', finishedAt: null })
     app.db.deleteGame('progress-game')
   })
 

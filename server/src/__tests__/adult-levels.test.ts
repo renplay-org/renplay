@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import yazl from 'yazl'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
-import { groupCeiling, legacyMirror, parseAdultGroups, parseAdultLevel } from '../content.js'
+import { groupCeiling, parseAdultGroups, parseAdultLevel } from '../content.js'
 import { adultFlag } from '../pipeline/import.js'
 import { Db } from '../db.js'
 import { readZipEntries } from '../saves/savefile.js'
@@ -140,43 +140,6 @@ describe('OIDC sign-in groups set the ceiling', () => {
   })
 })
 
-describe('migration from 3.x, and back', () => {
-  it('turns 3.x access into ceilings and the 3.x picture preference into choices, and keeps the 3.x columns readable', () => {
-    const root = mkdtempSync(join(tmpdir(), 'renplay-levels-mig-'))
-    const path = join(root, 'library.db')
-    // A 3.2 database: users with and without adult access, the install question answered.
-    let db = new Db(path)
-    db.raw.exec(`ALTER TABLE users DROP COLUMN adult_ceiling; ALTER TABLE users DROP COLUMN adult_choice; PRAGMA user_version = 10`)
-    // 3.x hid pictures unless a person chose Show, so no preference means Blurred.
-    db.raw.prepare(`INSERT INTO users (username, name, role, adult_access, prefs, created_at) VALUES
-      ('yes', 'Yes', 'player', 1, '{"adultPictures":"show"}', '2026-01-01'),
-      ('hidden', 'Hidden', 'player', 1, '{"adultPictures":"hide-pictures"}', '2026-01-01'),
-      ('nogames', 'No games', 'player', 1, '{"adultPictures":"hide-games"}', '2026-01-01'),
-      ('broken', 'Broken', 'player', 1, 'not json', '2026-01-01'),
-      ('no', 'No', 'player', 0, '{"adultPictures":"show"}', '2026-01-01')`).run()
-    db.raw.prepare('UPDATE users SET adult_access = 1 WHERE id = 1').run()
-    db.setSetting('adult_games', 'block')
-    db.close()
-    db = new Db(path)
-    const user = (username: string) => db.raw.prepare('SELECT * FROM users WHERE username = ?').get(username) as { adult_ceiling: string; adult_choice: string }
-    expect(user('owner')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
-    expect(user('yes')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'shown' })
-    expect(user('hidden')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
-    expect(user('nogames')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'off' })
-    expect(user('broken')).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred' })
-    expect(user('no')).toMatchObject({ adult_ceiling: 'off', adult_choice: 'off' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
-    // Downgrading to 3.2 reads the columns 4.0 keeps in step: access, the picture
-    // preference and the allow/block install setting (covered by legacyMirror in content.test).
-    const cols = db.raw.prepare('PRAGMA table_info(users)').all().map((c) => c.name)
-    expect(cols).toContain('adult_access')
-    expect(cols).toContain('prefs')
-    expect(db.getSetting('adult_games', '')).toBe('block')
-    db.close()
-    rmSync(root, { recursive: true, force: true })
-  })
-})
-
 /**
  * Every route addressed to a game, at every level. The count canary walks the
  * app's registered routes: a route added later fails the canary until it is
@@ -212,18 +175,19 @@ describe('the levels on every route', () => {
     mkdirSync(engine, { recursive: true })
     writeFileSync(join(engine, 'index.html'), TEMPLATE)
     writeFileSync(join(engine, '.ready'), '{}')
+    const ownerSaves = join(cfg.dataDir, 'users', '1', 'saves')
     for (const id of ['adult', 'safe', 'adult-two']) {
       const build = join(cfg.gamesDir, id, 'b1')
       mkdirSync(build, { recursive: true })
       writeFileSync(join(build, 'game.zip'), zip)
       writeFileSync(join(build, 'assets.pack'), 'xxpng0123456789')
       writeFileSync(join(build, 'assets.json'), JSON.stringify({ 'images/a.png': [2, 3] }))
-      mkdirSync(join(cfg.savesDir, `${id}-1`), { recursive: true })
-      writeFileSync(join(cfg.savesDir, `${id}-1`, '1-1.save'), 'x')
+      mkdirSync(join(ownerSaves, `${id}-1`), { recursive: true })
+      writeFileSync(join(ownerSaves, `${id}-1`, '1-1.save'), 'x')
     }
     // A save with a real picture, for its hash at Blurred.
     const shot = await sharp({ create: { width: 384, height: 216, channels: 3, background: '#c42' } }).png().toBuffer()
-    writeFileSync(join(cfg.savesDir, 'adult-1', '2-1.save'), await zipBuffer({ json: JSON.stringify({ _save_name: 'A picture', _ctime: 1700000000 }), 'screenshot.png': shot, log: 'x', renpy_version: '8.5.3' }))
+    writeFileSync(join(ownerSaves, 'adult-1', '2-1.save'), await zipBuffer({ json: JSON.stringify({ _save_name: 'A picture', _ctime: 1700000000 }), 'screenshot.png': shot, log: 'x', renpy_version: '8.5.3' }))
     // Each recipe's grid is in the art cache's originals already: made without any download.
     const grids: Record<string, { sha256: string }> = {}
     mkdirSync(join(cfg.dataDir, 'art', 'src'), { recursive: true })
@@ -314,7 +278,7 @@ describe('the levels on every route', () => {
     ['GET /api/art/:file', 'game'], ['GET /:id/art', 'game'], ['PUT /:id/art', 'game'], ['DELETE /:id/art', 'game'], ['POST /:id/art/upload', 'game'],
     ['GET /:id/files', 'game'], ['GET /:id/files/raw', 'game'], ['PUT /:id/files/raw', 'game'], ['DELETE /:id/files/raw', 'game'],
     ['POST /:id/files/revert', 'game'], ['POST /:id/files/upload', 'game'], ['POST /:id/files/apply', 'game'], ['POST /:id/files/reset', 'game'],
-    ['GET /', 'list'], ['GET /:id', 'game'], ['PUT /:id/favorite', 'game'], ['PUT /:id/finished', 'game'], ['POST /:id/play-time', 'game'],
+    ['GET /', 'list'], ['GET /:id', 'game'], ['PUT /:id/favorite', 'game'], ['POST /:id/play-time', 'game'],
     ['POST /:id/played', 'game'], ['DELETE /:id', 'game'], ['DELETE /:id/download', 'game'], ['POST /:id/reinstall', 'game'],
     ['PUT /:id/cache', 'game'], ['GET /:id/recipe', 'game'], ['POST /:id/walkthroughs', 'game'], ['PUT /:id/walkthroughs/:file', 'game'], ['DELETE /:id/walkthroughs/:file', 'game'], ['DELETE /:id/art/uploads/:upload', 'game'],
     ['GET /archives', 'list'], ['POST /archives/inspect', 'tool'], ['POST /archives/hash', 'tool'], ['DELETE /archives', 'tool'],
@@ -393,7 +357,7 @@ describe('the levels on every route', () => {
     ]
     for (const path of reads) await request(app.app).get(path).expect(200)
     const writes: Array<[method: string, path: string, body?: unknown, raw?: 'raw']> = [
-      ['put', '/api/games/adult/favorite', { on: true }], ['put', '/api/games/adult/finished', { on: true }],
+      ['put', '/api/games/adult/favorite', { on: true }], ['put', '/api/games/adult/status', { status: 'finished' }],
       ['post', '/api/games/adult/played'], ['post', '/api/games/adult/play-time', { seconds: 5 }],
       ['put', '/api/games/adult/cache?name=bytecode-8.rpyb&build=b1', undefined, 'raw'],
       ['post', '/api/saves/adult/save-dir', { saveDir: 'adult-1' }],
@@ -473,7 +437,7 @@ describe('the levels on every route', () => {
     // Every route addressed to an adult game gets the 404 an unknown game gets.
     const gone: Array<[string, string, unknown?]> = [
       ['get', '/api/games/adult'], ['get', '/api/games/adult/recipe'],
-      ['put', '/api/games/adult/favorite', { on: true }], ['put', '/api/games/adult/finished', { on: true }],
+      ['put', '/api/games/adult/favorite', { on: true }], ['put', '/api/games/adult/status', { status: 'finished' }],
       ['post', '/api/games/adult/played'], ['post', '/api/games/adult/play-time', { seconds: 5 }],
       ['put', '/api/games/adult/cache?name=bytecode-8.rpyb&build=b1'], ['delete', '/api/games/adult'],
       ['delete', '/api/games/adult/download'], ['post', '/api/games/adult/reinstall'],
@@ -645,14 +609,6 @@ describe('the levels on every route', () => {
     expect(off.count).toBe((await request(app.app).get('/api/catalog').set('x-renplay-adult', 'off')).body.games.length)
   })
 
-  it('writes the 3.2 columns with the installation level, so a downgrade never shows more', async () => {
-    await setLevel('blurred')
-    const owner = app.db.raw.prepare('SELECT adult_access, prefs FROM users WHERE id = 1').get() as { adult_access: number; prefs: string }
-    expect(JSON.parse(owner.prefs).adultPictures).toBe('hide-pictures')
-    expect(app.db.getSetting('adult_games', '')).toBe('allow')
-    await setLevel('shown')
-    expect(JSON.parse((app.db.raw.prepare('SELECT prefs FROM users WHERE id = 1').get() as { prefs: string }).prefs).adultPictures).toBe('show')
-  })
 })
 
 describe('review fixes outside the routes', () => {
@@ -682,9 +638,4 @@ describe('review fixes outside the routes', () => {
     }
   })
 
-  it('projects the installation level into the 3.2 picture preference', () => {
-    expect(legacyMirror('shown', 'shown', 'blurred')).toEqual({ adultAccess: 1, adultPictures: 'hide-pictures' })
-    expect(legacyMirror('shown', 'shown', 'off')).toEqual({ adultAccess: 1, adultPictures: 'hide-games' })
-    expect(legacyMirror('shown', 'shown')).toEqual({ adultAccess: 1, adultPictures: 'show' })
-  })
 })

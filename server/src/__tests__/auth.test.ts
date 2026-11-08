@@ -30,7 +30,7 @@ function config(): Config {
   const root = mkdtempSync(join(tmpdir(), 'renplay-auth-')); roots.push(root)
   const cfg = loadConfig()
   const dataDir = join(root, 'data'), gamesDir = join(root, 'games'), internalDir = join(gamesDir, '_renplay')
-  return { ...cfg, dataDir, gamesDir, internalDir, savesDir: join(dataDir, 'saves'), saveHistoryDir: join(dataDir, 'save-history'), coversDir: join(dataDir, 'covers'), walkthroughsDir: join(dataDir, 'walkthroughs'), overlaysDir: join(dataDir, 'overlays'), workDir: join(internalDir, 'work'), purgeDir: join(internalDir, 'purge'), archivesDir: join(gamesDir, '_archives'), uploadsDir: join(internalDir, 'uploads'), enginesDir: join(internalDir, 'engines'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', auth: 'on', authLocal: true, authUser: 1, adultGames: 'shown', adminUsername: '', adminPassword: '', adultDefault: 'off' }
+  return { ...cfg, dataDir, gamesDir, internalDir, coversDir: join(dataDir, 'covers'), walkthroughsDir: join(dataDir, 'walkthroughs'), overlaysDir: join(dataDir, 'overlays'), workDir: join(internalDir, 'work'), purgeDir: join(internalDir, 'purge'), archivesDir: join(gamesDir, '_archives'), uploadsDir: join(internalDir, 'uploads'), enginesDir: join(internalDir, 'engines'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', auth: 'on', authLocal: true, authUser: 1, adultGames: 'shown', adminUsername: '', adminPassword: '', adultDefault: 'off' }
 }
 async function start(cfg = config(), seeded = true) {
   if (seeded) { cfg.adminUsername = 'admin'; cfg.adminPassword = 'correct password' }
@@ -430,13 +430,12 @@ describe('personal data and save moves', () => {
       await request(a.app).post('/api/games/safe/played').set(site).set('Cookie', cookie!).send({}).expect(200)
     }
     await request(a.app).put('/api/games/safe/favorite').set(site).set('Cookie', player).send({ on: true }).expect(200)
-    await request(a.app).put('/api/games/safe/finished').set(site).set('Cookie', player).send({ on: true }).expect(200)
+    await request(a.app).put('/api/games/safe/status').set(site).set('Cookie', player).send({ status: 'finished' }).expect(200)
     await request(a.app).post('/api/games/safe/play-time').set(site).set('Cookie', player).send({ seconds: 23 }).expect(200)
     const personal = (await request(a.app).get('/api/games/safe').set('Cookie', player)).body.game
     expect(personal).toMatchObject({ playTime: 23, saves: { count: 0 } }); expect(personal.favoriteAt).toBeTruthy(); expect(personal.finishedAt).toBeTruthy()
     const owner = (await request(a.app).get('/api/games/safe').set('Cookie', admin)).body.game
     expect(owner).toMatchObject({ playTime: 0, favoriteAt: null, finishedAt: null })
-    expect(a.db.getGame('safe')!.last_played_at).toBe(personal.lastPlayedAt)
     expect((await a.accounts.store(id).read('safe', 'persistent')).toString()).toBe('player')
     expect((await a.saves.read('safe', 'persistent')).toString()).toBe('owner')
     await request(a.app).put('/api/saves/safe/file?path=safe/persistent').set(site).set('Cookie', player).set('X-Renplay-User', '1').send('wrong account').expect(401)
@@ -641,42 +640,3 @@ describe('adult access and signed game URLs', () => {
   })
 })
 
-describe('account migration', () => {
-  it('backs up v6 saves, history and database, preserves progress and opens through the 2.10 layout after downgrade', () => {
-    const cfg = config(); let db = Db.open(cfg.dataDir)
-    db.insertGame({ id: 'safe', title: 'Safe', favorite_at: 'favorite', finished_at: 'finished', play_time: 12, last_played_at: 'played' })
-    db.raw.exec('DROP TABLE sessions; DROP TABLE tokens; DROP TABLE identities; DROP TABLE user_games; DROP TABLE users; DROP TABLE safe_games; DELETE FROM settings WHERE key = \'auth_default\'; PRAGMA user_version = 6'); db.close()
-    mkdirSync(join(cfg.savesDir, 'Safe'), { recursive: true }); writeFileSync(join(cfg.savesDir, 'Safe', 'persistent'), 'original')
-    mkdirSync(join(cfg.saveHistoryDir, 'Safe', 'persistent'), { recursive: true }); writeFileSync(join(cfg.saveHistoryDir, 'Safe', 'persistent', '1__game__abc'), 'previous')
-    db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir })
-    expect(db.getSetting('auth_default', '')).toBe('off')
-    expect(db.raw.prepare('SELECT * FROM user_games').get()).toMatchObject({ user_id: 1, favorite_at: 'favorite', play_time: 12, last_played_at: 'played', finished_at: 'finished' })
-    expect(lstatSync(cfg.savesDir).isSymbolicLink()).toBe(true); expect(lstatSync(cfg.saveHistoryDir).isSymbolicLink()).toBe(true)
-    expect(readFileSync(join(cfg.dataDir, 'backups', 'pre-3.0', 'saves', 'Safe', 'persistent'), 'utf-8')).toBe('original')
-    const backup = new DatabaseSync(join(cfg.dataDir, 'backups', 'pre-3.0', 'library.db'))
-    expect(backup.prepare('PRAGMA user_version').get()!.user_version).toBe(6); backup.close(); db.close()
-    // 2.10 accepts a newer user_version and uses these unchanged paths and columns.
-    const oldDb = new DatabaseSync(join(cfg.dataDir, 'library.db'))
-    expect(oldDb.prepare('SELECT last_played_at, favorite_at FROM games').get()).toMatchObject({ last_played_at: 'played', favorite_at: 'favorite' })
-    expect(readFileSync(join(cfg.savesDir, 'Safe', 'persistent'), 'utf-8')).toBe('original')
-    expect(readFileSync(join(cfg.saveHistoryDir, 'Safe', 'persistent', '1__game__abc'), 'utf-8')).toBe('previous')
-    writeFileSync(join(cfg.savesDir, 'Safe', 'from-2.10'), 'downgrade write')
-    expect(readFileSync(join(cfg.dataDir, 'users', '1', 'saves', 'Safe', 'from-2.10'), 'utf-8')).toBe('downgrade write')
-    oldDb.close()
-  })
-  it('resumes after a folder moved but history did not, merges partial copies and leaves both originals recoverable', () => {
-    const cfg = config(); let db = Db.open(cfg.dataDir)
-    db.raw.exec('PRAGMA user_version = 6'); db.close()
-    const owner = join(cfg.dataDir, 'users', '1')
-    mkdirSync(join(owner, 'saves', 'Safe'), { recursive: true }); writeFileSync(join(owner, 'saves', 'Safe', 'persistent'), 'moved')
-    symlinkSync(join(owner, 'saves'), cfg.savesDir)
-    mkdirSync(join(cfg.saveHistoryDir, 'Safe', 'persistent'), { recursive: true }); writeFileSync(join(cfg.saveHistoryDir, 'Safe', 'persistent', '1__game__abc'), 'source')
-    mkdirSync(join(owner, 'save-history', 'Safe', 'persistent'), { recursive: true }); writeFileSync(join(owner, 'save-history', 'Safe', 'persistent', '1__game__abc'), 'target')
-    db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir }); db.close()
-    expect(realpathSync(cfg.savesDir)).toBe(realpathSync(join(owner, 'saves'))); expect(realpathSync(cfg.saveHistoryDir)).toBe(realpathSync(join(owner, 'save-history')))
-    expect(readFileSync(join(cfg.saveHistoryDir, 'Safe', 'persistent', '1__game__abc'), 'utf-8')).toBe('target')
-    expect(readdirSync(join(owner, 'migration-conflicts', 'save-history', 'Safe', 'persistent', '1__game__abc'))).toHaveLength(1)
-    db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir }); db.close()
-    expect(readFileSync(join(cfg.savesDir, 'Safe', 'persistent'), 'utf-8')).toBe('moved')
-  })
-})

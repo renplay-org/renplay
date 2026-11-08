@@ -180,9 +180,8 @@ library entry's `createdAt`, not the installation date. Library pages reveal 60 
 then 48 at a time. Catalog pages reveal 30 at a time. Tag chips count games, include only play
 and story tags shared by at least two games, and use the catalog vocabulary for labels.
 
-Favourites first lived in `games.favorite_at` (schema 4). Schema 7 copies owner progress into
-`user_games` and all account-facing progress reads and writes use that table, independently of builds.
-The shared `games.last_played_at` remains the latest across accounts for downgrade compatibility.
+Each person's progress (favourite, status, rating, play time, last played) lives in `user_games`,
+independently of builds.
 `PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
 Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
 its timestamp. Uninstall keeps it. Forgetting the library entry removes it.
@@ -221,9 +220,7 @@ a download or a recipe), downloads, the Users tools, counts and catalog problems
 is listed and plays, with its walkthrough and the person's own save files, but no picture of it is
 sent: no art URL in JSON (each format is its ThumbHash and tint), 404 for art, save screenshots and the build's presplash, directly and
 through nginx's `/api/auth/check`. `adult-levels.test.ts` lists every registered route with what
-the levels do on it, so a new route fails until it is classified. The 3.x columns (`adult_access`,
-the `adultPictures` preference, the `adult_games` setting) are kept in step, the installation level
-included, so a downgrade to 3.2 never shows more.
+the levels do on it, so a new route fails until it is classified.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1 to 200) and `offset` (default 0). Invalid or unsafe integers use the defaults.

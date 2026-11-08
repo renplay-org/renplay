@@ -72,7 +72,6 @@ export default function Player() {
   const userId = useRef(account!.user.id).current
   const [signedOut, setSignedOut] = useState(false)
   const [signInError, setSignInError] = useState('')
-  const [legacySaves, setLegacySaves] = useState(false)
   const { id: gameId = '' } = useParams()
   const [params] = useSearchParams()
   const resume = params.get('resume')
@@ -179,9 +178,6 @@ export default function Player() {
       if (!d || typeof d.type !== 'string' || !d.type.startsWith('renplay:')) return
       if (sandboxed && d.userId !== userId) return
       switch (d.type) {
-        case 'renplay:legacy-saves':
-          setLegacySaves(true)
-          break
         case 'renplay:signed-out':
           setSignedOut(true)
           break
@@ -590,7 +586,6 @@ export default function Player() {
       {signedOut && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center"><section role="dialog" aria-modal="true" aria-label="You were signed out" className="safe-bottom w-full max-w-md space-y-4 rounded-3xl bg-ink-950 p-6 ring-1 ring-white/10"><h2 className="text-xl font-semibold">You were signed out.</h2><p className="text-sm text-zinc-400">Your saves are kept on this device until you sign in to the same account.</p><a className="btn p" style={{ display: 'inline-flex' }} href="/signin" target="_blank" rel="noreferrer">Sign in</a><Button className="ml-3" onClick={async () => {
         try { const me = await api<{ user: { id: number } }>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
       }}>Continue</Button>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
-      {legacySaves && <div role="status" className="fixed inset-x-4 top-4 z-[90] mx-auto max-w-md rounded-2xl bg-ink-950 p-4 text-sm shadow-xl"><p>Unowned browser saves are kept on this device. Their account is not known. Ask an admin to help recover them before clearing browser storage.</p><Button onClick={() => setLegacySaves(false)} className="mt-2">Dismiss</Button></div>}
       {/* Game stage */}
       {/* A click in the bars around the game gives the keyboard back to the game. */}
       <div ref={stageRef} className={cx('rp-stage absolute inset-0', drawer && 'dim')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>

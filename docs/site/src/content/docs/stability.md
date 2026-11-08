@@ -50,8 +50,8 @@ Both work with a read-only root filesystem and writable `/data`, `/games` and `/
 
 ## Environment variables
 
-Every variable on [Configuration](/configuration/) is part of the contract. None is renamed or
-removed in 4.x, and new ones may be added. Older spellings keep working.
+Every variable on [Configuration](/configuration/) is part of the contract: it keeps its name and
+what it does throughout 4.x, and new ones may be added. Older spellings keep working.
 Changed defaults and security fixes are in the release notes, so set a value explicitly when your
 package depends on it.
 
@@ -81,6 +81,6 @@ on the same folders. Never run two versions at once.
 Every change is tested on the way from the newest release to it, back to that release, and up
 again, with saves, their history and everything people set unchanged. Going back further is not
 promised, because database changes only move forward. Then restore the backup that matches the
-older release.
+older release. A library from before 4.0 opens in Renplay 4.5.1 first, then in the newest version.
 
 Read [Upgrading and backups](/upgrading/) before updating a library you care about.

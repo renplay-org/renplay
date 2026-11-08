@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type { Accounts } from '../auth.js'
 import type { Catalog } from '../catalog.js'
-import type { Db, GameRow } from '../db.js'
+import type { Db, GameRow, GameWithProgress } from '../db.js'
 
 interface SessionRow {
   game: string
@@ -39,8 +39,8 @@ export function createHistoryRouter(db: Db, catalog: Catalog, accounts: Accounts
     const dayOf = dayFormat(req.query['tz'])
     const days = Math.max(1, Math.min(90, Number.parseInt(String(req.query['days'] ?? '14'), 10) || 14))
     const before = Number.parseInt(String(req.query['before'] ?? ''), 10)
-    const visible = new Map<string, GameRow>()
-    const seen = (id: string): GameRow | null => {
+    const visible = new Map<string, GameWithProgress>()
+    const seen = (id: string): GameWithProgress | null => {
       if (visible.has(id)) return visible.get(id)!
       const row = db.getGame(id)
       if (!row || catalog.content.hides(row)) return null

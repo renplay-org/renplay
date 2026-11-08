@@ -129,15 +129,10 @@ default to admin-only unless the player allowlist is extended and tested.
 
 ## Database and request boundary
 
-Schema **10** records each user's current admin grant source and its provider and subject.
-`manual` covers admin access assigned in Renplay, including accounts upgraded from 3.0.
-It also adds `identity_metadata` to record the directory username used by a linked identity.
-An `owner_claim` setting reserves ownership during copying. Startup clears an interrupted reservation
-without deleting copied saves or history. Schema **9** adds `avatar` and `avatar_uploaded` to users.
-Schema 8 records uploaded archive ownership. Schema 7 (2.10 already uses schema 6) adds `users`, `identities`, `sessions`, `tokens`,
-`user_games` and `safe_games`. Owner 1 receives existing library progress. Account ids are never
-reused. The migration backs up the checkpointed database and both save trees before moving any
-folder and only commits the new schema after folder migration succeeds.
+Each user records the source of their admin access (`manual`, or the provider and subject that
+granted it), and `identity_metadata` records the directory username of a linked identity. An
+`owner_claim` setting reserves ownership while saves are copied. Startup clears an interrupted
+reservation without deleting copied saves or history. Account ids are never reused.
 
 A request-local viewer selects one `SaveStore` per user. Metadata keys include its root, screenshot
 URLs include user id, and personalized responses are not stored in HTTP caches. Runtime requests

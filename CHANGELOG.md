@@ -7,6 +7,12 @@ release notes say what).
 
 ## [Unreleased]
 
+### Removed
+
+- Libraries from before 4.0 no longer open in this version: start Renplay 4.5.1 on one once, then this version. Going back from 4.x to 3.x is no longer possible.
+- `SAVES_DIR` and `SAVE_HISTORY_DIR`. Since 3.0 saves live under `/data/users/<id>/`, and these only placed links at the old folders for going back to 2.11.
+- The API's `PUT /api/games/<id>/finished`. Set the status `finished` with `PUT /api/games/<id>/status` instead.
+
 ## [4.5.1] - 2026-11-08
 
 ### Fixed

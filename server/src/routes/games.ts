@@ -62,8 +62,8 @@ export interface GameDeps {
   version: string
 }
 
-export async function toGame(row: GameRow, deps: GameDeps) {
-  row = deps.accounts.progress(row)
+export async function toGame(game: GameRow, deps: GameDeps) {
+  const row = deps.accounts.progress(game)
   const source = parseJson<GameSource>(row.source, {})
   const job = deps.jobs.activeFor(row.id)
   let latestSave: { file: string; label: string; name: string; ctime: number; runtime: number | undefined; screenshot: string | null; screenshotHash?: string | null } | null = null
@@ -115,7 +115,6 @@ export async function toGame(row: GameRow, deps: GameDeps) {
     free: recipe?.free,
     // The five formats. Below Shown an adult game's formats are hashes and tints, no address.
     art: deps.catalog.gameArt(row),
-    walkthrough: row.walkthrough || null,
     /** The walkthrough files, in order: PDFs, pictures and plain text. */
     walkthroughs: deps.db.walkthroughs(row.id).map((w) => ({ file: w.file, title: w.title, kind: w.kind, size: w.size, addedAt: w.added_at, url: `/api/walkthroughs/${encodeURIComponent(w.file)}` })),
     status: row.status,
@@ -279,22 +278,12 @@ export function createGamesRouter(deps: GameDeps): Router {
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
-  /** Finished keeps finished_at in step with the status, which 3.x reads. */
+  /** finished_at is when the status became finished. */
   const setStatus = (g: GameRow, status: string) => {
     const previous = deps.accounts.progress(g).finished_at
     const patch = { play_status: status, finished_at: status === 'finished' ? previous || new Date().toISOString() : '' }
     deps.accounts.setProgress(g.id, patch)
   }
-
-  router.put('/:id/finished', async (req, res) => {
-    const g = get(req)
-    if (typeof req.body?.on !== 'boolean') throw new HttpError(400, 'On must be a boolean')
-    // Not finished (from 3.x) clears Finished only: Stalled or Dropped stay.
-    const current = deps.accounts.progress(g).play_status
-    if (req.body.on) setStatus(g, 'finished')
-    else if (!current || current === 'finished') setStatus(g, '')
-    res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
-  })
 
   router.put('/:id/status', async (req, res) => {
     const g = get(req)
@@ -476,7 +465,6 @@ export function createGamesRouter(deps: GameDeps): Router {
     const title = typeof req.body?.title === 'string' && req.body.title.trim() ? req.body.title.trim().slice(0, 100) : fallback
     const position = (db.walkthroughs(g.id).at(-1)?.position ?? -1) + 1
     db.raw.prepare('INSERT INTO walkthroughs (file, game, title, kind, size, added_at, position) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, g.id, title, kind.kind, f.size, new Date().toISOString(), position)
-    db.syncFirstWalkthrough(g.id)
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
@@ -494,7 +482,6 @@ export function createGamesRouter(deps: GameDeps): Router {
       if (!Number.isInteger(at) || at < 0) throw new HttpError(400, 'Position must be a whole number from 0')
       list.splice(Math.min(at, list.length), 0, w)
       list.forEach((x, i) => db.raw.prepare('UPDATE walkthroughs SET position = ? WHERE file = ?').run(i, x.file))
-      db.syncFirstWalkthrough(g.id)
     }
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
@@ -504,7 +491,6 @@ export function createGamesRouter(deps: GameDeps): Router {
     const w = walkthroughOf(g, req.params.file)
     db.raw.prepare('DELETE FROM walkthroughs WHERE file = ?').run(w.file)
     await unlink(join(cfg.walkthroughsDir, w.file)).catch(() => {})
-    db.syncFirstWalkthrough(g.id)
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 

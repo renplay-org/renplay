@@ -1,12 +1,12 @@
 import { createHash, createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
-import { mkdir, rename, writeFile, symlink, lstat } from 'node:fs/promises'
-import { dirname as pathDirname, relative as pathRelative } from 'node:path'
+import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import express, { Router, type Request, type Response } from 'express'
 import type { Config } from './config.js'
-import { legacyMirror, lowestLevel, parseAdultLevel, type AdultLevel, type ContentMode } from './content.js'
+import { lowestLevel, parseAdultLevel, type AdultLevel, type ContentMode } from './content.js'
 import type { Db, GameRow } from './db.js'
-import { parseJson } from './db.js'
+import type { SQLInputValue } from 'node:sqlite'
+import { NO_PROGRESS, parseJson, type GameWithProgress, type Progress } from './db.js'
 import { viewer, viewers, type User, type Viewer } from './accounts-context.js'
 import { SaveStore, SHARED_DIRS } from './saves/store.js'
 import { readZipEntries } from './saves/savefile.js'
@@ -150,10 +150,6 @@ export class Accounts {
     if (!user) throw new HttpError(401, 'Sign in to Renplay')
     return user
   }
-  /** Only an upgraded single-user installation may attribute pre-account browser saves. */
-  get legacySaveOwner(): number | null {
-    return this.db.getSetting<string>('auth_default', 'on') === 'off' ? 1 : null
-  }
   store(id = this.current().id): SaveStore {
     this.user(id)
     let s = this.stores.get(id)
@@ -183,10 +179,6 @@ export class Accounts {
     if (!this.enabled && this.user(this.cfg.authUser).disabled) throw new Error('RENPLAY_AUTH_USER is disabled')
     if (this.cfg.demo) this.ensureGuest()
     for (const u of this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]) await this.tag(u)
-    for (const [legacy, target] of [[this.cfg.savesDir, this.store(1).root], [this.cfg.saveHistoryDir, this.store(1).historyRoot]]) {
-      await mkdir(target!, { recursive: true })
-      if (!await lstat(legacy!).catch(() => null)) { await mkdir(join(legacy!, '..'), { recursive: true }); await symlink(pathRelative(pathDirname(legacy!), target!), legacy!, 'dir') }
-    }
   }
   /**
    * The demo's guest: a player everyone signs in as with Try the demo. It has no password, and its
@@ -202,14 +194,12 @@ export class Accounts {
     const row = this.db.raw.prepare("SELECT id FROM users WHERE username = 'demo'").get() as { id: number } | undefined
     return row?.id ?? null
   }
-  /** Writes a person's ceiling and choice, and the 3.x columns a downgrade to 3.2 still reads. */
+  /** Writes a person's ceiling and choice. */
   private writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
     const u = this.user(id)
     const ceiling = patch.ceiling ?? parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
     const choice = patch.choice ?? parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
-    const mirror = legacyMirror(ceiling, choice, this.content.level)
-    const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), adultPictures: mirror.adultPictures }
-    this.db.raw.prepare('UPDATE users SET adult_ceiling = ?, adult_choice = ?, adult_access = ?, prefs = ? WHERE id = ?').run(ceiling, choice, mirror.adultAccess, JSON.stringify(prefs), id)
+    this.db.raw.prepare('UPDATE users SET adult_ceiling = ?, adult_choice = ? WHERE id = ?').run(ceiling, choice, id)
   }
   private invalidate(): void { this.sessionCache.clear() }
   private async claim(raw: unknown, display: unknown, password: unknown): Promise<void> {
@@ -354,15 +344,14 @@ export class Accounts {
     if (tokenUser) { const user = this.user(tokenUser.user_id); return user.disabled ? null : { user, session, bearer: true } }
     return this.session(session)
   }
-  progress(row: GameRow): GameRow {
-    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ? AND game = ?').get(this.current().id, row.id)
-    return { ...row, favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, play_status: '', rating: 0, not_now_at: '', ...u }
+  progress(row: GameRow): GameWithProgress {
+    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ? AND game = ?').get(this.current().id, row.id) as Partial<Progress> | undefined
+    return { ...row, ...NO_PROGRESS, ...u }
   }
-  setProgress(game: string, patch: Partial<Pick<GameRow, 'favorite_at' | 'finished_at' | 'last_played_at' | 'play_time' | 'play_status' | 'rating' | 'not_now_at'>>): void {
+  setProgress(game: string, patch: Partial<Progress>): void {
     const id = this.current().id
     this.db.raw.prepare('INSERT OR IGNORE INTO user_games (user_id, game) VALUES (?, ?)').run(id, game)
-    for (const [key, value] of Object.entries(patch)) this.db.raw.prepare(`UPDATE user_games SET ${key} = ? WHERE user_id = ? AND game = ?`).run(value, id, game)
-    if (patch.last_played_at) this.db.raw.prepare('UPDATE games SET last_played_at = MAX(last_played_at, ?) WHERE id = ?').run(patch.last_played_at, game)
+    for (const [key, value] of Object.entries(patch)) this.db.raw.prepare(`UPDATE user_games SET ${key} = ? WHERE user_id = ? AND game = ?`).run(value as SQLInputValue, id, game)
   }
   private guardLastAdmin(target: User, patch: { role?: string; disabled?: boolean }, removing = false): void {
     if (target.role !== 'admin' || target.disabled || (!removing && patch.role !== 'player' && patch.disabled !== true)) return

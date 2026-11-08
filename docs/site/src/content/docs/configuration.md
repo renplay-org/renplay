@@ -70,34 +70,6 @@ Engines and scratch space. Keep it on the same filesystem as `GAMES_DIR`.
 
 </div>
 
-<div class="config-entry" id="saves-dir">
-
-**`SAVES_DIR`**
-
-<div class="config-default">
-
-Default: `$DATA_DIR/saves`
-
-</div>
-
-Where saves are stored, laid out like desktop Ren’Py does.
-
-</div>
-
-<div class="config-entry" id="save-history-dir">
-
-**`SAVE_HISTORY_DIR`**
-
-<div class="config-default">
-
-Default: `$DATA_DIR/save-history`
-
-</div>
-
-Earlier versions of saves that were overwritten or deleted.
-
-</div>
-
 <div class="config-entry" id="overlays-dir">
 
 **`OVERLAYS_DIR`**

@@ -111,8 +111,6 @@ export interface Config {
   adultDefault: AdultLevel
   port: number
   dataDir: string
-  savesDir: string
-  saveHistoryDir: string
   coversDir: string
   walkthroughsDir: string
   overlaysDir: string
@@ -205,8 +203,6 @@ export function loadConfig(): Config {
     adultDefault: adultDefault(),
     port: envInt('PORT', fallbackOf('PORT')),
     dataDir,
-    savesDir: env('SAVES_DIR', join(dataDir, 'saves')),
-    saveHistoryDir: env('SAVE_HISTORY_DIR', join(dataDir, 'save-history')),
     coversDir: join(dataDir, 'covers'),
     walkthroughsDir: join(dataDir, 'walkthroughs'),
     overlaysDir: env('OVERLAYS_DIR', join(dataDir, 'overlays')),
