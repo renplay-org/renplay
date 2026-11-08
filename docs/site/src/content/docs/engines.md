@@ -56,7 +56,8 @@ fullscreen, mute, wake lock, phones) is shared.
    itself, as HTML games do.
 3. **Runtime**: a small script in the game's frame that tells the player when the game is ready,
    keeps its saves on the server, and handles mute. Ren'Py's is `runtime/renplay-runtime.js`,
-   HTML games' is `runtime/renplay-html.js`.
+   HTML games' is `runtime/renplay-html.js`, and both start with `runtime/renplay-player.js`, what
+   they share: messages to the player, muting and Esc in fullscreen.
 4. **Player**: the shared player, with the features the runtime supports.
 
 ## Security
