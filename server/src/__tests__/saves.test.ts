@@ -9,7 +9,7 @@ import { SaveStore, fnv } from '../saves/store.js'
 import express from 'express'
 import request from 'supertest'
 import { loadConfig } from '../config.js'
-import { ContentMode } from '../content.js'
+import { ContentMode } from '../content/mode.js'
 import { Db } from '../db.js'
 import { createSavesRouter } from '../saves/routes.js'
 

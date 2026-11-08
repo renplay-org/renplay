@@ -19,7 +19,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 ## The server
 
 `services.ts` makes the server's parts once at start: the database, the adult level rules
-(`content.ts`), accounts, the catalog with its art cache, jobs, builds, engines and save backups.
+(`content/mode.ts`), accounts, the catalog with its art cache, jobs, builds, engines and save backups.
 Every router and job gets that one object. The person a request is for comes from the request
 itself (`accounts-context.ts`), so `services.saves` is always the saves of whoever is asking.
 Modules below the routes, like the install pipeline, take only the parts they use.
@@ -216,7 +216,7 @@ non-finished game and invalidates on player exit.
 The empty library's starter is the first Ren'Py recipe with `free: true` that is not `nsfw` and
 has a working release. Without one it shows no starter.
 
-**Adult levels** (`content.ts`). A request's level is the lowest of the installation's, the
+**Adult levels** (`content/mode.ts`). A request's level is the lowest of the installation's, the
 person's ceiling, the person's choice and this device's. The interface shows a person one choice
 (`AdultChoice` on the account page) with the levels above their limit struck through. The browser keeps the device level in
 `localStorage` (`renplay:adult-device`, for everyone using that browser) and sends it as the
@@ -265,7 +265,7 @@ come from the base build's pack. Updating a game can re-apply mods or move them 
 
 ## Adult games
 
-`content.ts` holds the three levels, Off, Blurred and Shown. The installation's level is
+`content/levels.ts` holds the three levels, Off, Blurred and Shown, and `content/mode.ts` applies them. The installation's level is
 `RENPLAY_ADULT_GAMES=off|blurred|shown` when set (it locks it, and `allow` and `block` still mean
 Shown and Off), else the `adult_level` setting, else Shown until the owner answers the one question
 in the empty library (`GET`/`PUT /api/content`). Each person has a ceiling, set by an admin, by a

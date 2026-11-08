@@ -51,7 +51,7 @@ These decide most review comments. Follow them without being asked.
 - **Adult games have three levels.** Off (they do not exist for that person), Blurred (they show,
   but no picture of them is ever sent) and Shown, set by the installation, the person's account (an
   admin or a sign-in group), the person and the device. Each layer only narrows the one above. The
-  server enforces the person's level and the device's on every route (`content.ts`). Every route is
+  server enforces the person's level and the device's on every route (`content/mode.ts`). Every route is
   listed in `adult-levels.test.ts` with what the levels do on it, so a new route fails the tests
   until it is classified. At Blurred the game plays (with its walkthrough and the person's save
   files) but no picture of it is sent. Safe-for-work games
@@ -69,6 +69,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/services.ts    The server's parts, made once at start and given to every router and job
   src/config.ts      Environment variables (all documented in README.md)
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
+  src/content/       The adult levels (levels.ts), what each person may see (mode.ts), their routes
   src/recipes/       The recipe format (recipe.ts, read by everything) and Your recipes (local.ts)
   src/catalog/       Catalog index: recipe matching, linking games to recipes, updates, its routes
   src/art/           The art cache (store.ts): five formats per game, the making order, choices,

@@ -3,7 +3,8 @@ import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import express, { Router, type Request, type Response } from 'express'
 import type { Config } from './config.js'
-import { lowestLevel, parseAdultLevel, type AdultLevel, type ContentMode } from './content.js'
+import { type ContentMode } from './content/mode.js'
+import { lowestLevel, parseAdultLevel, type AdultLevel } from './content/levels.js'
 import type { Db, GameRow } from './db.js'
 import { parseJson } from './db.js'
 import type { ProgressStore } from './progress/store.js'
@@ -14,6 +15,7 @@ import { HttpError } from './util/paths.js'
 import { SignInProviders, signInRandom, type ExternalIdentity } from './sign-in-providers.js'
 import { fetchAvatar, storeAvatar } from './avatars.js'
 import { always, log } from './util/log.js'
+import { readDefaults } from './defaults/defaults.js'
 
 // Measured locally at 207 ms (N=65536: 105 ms); explicit 128 MiB work factor.
 const PASSWORD_PREFIX = 'scrypt$1$131072$8$1$'
@@ -23,32 +25,6 @@ const scrypt = (password: string, salt: string, N: number) => new Promise<Buffer
 const hash = (s: string) => createHash('sha256').update(s).digest('hex')
 const random = () => randomBytes(32).toString('base64url')
 const DAYS30 = 30 * 86400_000
-
-/**
- * Defaults for everyone: what a person starts with until they choose. Each value is null when the
- * admin leaves it to Renplay's own default.
- */
-export interface Defaults {
-  /** Tags left out on the Catalog page. */
-  tagsExclude: string[]
-  /** Lighter background on browsers that did not choose. */
-  lighterBackground: boolean | null
-  /** Ren'Py text size in games where the person did not choose one. */
-  textSize: number | null
-  rollback: boolean | null
-  skip: boolean | null
-}
-export const DEFAULTS_KEY = 'defaults_for_everyone'
-export function readDefaults(db: Db): Defaults {
-  const d = db.getSetting<Partial<Defaults>>(DEFAULTS_KEY, {})
-  return {
-    tagsExclude: Array.isArray(d.tagsExclude) ? d.tagsExclude.filter((t) => typeof t === 'string') : [],
-    lighterBackground: typeof d.lighterBackground === 'boolean' ? d.lighterBackground : null,
-    textSize: typeof d.textSize === 'number' && [1, 1.25, 1.5].includes(d.textSize) ? d.textSize : null,
-    rollback: typeof d.rollback === 'boolean' ? d.rollback : null,
-    skip: typeof d.skip === 'boolean' ? d.skip : null,
-  }
-}
 
 /** An account as the API sends it: never its PIN's hash or lock. */
 export function publicUser<T extends Partial<User>>(u: T): Omit<T, 'pin_hash' | 'pin_failures' | 'pin_locked_until'> & { hasPin: boolean } {
@@ -89,7 +65,7 @@ export function playerRoute(method: string, path: string): boolean {
   if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art|\/offline)?$/.test(path))) return true
   // A player chooses and uploads art for their own view (the route refuses everyone).
   if ((method === 'GET' || method === 'HEAD') && (path === '/api/history' || path === '/api/widget' || path === '/api/defaults')) return true
-  return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
+  return /^(PUT \/api\/games\/[^/]+\/(favorite|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
 }
 
 /**
@@ -813,14 +789,6 @@ export class Accounts {
       await remove(id); res.json({ copied })
     })
     r.delete('/users/:id', async (req, res) => { await remove(Number(req.params.id)); res.json({ ok: true }) })
-    r.post('/games/:id/safe', (req, res) => {
-      const g = this.content.game(req.params.id)
-      if (g.recipe_id) throw new HttpError(409, 'Only games without a recipe can be marked safe')
-      if (typeof req.body?.safe !== 'boolean') throw new HttpError(400, 'Safe must be a boolean')
-      if (req.body.safe) this.db.raw.prepare('INSERT OR IGNORE INTO safe_games VALUES (?)').run(g.id)
-      else this.db.raw.prepare('DELETE FROM safe_games WHERE game = ?').run(g.id)
-      res.json({ ok: true })
-    })
     return r
   }
 }

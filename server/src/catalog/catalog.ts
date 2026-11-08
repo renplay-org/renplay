@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { viewer } from '../accounts-context.js'
 import { catalogPictures, type ArtSet, type ArtStore, type ArtSubject } from '../art/store.js'
 import type { Config } from '../config.js'
-import { ContentMode, parseAdultLevel, sfwIndexUrl } from '../content.js'
+import { ContentMode } from '../content/mode.js'
+import { parseAdultLevel } from '../content/levels.js'
 import { parseJson, type Db, type GameRow, type GameSource } from '../db.js'
 import type { JobContext } from '../jobs/manager.js'
 import { cleanRelPath } from '../util/paths.js'
@@ -445,5 +446,17 @@ export class Catalog {
       ctx.log(`Recipe patch ${rel}`)
     }
     return out
+  }
+}
+
+/** `.../index.v4.json` -> `.../index.v4.sfw.json`; null when the URL has no such sibling. */
+export function sfwIndexUrl(url: string): string | null {
+  try {
+    const u = new URL(url)
+    if (!/\.json$/i.test(u.pathname) || /\.sfw\.json$/i.test(u.pathname)) return null
+    u.pathname = u.pathname.replace(/\.json$/i, '.sfw.json')
+    return u.toString()
+  } catch {
+    return null
   }
 }
