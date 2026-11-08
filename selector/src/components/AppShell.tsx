@@ -1,4 +1,4 @@
-import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
+import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, Sparkles, User } from 'lucide-react'
 import { keptGames, removeKept, useOnline } from '../lib/offline'
 import ChooseArtwork from './ChooseArtwork'
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
@@ -148,6 +148,17 @@ function Shell() {
         </div>
       </header>
       <main className="rise">
+        {data?.demo && (
+          <p className="notice" role="note" style={{ margin: '12px 16px 0' }}>
+            <Sparkles aria-hidden />
+            <span>
+              This is a demo of Renplay with free games. It starts fresh every few hours, so nothing you do here is kept.{' '}
+              <a className="link" href="https://renplay.org/#install">
+                Install your own
+              </a>
+            </span>
+          </p>
+        )}
         {!online && (
           <p className="notice amber" role="status" style={{ margin: '12px 16px 0' }}>
             <CloudOff aria-hidden />

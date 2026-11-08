@@ -10,8 +10,51 @@ import { signInReturnUrl } from '../lib/sign-in-return'
 export default function SignIn() {
   const [params] = useSearchParams()
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ enabled: boolean; setup: boolean; local: boolean; oidc: string | null }>('/api/auth/providers') })
+  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ enabled: boolean; setup: boolean; local: boolean; oidc: string | null; demo?: boolean }>('/api/auth/providers') })
   if (providers.data && !providers.data.enabled) return <Navigate to="/" replace />
+  // The public demo: one button, no account to make.
+  if (providers.data?.demo)
+    return (
+      <AuthLayout>
+        <div className="logo" style={{ justifyContent: 'center', marginBottom: 26 }}>
+          <img src="/favicon.svg" alt="" />
+          Renplay
+        </div>
+        <h1 className="h1 center" style={{ fontSize: 26 }}>Try Renplay</h1>
+        <p className="lead center" style={{ margin: '8px auto 0' }}>
+          A demo with free games. Play, save and pick up on another device. It starts fresh every few hours.
+        </p>
+        {error && (
+          <p role="alert" className="small red center" style={{ marginTop: 14 }}>
+            {error}
+          </p>
+        )}
+        <div style={{ marginTop: 22 }}>
+          <Pill
+            variant="p"
+            size="lg"
+            className="block"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true)
+              setError('')
+              try {
+                await post('/api/auth/demo')
+                window.location.assign(signInReturnUrl(params.get('return'), location.origin))
+              } catch (e) {
+                setError(errorText(e))
+                setBusy(false)
+              }
+            }}
+          >
+            {busy ? 'Opening the demo' : 'Try the demo'}
+          </Pill>
+        </div>
+        <p className="center small muted" style={{ marginTop: 18 }}>
+          Like it? <a className="link" href="https://renplay.org/#install">Install your own</a> in a minute.
+        </p>
+      </AuthLayout>
+    )
   return (
     <AuthLayout>
       <div className="logo" style={{ justifyContent: 'center', marginBottom: 26 }}>

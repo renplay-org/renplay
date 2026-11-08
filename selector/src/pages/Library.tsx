@@ -185,7 +185,8 @@ export default function Library() {
   const favorites = all.filter((g) => g.favoriteAt).sort((a, b) => b.favoriteAt!.localeCompare(a.favoriteAt!))
   const added = all.filter((g) => !g.lastPlayedAt && g.status === 'installed' && !g.job && Date.now() - Date.parse(g.createdAt) < 7 * 86400000).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   // A shelf of new games says something only while most of the library is not new.
-  const addedShelf = added.length <= Math.max(4, all.length / 2) ? added : []
+  // And never when it holds the whole library: All games below shows the same.
+  const addedShelf = added.length <= Math.max(4, all.length / 2) && added.length < all.length ? added : []
   // A failed install a person dismissed stays out of the way on this device.
   const [dismissed, setDismissed] = useState<string[]>(() => {
     try {

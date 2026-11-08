@@ -1,0 +1,86 @@
+name: Demo
+
+# Builds the public demo's image (deploy/demo) after each release, or when asked, and tells Render to
+# start the demo from it. The demo runs on Render's free plan at demo.renplay.org, never on the
+# maintainers' own servers. The image is ghcr.io/renplay-org/renplay:demo.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The Renplay release to build the demo from (the newest when empty)
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: demo
+  cancel-in-progress: true
+
+jobs:
+  demo:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      # The Ren'Py SDK the demo's games are built with: the engine Renplay plays them on.
+      RENPY: 8.5.3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Release to build from
+        id: version
+        env:
+          INPUT: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$INPUT"
+          [ -n "$version" ] || version=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          echo "version=${version#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build the demo's games
+        run: |
+          mkdir -p deploy/demo/games
+          sh deploy/demo/build-games.sh "$RENPY" deploy/demo/games
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/demo
+          platforms: linux/amd64
+          build-args: IMAGE=ghcr.io/renplay-org/renplay:${{ steps.version.outputs.version }}
+          load: true
+          tags: ghcr.io/renplay-org/renplay:demo
+
+      # A release without demo mode, or a broken build, must not replace a working demo.
+      - name: Try the demo in the new image
+        run: |
+          docker run -d --name demo -e PORT=10000 -p 8080:8080 --memory 512m ghcr.io/renplay-org/renplay:demo
+          for i in $(seq 1 60); do curl -fs -o /dev/null http://127.0.0.1:8080/api/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8080/api/auth/providers | grep -q '"demo":true'
+          curl -fsS -c /tmp/jar -X POST -H 'Sec-Fetch-Site: same-origin' http://127.0.0.1:8080/api/auth/demo > /dev/null
+          curl -fsS -b /tmp/jar http://127.0.0.1:8080/api/games/the-question | grep -q '"status":"installed"'
+          docker logs demo | tail -20
+          docker rm -f demo
+
+      - name: Push the image
+        run: docker push ghcr.io/renplay-org/renplay:demo
+
+      - name: Start the demo from the new image
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "No RENDER_DEPLOY_HOOK secret, so Render is not told"; exit 0; fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "Render starts the demo from the new image"
