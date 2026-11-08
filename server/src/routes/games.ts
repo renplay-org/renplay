@@ -3,10 +3,8 @@ import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
-import YAML from 'yaml'
 import { viewer } from '../accounts-context.js'
-import { ART_KINDS, type ArtKind } from '../art.js'
-import { installedRelease } from '../catalog.js'
+import { ART_KINDS, installedRelease, type ArtKind } from '../recipes/recipe.js'
 import { parseJson, type GameRow, type GameSource } from '../db.js'
 import { playPath } from './play.js'
 import { cachedSaveMeta, cachedSceneHash } from '../saves/cache.js'
@@ -42,8 +40,6 @@ function cacheName(raw: unknown): string {
   throw new HttpError(400, 'Not a cache file')
 }
 
-/** The catalog's recipe schema, for editors that validate YAML (yaml-language-server). */
-export const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json'
 
 
 export async function toGame(game: GameRow, deps: Services) {
@@ -162,7 +158,7 @@ export function createGamesRouter(deps: Services): Router {
     res.json({ game: await toGame(get(req), deps) })
   })
 
-  // ---- art: choices and uploads (DESIGN 0.7) ------------------------------------
+  // ---- art: choices and uploads ------------------------------------
 
   /** The game, when this person may see its pictures: below Shown an adult game's art does not exist. */
   const withArt = (req: Request): GameRow => {
@@ -319,45 +315,6 @@ export function createGamesRouter(deps: Services): Router {
   })
 
   /** A recipe for this game, filled in from the installed build, to contribute to the catalog. */
-  router.get('/:id/recipe', async (req, res) => {
-    const g = get(req)
-    const src = parseJson<GameSource>(g.source, {})
-    let sha256 = src.sha256 ?? ''
-    if (!sha256 && src.archive) sha256 = db.getArchive(src.archive)?.sha256 ?? ''
-    let hashJob: string | null = null
-    if (!sha256 && src.archive && (await exists(join(cfg.archivesDir, src.archive)))) {
-      const running = db.listJobs(100).find((j) => j.type === 'hash-archive' && (j.status === 'queued' || j.status === 'running') && j.params.includes(src.archive!))
-      hashJob = running?.id ?? jobs.enqueue('hash-archive', '', { path: src.archive })
-    }
-    const existing = g.recipe_id ? deps.catalog.recipe(g.recipe_id) : null
-    const recipe = {
-      id: g.recipe_id || g.id,
-      title: existing?.title ?? g.title,
-      developer: existing?.developer ?? '',
-      tags: existing?.tags ?? [],
-      nsfw: existing?.nsfw ?? false,
-      links: existing?.links ?? { website: '' },
-      saveDir: g.save_dir || undefined,
-      continuesFrom: existing?.continuesFrom,
-      match: existing?.match,
-      engine: existing?.engine ?? ((g.family || 'renpy') as 'renpy'),
-      runtime: existing?.runtime,
-      build: existing?.build,
-      releases: [
-        {
-          version: g.version || 'unknown',
-          madeWith: g.renpy_version || undefined,
-          runtime: g.engine || undefined,
-          status: 'untested',
-          archives: src.archive ? [{ name: src.archive.split('/').pop(), size: src.size, sha256: sha256 || 'pending' }] : [],
-          verified: { date: new Date().toISOString().slice(0, 10), renplay: deps.version, browsers: [], notes: '' },
-        },
-        ...(existing?.releases.filter((r) => r.version !== g.version) ?? []),
-      ],
-    }
-    const yaml = `# yaml-language-server: $schema=${RECIPE_SCHEMA_URL}\n${YAML.stringify(JSON.parse(JSON.stringify(recipe)), { lineWidth: 0 })}`
-    res.json({ yaml, sha256Pending: !sha256, hashJob })
-  })
 
   // ---- walkthroughs --------------------------------------------------------
 

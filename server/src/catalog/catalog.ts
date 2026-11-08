@@ -1,117 +1,20 @@
 import { createHash } from 'node:crypto'
-import { readFile, rm } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { viewer } from './accounts-context.js'
-import { catalogPictures, type ArtSet, type ArtStore, type ArtSubject, type CatalogImage } from './art.js'
-import type { Config } from './config.js'
-import { ContentMode, parseAdultLevel, sfwIndexUrl } from './content.js'
-import { parseJson, type Db, type GameRow, type GameSource } from './db.js'
-import type { JobContext } from './jobs/manager.js'
-import { cleanRelPath } from './util/paths.js'
-import { log } from './util/log.js'
-import { catalogHosts, fetchPublic } from './util/net.js'
-import { readLocalFile, readLocalRecipes } from './recipes-local.js'
-
-export interface RecipeArchive {
-  name: string
-  size?: number
-  sha256?: string
-  platform?: string
-}
-
-export type RecipeStatus = 'verified' | 'playable' | 'broken' | 'untested'
-
-export interface RecipeRelease {
-  version: string
-  date?: string
-  /** Version of the engine the game was made with (Ren'Py 8.2.1, Godot 4.6.2). */
-  madeWith?: string
-  /** Web runtime to build this release with (overrides the recipe's). */
-  runtime?: string
-  status: RecipeStatus
-  archives: RecipeArchive[]
-  verified?: { date?: string; renplay?: string; browsers?: string[]; notes?: string }
-}
-
-export interface RecipePatch {
-  /** Destination inside the game, e.g. "game/zz_renplay_fix.rpy". */
-  path: string
-  /** URL relative to the catalog index, or absolute. */
-  url: string
-  sha256: string
-}
-
-export type GameState = 'ongoing' | 'completed' | 'on-hold' | 'abandoned'
-export type Vocabulary = Record<string, { label: string; group: 'play' | 'story' | 'art' | 'protagonist' | 'content' }>
-
-/** Archive names identify releases even when the game's internal version is unrelated. */
-export function installedRelease(recipe: Recipe, version: string, archive?: string): RecipeRelease | null {
-  const name = archive?.split('/').pop()
-  return (name ? recipe.releases.find((r) => r.archives?.some((a) => a.name === name)) : undefined)
-    ?? recipe.releases.find((r) => r.version === version) ?? null
-}
-
-export interface Recipe {
-  id: string
-  title: string
-  developer?: string
-  tags?: string[]
-  tagIds?: string[]
-  content?: string[]
-  state?: GameState
-  summary?: string
-  nsfw?: boolean
-  free?: boolean
-  /** The game's pictures in SteamGridDB's formats (schema 4). A schema 3 cover becomes one grid. */
-  art?: CatalogImage[]
-  /** How the game plays on a phone, curated: great, playable, or desktop (needs a bigger screen). */
-  phone?: 'great' | 'playable' | 'desktop'
-  links?: Record<string, string>
-  saveDir?: string
-  /** Games whose saves this one imports (an earlier season, a prequel). */
-  continuesFrom?: string[]
-  /** Archive name patterns (with *) that belong to this game, for releases not listed yet. */
-  match?: string[]
-  /** What made the game. Ren'Py is what Renplay is for (docs.renplay.org/engines). */
-  engine: 'renpy' | 'html' | 'godot' | 'unity'
-  /** Web runtime to build with, from renplay-org/engines; default the newest that fits. */
-  runtime?: string
-  build?: {
-    optimizeImages?: boolean
-    imageQuality?: number
-    /** Files (globs relative to game/) that go into game.zip instead of streaming. */
-    keep?: string[]
-    /** Files (globs relative to game/) left out of the build entirely. */
-    exclude?: string[]
-    patches?: RecipePatch[]
-  }
-  releases: RecipeRelease[]
-  /** Index URL the recipe came from (for relative URLs). */
-  _base?: string
-  /** Its source: the configured catalog address, or 'local' for Your recipes. */
-  _origin?: string
-}
-
-export interface BuildSettings {
-  engine?: string
-  quality?: number
-  optimize?: boolean
-  keep?: string[]
-  exclude?: string[]
-}
-
-export interface RecipeMatch {
-  recipe: Recipe
-  /** The listed release, or null for a newer, unlisted version matched by pattern. */
-  release: RecipeRelease | null
-  /** sha256, or name and size, match a listed archive. */
-  exact: boolean
-}
+import { viewer } from '../accounts-context.js'
+import { catalogPictures, type ArtSet, type ArtStore, type ArtSubject } from '../art.js'
+import type { Config } from '../config.js'
+import { ContentMode, parseAdultLevel, sfwIndexUrl } from '../content.js'
+import { parseJson, type Db, type GameRow, type GameSource } from '../db.js'
+import type { JobContext } from '../jobs/manager.js'
+import { cleanRelPath } from '../util/paths.js'
+import { log } from '../util/log.js'
+import { catalogHosts, fetchPublic } from '../util/net.js'
+import { readLocalFile, readLocalRecipes } from '../recipes/local.js'
+import { installedRelease, normalizeRecipe, type BuildSettings, type Recipe, type RecipeMatch, type RecipeRelease, type Vocabulary } from '../recipes/recipe.js'
 
 const CACHE_KEY = 'catalog_cache'
-/** Where Renplay 3.x kept its covers. 4.0 makes its pictures in the art cache and forgets these. */
-const COVERS_KEY = 'catalog_covers'
 /** What blocking needs to know about adult recipes: ids, archives and save folders, never titles, tags or covers. */
 const STUBS_KEY = 'catalog_adult_stubs'
 /** How often the catalog is fetched while Renplay runs (cheap: pictures are fetched only once). */
@@ -124,30 +27,6 @@ function globMatch(pattern: string, name: string): boolean {
 
 function valid(g: any): g is Recipe {
   return g && typeof g.id === 'string' && typeof g.title === 'string' && Array.isArray(g.releases)
-}
-
-/**
- * Recipes in catalog schema 4 names. Schema 2 (and caches written by Renplay
- * 2.5 and older) called the runtime `engine` and a release's madeWith and
- * runtime `renpy` and `engine`; all of those were Ren'Py games. Schema 3 had
- * one `cover` instead of the `art` list: it becomes a grid, placed by the
- * making order like any picture of another shape.
- */
-export function normalizeRecipe(g: any): Recipe {
-  const old = typeof g.engine !== 'string' || /^\d/.test(g.engine)
-  const { renpy: _r, engine: _e, cover, coverSfw: _s, ...rest } = g
-  const fromCover = (): CatalogImage[] | undefined => {
-    const c = typeof cover === 'string' ? { url: cover } : cover && typeof cover === 'object' && typeof cover.url === 'string' ? cover : null
-    if (!c) return undefined
-    return [{ kind: 'grid', url: c.url, source: 'developer', sha256: c.sha256, width: c.width, height: c.height, default: true }]
-  }
-  return {
-    ...rest,
-    art: Array.isArray(g.art) ? g.art : fromCover(),
-    engine: old ? 'renpy' : g.engine,
-    runtime: g.runtime ?? (old ? g.engine : undefined),
-    releases: g.releases.map(({ renpy, engine, ...r }: any) => ({ ...r, madeWith: r.madeWith ?? renpy, runtime: r.runtime ?? engine })),
-  }
 }
 
 /** A catalog's recipe never names files in Your recipes (`local:`): only recipes there may. */
@@ -239,15 +118,10 @@ export class Catalog {
     } else {
       try {
         const here = dirname(fileURLToPath(import.meta.url))
-        const idx = JSON.parse(await readFile(join(here, '..', 'catalog.json'), 'utf-8'))
+        const idx = JSON.parse(await readFile(join(here, '..', '..', 'catalog.json'), 'utf-8'))
         this.load(idx.games ?? [])
         this.vocabulary = idx.vocabulary ?? {}
       } catch {}
-    }
-    // 3.x covers: 4.0 never serves them, the art cache replaces them.
-    if (this.db.getSetting<unknown>(COVERS_KEY, null) !== null) {
-      this.db.raw.prepare('DELETE FROM settings WHERE key = ?').run(COVERS_KEY)
-      await rm(this.cfg.coversDir, { recursive: true, force: true }).catch(() => {})
     }
     this.syncAdult()
     if (this.content.level === 'off') await this.restrict()

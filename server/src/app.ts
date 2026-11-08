@@ -9,11 +9,12 @@ import { playerRoute, type Accounts } from './auth.js'
 import { viewer } from './accounts-context.js'
 import type { SaveBackups } from './saves/backups.js'
 import type { Builds } from './builds.js'
-import type { Catalog } from './catalog.js'
+import type { Catalog } from './catalog/catalog.js'
 import type { Config } from './config.js'
 import type { Db } from './db.js'
 import type { EngineStore } from './engines.js'
 import type { JobManager } from './jobs/manager.js'
+import { createCatalogRouter } from './catalog/routes.js'
 import { createJobsRouter } from './jobs/routes.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
@@ -153,6 +154,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   app.use('/api/games', createGamesRouter(services))
   app.use('/api', createProgressRouter(services))
   app.use('/api', createLibraryRouter(services))
+  app.use('/api', createCatalogRouter(services))
   // Made pictures are named by their content, so they never change: browsers keep them.
   app.get('/api/art/:file', (req, res, next) => {
     if (!art.canRead(req.params.file)) return next(new HttpError(404, 'Not found'))

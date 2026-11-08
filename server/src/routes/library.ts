@@ -4,7 +4,6 @@ import { basename, join, relative } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
 import { archiveIdentity, publishUpload } from '../archive-origin.js'
-import { installedRelease } from '../catalog.js'
 import { parseJson, type GameSource } from '../db.js'
 import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
 import { exists, newId } from '../util/fsx.js'
@@ -232,24 +231,6 @@ export function createLibraryRouter(deps: Services): Router {
   })
 
   // ---- catalog --------------------------------------------------------------
-
-  router.get('/catalog', async (_req, res) => {
-    const games = db.allGames().filter((g) => !catalog.content.hides(g))
-    res.json({
-      // Where Your recipes live on the server is for admins.
-      status: { ...catalog.status(), count: catalog.list().length, sources: catalog.sources().map((s) => (s.kind === 'folder' && viewer()?.user.role !== 'admin' ? { ...s, location: '' } : s)) },
-      vocabulary: catalog.content.hidesRecipe(true) ? Object.fromEntries(Object.entries(catalog.vocabulary).filter(([, v]) => v.group !== 'content')) : catalog.vocabulary,
-      games: catalog.list().map((r) => {
-        const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
-        // The source as the interface says it: Your recipes, or the catalog (its address stays here).
-        return { ...r, _base: undefined, _origin: undefined, fromYourRecipes: r._origin === 'local' || undefined, art: catalog.recipeArt(r), local: local ? { id: local.id, status: local.status, version: installedRelease(r, local.version, parseJson<GameSource>(local.source, {}).archive)?.version ?? local.version, detectedVersion: local.version } : null }
-      }),
-    })
-  })
-
-  router.post('/catalog/refresh', async (_req, res) => {
-    res.json(await catalog.refresh())
-  })
 
   return router
 }
