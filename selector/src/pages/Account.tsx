@@ -91,76 +91,84 @@ export default function Account() {
           <p className="small muted">What you see of adult games, on every device. Games that are not adult are never affected.</p>
           <AdultChoice />
         </AccountSection>
-        <AccountSection title="Profile">
-          <form onSubmit={(e) => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(() => put('/api/me', { name: form.get('name') }), 'Display name saved') }} className="stack">
-            <label className="field">
-              <span>Display name</span>
-              <input key={me.user.name} name="name" autoComplete="name" required maxLength={100} defaultValue={me.user.name} className={accountInput} />
-            </label>
-            <div>
-              <Button type="submit" size="sm" loading={busy}>Save name</Button>
-            </div>
-          </form>
-          <p className="small muted">Username: {me.user.username}.</p>
-          <AvatarUpload />
-          {me.hasPassword && (
-            <div>
-              <Button size="sm" onClick={() => { setError(''); setDialog('password') }}>Change password</Button>
-            </div>
-          )}
-        </AccountSection>
-        {me.auth && (
+        {!me.demo && (
+          <AccountSection title="Profile">
+            <form onSubmit={(e) => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(() => put('/api/me', { name: form.get('name') }), 'Display name saved') }} className="stack">
+              <label className="field">
+                <span>Display name</span>
+                <input key={me.user.name} name="name" autoComplete="name" required maxLength={100} defaultValue={me.user.name} className={accountInput} />
+              </label>
+              <div>
+                <Button type="submit" size="sm" loading={busy}>Save name</Button>
+              </div>
+            </form>
+            <p className="small muted">Username: {me.user.username}.</p>
+            <AvatarUpload />
+            {me.hasPassword && (
+              <div>
+                <Button size="sm" onClick={() => { setError(''); setDialog('password') }}>Change password</Button>
+              </div>
+            )}
+          </AccountSection>
+        )}
+        {me.auth && !me.demo && (
           <AccountSection title="Switching on a shared device">
             <PinSection admin={admin} hasPin={!!me.user.hasPin} />
           </AccountSection>
         )}
-        <AccountSection title="How you sign in">
-          <LinkedSignIns />
-        </AccountSection>
-        <AccountSection title="Where you are signed in">
-          {sessions.isPending ? <Spinner /> : sessions.isError ? <p role="alert" className="small red">{errorText(sessions.error)}</p> : (
-            <div className="list tight">
-              {sessions.data.sessions.map((session) => (
-                <div key={session.id} className="row between wrap" style={{ gap: 8 }}>
-                  <div className="grow">
-                    <p className="small" style={{ overflowWrap: 'anywhere' }}>{session.current ? 'This session' : sessionLabel(session.label)}</p>
-                    <p className="xs muted">Active {ago(session.touched_at)} · Expires {ago(session.expires_at, true)}</p>
+        {!me.demo && (
+          <AccountSection title="How you sign in">
+            <LinkedSignIns />
+          </AccountSection>
+        )}
+        {!me.demo && (
+          <AccountSection title="Where you are signed in">
+            {sessions.isPending ? <Spinner /> : sessions.isError ? <p role="alert" className="small red">{errorText(sessions.error)}</p> : (
+              <div className="list tight">
+                {sessions.data.sessions.map((session) => (
+                  <div key={session.id} className="row between wrap" style={{ gap: 8 }}>
+                    <div className="grow">
+                      <p className="small" style={{ overflowWrap: 'anywhere' }}>{session.current ? 'This session' : sessionLabel(session.label)}</p>
+                      <p className="xs muted">Active {ago(session.touched_at)} · Expires {ago(session.expires_at, true)}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirm({ title: 'Sign out of this session?', action: async () => { await del(`/api/me/sessions/${session.id}`); if (session.current) window.location.assign('/signin') } })}>Sign out</Button>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirm({ title: 'Sign out of this session?', action: async () => { await del(`/api/me/sessions/${session.id}`); if (session.current) window.location.assign('/signin') } })}>Sign out</Button>
-                </div>
-              ))}
-              {!sessions.data.sessions.length && <p className="small muted">No signed-in sessions. {me.auth ? '' : 'Sign-in is off.'}</p>}
+                ))}
+                {!sessions.data.sessions.length && <p className="small muted">No signed-in sessions. {me.auth ? '' : 'Sign-in is off.'}</p>}
+              </div>
+            )}
+            <div>
+              <Button size="sm" disabled={!sessions.data?.sessions.some((s) => !s.current)} onClick={() => setConfirm({ title: 'Sign out everywhere else?', action: () => del('/api/me/sessions') })}>Sign out everywhere else</Button>
             </div>
-          )}
-          <div>
-            <Button size="sm" disabled={!sessions.data?.sessions.some((s) => !s.current)} onClick={() => setConfirm({ title: 'Sign out everywhere else?', action: () => del('/api/me/sessions') })}>Sign out everywhere else</Button>
-          </div>
-        </AccountSection>
-        <AccountSection title="Access tokens">
-          <p className="small muted">For scripts and the upload tool. A token acts as you. Keep it private.</p>
-          {tokens.isPending ? <Spinner /> : tokens.isError ? <p role="alert" className="small red">{errorText(tokens.error)}</p> : (
-            <div className="list tight">
-              {tokens.data.tokens.map((token) => (
-                <div key={token.id} className="row between">
-                  <div className="grow">
-                    <p className="small" style={{ overflowWrap: 'anywhere' }}>{token.name}</p>
-                    <p className="xs muted">Created {ago(token.created_at)}</p>
+          </AccountSection>
+        )}
+        {!me.demo && (
+          <AccountSection title="Access tokens">
+            <p className="small muted">For scripts and the upload tool. A token acts as you. Keep it private.</p>
+            {tokens.isPending ? <Spinner /> : tokens.isError ? <p role="alert" className="small red">{errorText(tokens.error)}</p> : (
+              <div className="list tight">
+                {tokens.data.tokens.map((token) => (
+                  <div key={token.id} className="row between">
+                    <div className="grow">
+                      <p className="small" style={{ overflowWrap: 'anywhere' }}>{token.name}</p>
+                      <p className="xs muted">Created {ago(token.created_at)}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirm({ title: `Revoke ${token.name}?`, action: () => del(`/api/me/tokens/${token.id}`) })}>Revoke</Button>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirm({ title: `Revoke ${token.name}?`, action: () => del(`/api/me/tokens/${token.id}`) })}>Revoke</Button>
-                </div>
-              ))}
-              {!tokens.data.tokens.length && <p className="small muted">No access tokens.</p>}
+                ))}
+                {!tokens.data.tokens.length && <p className="small muted">No access tokens.</p>}
+              </div>
+            )}
+            <div>
+              <Button size="sm" onClick={() => { setError(''); setSecret(''); setDialog('token') }}>New token</Button>
             </div>
-          )}
-          <div>
-            <Button size="sm" onClick={() => { setError(''); setSecret(''); setDialog('token') }}>New token</Button>
-          </div>
-        </AccountSection>
+          </AccountSection>
+        )}
         <AccountSection title="Your saves">
           <p className="small muted">Export current saves for the games you can see, including shared keys and HTML game data, as one zip. Hidden games’ saves and save history stay on the server.</p>
           <div className="actions">
             <Button size="sm" href="/api/saves-export">Export all my saves</Button>
-            <Button size="sm" to="/import-saves">Import from a computer</Button>
+            {!me.demo && <Button size="sm" to="/import-saves">Import from a computer</Button>}
           </div>
         </AccountSection>
       </div>

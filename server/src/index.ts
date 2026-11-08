@@ -24,6 +24,20 @@ async function main() {
   }
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)
+  // A demo starts fresh: after 4 hours of running, once nobody has asked anything for a minute, the
+  // server stops and the host starts it again from its image.
+  if (cfg.demo) {
+    let lastRequest = Date.now()
+    server.on('request', () => {
+      lastRequest = Date.now()
+    })
+    const started = Date.now()
+    setInterval(() => {
+      if (Date.now() - started < 4 * 3600_000 || Date.now() - lastRequest < 60_000) return
+      log('server', 'The demo ran for 4 hours. Stopping, to start again fresh.')
+      stop()
+    }, 30_000).unref()
+  }
 }
 
 main().catch((err) => {

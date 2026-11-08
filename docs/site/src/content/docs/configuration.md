@@ -796,6 +796,20 @@ Enable username and password sign-in. With sign-in on, disabling the only provid
 
 </div>
 
+<div class="config-entry" id="renplay-demo">
+
+**`RENPLAY_DEMO`**
+
+<div class="config-default">
+
+Default: `false`
+
+</div>
+
+Run Renplay as a public demo. The sign-in page offers Try the demo, a shared guest who can play, save, rate and keep games offline, but cannot upload, install, change their account or see Settings. Sign-in is on. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.
+
+</div>
+
 <div class="config-entry" id="renplay-admin-username">
 
 **`RENPLAY_ADMIN_USERNAME`**

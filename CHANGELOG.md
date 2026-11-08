@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- `RENPLAY_DEMO=on` runs Renplay as a public demo. The sign-in page offers **Try the demo**, a shared guest who can play, save, rate and keep games offline, but cannot upload, install, change the account or see Settings. A banner says it is a demo. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.
+
 ## [4.3.1] - 2026-11-08
 
 The docs describe Renplay 4.0 to 4.3, with new screenshots, and **Import from a computer** is on

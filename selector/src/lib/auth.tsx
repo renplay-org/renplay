@@ -22,7 +22,7 @@ export interface Account {
   hasPin?: boolean
 }
 export function useAuth() {
-  return useQuery({ queryKey: ['me'], queryFn: () => api<{ user: Account; auth: boolean; unclaimed: boolean; hasPassword: boolean }>('/api/me'), retry: false })
+  return useQuery({ queryKey: ['me'], queryFn: () => api<{ user: Account; auth: boolean; unclaimed: boolean; hasPassword: boolean; demo?: boolean }>('/api/me'), retry: false })
 }
 export function AuthGuard({ admin = false }: { admin?: boolean }) {
   const me = useAuth(), location = useLocation()

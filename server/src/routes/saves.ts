@@ -55,7 +55,7 @@ export async function cachedSceneHash(store: SaveStore, dir: string, file: { nam
 export const syncCodesOn = (db: Db): boolean => db.getSetting<boolean>(SYNC_SETTING, false) === true
 export const SYNC_SETTING = 'renpy_sync'
 
-export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer = 'https://sync.renpy.org'): Router {
+export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer = 'https://sync.renpy.org', maxFile = 64 << 20): Router {
   const router = Router({ caseSensitive: true, strict: true })
 
   const game = (req: Request): GameRow => {
@@ -139,6 +139,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const { dir, name } = resolvePath(g, req.query['path'])
     const body = req.body as Buffer
     if (!Buffer.isBuffer(body)) throw new HttpError(400, 'Expected a binary body')
+    if (body.length > maxFile) throw new HttpError(413, `A save here can be at most ${Math.round(maxFile / (1 << 20))} MB`)
     const mtime = Number(req.header('x-mtime')) || undefined
     // The version the device last saw, for the conflict rule. Older runtimes send none.
     const rawBase = req.header('x-base')
