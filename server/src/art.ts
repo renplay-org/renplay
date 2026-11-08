@@ -11,10 +11,11 @@ import { MAX_IMAGE_PIXELS, PixelBudget } from './pipeline/image-memory.js'
 import { exists, writeFileAtomic } from './util/fsx.js'
 import { HttpError } from './util/paths.js'
 import { catalogHosts, fetchPublic } from './util/net.js'
-import { readLocalFile } from './recipes-local.js'
+import { readLocalFile } from './recipes/local.js'
+import { ART_KINDS, type ArtKind, type CatalogImage } from './recipes/recipe.js'
 
 /**
- * The art system (DESIGN 0.4). A game has five formats in SteamGridDB's shapes. The catalog links
+ * The art system. A game has five formats in SteamGridDB's shapes. The catalog links
  * pictures, a person or an admin may choose another one or upload their own, and this module makes
  * every format from what there is, in this order: real art in the shape, a crop at the focal
  * point, a composition, the picture whole on its glow. Everything it serves is made here, cached by
@@ -22,8 +23,6 @@ import { readLocalFile } from './recipes-local.js'
  * interface draws the logo or the title where a composition leaves room for it.
  */
 
-export type ArtKind = 'grid' | 'wide' | 'hero' | 'logo' | 'icon'
-export const ART_KINDS: readonly ArtKind[] = ['grid', 'wide', 'hero', 'logo', 'icon']
 type Shaped = Exclude<ArtKind, 'logo'>
 /** The formats at 1x. A logo has no shape: any transparent picture. */
 export const SHAPES: Record<Shaped, readonly [number, number]> = { grid: [600, 900], wide: [920, 430], hero: [1920, 620], icon: [512, 512] }
@@ -40,25 +39,6 @@ export const MIN_CROP = 0.6
 export const MAX_ENLARGE = 2.25
 /** The icon cut from a grid: this share of the grid's short side. */
 const ICON_SHARE = 0.62
-
-/** A picture as the catalog's schema 4 index publishes it. */
-export interface CatalogImage {
-  kind: ArtKind
-  url: string
-  source: string
-  sha256?: string
-  width?: number
-  height?: number
-  thumbhash?: string
-  tint?: string
-  focal?: [number, number]
-  dark?: boolean
-  default?: boolean
-  sgdb?: number
-  asset?: string
-  by?: string
-  byUrl?: string
-}
 
 export type Credit = { by: string; byUrl?: string; asset?: string } | { store: 'Steam' | 'itch.io' } | { renplay: true } | { developer: true } | { upload: true }
 
@@ -148,7 +128,7 @@ export function enlarges(kind: Shaped, p: { width: number; height: number }): nu
 }
 
 /**
- * How a format is made from the chosen pictures (DESIGN 0.4):
+ * How a format is made from the chosen pictures:
  * 1. real art in the shape, resized,
  * 2. a crop at the focal point: always when the recipe gives one, else when it keeps 60 percent,
  * 3. a composition: a wide from a poster puts the poster at the left on its glow, a grid from a

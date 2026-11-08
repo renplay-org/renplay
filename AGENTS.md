@@ -69,7 +69,8 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/services.ts    The server's parts, made once at start and given to every router and job
   src/config.ts      Environment variables (all documented in README.md)
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
-  src/catalog.ts     Catalog index: recipe matching, linking games to recipes, updates
+  src/recipes/       The recipe format (recipe.ts, read by everything) and Your recipes (local.ts)
+  src/catalog/       Catalog index: recipe matching, linking games to recipes, updates, its routes
   src/art.ts         The art cache: five formats per game, the making order, choices, uploads
   src/engines.ts     Engine packs: index, download on demand, checksum, pruning
   src/builds.ts      Build folders /games/<id>/<build>/, build.json, caches

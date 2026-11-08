@@ -123,7 +123,6 @@ export interface Config {
   adultDefault: AdultLevel
   port: number
   dataDir: string
-  coversDir: string
   walkthroughsDir: string
   overlaysDir: string
   /** Installed games: <gamesDir>/<id>/<build>/. */
@@ -216,7 +215,6 @@ export function loadConfig(): Config {
     adultDefault: adultDefault(),
     port: int('PORT'),
     dataDir,
-    coversDir: join(dataDir, 'covers'),
     walkthroughsDir: join(dataDir, 'walkthroughs'),
     overlaysDir: text('OVERLAYS_DIR') || join(dataDir, 'overlays'),
     gamesDir,

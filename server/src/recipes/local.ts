@@ -3,10 +3,9 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, extname, sep } from 'node:path'
 import sharp from 'sharp'
 import YAML from 'yaml'
-import type { CatalogImage } from './art.js'
-import { normalizeRecipe, type Recipe, type Vocabulary } from './catalog.js'
-import { MAX_IMAGE_PIXELS } from './pipeline/image-memory.js'
-import { cleanRelPath, safeJoin } from './util/paths.js'
+import { normalizeRecipe, type CatalogImage, type Recipe, type Vocabulary } from './recipe.js'
+import { MAX_IMAGE_PIXELS } from '../pipeline/image-memory.js'
+import { cleanRelPath, safeJoin } from '../util/paths.js'
 
 /*
  * Your recipes: a folder of recipe files, in the catalog's own format (recipes/<id>.yaml in

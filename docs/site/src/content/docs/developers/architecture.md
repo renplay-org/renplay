@@ -52,7 +52,7 @@ archives, while they are kept).
 1. **Read the archive in place** (`archive.ts`): zip, 7z, rar or tar, without unpacking it to disk.
    Find the game folder and the Ren'Py version (`renpy/vc_version.py`). Other engines' games are
    recognized (`family.ts`) and refused with the reason. See [Engines](/engines/).
-2. **Match the catalog** (`catalog.ts`): by sha256, name and size, or a `match` pattern. The recipe
+2. **Match the catalog** (`catalog/catalog.ts`): by sha256, name and size, or a `match` pattern. The recipe
    can choose the engine, files to keep or exclude, and small patches.
 3. **Pick the engine** (`engines.ts`): the recipe's, `RENPLAY_ENGINE`, or the newest published
    engine of the game's major version. Games made with Ren'Py 7 or older get the newest Ren'Py 8
@@ -166,7 +166,7 @@ for schema 7, migration, sessions, nginx protection and the request-local permis
 
 ## The catalog
 
-`catalog.ts` fetches the index (`index.v4.json`, catalog schema 4; `normalizeRecipe` also reads
+`catalog/catalog.ts` fetches the index (`index.v4.json`, catalog schema 4; `normalizeRecipe` also reads
 schemas 2 and 3, turning a schema 3 cover into a grid) every hour (or from Settings). It links
 installed games to recipes (by id, archive or save folder) and reports newer working releases as
 updates. Library metadata (title, developer, tags, links, summary and game state) comes only from

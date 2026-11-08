@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ArtStore } from '../art.js'
-import { Catalog, installedRelease, normalizeRecipe } from '../catalog.js'
+import { Catalog } from '../catalog/catalog.js'
+import { installedRelease, normalizeRecipe } from '../recipes/recipe.js'
 import { loadConfig, type Config } from '../config.js'
 import { ContentMode } from '../content.js'
 import { Db } from '../db.js'
@@ -87,14 +88,8 @@ describe('catalog', () => {
     db.insertGame({ id: 'some-save', title: 'Some', status: 'installed', save_dir: 'BySave-1' })
     db.insertGame({ id: 'some-archive', title: 'Other', status: 'installed', source: JSON.stringify({ archive: 'Pattern-2.0-pc.zip' }) })
     db.insertGame({ id: 'unknown', title: 'Unknown', status: 'installed' })
-    // Renplay 3.x covers are forgotten: 4.0 makes its pictures in the art cache.
-    mkdirSync(cfg.coversDir, { recursive: true })
-    writeFileSync(join(cfg.coversDir, 'ripples.0123456789ab.webp'), 'old')
-    db.setSetting('catalog_covers', { ripples: { url: 'x', sha256: '', file: 'ripples.0123456789ab.webp', etag: '' } })
     await catalog.init()
     catalog.stop()
-    expect(existsSync(cfg.coversDir)).toBe(false)
-    expect(db.getSetting('catalog_covers', null)).toBeNull()
 
     const res = await catalog.refresh()
     expect(res.games).toBe(3)
@@ -190,6 +185,16 @@ describe('catalog', () => {
     expect(restarted.vocabulary).toEqual(catalog.vocabulary)
     expect(restarted.recipe('ripples')).toEqual(catalog.recipe('ripples'))
     restarted.stop()
+    db.close()
+  })
+
+  it('starts from the catalog in the image when it has no cache and no network', async () => {
+    const { cfg, db } = setup()
+    const bundled = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'catalog.json'), 'utf-8')) as { games: Array<{ id: string }> }
+    const catalog = catalogOf({ ...cfg, catalogUrls: ['http://127.0.0.1:9/offline'] }, db)
+    await catalog.init()
+    catalog.stop()
+    expect(catalog.list().map((r) => r.id)).toEqual(bundled.games.map((g) => g.id))
     db.close()
   })
 

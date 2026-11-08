@@ -280,7 +280,7 @@ describe('the levels on every route', () => {
     ['POST /:id/files/revert', 'game'], ['POST /:id/files/upload', 'game'], ['POST /:id/files/apply', 'game'], ['POST /:id/files/reset', 'game'],
     ['GET /', 'list'], ['GET /:id', 'game'], ['PUT /games/:id/favorite', 'game'], ['POST /games/:id/play-time', 'game'],
     ['POST /games/:id/played', 'game'], ['DELETE /:id', 'game'], ['DELETE /:id/download', 'game'], ['POST /:id/reinstall', 'game'],
-    ['PUT /:id/cache', 'game'], ['GET /:id/recipe', 'game'], ['POST /:id/walkthroughs', 'game'], ['PUT /:id/walkthroughs/:file', 'game'], ['DELETE /:id/walkthroughs/:file', 'game'], ['DELETE /:id/art/uploads/:upload', 'game'],
+    ['PUT /:id/cache', 'game'], ['GET /games/:id/recipe', 'game'], ['POST /:id/walkthroughs', 'game'], ['PUT /:id/walkthroughs/:file', 'game'], ['DELETE /:id/walkthroughs/:file', 'game'], ['DELETE /:id/art/uploads/:upload', 'game'],
     ['GET /archives', 'list'], ['POST /archives/inspect', 'tool'], ['POST /archives/hash', 'tool'], ['DELETE /archives', 'tool'],
     ['POST /imports', 'tool'], ['POST /uploads', 'person'], ['GET /uploads/:id', 'person'], ['PUT /uploads/:id', 'person'],
     ['POST /uploads/:id/complete', 'person'], ['DELETE /uploads/:id', 'person'], ['GET /catalog', 'list'], ['POST /catalog/refresh', 'list'],
