@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { expect, it, vi } from 'vitest'
-import { queueHtmlSave, uploadHtmlSave } from '../../../selector/src/lib/html-save-queue.js'
+import { htmlSaveKeeper } from '../../../selector/src/pages/player/htmlSaves.js'
 
 it('Player persists and acknowledges both HTML storage snapshots while the first upload is pending', async () => {
   const window: any = {}
@@ -19,14 +19,9 @@ it('Player persists and acknowledges both HTML storage snapshots while the first
   })
   vi.stubGlobal('fetch', fetch)
   const send = vi.fn(), setSignedOut = vi.fn()
-  const storageWrite = { current: Promise.resolve() }, storageUpload = { current: Promise.resolve() }
-  // Execute the actual Player message handler, including its separate durable/upload queues.
-  const source = readFileSync(new URL('../../../selector/src/pages/Player.tsx', import.meta.url), 'utf-8')
-  const storage = source.slice(source.indexOf("        case 'renplay:storage':"), source.indexOf("        case 'renplay:exited':"))
-  const receive = new Function('storageWrite', 'storageUpload', 'queueHtmlSave', 'uploadHtmlSave', 'send', 'setSignedOut', `
-    var sandboxed = true, game = { saveDir: 'Html' }, gameId = 'html', userId = 1;
-    return function (d) { switch ('renplay:storage') { ${storage} } };
-  `)(storageWrite, storageUpload, queueHtmlSave, uploadHtmlSave, send, setSignedOut)
+  // The player's keeper, with its separate durable and upload queues.
+  const keeper = htmlSaveKeeper(() => ({ userId: 1, gameId: 'html', send, onSignedOut: setSignedOut }))
+  const receive = (d: { kind?: string; data: string }) => keeper.store('Html', d.kind, d.data)
   const pending = () => new Promise<any[]>((resolve, reject) => {
     const open = indexedDB.open('renplay-html-queue', 1)
     open.onerror = () => reject(open.error)
@@ -38,10 +33,10 @@ it('Player persists and acknowledges both HTML storage snapshots while the first
   })
   try {
     receive({ data: '{"progress":"first"}' })
-    await storageWrite.current
+    await keeper.kept()
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
     for (const kind of [undefined, 'idb']) receive({ kind, data: '{"progress":"second"}' })
-    await storageWrite.current
+    await keeper.kept()
     expect(send).toHaveBeenCalledTimes(3)
     expect(send).toHaveBeenLastCalledWith({ type: 'renplay:storage-kept', kind: 'idb', data: '{"progress":"second"}', userId: 1 })
     expect(await pending()).toMatchObject([
@@ -51,13 +46,14 @@ it('Player persists and acknowledges both HTML storage snapshots while the first
     expect(uploaded).toEqual([])
     expect(fetch).toHaveBeenCalledTimes(1)
     release()
-    await storageUpload.current
+    // Every upload done: the device's queue is empty again.
+    await vi.waitFor(async () => expect(await pending()).toEqual([]))
     expect(uploaded).toEqual(['{"progress":"first"}', '{"progress":"second"}', '{"progress":"second"}'])
     expect(await pending()).toEqual([])
     expect(setSignedOut).not.toHaveBeenCalled()
   } finally {
     release()
-    await storageUpload.current
+    await vi.waitFor(async () => expect(await pending()).toEqual([])).catch(() => {})
     vi.unstubAllGlobals()
   }
 })

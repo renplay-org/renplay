@@ -29,8 +29,6 @@ export class PyObject {
   }
 }
 
-const MARK = Symbol('mark')
-
 export class UnpicklingError extends Error {}
 
 export interface UnpickleOptions {

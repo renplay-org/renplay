@@ -7,10 +7,10 @@ import ActionBar from '../components/ActionBar'
 import SceneCard from '../components/SceneCard'
 import UpdateCard from '../components/UpdateCard'
 import OfflineCard from '../components/OfflineCard'
-import { Seg, Pill, Stars, TagPill } from '../lantern/controls'
+import { Seg, Pill, Stars } from '../lantern/controls'
 import Stage, { travelToDoor } from '../lantern/Stage'
 import { useRoom } from '../lantern/Room'
-import { creditText, useHidden } from '../lantern/art'
+import { creditText } from '../lantern/art'
 import { useAdultView } from '../lib/adult'
 import FavoriteButton from '../components/FavoriteButton'
 import GameTags from '../components/GameTags'
@@ -39,8 +39,6 @@ export default function GamePage() {
   const [tab, setTab] = useState<Tab>('play')
   const [picker, setPicker] = useState<ArtKind | null>(null)
   const navigate = useNavigate()
-  const qc = useQueryClient()
-  const toast = useToast()
   const view = useAdultView()
   const actsRef = useRef<HTMLDivElement>(null)
   const { data: saves } = useSaves(gameId, !!game?.saveDir)

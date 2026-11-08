@@ -7,7 +7,7 @@ import { useContent, useSetInstallationLevel, useSystem } from '../lib/queries'
 import type { AdultLevel } from '@shared/levels'
 import { Frame } from '../lantern/art'
 import { Pill, TagPill } from '../lantern/controls'
-import { Button, errorText, useToast } from './ui'
+import { errorText, useToast } from './ui'
 
 /** A fresh install asks once which games it shows. Until then it uses the default, Shown. */
 function ContentChoice() {
