@@ -184,6 +184,9 @@ export default function Player() {
           )
           void qc.invalidateQueries({ queryKey: ['saves', game?.id] })
           break
+        case 'renplay:download-log':
+          if (d.ok === false) toast('This game has not written a log yet.')
+          break
         case 'renplay:accessibility':
           if (!d.ok) toast('This game does not offer Ren’Py’s accessibility menu.')
           break

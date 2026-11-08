@@ -17,6 +17,8 @@ import { readLocalFile, readLocalRecipes } from '../recipes/local.js'
 import { installedRelease, normalizeRecipe, type BuildSettings, type Recipe, type RecipeMatch, type RecipeRelease, type Vocabulary } from '../shared/recipe.js'
 
 const CACHE_KEY = 'catalog_cache'
+/** refresh and syncArt report what they could not fetch or make. Anything else they throw is a bug, and logged. */
+const failed = (e: unknown) => log('catalog', `Could not update: ${(e as Error).message}`, 'error')
 /** What blocking needs to know about adult recipes: ids, archives and save folders, never titles, tags or covers. */
 const STUBS_KEY = 'catalog_adult_stubs'
 /** How often the catalog is fetched while Renplay runs (cheap: pictures are fetched only once). */
@@ -123,14 +125,16 @@ export class Catalog {
         const idx = JSON.parse(await readFile(join(here, '..', '..', 'catalog.json'), 'utf-8'))
         this.load(idx.games ?? [])
         this.vocabulary = idx.vocabulary ?? {}
-      } catch {}
+      } catch (e) {
+        log('catalog', `The catalog in the image could not be read: ${(e as Error).message}`, 'warn')
+      }
     }
     this.syncAdult()
     if (this.content.level === 'off') await this.restrict()
     this.link()
-    if (Date.now() - this.fetchedAt > REFRESH_EVERY) void this.refresh().catch(() => {})
-    else void this.syncArt().catch(() => {})
-    this.timer = setInterval(() => void this.refresh().catch(() => {}), REFRESH_EVERY)
+    if (Date.now() - this.fetchedAt > REFRESH_EVERY) void this.refresh().catch(failed)
+    else void this.syncArt().catch(failed)
+    this.timer = setInterval(() => void this.refresh().catch(failed), REFRESH_EVERY)
     this.timer.unref()
   }
 
@@ -159,7 +163,7 @@ export class Catalog {
       // leaves adult downloads unrecognized for a later switch back to off.
       this.syncAdult()
     }
-    void this.refresh().catch(() => {})
+    void this.refresh().catch(failed)
   }
 
   /** Moves adult recipes out of the catalog, keeping a stub. */

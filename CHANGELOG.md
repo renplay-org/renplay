@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- Download log in the player's options says when the game has not written a log yet, instead of doing nothing.
+
 ### Removed
 
 - Libraries from before 4.0 no longer open in this version: start Renplay 4.5.1 on one once, then this version. Going back from 4.x to 3.x is no longer possible.

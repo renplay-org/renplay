@@ -1487,7 +1487,10 @@
           setTimeout(function () {
             URL.revokeObjectURL(a.href)
           }, 1000)
-        } catch (e) {}
+        } catch (e) {
+          // Ren'Py writes its log as it starts: say there is none yet rather than do nothing.
+          post('download-log', { ok: false })
+        }
         break
       case 'renplay:focus':
         var c = document.getElementById('canvas')
