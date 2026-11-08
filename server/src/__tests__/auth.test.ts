@@ -10,9 +10,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
 import { Db, type GameRow } from '../db.js'
-import { playerRoute } from '../auth.js'
+import { playerRoute } from '../accounts/access.js'
 import { keepaliveToken } from '../jobs/keepalive.js'
-import { viewer, viewers } from '../accounts-context.js'
+import { viewer, viewers } from '../accounts/context.js'
 import yazl from 'yazl'
 
 function zipBuffer(entries: Record<string, string>): Promise<Buffer> {

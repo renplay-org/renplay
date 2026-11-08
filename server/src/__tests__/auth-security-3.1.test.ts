@@ -1,7 +1,7 @@
 import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { signInFixture, site } from './sign-in-fixture.js'
-import type { ExternalIdentity } from '../sign-in-providers.js'
+import type { ExternalIdentity } from '../accounts/sign-in.js'
 
 let app: Awaited<ReturnType<typeof signInFixture>>
 afterEach(() => { vi.restoreAllMocks(); app?.cleanup() })

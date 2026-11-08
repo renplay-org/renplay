@@ -12,7 +12,7 @@ import { groupCeiling, parseAdultGroups, parseAdultLevel } from '../content/leve
 import { adultFlag } from '../pipeline/import.js'
 import { Db } from '../db.js'
 import { readZipEntries } from '../saves/savefile.js'
-import { groupCns } from '../sign-in-providers.js'
+import { groupCns } from '../accounts/sign-in.js'
 import { mockOidc, signInFixture, site } from './sign-in-fixture.js'
 
 function zipBuffer(entries: Record<string, Buffer | string>): Promise<Buffer> {

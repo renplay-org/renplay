@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { viewer } from '../accounts-context.js'
+import { viewer } from '../accounts/context.js'
 import { parseAdultLevel } from './levels.js'
 import { HttpError } from '../util/paths.js'
 import type { Services } from '../services.js'

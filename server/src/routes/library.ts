@@ -8,7 +8,7 @@ import { parseJson, type GameSource } from '../db.js'
 import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
 import { exists, newId } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
-import { viewer } from '../accounts-context.js'
+import { viewer } from '../accounts/context.js'
 import type { Services } from '../services.js'
 
 const ARCHIVE_RE = /\.(zip|7z|rar|tar|tgz|tar\.(gz|bz2|xz|zst))$/i

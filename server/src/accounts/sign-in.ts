@@ -3,9 +3,9 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { readFileSync } from 'node:fs'
 import { Client } from 'ldapts'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
-import type { Config } from './config.js'
-import { groupCeiling, type AdultLevel } from './content/levels.js'
-import { HttpError } from './util/paths.js'
+import type { Config } from '../config.js'
+import { groupCeiling, type AdultLevel } from '../content/levels.js'
+import { HttpError } from '../util/paths.js'
 
 export interface ExternalIdentity {
   provider: string; subject: string; username: string; name: string

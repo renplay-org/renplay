@@ -1,7 +1,7 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
-import { viewer } from '../accounts-context.js'
+import { viewer } from '../accounts/context.js'
 import { BUILD_RE, baseOf } from '../builds.js'
 import type { GameRow } from '../db.js'
 import { PackReader } from '../pipeline/pack.js'

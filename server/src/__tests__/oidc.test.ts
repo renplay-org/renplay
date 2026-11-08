@@ -1,7 +1,7 @@
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
-import * as avatars from '../avatars.js'
+import * as avatars from '../accounts/avatars.js'
 import { signInFixture, mockOidc, site } from './sign-in-fixture.js'
 
 let provider: Awaited<ReturnType<typeof mockOidc>>, app: Awaited<ReturnType<typeof signInFixture>>

@@ -1,29 +1,22 @@
-import { createHash, createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
-import { mkdir, rename, writeFile } from 'node:fs/promises'
+import { createHmac, randomBytes } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import express, { Router, type Request, type Response } from 'express'
-import type { Config } from './config.js'
-import { type ContentMode } from './content/mode.js'
-import { lowestLevel, parseAdultLevel, type AdultLevel } from './content/levels.js'
-import type { Db, GameRow } from './db.js'
-import { parseJson } from './db.js'
-import type { ProgressStore } from './progress/store.js'
-import { viewer, viewers, type User, type Viewer } from './accounts-context.js'
-import type { ArtStore } from './art/store.js'
-import type { SaveStores } from './saves/stores.js'
-import { HttpError } from './util/paths.js'
-import { SignInProviders, signInRandom, type ExternalIdentity } from './sign-in-providers.js'
+import type { Config } from '../config.js'
+import { type ContentMode } from '../content/mode.js'
+import { lowestLevel, parseAdultLevel, type AdultLevel } from '../content/levels.js'
+import type { Db, GameRow } from '../db.js'
+import { parseJson } from '../db.js'
+import { viewer, viewers, type User, type Viewer } from './context.js'
+import type { SaveStores } from '../saves/stores.js'
+import { HttpError } from '../util/paths.js'
+import { SignInProviders, signInRandom, type ExternalIdentity } from './sign-in.js'
 import { fetchAvatar, storeAvatar } from './avatars.js'
-import { always, log } from './util/log.js'
-import { readDefaults } from './defaults/defaults.js'
+import { always, log } from '../util/log.js'
+import { readDefaults } from '../defaults/defaults.js'
+import { PASSWORD_PREFIX, equal, hash, passwordHash, passwordMatches, random, secretHash } from './passwords.js'
+import { demoCheck, playerRoute } from './access.js'
 
-// Measured locally at 207 ms (N=65536: 105 ms); explicit 128 MiB work factor.
-const PASSWORD_PREFIX = 'scrypt$1$131072$8$1$'
-const scrypt = (password: string, salt: string, N: number) => new Promise<Buffer>((resolve, reject) => {
-  scryptCallback(password, salt, 64, { N, r: 8, p: 1, maxmem: 256 << 20 }, (error, key) => error ? reject(error) : resolve(key))
-})
-const hash = (s: string) => createHash('sha256').update(s).digest('hex')
-const random = () => randomBytes(32).toString('base64url')
 const DAYS30 = 30 * 86400_000
 
 /** An account as the API sends it: never its PIN's hash or lock. */
@@ -32,67 +25,13 @@ export function publicUser<T extends Partial<User>>(u: T): Omit<T, 'pin_hash' | 
   return { ...rest, hasPin: !!pin_hash }
 }
 
-export async function passwordHash(password: unknown): Promise<string> {
-  if (typeof password !== 'string' || password.length < 10 || password.length > 1024) throw new HttpError(400, 'Use a password with 10 to 1024 characters')
-  const salt = randomBytes(16).toString('hex')
-  return `${PASSWORD_PREFIX}${salt}$${(await scrypt(password, salt, 131072)).toString('hex')}`
-}
-async function passwordMatches(password: unknown, encoded: string): Promise<boolean> {
-  if (typeof password !== 'string' || password.length > 1024) return false
-  const parts = encoded.split('$')
-  const [salt, key] = parts.length === 1 ? encoded.split(':') : parts.slice(5)
-  const N = parts.length === 1 ? 16384 : Number(parts[2])
-  if (parts.length !== 1 && (parts.length !== 7 || parts[0] !== 'scrypt' || parts[1] !== '1' || parts[3] !== '8' || parts[4] !== '1' || ![16384, 65536, 131072].includes(N))) return false
-  if (!salt || !key || !/^[0-9a-f]{128}$/.test(key)) return false
-  const actual = await scrypt(password, salt, N)
-  const expected = Buffer.from(key, 'hex')
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
-}
-function equal(a: string, b: string): boolean { return timingSafeEqual(Buffer.from(hash(a)), Buffer.from(hash(b))) }
-function username(value: unknown): string {
+export function validUsername(value: unknown): string {
   if (typeof value !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,63}$/.test(value)) throw new HttpError(400, 'Use 2 to 64 letters, numbers, dots, dashes or underscores for the username')
   return value.toLowerCase()
 }
-function name(value: unknown): string {
+export function validName(value: unknown): string {
   if (typeof value !== 'string' || !value.trim() || value.length > 100) throw new HttpError(400, 'Enter a name with at most 100 characters')
   return value.trim()
-}
-
-/** A closed player allowlist makes new management endpoints admin-only by default. */
-export function playerRoute(method: string, path: string): boolean {
-  if (/^\/api\/me(?:\/|$)/.test(path) || /^\/api\/avatars\/[a-f0-9]{64}\.webp$/.test(path) && ['GET', 'HEAD'].includes(method)) return true
-  if (/^\/api\/saves(?:\/|$)/.test(path) || path === '/api/saves-export' || path === '/api/saves-import') return true
-  if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art|\/offline)?$/.test(path))) return true
-  // A player chooses and uploads art for their own view (the route refuses everyone).
-  if ((method === 'GET' || method === 'HEAD') && (path === '/api/history' || path === '/api/widget' || path === '/api/defaults')) return true
-  return /^(PUT \/api\/games\/[^/]+\/(favorite|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
-}
-
-/**
- * What the demo's guest may not do, on top of a player's limits: anything that changes the shared
- * account or adds files to the server. Everything a visitor tries goes at the next restart anyway.
- */
-const DEMO_REFUSED: Array<[method: string, path: RegExp]> = [
-  ['PUT', /^\/api\/me$/],
-  ['POST', /^\/api\/me\/(password|avatar|tokens|claim-owner)$/],
-  ['PUT', /^\/api\/me\/pin$/],
-  ['DELETE', /^\/api\/me\/(tokens|sessions)(\/.*)?$/],
-  // The shared account's sessions are other visitors' browsers.
-  ['GET', /^\/api\/me\/sessions$/],
-  ['*', /^\/api\/me\/identities(\/.*)?$/],
-  ['POST', /^\/api\/games\/[^/]+\/art\/upload$/],
-  ['DELETE', /^\/api\/games\/[^/]+\/art\/uploads\/.+$/],
-  ['POST', /^\/api\/saves-import$/],
-  // Choices everyone shares, since everyone is the same guest.
-  ['PUT', /^\/api\/me\/(tags|adult)$/],
-]
-/** The guest's save writes: a game's own saving, a save's name and note, deleting one, restoring one. */
-const DEMO_SAVE_WRITES = /^\/api\/saves\/[^/]+\/(file|meta|slot|history\/restore)$/
-export function demoCheck(req: Request): void {
-  const refused = DEMO_REFUSED.some(([m, p]) => (m === '*' || m === req.method) && p.test(req.path))
-  // Imports, copies, Sync codes and the save folder are not among them: they bring in files or change the game for everyone.
-  const saveWrite = req.method !== 'GET' && req.method !== 'HEAD' && /^\/api\/saves\//.test(req.path) && !DEMO_SAVE_WRITES.test(req.path)
-  if (refused || saveWrite) throw new HttpError(403, 'The demo cannot do this. Install your own Renplay to try it.')
 }
 
 export class Accounts {
@@ -103,11 +42,10 @@ export class Accounts {
   private attempts = 10
   private setupGrant = ''
   private readonly signingKey = random()
-  private readonly removing = new Set<number>()
   private readonly limits = new Map<string, { count: number; until: number }>()
   private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
   private dummyPassword = ''
-  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly progress: ProgressStore, private readonly saveStores: SaveStores, private readonly art: ArtStore) {
+  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly saveStores: SaveStores) {
     // A demo needs its guest, so sign-in is always on there.
     this.enabled = cfg.demo || (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
@@ -157,15 +95,16 @@ export class Accounts {
     return row?.id ?? null
   }
   /** Writes a person's ceiling and choice. */
-  private writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
+  writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
     const u = this.user(id)
     const ceiling = patch.ceiling ?? parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
     const choice = patch.choice ?? parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
     this.db.raw.prepare('UPDATE users SET adult_ceiling = ?, adult_choice = ? WHERE id = ?').run(ceiling, choice, id)
   }
-  private invalidate(): void { this.sessionCache.clear() }
+  /** Forgets the cached sessions, after a change to people or their sessions. */
+  invalidate(): void { this.sessionCache.clear() }
   private async claim(raw: unknown, display: unknown, password: unknown): Promise<void> {
-    const login = username(raw), displayName = name(display), encoded = await passwordHash(password)
+    const login = validUsername(raw), displayName = validName(display), encoded = await passwordHash(password)
     if (!this.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
     if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != 1').get(login)) throw new HttpError(409, 'That username is taken')
     this.db.raw.exec('BEGIN IMMEDIATE')
@@ -176,6 +115,10 @@ export class Accounts {
       this.db.raw.exec('COMMIT')
     } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
     await this.tag(this.user(1))
+    this.ownerClaimed()
+  }
+  /** The owner account has its sign-in: the setup code is no use any more. */
+  ownerClaimed(): void {
     this.setupGrant = ''; this.setupCode = ''
   }
   private limit(key: string): void {
@@ -228,7 +171,7 @@ export class Accounts {
     }
     return { user: u, session: key, bearer: false }
   }
-  private requireLiveLink(user: number, session: string, bearer = false): void {
+  requireLiveLink(user: number, session: string, bearer = false): void {
     const row = bearer
       ? this.db.raw.prepare('SELECT user_id FROM tokens WHERE hash = ?').get(session)
       : this.db.raw.prepare('SELECT user_id FROM sessions WHERE hash = ? AND expires_at > ?').get(session, Date.now())
@@ -306,7 +249,7 @@ export class Accounts {
     if (tokenUser) { const user = this.user(tokenUser.user_id); return user.disabled ? null : { user, session, bearer: true } }
     return this.session(session)
   }
-  private guardLastAdmin(target: User, patch: { role?: string; disabled?: boolean }, removing = false): void {
+  guardLastAdmin(target: User, patch: { role?: string; disabled?: boolean }, removing = false): void {
     if (target.role !== 'admin' || target.disabled || (!removing && patch.role !== 'player' && patch.disabled !== true)) return
     const { n } = this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }
     if (n <= 1) throw new HttpError(409, 'Keep at least one enabled admin')
@@ -315,20 +258,14 @@ export class Accounts {
    * Signs a person out everywhere but `except`. Their PIN goes too, and other browsers forget them,
    * so whoever held a session or a token cannot come back with a PIN they set.
    */
-  private revoke(id: number, except = '', keepDevice = ''): void {
+  revoke(id: number, except = '', keepDevice = ''): void {
     this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash != ?').run(id, except)
     this.db.raw.prepare("UPDATE users SET pin_hash = '', pin_failures = 0, pin_locked_until = 0 WHERE id = ?").run(id)
     this.db.raw.prepare('DELETE FROM device_people WHERE user_id = ? AND device != ?').run(id, keepDevice)
     this.invalidate()
   }
-  /** Gives one person's progress, save names and art choices to another. */
-  private mergeData(from: number, to: number): void {
-    this.progress.merge(from, to)
-    this.saveStores.mergeNotes(from, to)
-    this.art.mergePerson(from, to)
-  }
-
-  private managed(id: number) {
+  /** Whether a sign-in provider sets this person's role or adult ceiling. */
+  managed(id: number) {
     const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)
     const oidc = identities.some(i => i.provider === this.providers.oidcProvider), ldap = identities.some(i => i.provider === this.providers.ldapProvider)
     const u = this.user(id)
@@ -534,8 +471,7 @@ export class Accounts {
       }
       if (u.role === 'admin') throw new HttpError(409, 'Admins switch in with their full sign-in, so an admin account has no PIN')
       if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) throw new HttpError(400, 'A PIN has 4 to 8 digits')
-      const salt = randomBytes(16).toString('hex')
-      const encoded = `${PASSWORD_PREFIX}${salt}$${(await scrypt(pin, salt, 131072)).toString('hex')}`
+      const encoded = await secretHash(pin)
       this.db.raw.prepare('UPDATE users SET pin_hash = ?, pin_failures = 0, pin_locked_until = 0 WHERE id = ?').run(encoded, u.id)
       res.json({ hasPin: true })
     })
@@ -591,7 +527,7 @@ export class Accounts {
     })
     r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: this.cfg.demo && this.current().id === this.demoGuest(), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) }))
     r.put('/me', async (req, res) => {
-      this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(name(req.body?.name), this.current().id)
+      this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(validName(req.body?.name), this.current().id)
       await this.tag(this.user(this.current().id)); res.json({ ok: true })
     })
     r.post('/me/password', async (req, res) => {
@@ -652,143 +588,10 @@ export class Accounts {
     r.get('/me/tokens', (_req, res) => res.json({ tokens: this.db.raw.prepare('SELECT id, name, created_at FROM tokens WHERE user_id = ?').all(this.current().id) }))
     r.post('/me/tokens', (req, res) => {
       const token = random(), id = randomBytes(12).toString('hex')
-      this.db.raw.prepare('INSERT INTO tokens VALUES (?, ?, ?, ?, ?)').run(hash(token), id, this.current().id, name(req.body?.name), Date.now())
+      this.db.raw.prepare('INSERT INTO tokens VALUES (?, ?, ?, ?, ?)').run(hash(token), id, this.current().id, validName(req.body?.name), Date.now())
       res.json({ id, token })
     })
     r.delete('/me/tokens/:id', (req, res) => { this.db.raw.prepare('DELETE FROM tokens WHERE user_id = ? AND id = ?').run(this.current().id, req.params.id); res.json({ ok: true }) })
-    r.get('/users', async (_req, res) => {
-      const users = await Promise.all((this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]).map(async (u) => {
-        // Counts follow the admin's own level: an Off admin's counts leave hidden games' saves out.
-        const store = this.saveStores.of(u.id), dirs = this.content.visibleSaveDirs(await store.listDirs())
-        const files = await Promise.all(dirs.map((dir) => store.list(dir)))
-        return { ...publicUser(u), games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === this.cfg.authUser, ...this.managed(u.id) }
-      }))
-      res.json({ users, adultDefault: this.cfg.adultDefault })
-    })
-    r.post('/users', async (req, res) => {
-      const login = username(req.body?.username), display = name(req.body?.name || login), encoded = await passwordHash(req.body?.password)
-      if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login)) throw new HttpError(409, 'That username is taken')
-      const role = req.body?.role ?? 'player'
-      if (!['admin', 'player'].includes(role)) throw new HttpError(400, 'Choose Admin or Player')
-      const ceiling = req.body?.adultCeiling === undefined ? this.cfg.adultDefault : parseAdultLevel(req.body?.adultCeiling)
-      if (!ceiling) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games ceiling')
-      this.db.raw.exec('BEGIN IMMEDIATE')
-      let id: number
-      try {
-        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, created_at) VALUES (?, ?, ?, ?)').run(login, display, role, new Date().toISOString()).lastInsertRowid)
-        // The ceiling an admin chooses here is also where the person's own choice starts.
-        this.writeLevels(id, { ceiling, choice: ceiling })
-        this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, ?, ?)").run(login, id, encoded)
-        this.db.raw.exec('COMMIT')
-      } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
-      await this.tag(this.user(id)); res.status(201).json({ user: publicUser(this.user(id)) })
-    })
-    r.put('/users/:id', async (req, res) => {
-      const target = this.user(Number(req.params.id)), b = req.body ?? {}
-      if (this.removing.has(target.id)) throw new HttpError(409, 'This account is being archived')
-      if (b.role !== undefined && !['admin', 'player'].includes(b.role)) throw new HttpError(400, 'Choose Admin or Player')
-      if (b.disabled !== undefined && typeof b.disabled !== 'boolean') throw new HttpError(400, 'disabled must be a boolean')
-      const ceiling = b.adultCeiling === undefined ? undefined : parseAdultLevel(b.adultCeiling) ?? undefined
-      if (b.adultCeiling !== undefined && !ceiling) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games ceiling')
-      const choice = b.adultChoice === undefined ? undefined : parseAdultLevel(b.adultChoice) ?? undefined
-      if (b.adultChoice !== undefined && !choice) throw new HttpError(400, 'Choose Off, Blurred or Shown for the adult games choice')
-      const managed = this.managed(target.id)
-      if (b.role !== undefined && managed.roleManaged || ceiling !== undefined && managed.adultManaged) throw new HttpError(409, 'This permission is set by the sign-in provider')
-      this.guardLastAdmin(target, b)
-      this.db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ? WHERE id = ?').run(b.name === undefined ? target.name : name(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), target.id)
-      if (ceiling !== undefined || choice !== undefined) this.writeLevels(target.id, { ceiling, choice })
-      if (b.role !== undefined) this.db.raw.prepare("UPDATE users SET admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(target.id)
-      this.invalidate(); await this.tag(this.user(target.id)); res.json({ user: publicUser(this.user(target.id)) })
-    })
-    r.post('/users/:id/password', async (req, res) => {
-      const target = this.user(Number(req.params.id)), encoded = await passwordHash(req.body?.password)
-      this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, target.id)
-      this.revoke(target.id); res.json({ ok: true })
-    })
-    const remove = async (id: number) => {
-      const u = this.user(id)
-      if (id === 1 || id === this.cfg.authUser) throw new HttpError(409, 'The no-sign-in account must stay')
-      if (this.removing.has(id)) throw new HttpError(409, 'This account is being archived')
-      this.guardLastAdmin(u, {}, true)
-      const store = this.saveStores.of(id), source = this.saveStores.folder(id)
-      const destination = join(this.cfg.dataDir, 'users-removed', `${id}-${Date.now()}`)
-      this.removing.add(id)
-      // Reserve the removal synchronously: two concurrent removals cannot both pass the last-admin check.
-      this.db.raw.prepare('UPDATE users SET disabled = 1 WHERE id = ?').run(id)
-      this.invalidate()
-      try {
-        await store.pauseWrites()
-        await mkdir(join(this.cfg.dataDir, 'users-removed'), { recursive: true })
-        await rename(source, destination)
-        this.db.raw.exec('BEGIN IMMEDIATE')
-        try {
-          this.db.raw.prepare('DELETE FROM identity_metadata WHERE (provider, subject) IN (SELECT provider, subject FROM identities WHERE user_id = ?)').run(id)
-          for (const table of ['sessions', 'tokens', 'identities', 'device_people']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id)
-          this.progress.forget(id)
-          this.saveStores.forget(id)
-          this.art.forgetPerson(id)
-          this.db.raw.prepare('DELETE FROM users WHERE id = ?').run(id)
-          this.db.raw.exec('COMMIT')
-        } catch (error) {
-          this.db.raw.exec('ROLLBACK')
-          await rename(destination, source)
-          throw error
-        }
-        this.invalidate()
-      } catch (error) {
-        this.db.raw.prepare('UPDATE users SET disabled = ? WHERE id = ?').run(u.disabled, id)
-        store.resumeWrites()
-        throw error
-      } finally { this.removing.delete(id) }
-    }
-    r.post('/me/claim-owner', async (_req, res) => {
-      const u = this.current(), { session, bearer } = viewer()!
-      if (u.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
-      if (!this.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
-      if (u.id === 1) throw new HttpError(409, 'Use the setup code to choose the owner password')
-      if (u.id === this.cfg.authUser) throw new HttpError(409, 'Choose the owner as RENPLAY_AUTH_USER before claiming it')
-      const reservation = random()
-      this.db.raw.exec('BEGIN IMMEDIATE')
-      try {
-        if (!this.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
-        this.db.setSetting('owner_claim', reservation)
-        this.db.raw.exec('COMMIT')
-      } catch (error) { this.db.raw.exec('ROLLBACK'); throw error }
-      try {
-        await this.saveStores.copy(u.id, 1)
-        this.db.raw.exec('BEGIN IMMEDIATE')
-        try {
-          // The copy can take a while. Check again that the claimant is still signed in, enabled
-          // and an admin, and carry over their permissions as they are now, so a role or grant
-          // removed meanwhile is not restored through the owner account.
-          this.requireLiveLink(u.id, session, bearer)
-          const now = this.db.raw.prepare('SELECT * FROM users WHERE id = ?').get(u.id) as unknown as User | undefined
-          if (!now || now.disabled || now.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
-          this.mergeData(u.id, 1)
-          this.db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
-          this.db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(now.username, now.name, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject)
-          this.writeLevels(1, { ceiling: parseAdultLevel(now.adult_ceiling) ?? this.cfg.adultDefault, choice: parseAdultLevel(now.adult_choice) ?? this.cfg.adultDefault })
-          this.db.raw.prepare('UPDATE identities SET user_id = 1 WHERE user_id = ?').run(u.id)
-          this.db.raw.prepare('UPDATE sessions SET user_id = 1 WHERE hash = ?').run(session)
-          this.db.raw.prepare('UPDATE tokens SET user_id = 1 WHERE hash = ?').run(session)
-          this.db.raw.exec('COMMIT')
-        } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
-        await remove(u.id)
-        await this.tag(this.user(1)); this.setupCode = ''; this.setupGrant = ''; this.invalidate()
-        res.json({ ok: true })
-      } finally {
-        this.db.raw.prepare("DELETE FROM settings WHERE key = 'owner_claim' AND value = ?").run(JSON.stringify(reservation))
-      }
-    })
-    r.post('/users/:id/merge', async (req, res) => {
-      const id = Number(req.params.id), target = Number(req.body?.target)
-      if (id === 1 || id === this.cfg.authUser) throw new HttpError(409, 'The no-sign-in account must stay')
-      this.guardLastAdmin(this.user(id), {}, true)
-      const copied = await this.saveStores.copy(id, target)
-      this.mergeData(id, target)
-      await remove(id); res.json({ copied })
-    })
-    r.delete('/users/:id', async (req, res) => { await remove(Number(req.params.id)); res.json({ ok: true }) })
     return r
   }
 }

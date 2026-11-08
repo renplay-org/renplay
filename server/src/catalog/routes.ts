@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { Router } from 'express'
 import YAML from 'yaml'
-import { viewer } from '../accounts-context.js'
+import { viewer } from '../accounts/context.js'
 import { parseJson, type GameSource } from '../db.js'
 import { installedRelease } from '../recipes/recipe.js'
 import type { Services } from '../services.js'
