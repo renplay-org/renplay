@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { queueHtmlSave, replayHtmlSaves, uploadHtmlSave } from '../../lib/html-save-queue'
+import { replayHtmlSaves } from '../../lib/html-save-queue'
+import { htmlSaveKeeper, type HtmlSaveContext, type HtmlSaveKeeper } from './htmlSaves'
 
 type Send = (msg: Record<string, unknown>) => void
 const newId = () => Math.random().toString(36).slice(2)
@@ -60,13 +61,10 @@ export function useSaving(send: Send, ready: boolean, toast: (text: string, tone
 }
 
 /**
- * A sandboxed HTML game's storage, which comes through the player. Snapshots left unsent on this
- * device go up before the game starts (`ready`). Each new one is kept on this device before the
- * game hears that it is, then uploaded.
+ * A sandboxed HTML game's storage. Snapshots left unsent on this device go up before the game
+ * starts (`ready`). New ones go through htmlSaveKeeper.
  */
 export function useHtmlSaves(sandboxed: boolean, userId: number, gameId: string, attempt: number, send: Send, onSignedOut: () => void, onFailed: (message: string) => void) {
-  const write = useRef<Promise<unknown>>(Promise.resolve())
-  const upload = useRef<Promise<unknown>>(Promise.resolve())
   const [ready, setReady] = useState(false)
   useEffect(() => {
     if (!sandboxed) return
@@ -81,23 +79,9 @@ export function useHtmlSaves(sandboxed: boolean, userId: number, gameId: string,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sandboxed, userId, gameId, attempt])
 
-  /** Keeps a snapshot of the game's whole storage (localStorage, or IndexedDB as 'idb'). */
-  const store = (saveDir: string, kind: string | undefined, data: string) => {
-    const path = `${saveDir}/${kind === 'idb' ? 'indexedDB.json' : 'localStorage.json'}`
-    write.current = write.current
-      .catch(() => {})
-      .then(async () => {
-        const entry = await queueHtmlSave(userId, gameId, path, data)
-        send({ type: 'renplay:storage-kept', kind, data, userId })
-        // A stalled upload must never delay the next durable snapshot or its acknowledgement.
-        upload.current = upload.current.catch(() => {})
-          .then(() => uploadHtmlSave(entry))
-          .catch(onSignedOut)
-      })
-      .catch(onSignedOut)
-  }
-  /** Settles once every snapshot sent so far is kept on this device. */
-  const kept = () => write.current
-
-  return { ready, store, kept }
+  const context = useRef<HtmlSaveContext>({ userId, gameId, send, onSignedOut })
+  context.current = { userId, gameId, send, onSignedOut }
+  const keeper = useRef<HtmlSaveKeeper | null>(null)
+  keeper.current ??= htmlSaveKeeper(() => context.current)
+  return { ready, store: keeper.current.store, kept: keeper.current.kept }
 }
