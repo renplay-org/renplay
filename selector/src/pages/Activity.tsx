@@ -12,6 +12,7 @@ import { ago, pct, capitalize } from '../lib/format'
 import { bytes } from '@shared/format'
 import { useGames, useJobs } from '../lib/queries'
 import Sheet from '../lantern/Sheet'
+import BackLink from '../components/BackLink'
 
 const icon = {
   queued: <Clock />,
@@ -97,6 +98,7 @@ export default function Activity() {
   }
   return (
     <div>
+      <BackLink to="/" />
       <div className="row between wrap" style={{ gap: 12 }}>
         <div>
           <h1 className="h1">Activity</h1>

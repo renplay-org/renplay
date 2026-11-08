@@ -8,6 +8,7 @@ import type { ArtFormat } from '@shared/art'
 import { duration, timeZone } from '../lib/format'
 import type { HistoryPage } from '@shared/api'
 import { Pill } from '../lantern/controls'
+import BackLink from '../components/BackLink'
 
 /** A length of time in seconds: "45m", "1h 20m". */
 const length = (seconds: number) => (seconds < 60 ? 'Under a minute' : duration(seconds))
@@ -53,6 +54,7 @@ export default function History() {
   return (
     <div className="stack" style={{ gap: 32 }}>
       <header>
+        <BackLink to="/account" />
         <h1 className="h1">History</h1>
         <p className="muted-2" style={{ marginTop: 8 }}>
           {length(first.totals.seconds)} in {first.totals.sessions} {first.totals.sessions === 1 ? 'session' : 'sessions'} across {first.totals.games} {first.totals.games === 1 ? 'game' : 'games'}

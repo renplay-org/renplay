@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react'
+import { MoreHorizontal, Plus } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Avatar from '../components/Avatar'
 import { Spinner, errorText, useToast } from '../lantern/ui'
@@ -14,6 +13,7 @@ import { useGames } from '../lib/queries'
 import { AccountSection } from './Account'
 import type { People, PersonListed } from '@shared/api'
 import Sheet from '../lantern/Sheet'
+import BackLink from '../components/BackLink'
 
 type Action = 'add' | 'edit' | 'password' | 'copy' | 'merge' | 'import' | 'remove'
 const historyNotice = 'Nothing is overwritten without a copy in the destination’s save history.'
@@ -42,9 +42,7 @@ export default function Users() {
   const destinations = all.filter((u) => u.id !== dialog?.user?.id)
   return (
     <div>
-      <Link to="/settings" className="crumb row small muted hide-desk" style={{ gap: 6 }}>
-        <ArrowLeft style={{ width: 16, height: 16 }} /> Settings
-      </Link>
+      <BackLink to="/settings" label="Settings" />
       <header className="row between wrap" style={{ gap: 12, marginTop: 8 }}>
         <div>
           <h1 className="h1">Users</h1>
@@ -69,7 +67,7 @@ export default function Users() {
                   {!!user.disabled && <TagPill tone="amber">Disabled</TagPill>}
                 </div>
                 <div className="m">
-                  {user.username} · {user.games} {user.games === 1 ? 'game' : 'games'} · {user.saves} save {user.saves === 1 ? 'file' : 'files'} · Adult games at most {adultLabels[ceilingOf(user)]}
+                  Username {user.username} · {user.games} {user.games === 1 ? 'game' : 'games'} · {user.saves} save {user.saves === 1 ? 'file' : 'files'} · Adult games at most {adultLabels[ceilingOf(user)]}
                   {choiceOf(user) !== ceilingOf(user) && `, chose ${adultLabels[choiceOf(user)]}`}
                 </div>
                 {user.role === 'admin' && <div className="m">{user.admin_source === 'provider' ? 'Admin access set by the sign-in provider.' : user.admin_source === 'allowlist' ? 'Admin access granted by RENPLAY_ADMINS.' : 'Admin access set in Renplay.'}</div>}
