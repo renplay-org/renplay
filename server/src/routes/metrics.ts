@@ -2,12 +2,7 @@ import { Router } from 'express'
 import { readdir, statfs } from 'node:fs/promises'
 import { join } from 'node:path'
 import { viewer } from '../accounts-context.js'
-import type { SaveBackups } from '../backups.js'
-import type { Catalog } from '../catalog.js'
-import type { Config } from '../config.js'
-import type { ContentMode } from '../content.js'
-import type { Db } from '../db.js'
-import type { JobManager } from '../jobs.js'
+import type { Services } from '../services.js'
 
 /*
  * For dashboards. /api/metrics is the Prometheus text format, for admins: counts about the whole
@@ -34,7 +29,8 @@ async function countSaves(dataDir: string): Promise<number> {
 
 const esc = (v: string) => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
 
-export function createMetricsRouter(cfg: Config, db: Db, jobs: JobManager, catalog: Catalog, backups: SaveBackups, content: ContentMode, version: string): Router {
+export function createMetricsRouter(s: Services): Router {
+  const { cfg, db, catalog, backups, content, version } = s
   const router = Router()
 
   router.get('/metrics', async (_req, res) => {

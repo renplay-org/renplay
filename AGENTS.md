@@ -66,6 +66,7 @@ These decide most review comments. Follow them without being asked.
 ```
 server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). Tests: vitest.
   src/app.ts         HTTP app; src/index.ts starts it
+  src/services.ts    The server's parts, made once at start and given to every router and job
   src/config.ts      Environment variables (all documented in README.md)
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
   src/catalog.ts     Catalog index: recipe matching, linking games to recipes, updates

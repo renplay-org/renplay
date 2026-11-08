@@ -284,6 +284,11 @@ describe('the levels on every route', () => {
     ['GET /archives', 'list'], ['POST /archives/inspect', 'tool'], ['POST /archives/hash', 'tool'], ['DELETE /archives', 'tool'],
     ['POST /imports', 'tool'], ['POST /uploads', 'person'], ['GET /uploads/:id', 'person'], ['PUT /uploads/:id', 'person'],
     ['POST /uploads/:id/complete', 'person'], ['DELETE /uploads/:id', 'person'], ['GET /catalog', 'list'], ['POST /catalog/refresh', 'list'],
+    // A person's saves of one game (the matrix below calls each under /api/saves/adult).
+    ['GET /:id/boot', 'game'], ['GET /:id/raw', 'game'], ['PUT /:id/file', 'game'], ['DELETE /:id/file', 'game'], ['POST /:id/save-dir', 'game'],
+    ['GET /:id', 'game'], ['POST /:id/sync', 'game'], ['POST /:id/sync/download', 'game'], ['PUT /:id/meta', 'game'], ['GET /:id/screenshot', 'game'],
+    ['GET /:id/download', 'game'], ['DELETE /:id/slot', 'game'], ['GET /:id/export', 'game'], ['POST /:id/import', 'game'], ['POST /:id/copy', 'game'],
+    ['GET /:id/history', 'game'], ['POST /:id/history/restore', 'game'],
   ]
 
   it('registers exactly the routes this file classifies', () => {

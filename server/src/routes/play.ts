@@ -1,15 +1,12 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
-import type { Accounts } from '../auth.js'
 import { viewer } from '../accounts-context.js'
-import { BUILD_RE, baseOf, type Builds } from '../builds.js'
-import type { ContentMode } from '../content.js'
-import type { Db, GameRow } from '../db.js'
-import type { EngineStore } from '../engines.js'
+import { BUILD_RE, baseOf } from '../builds.js'
+import type { GameRow } from '../db.js'
 import { PackReader } from '../pipeline/pack.js'
-import type { SaveStore } from '../saves/store.js'
 import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
+import type { Services } from '../services.js'
 
 /** Where a web game's localStorage and IndexedDB are kept, in its save folder. */
 // Game pages play only inside Renplay's own player: another site cannot frame them to trick people
@@ -33,15 +30,10 @@ export function playPath(g: GameRow): string {
  * Serves a game page: the engine's page template with renplay's runtime wired
  * in. Everything else under /g/ is static and served by nginx.
  */
-export function createPlayRouter(
-  db: Db,
-  builds: Builds,
-  engines: EngineStore,
-  runtimeVersion: string,
-  html: { runtime: () => Promise<string>; saves: SaveStore },
-  content: ContentMode,
-  accounts?: Accounts,
-): Router {
+/** Game pages and their files, with the HTML games' runtime and the version of Ren'Py's, for its address. */
+export function createPlayRouter(s: Services, runtime: { html: () => Promise<string>; version: string }): Router {
+  const { db, builds, engines, content, accounts } = s
+  const runtimeVersion = runtime.version
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get(['/g/:id/:build/', '/g/:id/:build/index.html'], async (req, res) => {
@@ -67,7 +59,7 @@ export function createPlayRouter(
       caches: await builds.caches(id, game.build),
       presplash: presplash ?? `/engine/${game.engine}/web-presplash.jpg`,
       runtimeVersion,
-      userId: accounts ? accounts.current().id : viewer()?.user.id ?? 1,
+      userId: accounts.current().id,
     })
     res.setHeader('Cache-Control', 'private, no-store')
     res.setHeader('Content-Security-Policy', FRAME_ANCESTORS)
@@ -119,7 +111,7 @@ export function createPlayRouter(
     const [id, base, raw] = [req.params[0], req.params[1], req.params[2]] as string[]
     const name = safeName(raw)
     const installed = db.getGame(id)
-    if (accounts?.enabled && installed && isWebGame(installed) && !res.locals.verifiedAsset) throw new HttpError(403, 'Open this game from the library')
+    if (accounts.enabled && installed && isWebGame(installed) && !res.locals.verifiedAsset) throw new HttpError(403, 'Open this game from the library')
     if (!name || !isSlug(id) || content.hides(db.getGame(id))) throw new HttpError(404, 'Not found')
     const reader = new PackReader(join(builds.dir(id, base), 'assets.pack'), join(builds.dir(id, base), 'assets.json'))
     let entry: [number, number] | null
@@ -185,7 +177,7 @@ export function createPlayRouter(
     const stored = async (name: string): Promise<Record<string, unknown> | null> => {
       if (!game.save_dir) return null
       try {
-        const parsed = JSON.parse((await html.saves.read(game.save_dir, name)).toString('utf-8'))
+        const parsed = JSON.parse((await s.saves.read(game.save_dir, name)).toString('utf-8'))
         return parsed && typeof parsed === 'object' ? parsed : null
       } catch {
         return null
@@ -194,7 +186,7 @@ export function createPlayRouter(
     const storage = (await stored(HTML_STORAGE)) ?? {}
     const idb = await stored(HTML_IDB)
     const cfg = JSON.stringify({ id: game.id, build: game.build, userId: viewer()?.user.id ?? 1, storage, idb }).replace(/</g, '\\u003c')
-    const inject = `<script>window.__renplay=${cfg};</script><script>${await html.runtime()}</script>`
+    const inject = `<script>window.__renplay=${cfg};</script><script>${await runtime.html()}</script>`
     const head = page.match(/<head\b[^>]*>/i)
     if (head) return page.slice(0, head.index! + head[0].length) + inject + page.slice(head.index! + head[0].length)
     const doctype = page.match(/^\s*<!doctype[^>]*>/i)

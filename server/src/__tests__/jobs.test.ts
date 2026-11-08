@@ -52,7 +52,7 @@ describe('job logs', () => {
       restarted.start()
       expect(db.getJob(id)?.status).toBe('interrupted')
       const app = express()
-      app.use('/api', createSystemRouter(cfg, db, restarted, null as never, null as never, null as never, 'test', { hides: () => false, viewerLevel: () => 'shown' } as never, { jobHidden: () => false } as never))
+      app.use('/api', createSystemRouter({ cfg, db, jobs: restarted, version: 'test', content: { hides: () => false, viewerLevel: () => 'shown' }, catalog: { jobHidden: () => false } } as never))
       const response = await request(app).get(`/api/jobs/${id}/log`).expect(200)
       expect(response.text).toContain('Source: game with spaces.zip')
       expect(response.text).toContain('Unpacking: 74%')

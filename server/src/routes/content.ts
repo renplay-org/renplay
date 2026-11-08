@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import { viewer } from '../accounts-context.js'
-import type { Catalog } from '../catalog.js'
-import type { Config } from '../config.js'
-import { parseAdultLevel, type ContentMode } from '../content.js'
+import { parseAdultLevel } from '../content.js'
 import { HttpError } from '../util/paths.js'
+import type { Services } from '../services.js'
 
-export function createContentRouter(cfg: Config, content: ContentMode, catalog: Catalog): Router {
+export function createContentRouter(s: Services): Router {
+  const { cfg, content, catalog } = s
   const router = Router({ caseSensitive: true, strict: true })
   const state = () => {
     const installation = { level: content.level, fixed: content.locked, chosen: content.chosen, variable: 'RENPLAY_ADULT_GAMES' }

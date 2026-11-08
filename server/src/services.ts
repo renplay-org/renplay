@@ -1,0 +1,93 @@
+import { readFileSync } from 'node:fs'
+import { mkdir } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { hashArchive } from './archive-origin.js'
+import { ArtStore } from './art.js'
+import { Accounts } from './auth.js'
+import { SaveBackups } from './backups.js'
+import { Builds } from './builds.js'
+import { Catalog } from './catalog.js'
+import type { Config } from './config.js'
+import { ContentMode } from './content.js'
+import { Db } from './db.js'
+import { EngineStore } from './engines.js'
+import { JobManager } from './jobs.js'
+import { Overlays } from './mods.js'
+import { applyMods } from './pipeline/applymods.js'
+import { runImport } from './pipeline/import.js'
+import type { SaveStore } from './saves/store.js'
+import { Purger } from './util/purge.js'
+
+const here = dirname(fileURLToPath(import.meta.url))
+
+export function packageVersion(): string {
+  try {
+    return JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf-8')).version
+  } catch {
+    return '0.0.0'
+  }
+}
+
+/**
+ * What the server's parts share, made once at start. Every router and job gets it. The signed-in
+ * person comes from the request (accounts-context.ts), so `saves` is that person's.
+ */
+export interface Services {
+  cfg: Config
+  db: Db
+  version: string
+  content: ContentMode
+  accounts: Accounts
+  /** The signed-in person's saves. */
+  readonly saves: SaveStore
+  purger: Purger
+  jobs: JobManager
+  builds: Builds
+  engines: EngineStore
+  overlays: Overlays
+  art: ArtStore
+  catalog: Catalog
+  backups: SaveBackups
+}
+
+export async function createServices(cfg: Config): Promise<Services> {
+  const db = Db.open(cfg.dataDir)
+  for (const d of [cfg.dataDir, cfg.walkthroughsDir, cfg.overlaysDir, cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
+  // The content mode asks the catalog which save folders are adult; the catalog needs the content mode.
+  let catalog: Catalog | null = null
+  const content = new ContentMode(cfg, db, () => catalog?.adultSaveDirs() ?? [])
+  const accounts = new Accounts(db, cfg, content)
+  try {
+    await accounts.init()
+  } catch (error) {
+    db.close()
+    throw error
+  }
+  const purger = new Purger(cfg.purgeDir)
+  const art = new ArtStore(cfg, db, content)
+  catalog = new Catalog(cfg, db, content, art)
+  await catalog.init()
+  const s: Services = {
+    cfg,
+    db,
+    version: packageVersion(),
+    content,
+    accounts,
+    get saves() {
+      return accounts.store()
+    },
+    purger,
+    jobs: new JobManager(db, cfg),
+    builds: new Builds(cfg, db, purger),
+    engines: new EngineStore(cfg, db, purger),
+    overlays: new Overlays(cfg),
+    art,
+    catalog,
+    backups: new SaveBackups(cfg, db),
+  }
+  s.jobs.register('import', (ctx) => runImport(ctx, s))
+  s.jobs.register('apply-mods', (ctx) => applyMods(ctx, s))
+  s.jobs.register('hash-archive', (ctx) => hashArchive(ctx, s))
+  return s
+}

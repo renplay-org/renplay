@@ -6,19 +6,14 @@ import multer from 'multer'
 import YAML from 'yaml'
 import { viewer } from '../accounts-context.js'
 import { ART_KINDS, type ArtKind } from '../art.js'
-import type { Accounts } from '../auth.js'
-import type { Builds } from '../builds.js'
-import { installedRelease, type Catalog } from '../catalog.js'
-import type { Config } from '../config.js'
-import { parseJson, type Db, type GameRow, type GameSource } from '../db.js'
-import type { JobManager } from '../jobs.js'
-import type { Overlays } from '../mods.js'
-import type { SaveStore } from '../saves/store.js'
+import { installedRelease } from '../catalog.js'
+import { parseJson, type GameRow, type GameSource } from '../db.js'
 import { playPath } from './play.js'
 import { cachedSaveMeta, cachedSceneHash } from './saves.js'
 import { slotInfo } from '../saves/savefile.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, safeJoin } from '../util/paths.js'
+import type { Services } from '../services.js'
 
 /** What a walkthrough file is, from its first bytes (and its name for text), or null. */
 export function walkthroughKind(data: Buffer, name = ''): { kind: 'pdf' | 'image' | 'text'; ext: string } | null {
@@ -50,19 +45,8 @@ function cacheName(raw: unknown): string {
 /** The catalog's recipe schema, for editors that validate YAML (yaml-language-server). */
 export const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json'
 
-export interface GameDeps {
-  cfg: Config
-  accounts: Accounts
-  db: Db
-  jobs: JobManager
-  builds: Builds
-  saves: SaveStore
-  overlays: Overlays
-  catalog: Catalog
-  version: string
-}
 
-export async function toGame(game: GameRow, deps: GameDeps) {
+export async function toGame(game: GameRow, deps: Services) {
   const row = deps.accounts.progress(game)
   const source = parseJson<GameSource>(row.source, {})
   const job = deps.jobs.activeFor(row.id)
@@ -164,7 +148,7 @@ export async function toGame(game: GameRow, deps: GameDeps) {
   }
 }
 
-export function createGamesRouter(deps: GameDeps): Router {
+export function createGamesRouter(deps: Services): Router {
   const { cfg, db, jobs, builds } = deps
   const router = Router({ caseSensitive: true, strict: true })
 
@@ -187,7 +171,7 @@ export function createGamesRouter(deps: GameDeps): Router {
   /** The game, when this person may see its pictures: below Shown an adult game's art does not exist. */
   const withArt = (req: Request): GameRow => {
     const g = get(req)
-    if (deps.catalog.content.blurs(g) || !deps.catalog.art) throw new HttpError(404, 'Not found')
+    if (deps.catalog.content.blurs(g)) throw new HttpError(404, 'Not found')
     return g
   }
   const kindOf = (value: unknown): ArtKind => {
@@ -210,11 +194,11 @@ export function createGamesRouter(deps: GameDeps): Router {
     const subject = deps.catalog.gameSubject(g)
     const scope = scopeOf(undefined)
     if (req.query['kind'] === undefined) {
-      res.json({ art: deps.catalog.art!.forSubject(subject), counts: Object.fromEntries(ART_KINDS.map((k) => [k, subject.pictures.filter((p) => p.kind === k).length])) })
+      res.json({ art: deps.art.forSubject(subject), counts: Object.fromEntries(ART_KINDS.map((k) => [k, subject.pictures.filter((p) => p.kind === k).length])) })
       return
     }
     const kind = kindOf(req.query['kind'])
-    res.json({ kind, candidates: await deps.catalog.art!.candidates(subject, kind, scope) })
+    res.json({ kind, candidates: await deps.art.candidates(subject, kind, scope) })
   })
 
   router.put('/:id/art', async (req, res) => {
@@ -225,21 +209,21 @@ export function createGamesRouter(deps: GameDeps): Router {
     const picture = subject.pictures.find((p) => p.kind === kind && p.id === req.body?.candidate)
     if (!picture) throw new HttpError(404, 'That picture is not a choice for this game')
     // For everyone: a catalog picture or one uploaded for everyone. A personal upload is not on the others' lists.
-    if (scope === 0 && picture.upload && !deps.catalog.art!.isShared(picture.id, g.id))
+    if (scope === 0 && picture.upload && !deps.art.isShared(picture.id, g.id))
       throw new HttpError(409, 'Upload this picture for everyone first, then choose it for everyone.')
-    deps.catalog.art!.choose(g.id, kind, req.body.candidate, scope)
-    await deps.catalog.art!.ready(subject, scope)
-    res.json({ art: deps.catalog.art!.forSubject(subject) })
+    deps.art.choose(g.id, kind, req.body.candidate, scope)
+    await deps.art.ready(subject, scope)
+    res.json({ art: deps.art.forSubject(subject) })
   })
 
   router.delete('/:id/art', async (req, res) => {
     const g = withArt(req)
     const kind = kindOf(req.query['kind'])
     const scope = scopeOf(req.query['scope'])
-    deps.catalog.art!.clearChoice(g.id, kind, scope)
+    deps.art.clearChoice(g.id, kind, scope)
     const subject = deps.catalog.gameSubject(g)
-    await deps.catalog.art!.ready(subject, scope)
-    res.json({ art: deps.catalog.art!.forSubject(subject) })
+    await deps.art.ready(subject, scope)
+    res.json({ art: deps.art.forSubject(subject) })
   })
 
   router.post('/:id/art/upload', express.raw({ type: () => true, limit: '16mb' }), async (req, res) => {
@@ -250,12 +234,12 @@ export function createGamesRouter(deps: GameDeps): Router {
     const focal = /^(0(\.\d+)?|1(\.0+)?),(0(\.\d+)?|1(\.0+)?)$/.test(focalText) ? (focalText.split(',').map(Number) as [number, number]) : null
     if (focalText && !focal) throw new HttpError(400, 'The focal point is two numbers from 0 to 1, like 0.5,0.3')
     if (!Buffer.isBuffer(req.body) || !req.body.length) throw new HttpError(400, 'No picture uploaded')
-    const { id, warning } = await deps.catalog.art!.upload(g.id, kind, req.body, focal, scope)
+    const { id, warning } = await deps.art.upload(g.id, kind, req.body, focal, scope)
     // An upload is made to be used: it becomes the choice at the scope it was uploaded for.
-    deps.catalog.art!.choose(g.id, kind, id, scope)
+    deps.art.choose(g.id, kind, id, scope)
     const subject = deps.catalog.gameSubject(g)
-    await deps.catalog.art!.ready(subject, scope)
-    res.json({ id, warning, art: deps.catalog.art!.forSubject(subject) })
+    await deps.art.ready(subject, scope)
+    res.json({ id, warning, art: deps.art.forSubject(subject) })
   })
 
   /** Deletes one's own upload (scope me), or an admin's upload for everyone (scope everyone). */
@@ -264,10 +248,10 @@ export function createGamesRouter(deps: GameDeps): Router {
     const kind = kindOf(req.query['kind'])
     const scope = scopeOf(req.query['scope'])
     if (!/^[0-9a-f]{64}$/.test(req.params.upload)) throw new HttpError(404, 'Picture not found')
-    if (!deps.catalog.art!.removeUpload(g.id, kind, req.params.upload, scope)) throw new HttpError(404, 'Picture not found')
+    if (!deps.art.removeUpload(g.id, kind, req.params.upload, scope)) throw new HttpError(404, 'Picture not found')
     const subject = deps.catalog.gameSubject(g)
-    await deps.catalog.art!.ready(subject, scope)
-    res.json({ art: deps.catalog.art!.forSubject(subject) })
+    await deps.art.ready(subject, scope)
+    res.json({ art: deps.art.forSubject(subject) })
   })
 
   router.put('/:id/favorite', async (req, res) => {
@@ -336,7 +320,7 @@ export function createGamesRouter(deps: GameDeps): Router {
     await builds.remove(g.id)
     if (req.query['forget'] === '1') {
       for (const w of db.walkthroughs(g.id)) await unlink(join(cfg.walkthroughsDir, w.file)).catch(() => {})
-      deps.catalog.art?.forgetGame(g.id)
+      deps.art.forgetGame(g.id)
       db.raw.prepare('DELETE FROM walkthroughs WHERE game = ?').run(g.id)
       // Its finished jobs go with it: without the game, nothing tells whether they were about an
       // adult game. Saves stay, as always.

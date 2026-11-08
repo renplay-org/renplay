@@ -7,8 +7,15 @@ import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ArtStore } from '../art.js'
 import { Catalog, installedRelease, normalizeRecipe } from '../catalog.js'
-import { loadConfig } from '../config.js'
+import { loadConfig, type Config } from '../config.js'
+import { ContentMode } from '../content.js'
 import { Db } from '../db.js'
+
+/** A catalog with its content mode and art cache, as the server makes it (services.ts). */
+function catalogOf(cfg: Config, db: Db): Catalog {
+  const content = new ContentMode(cfg, db)
+  return new Catalog(cfg, db, content, new ArtStore(cfg, db, content))
+}
 
 describe('catalog', () => {
   let server: Server
@@ -70,12 +77,11 @@ describe('catalog', () => {
     process.env['RENPLAY_ADULT_GAMES'] = 'allow'
     const cfg = loadConfig()
     const db = Db.open(cfg.dataDir)
-    return { cfg, db, catalog: new Catalog(cfg, db) }
+    return { cfg, db, catalog: catalogOf(cfg, db) }
   }
 
   it('links installed games to their recipe and makes their art from a schema 3 cover', async () => {
     const { cfg, db, catalog } = setup()
-    catalog.art = new ArtStore(cfg, db, catalog.content)
     db.insertGame({ id: 'ripples', title: 'ripples', status: 'installed', version: '0.9.23' })
     db.insertGame({ id: 'some-save', title: 'Some', status: 'installed', save_dir: 'BySave-1' })
     db.insertGame({ id: 'some-archive', title: 'Other', status: 'installed', source: JSON.stringify({ archive: 'Pattern-2.0-pc.zip' }) })
@@ -178,7 +184,7 @@ describe('catalog', () => {
     await catalog.refresh()
     expect(catalog.vocabulary).toEqual({ 'sci-fi': { label: 'Sci-fi', group: 'story' }, adventure: { label: 'Adventure', group: 'play' } })
     expect(catalog.recipe('ripples')).toMatchObject({ tagIds: ['sci-fi'], content: ['violence'], state: 'ongoing', summary: 'A journey through time.' })
-    const restarted = new Catalog({ ...cfg, catalogUrls: ['http://127.0.0.1:9/offline'] }, db)
+    const restarted = catalogOf({ ...cfg, catalogUrls: ['http://127.0.0.1:9/offline'] }, db)
     await restarted.init()
     expect(restarted.vocabulary).toEqual(catalog.vocabulary)
     expect(restarted.recipe('ripples')).toEqual(catalog.recipe('ripples'))
@@ -189,7 +195,7 @@ describe('catalog', () => {
   it('reads older caches without vocabulary and preserves label-only tags', async () => {
     const { cfg, db } = setup()
     db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'old', title: 'Old', tags: ['romance'], releases: [] }] })
-    const catalog = new Catalog(cfg, db)
+    const catalog = catalogOf(cfg, db)
     await catalog.init()
     expect(catalog.vocabulary).toEqual({})
     expect(catalog.recipe('old')?.tags).toEqual(['romance'])

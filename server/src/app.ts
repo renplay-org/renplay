@@ -1,24 +1,19 @@
-import { ArtStore } from './art.js'
-import { SaveBackups } from './backups.js'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { mkdir, readFile, readdir, stat } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
-import { Accounts, playerRoute } from './auth.js'
+import { playerRoute, type Accounts } from './auth.js'
 import { viewer } from './accounts-context.js'
-import { Builds } from './builds.js'
-import { Catalog } from './catalog.js'
-import { ContentMode } from './content.js'
+import type { SaveBackups } from './backups.js'
+import type { Builds } from './builds.js'
+import type { Catalog } from './catalog.js'
 import type { Config } from './config.js'
-import { Db } from './db.js'
-import { EngineStore } from './engines.js'
-import { JobManager } from './jobs.js'
-import { Overlays } from './mods.js'
-import { applyMods } from './pipeline/applymods.js'
-import { runImport } from './pipeline/import.js'
+import type { Db } from './db.js'
+import type { EngineStore } from './engines.js'
+import type { JobManager } from './jobs.js'
 import { createFilesRouter } from './routes/files.js'
 import { createGamesRouter } from './routes/games.js'
 import { createHistoryRouter } from './routes/history.js'
@@ -29,21 +24,13 @@ import { createSavesExportAll, createSavesRouter } from './routes/saves.js'
 import { createSavesImportRouter } from './routes/saves-import.js'
 import { createMetricsRouter } from './routes/metrics.js'
 import { createSystemRouter } from './routes/system.js'
-import { SaveStore } from './saves/store.js'
-import { sha256File } from './util/fsx.js'
-import { HttpError, cleanRelPath, safeJoin } from './util/paths.js'
-import { Purger } from './util/purge.js'
+import type { SaveStore } from './saves/store.js'
+import { createServices, packageVersion, type Services } from './services.js'
+import { HttpError } from './util/paths.js'
+import type { Purger } from './util/purge.js'
 import { log } from './util/log.js'
 
-const here = dirname(fileURLToPath(import.meta.url))
-
-export function packageVersion(): string {
-  try {
-    return JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf-8')).version
-  } catch {
-    return '0.0.0'
-  }
-}
+export { packageVersion }
 
 /** Version string for the injected runtime script, so browsers refetch it after upgrades. */
 function runtimeVersion(path: string | undefined): string {
@@ -55,6 +42,7 @@ function runtimeVersion(path: string | undefined): string {
 
 export interface App {
   app: express.Express
+  services: Services
   db: Db
   jobs: JobManager
   builds: Builds
@@ -72,42 +60,8 @@ export interface App {
 const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
 
 export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
-  const db = Db.open(cfg.dataDir)
-  for (const d of [cfg.dataDir, cfg.walkthroughsDir, cfg.overlaysDir]) await mkdir(d, { recursive: true })
-  for (const d of [cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
-
-  const version = packageVersion()
-  const content = new ContentMode(cfg, db)
-  const accounts = new Accounts(db, cfg, content)
-  try { await accounts.init() } catch (error) { db.close(); throw error }
-  const purger = new Purger(cfg.purgeDir)
-  const saves = accounts.store(1)
-  const jobs = new JobManager(db, cfg)
-  const builds = new Builds(cfg, db, purger)
-  const engines = new EngineStore(cfg, db, purger)
-  const overlays = new Overlays(cfg)
-  const catalog = new Catalog(cfg, db, content)
-  const art = new ArtStore(cfg, db, content)
-  catalog.art = art
-  await catalog.init()
-
-  const deps = { cfg, db, builds, engines, overlays, catalog, get saves() { return accounts.store() }, accounts, jobs, version }
-  jobs.register('import', (ctx) => runImport(ctx, deps))
-  jobs.register('apply-mods', (ctx) => applyMods(ctx, deps))
-  jobs.register('hash-archive', async (ctx) => {
-    const rel = cleanRelPath(ctx.params.path)
-    const full = safeJoin(cfg.archivesDir, rel)
-    const st = await stat(full)
-    const sha256 = await sha256File(full, (n) => ctx.progress('Computing checksum', n / st.size))
-    const prev = db.getArchive(rel)
-    db.upsertArchive({ path: rel, size: st.size, mtime_ms: Math.floor(st.mtimeMs), sha256, info: prev?.info })
-    for (const g of db.allGames()) {
-      const src = JSON.parse(g.source || '{}')
-      if (src.archive === rel && src.size === st.size && !src.sha256) db.updateGame(g.id, { source: JSON.stringify({ ...src, sha256 }) })
-    }
-    const match = catalog.match({ name: rel, size: st.size, sha256 })
-    return { sha256, recipe: match?.recipe.id ?? null, exact: match?.exact ?? false }
-  })
+  const services = await createServices(cfg)
+  const { db, content, accounts, art, catalog, jobs, builds, engines, purger, backups, version } = services
 
   const app = express()
   app.disable('x-powered-by')
@@ -171,7 +125,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     (htmlRuntime ??= Promise.all([readFile(join(dirname(htmlRuntimePath), 'vendor', 'fake-indexeddb.js'), 'utf-8'), readFile(htmlRuntimePath, 'utf-8')])
       .then((parts) => parts.join('\n;\n').replace(/<\/script/gi, '<\\/script'))
       .catch((e) => ((htmlRuntime = null), Promise.reject(e))))
-  app.use(createPlayRouter(db, builds, engines, runtimeVersion(opts.runtimePath), { runtime: readHtmlRuntime, get saves() { return accounts.store() } }, content, accounts))
+  app.use(createPlayRouter(services, { html: readHtmlRuntime, version: runtimeVersion(opts.runtimePath) }))
   // Static fallbacks for development; nginx serves these paths in production.
   // resolve(): sendFile refuses paths with "..", like the $PWD/../runtime one in AGENTS.md.
   if (opts.runtimePath) app.get('/renplay/runtime.js', (_req, res) => res.sendFile(resolve(opts.runtimePath!)))
@@ -189,18 +143,17 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     }
     tryNext(0)
   })
-  const backups = new SaveBackups(cfg, db)
   if (opts.startJobs !== false) backups.start()
-  app.use('/api', createSystemRouter(cfg, db, jobs, engines, builds, purger, version, content, catalog, backups))
-  app.use('/api', createMetricsRouter(cfg, db, jobs, catalog, backups, content, version))
-  app.use('/api/content', createContentRouter(cfg, content, catalog))
-  app.get('/api/saves-export', (req, res, next) => { void createSavesExportAll(accounts.store(), db, content)(req, res).catch(next) })
-  app.use('/api/saves-import', createSavesImportRouter(() => accounts.store(), db, content, catalog))
-  app.use('/api/saves', (req, res, next) => createSavesRouter(accounts.store(), db, content, cfg.syncServer, cfg.saveLimits)(req, res, next))
-  app.use('/api/games', createFilesRouter(db, builds, overlays, jobs, content))
-  app.use('/api/games', createGamesRouter(deps))
-  app.use('/api/history', createHistoryRouter(db, catalog, accounts))
-  app.use('/api', createLibraryRouter(deps))
+  app.use('/api', createSystemRouter(services))
+  app.use('/api', createMetricsRouter(services))
+  app.use('/api/content', createContentRouter(services))
+  app.get('/api/saves-export', createSavesExportAll(services))
+  app.use('/api/saves-import', createSavesImportRouter(services))
+  app.use('/api/saves', createSavesRouter(services))
+  app.use('/api/games', createFilesRouter(services))
+  app.use('/api/games', createGamesRouter(services))
+  app.use('/api/history', createHistoryRouter(services))
+  app.use('/api', createLibraryRouter(services))
   // Made pictures are named by their content, so they never change: browsers keep them.
   app.get('/api/art/:file', (req, res, next) => {
     if (!art.canRead(req.params.file)) return next(new HttpError(404, 'Not found'))
@@ -256,7 +209,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     ]
   }
 
-  return { app, db, jobs, builds, engines, saves, accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
+  return { app, services, db, jobs, builds, engines, saves: accounts.store(1), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
 }
 
 /** Development server: serve *.gz engine files with their encoding, like nginx does. */

@@ -39,7 +39,7 @@ describe('SaveStore', () => {
     const db = Db.open(join(root, 'data'))
     db.insertGame({ id: 'g', title: 'G', status: 'installed', build: 'b1', save_dir: 'G-1' })
     const app = express()
-    app.use('/api/saves', createSavesRouter(store, db, new ContentMode(loadConfig(), db), 'https://sync.renpy.org', { file: 100, total: 250, files: 3 }))
+    app.use('/api/saves', createSavesRouter({ db, content: new ContentMode(loadConfig(), db), cfg: { syncServer: 'https://sync.renpy.org', saveLimits: { file: 100, total: 250, files: 3 } }, saves: store } as never))
     const put = (name: string, size: number) => request(app).put(`/api/saves/g/file?path=G-1/${name}`).set('content-type', 'application/octet-stream').send(Buffer.alloc(size, 1))
     await put('1-1-LT1.save', 101).expect(413)
     await put('1-1-LT1.save', 100).expect(200)
@@ -51,7 +51,7 @@ describe('SaveStore', () => {
     // And a number of files: many tiny ones fill it as well.
     const few = new SaveStore(join(root, 'few'), join(root, 'few-history'), 3)
     const small = express()
-    small.use('/api/saves', createSavesRouter(few, db, new ContentMode(loadConfig(), db), 'https://sync.renpy.org', { file: 100, total: 10_000, files: 2 }))
+    small.use('/api/saves', createSavesRouter({ db, content: new ContentMode(loadConfig(), db), cfg: { syncServer: 'https://sync.renpy.org', saveLimits: { file: 100, total: 10_000, files: 2 } }, saves: few } as never))
     const tiny = (name: string) => request(small).put(`/api/saves/g/file?path=G-1/${name}`).set('content-type', 'application/octet-stream').send(Buffer.from('x'))
     await tiny('1-1-LT1.save').expect(200)
     await tiny('1-2-LT1.save').expect(200)

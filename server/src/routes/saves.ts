@@ -1,13 +1,13 @@
-import express, { Router, type Request } from 'express'
+import express, { Router, type Request, type RequestHandler } from 'express'
 import { readFile } from 'node:fs/promises'
 import sharp from 'sharp'
 import { rgbaToThumbHash } from 'thumbhash'
 import { saveImport } from '../saves/import-upload.js'
 import { viewer } from '../accounts-context.js'
-import type { ContentMode } from '../content.js'
 import type { Db, GameRow } from '../db.js'
 import { readSaveMeta, readSaveScreenshot, slotInfo } from '../saves/savefile.js'
 import type { SaveStore } from '../saves/store.js'
+import type { Services } from '../services.js'
 import { downloadSync, uploadSync } from '../saves/sync.js'
 import { dirSize, sha1 } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/paths.js'
@@ -55,23 +55,20 @@ export async function cachedSceneHash(store: SaveStore, dir: string, file: { nam
 export const syncCodesOn = (db: Db): boolean => db.getSetting<boolean>(SYNC_SETTING, false) === true
 export const SYNC_SETTING = 'renpy_sync'
 
-/** Limits for a shared account on a public server (the demo): one file, and all files with their history. */
-export interface SaveLimits {
-  file: number
-  total: number
-  files: number
-}
-
-export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode, syncServer: string, limits: SaveLimits): Router {
+export function createSavesRouter(s: Services): Router {
+  const { db, content } = s
+  const { syncServer, saveLimits: limits } = s.cfg
   const router = Router({ caseSensitive: true, strict: true })
-  // What the saves and their history take, counted again at most every 5 seconds.
-  let used: { at: number; size: Promise<{ bytes: number; files: number }> } | null = null
+  // What each person's saves and their history take, counted again at most every 5 seconds.
+  const used = new Map<string, { at: number; size: Promise<{ bytes: number; files: number }> }>()
   const usedSize = () => {
-    if (!used || Date.now() - used.at > 5000) {
-      const size = Promise.all([dirSize(store.root), dirSize(store.historyRoot)]).then(([a, b]) => ({ bytes: a.bytes + b.bytes, files: a.files + b.files }))
-      used = { at: Date.now(), size }
+    const store = s.saves
+    let u = used.get(store.root)
+    if (!u || Date.now() - u.at > 5000) {
+      u = { at: Date.now(), size: Promise.all([dirSize(store.root), dirSize(store.historyRoot)]).then(([a, b]) => ({ bytes: a.bytes + b.bytes, files: a.files + b.files })) }
+      used.set(store.root, u)
     }
-    return used.size
+    return u.size
   }
 
   const game = (req: Request): GameRow => {
@@ -106,14 +103,14 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const files: Array<{ path: string; data: string; mtime: number }> = []
     const lazy: Array<{ path: string; size: number; mtime: number }> = []
     if (g.save_dir) {
-      for (const f of await store.list(g.save_dir)) {
-        files.push({ path: `${g.save_dir}/${f.name}`, data: (await store.read(g.save_dir, f.name)).toString('base64'), mtime: f.mtimeMs })
+      for (const f of await s.saves.list(g.save_dir)) {
+        files.push({ path: `${g.save_dir}/${f.name}`, data: (await s.saves.read(g.save_dir, f.name)).toString('base64'), mtime: f.mtimeMs })
       }
     }
-    for (const t of await store.sharedFiles()) files.push({ path: t.name, data: t.data.toString('base64'), mtime: t.mtimeMs })
-    for (const dir of await store.listDirs()) {
+    for (const t of await s.saves.sharedFiles()) files.push({ path: t.name, data: t.data.toString('base64'), mtime: t.mtimeMs })
+    for (const dir of await s.saves.listDirs()) {
       if (dir === g.save_dir || !allowedDir(dir)) continue
-      for (const f of await store.list(dir)) lazy.push({ path: `${dir}/${f.name}`, size: f.size, mtime: f.mtimeMs })
+      for (const f of await s.saves.list(dir)) lazy.push({ path: `${dir}/${f.name}`, size: f.size, mtime: f.mtimeMs })
     }
     res.setHeader('Cache-Control', 'no-store')
     res.json({ saveDir: g.save_dir || null, files, lazy, serverTime: Date.now() })
@@ -143,10 +140,10 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const slash = rel.indexOf('/')
     if (slash === -1) throw new HttpError(400, 'Invalid path')
     if (!allowedDir(rel.slice(0, slash))) throw new HttpError(404, 'Save folder not found')
-    const data = await store.read(rel.slice(0, slash), rel.slice(slash + 1))
+    const data = await s.saves.read(rel.slice(0, slash), rel.slice(slash + 1))
     res.setHeader('Cache-Control', 'no-store')
     // The version sent, so a device that loads it knows what it saw.
-    res.setHeader('X-Renplay-Mtime', String((await store.stat(rel.slice(0, slash), rel.slice(slash + 1)))?.mtimeMs ?? 0))
+    res.setHeader('X-Renplay-Mtime', String((await s.saves.stat(rel.slice(0, slash), rel.slice(slash + 1)))?.mtimeMs ?? 0))
     res.type('application/octet-stream').send(data)
   })
 
@@ -167,7 +164,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const base = rawBase !== undefined && /^\d+$/.test(rawBase) ? Number(rawBase) : undefined
     const rawUnanswered = req.header('x-unanswered')
     const unanswered = rawUnanswered && /^[0-9a-f]{1,8}:\d{1,9}$/.test(rawUnanswered) ? rawUnanswered : undefined
-    const f = await store.write(dir, name, body, { mtimeMs: mtime, reason: 'game', base, unanswered })
+    const f = await s.saves.write(dir, name, body, { mtimeMs: mtime, reason: 'game', base, unanswered })
     res.json({ ok: true, size: f.size, mtime: f.mtimeMs, sha1: sha1(body), ...(f.conflict ? { conflict: f.conflict } : {}) })
   })
 
@@ -176,10 +173,10 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const { dir, name } = resolvePath(g, req.query['path'])
     const rawBase = req.header('x-base')
     const base = rawBase !== undefined && /^\d+$/.test(rawBase) ? Number(rawBase) : undefined
-    const removed = await store.remove(dir, name, 'game-delete', base)
+    const removed = await s.saves.remove(dir, name, 'game-delete', base)
     // Another device saved it since this one last saw it: the save stays, and the device loads it.
     if (removed === 'changed') {
-      res.status(409).json({ conflict: 'kept', mtime: (await store.stat(dir, name))?.mtimeMs ?? 0 })
+      res.status(409).json({ conflict: 'kept', mtime: (await s.saves.stat(dir, name))?.mtimeMs ?? 0 })
       return
     }
     if (removed && name.endsWith('.save') && !name.includes('/')) forgetMeta(dir, name)
@@ -194,7 +191,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     if (sd !== g.save_dir) {
       // Reporting a folder must not relabel a hidden game's (or an orphaned) saves as safe.
       const existing = db.allGames().filter((other) => other.id !== g.id && other.save_dir === sd)
-      if (existing.some((other) => content.hides(other)) || (!existing.length && !allowedDir(sd) && (await store.list(sd)).length)) throw new HttpError(404, 'Save folder not found')
+      if (existing.some((other) => content.hides(other)) || (!existing.length && !allowedDir(sd) && (await s.saves.list(sd)).length)) throw new HttpError(404, 'Save folder not found')
     }
     let changed = false
     if (g.save_dir !== sd) {
@@ -215,7 +212,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
       res.json({ saveDir: null, slots: [], other: [], conflicts: [] })
       return
     }
-    const files = await store.list(g.save_dir)
+    const files = await s.saves.list(g.save_dir)
     const user = viewer()?.user.id ?? 1
     const notes = new Map((db.raw.prepare('SELECT file, title, note, pinned_at FROM save_meta WHERE user_id = ? AND save_dir = ?').all(user, g.save_dir) as Array<{ file: string; title: string; note: string; pinned_at: string }>).map((r) => [r.file, r]))
     const slots = []
@@ -226,7 +223,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
         continue
       }
       const info = slotInfo(f.name)
-      const meta = await cachedSaveMeta(store, g.save_dir, f)
+      const meta = await cachedSaveMeta(s.saves, g.save_dir, f)
       slots.push({
         file: f.name,
         size: f.size,
@@ -242,7 +239,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
         runtime: meta?.runtime,
         // Blurred: the save's picture is the adult game's art and never leaves the server.
         screenshot: meta?.hasScreenshot && !content.blurs(g) ? `/api/saves/${g.id}/screenshot?user=${viewer()?.user.id ?? 1}&file=${encodeURIComponent(f.name)}&v=${f.mtimeMs}` : null,
-        screenshotHash: meta?.hasScreenshot && content.blurs(g) ? await cachedSceneHash(store, g.save_dir, f) : null,
+        screenshotHash: meta?.hasScreenshot && content.blurs(g) ? await cachedSceneHash(s.saves, g.save_dir, f) : null,
         valid: !!meta,
         title: notes.get(f.name)?.title || null,
         note: notes.get(f.name)?.note || null,
@@ -251,7 +248,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     }
     slots.sort((a, b) => b.ctime - a.ctime)
     // Second versions the conflict rule kept in History during the last two weeks.
-    const conflicts = await store.conflicts(g.save_dir, Date.now() - 14 * 24 * 3600_000)
+    const conflicts = await s.saves.conflicts(g.save_dir, Date.now() - 14 * 24 * 3600_000)
     res.json({ saveDir: g.save_dir, slots, other, conflicts, sync: g.family === 'renpy' && syncCodesOn(db) })
   })
 
@@ -266,12 +263,12 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
 
   /** Sends this person's saves of the game to Ren'Py's sync server and returns the code. */
   router.post('/:id/sync', async (req, res) => {
-    res.json(await uploadSync(syncServer, store, syncGame(req), typeof req.body?.tz === 'string' ? req.body.tz : undefined))
+    res.json(await uploadSync(syncServer, s.saves, syncGame(req), typeof req.body?.tz === 'string' ? req.body.tz : undefined))
   })
 
   /** Fetches the saves for a code made on another device. */
   router.post('/:id/sync/download', async (req, res) => {
-    res.json(await downloadSync(syncServer, store, syncGame(req), req.body?.code))
+    res.json(await downloadSync(syncServer, s.saves, syncGame(req), req.body?.code))
   })
 
   /** A save's name, note and pin for this person. The save file itself is not touched. */
@@ -301,7 +298,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const g = game(req)
     if (content.blurs(g)) throw new HttpError(404, 'No screenshot')
     const name = cleanRelPath(req.query['file'])
-    const png = await readSaveScreenshot(await store.read(requireSaveDir(g), name))
+    const png = await readSaveScreenshot(await s.saves.read(requireSaveDir(g), name))
     if (!png) throw new HttpError(404, 'No screenshot')
     if (req.query['user'] !== undefined && req.query['user'] !== String(viewer()?.user.id ?? 1)) throw new HttpError(404, 'Screenshot not found')
     res.setHeader('Cache-Control', 'private, no-store')
@@ -311,7 +308,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
   router.get('/:id/download', async (req, res) => {
     const g = game(req)
     const name = cleanRelPath(req.query['file'])
-    const data = await store.read(requireSaveDir(g), name)
+    const data = await s.saves.read(requireSaveDir(g), name)
     res.attachment(name.split('/').pop()!)
     res.type('application/octet-stream').send(data)
   })
@@ -319,7 +316,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
   router.delete('/:id/slot', async (req, res) => {
     const g = game(req)
     const file = cleanRelPath(req.query['file'])
-    const ok = await store.remove(requireSaveDir(g), file, 'user-delete')
+    const ok = await s.saves.remove(requireSaveDir(g), file, 'user-delete')
     if (!ok) throw new HttpError(404, 'Save not found')
     forgetMeta(requireSaveDir(g), file)
     res.json({ ok: true })
@@ -330,7 +327,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const dir = requireSaveDir(g)
     res.attachment(`${g.id}-saves-${new Date().toISOString().slice(0, 10)}.zip`)
     res.type('application/zip')
-    await store.exportZip([dir], res, { includeTokens: req.query['tokens'] === '1' })
+    await s.saves.exportZip([dir], res, { includeTokens: req.query['tokens'] === '1' })
   })
 
   router.post('/:id/import', saveImport('files', async (req, res) => {
@@ -341,7 +338,7 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     // Process one bounded file at a time, never materialize the multipart request in memory.
     const report = { imported: [] as string[], skipped: [] as Array<{ name: string; reason: string }>, trustedKeys: 0 }
     for (const f of files) {
-      const part = await store.importFiles(dir, [{ filename: Buffer.from(f.originalname, 'latin1').toString('utf-8'), data: await readFile(f.path) }])
+      const part = await s.saves.importFiles(dir, [{ filename: Buffer.from(f.originalname, 'latin1').toString('utf-8'), data: await readFile(f.path) }])
       report.imported.push(...part.imported); report.skipped.push(...part.skipped); report.trustedKeys += part.trustedKeys
     }
     res.json(report)
@@ -353,21 +350,21 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
     const target = db.getGame(assertSlug(req.body?.target))
     if (!target || content.hides(target)) throw new HttpError(404, 'Target game not found')
     const toDir = requireSaveDir(target)
-    const name = await store.copySave(requireSaveDir(g), cleanRelPath(req.body?.file), toDir)
+    const name = await s.saves.copySave(requireSaveDir(g), cleanRelPath(req.body?.file), toDir)
     res.json({ ok: true, file: name, target: target.id })
   })
 
   router.get('/:id/history', async (req, res) => {
     const g = game(req)
     const name = typeof req.query['file'] === 'string' ? cleanRelPath(req.query['file']) : undefined
-    res.json({ versions: await store.history(requireSaveDir(g), name) })
+    res.json({ versions: await s.saves.history(requireSaveDir(g), name) })
   })
 
   router.post('/:id/history/restore', async (req, res) => {
     const g = game(req)
     const id = req.body?.id
     if (typeof id !== 'string') throw new HttpError(400, 'Missing version id')
-    const f = await store.restoreVersion(requireSaveDir(g), id)
+    const f = await s.saves.restoreVersion(requireSaveDir(g), id)
     res.json({ ok: true, file: f })
   })
 
@@ -375,12 +372,16 @@ export function createSavesRouter(store: SaveStore, db: Db, content: ContentMode
 }
 
 /** All save folders (including ones without a game) as one zip. */
-export function createSavesExportAll(store: SaveStore, db: Db, content: ContentMode) {
-  return async (_req: Request, res: express.Response) => {
-    // The export is of what this person may see. Hidden games' saves stay where they are.
-    const dirs = new Set(content.visibleSaveDirs([...await store.listDirs(), ...db.allGames().map((g) => g.save_dir).filter(Boolean)]))
-    res.attachment(`renplay-saves-${new Date().toISOString().slice(0, 10)}.zip`)
-    res.type('application/zip')
-    await store.exportZip([...dirs], res, { includeTokens: true })
+export function createSavesExportAll(s: Services): RequestHandler {
+  const { db, content } = s
+  return (_req, res, next) => {
+    void (async () => {
+      const store = s.saves
+      // The export is of what this person may see. Hidden games' saves stay where they are.
+      const dirs = new Set(content.visibleSaveDirs([...await store.listDirs(), ...db.allGames().map((g) => g.save_dir).filter(Boolean)]))
+      res.attachment(`renplay-saves-${new Date().toISOString().slice(0, 10)}.zip`)
+      res.type('application/zip')
+      await store.exportZip([...dirs], res, { includeTokens: true })
+    })().catch(next)
   }
 }

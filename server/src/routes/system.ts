@@ -1,20 +1,13 @@
 import { DEFAULTS_KEY, keepaliveToken, readDefaults, type Defaults } from '../auth.js'
-import type { SaveBackups } from '../backups.js'
 import { SYNC_SETTING, syncCodesOn } from './saves.js'
-import type { Catalog } from '../catalog.js'
 import { keepDownloads } from '../downloads.js'
 import { readdir, stat, statfs } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
-import type { Builds } from '../builds.js'
-import type { Config } from '../config.js'
-import type { ContentMode } from '../content.js'
-import { parseJson, type Db } from '../db.js'
-import type { EngineStore } from '../engines.js'
-import type { JobManager } from '../jobs.js'
+import { parseJson } from '../db.js'
 import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
-import type { Purger } from '../util/purge.js'
 import { dirSize } from '../util/fsx.js'
+import type { Services } from '../services.js'
 
 async function disk(path: string) {
   try {
@@ -28,7 +21,8 @@ async function disk(path: string) {
 /** Variables whose effect Settings shows, so it can say whether the server sets them. */
 const PROVENANCE = ['RENPLAY_AUTH', 'GAMES_DIR', 'ARCHIVES_DIR', 'DATA_DIR', 'RENPLAY_BACKUP_DIR', 'RENPLAY_CATALOG_URLS', 'RENPLAY_RECIPES_DIR', 'RENPLAY_LOG_LEVEL', 'RENPLAY_SYNC_SERVER', 'RENPLAY_ENGINES_URL']
 
-export function createSystemRouter(cfg: Config, db: Db, jobs: JobManager, engines: EngineStore, builds: Builds, purger: Purger, version: string, content: ContentMode, catalog: Catalog, backups: SaveBackups): Router {
+export function createSystemRouter(s: Services): Router {
+  const { cfg, db, jobs, engines, builds, purger, version, content, catalog, backups } = s
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/health', (_req, res) => {

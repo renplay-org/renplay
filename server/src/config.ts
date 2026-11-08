@@ -2,7 +2,6 @@ import { join } from 'node:path'
 import { accessSync, constants, readFileSync, statSync } from 'node:fs'
 import { parseAdultGroups, parseAdultLevel, type AdultLevel } from './content.js'
 import { fallbackOf } from './envvars.js'
-import type { SaveLimits } from './routes/saves.js'
 
 /*
  * Every variable is documented, with its default, in envvars.ts. These read one, falling back to
@@ -78,6 +77,13 @@ export function downloadsDirectory(gamesDir: string, downloads = '/downloads'): 
 }
 
 let warnedDeleteArchives = false
+
+/** Limits for a shared account on a public server (the demo): one file, and all files with their history. */
+export interface SaveLimits {
+  file: number
+  total: number
+  files: number
+}
 
 export interface Config {
   auth: '' | 'on' | 'off'
