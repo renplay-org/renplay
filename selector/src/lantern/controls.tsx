@@ -125,7 +125,7 @@ export function LanternSwitch({ checked, onChange, label }: { checked: boolean; 
   return <button type="button" role="switch" aria-checked={checked} aria-label={label} className={`sw ${checked ? 'on' : ''}`} onClick={() => onChange?.(!checked)} />
 }
 
-export type SourceKind = 'def' | 'here' | 'you' | 'admin' | 'admin-you' | 'group' | 'server'
+type SourceKind = 'def' | 'here' | 'you' | 'admin' | 'admin-you' | 'group' | 'server'
 
 /** Every value says where it comes from. */
 export function SourceLabel({ kind, label, onReset }: { kind: SourceKind; label?: string; onReset?: () => void }) {
@@ -156,15 +156,6 @@ export function Bar({ value, thin, style }: { value: number; thin?: boolean; sty
   return (
     <div className={`bar ${thin ? 'thin' : ''}`} style={style}>
       <i style={{ width: `${Math.max(2, Math.min(100, value * 100))}%` }} />
-    </div>
-  )
-}
-
-export function Notice({ tone, icon, children }: { tone?: 'amber' | 'red' | 'green'; icon: ReactNode; children: ReactNode }) {
-  return (
-    <div className={`notice ${tone ?? ''}`.trim()}>
-      {icon}
-      <div className="grow">{children}</div>
     </div>
   )
 }

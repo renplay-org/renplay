@@ -9,7 +9,7 @@ function subscribe(callback: () => void) {
 }
 
 /** Actions stay anchored with a pointer and become an accessible dialog on phones. */
-export default function Sheet({ trigger, children, ...rest }: ComponentProps<typeof Menu>) {
+export default function ActionMenu({ trigger, children, ...rest }: ComponentProps<typeof Menu>) {
   const phone = useSyncExternalStore(subscribe, () => window.matchMedia(query).matches)
   const [open, setOpen] = useState(false)
   if (!phone) return <Menu trigger={trigger} {...rest}>{children}</Menu>

@@ -3,7 +3,7 @@ import { useLighterBackground } from '../lib/backdrop'
 import type { ArtSet } from '@shared/art'
 import { formatFor, hashUrl, tintOf, useHidden, type ArtGame } from './art'
 
-export interface RoomTarget {
+interface RoomTarget {
   game: (ArtGame & { id: string }) | null
   quiet?: boolean
   brand?: boolean

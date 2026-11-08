@@ -1,3 +1,4 @@
+import type { Game, Job } from '@shared/api'
 const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 
 export function ago(ts: number | string | null | undefined, relativeOnly = false): string {
@@ -49,5 +50,26 @@ export function timeZone(): string {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || ''
   } catch {
     return ''
+  }
+}
+
+/** A save file's name without its Ren'Py suffixes: 1-1 for 1-1-LT1.save. */
+export function slotName(file: string): string {
+  return file.replace(/-LT\d+\.save$/, '').replace(/\.save$/, '')
+}
+
+export function jobTitle(j: Job, games: Game[]): string {
+  const game = games.find((g) => g.id === j.game)
+  const name = j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? game?.source.archive?.split('/').pop() ?? game?.title ?? j.game
+  switch (j.type) {
+    case 'import':
+      if (j.status === 'done') return `Installed ${name || 'game'}`
+      return game && game.status === 'installed' ? `Updating ${name}` : `Installing ${name || 'game'}`
+    case 'apply-mods':
+      return `${j.status === 'done' ? 'Applied' : 'Applying'} mods to ${name}`
+    case 'hash-archive':
+      return `${j.status === 'done' ? 'Checked' : 'Checking'} ${name}`
+    default:
+      return j.type
   }
 }

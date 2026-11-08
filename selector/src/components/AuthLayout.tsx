@@ -26,4 +26,3 @@ export default function AuthLayout({ children, wide = false }: { children: React
     </RoomProvider>
   )
 }
-export const authInput = 'input'

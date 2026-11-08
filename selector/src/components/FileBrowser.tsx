@@ -24,7 +24,7 @@ import { api, del, post } from '../lib/api'
 import type { FileEntry, Game } from '@shared/api'
 import { bytes } from '@shared/format'
 import { useFiles, useJobs } from '../lib/queries'
-import { Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, accountInput, cx, errorText, useToast } from './ui'
+import { Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, cx, errorText, useToast } from './ui'
 import { Pill, TagPill } from '../lantern/controls'
 
 const CodeEditor = lazy(() => import('./CodeEditor'))
@@ -240,7 +240,7 @@ export default function FileBrowser({ game }: { game: Game }) {
       >
         <label className="field">
           <span>File name in {dir}</span>
-          <input autoFocus value={newName ?? ''} onChange={(e) => setNewName(e.target.value)} placeholder="zz_my_mod.rpy" className={accountInput} />
+          <input autoFocus value={newName ?? ''} onChange={(e) => setNewName(e.target.value)} placeholder="zz_my_mod.rpy" className="input" />
         </label>
       </Modal>
 

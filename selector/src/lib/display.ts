@@ -1,5 +1,5 @@
 import { isAppleTouch, isMacComputer, isStandalone } from './platform'
-export type FitMode = 'fit' | 'fill'
+type FitMode = 'fit' | 'fill'
 
 export interface DisplayPrefs {
   fit: FitMode

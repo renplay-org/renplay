@@ -1,17 +1,16 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import AuthLayout, { authInput } from '../components/AuthLayout'
+import AuthLayout from '../components/AuthLayout'
 import { Pill } from '../lantern/controls'
 import { errorText } from '../components/ui'
-import { api, post } from '../lib/api'
+import { post } from '../lib/api'
 import { signInReturnUrl } from '../lib/sign-in-return'
-import type { Providers } from '@shared/api'
+import { useProviders } from '../lib/auth'
 
 export default function SignIn() {
   const [params] = useSearchParams()
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<Providers>('/api/auth/providers') })
+  const providers = useProviders()
   if (providers.data && !providers.data.enabled) return <Navigate to="/" replace />
   // The public demo: one button, no account to make.
   if (providers.data?.demo)
@@ -102,11 +101,11 @@ export default function SignIn() {
         >
           <label className="field">
             <span>Username</span>
-            <input name="username" autoComplete="username" autoCapitalize="none" required className={authInput} />
+            <input name="username" autoComplete="username" autoCapitalize="none" required className="input" />
           </label>
           <label className="field">
             <span>Password</span>
-            <input name="password" type="password" autoComplete="current-password" required className={authInput} />
+            <input name="password" type="password" autoComplete="current-password" required className="input" />
           </label>
           {error && (
             <p role="alert" className="small red">

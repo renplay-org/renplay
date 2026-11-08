@@ -1,5 +1,5 @@
 /** Labels for recipe links, in display order. */
-export const LINK_LABELS: Record<string, string> = {
+const LINK_LABELS: Record<string, string> = {
   website: 'Website',
   itch: 'Itch.io',
   patreon: 'Patreon',

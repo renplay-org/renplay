@@ -3,16 +3,16 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Avatar from '../components/Avatar'
-import { Button, Modal, Spinner, accountInput, errorText, useToast } from '../components/ui'
+import { Button, Modal, Spinner, errorText, useToast } from '../components/ui'
 import { Pill, TagPill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { adultLabels } from '../lib/adult'
 import { ADULT_LEVELS, parseAdultLevel, type AdultLevel } from '@shared/levels'
 import { api, del, post, put } from '../lib/api'
-import { useAuth } from '../lib/auth'
+import { useAuth, useProviders } from '../lib/auth'
 import { useGames } from '../lib/queries'
 import { AccountSection } from './Account'
-import type { People, PersonListed, Providers } from '@shared/api'
+import type { People, PersonListed } from '@shared/api'
 
 type Action = 'add' | 'edit' | 'password' | 'copy' | 'merge' | 'import' | 'remove'
 const historyNotice = 'Nothing is overwritten without a copy in the destination’s save history.'
@@ -20,7 +20,7 @@ const historyNotice = 'Nothing is overwritten without a copy in the destination�
 export default function Users() {
   const { data: me } = useAuth(), qc = useQueryClient(), toast = useToast()
   const users = useQuery({ queryKey: ['users'], queryFn: () => api<People>('/api/users') })
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<Providers>('/api/auth/providers') })
+  const providers = useProviders()
   const { data: games } = useGames()
   const [dialog, setDialog] = useState<{ action: Action; user?: PersonListed } | null>(null)
   const [menu, setMenu] = useState<PersonListed | null>(null)
@@ -134,20 +134,20 @@ export default function Users() {
             {dialog.user && <p className="small muted-2" style={{ overflowWrap: 'anywhere' }}>{dialog.user.name} ({dialog.user.username})</p>}
             {dialog.action === 'add' && (
               <>
-                <label className="field"><span>Username</span><input name="username" required minLength={2} maxLength={64} pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{1,63}" autoCapitalize="none" autoComplete="off" className={accountInput} /></label>
-                <label className="field"><span>Display name</span><input name="name" required maxLength={100} className={accountInput} /></label>
+                <label className="field"><span>Username</span><input name="username" required minLength={2} maxLength={64} pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{1,63}" autoCapitalize="none" autoComplete="off" className="input" /></label>
+                <label className="field"><span>Display name</span><input name="name" required maxLength={100} className="input" /></label>
               </>
             )}
             {(dialog.action === 'add' || dialog.action === 'password') && (
               <>
-                <label className="field"><span>{dialog.action === 'password' ? 'New password' : 'Password'}</span><input name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={1024} className={accountInput} /></label>
+                <label className="field"><span>{dialog.action === 'password' ? 'New password' : 'Password'}</span><input name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={1024} className="input" /></label>
                 {dialog.action === 'password' && <p className="small muted">All of this user’s sessions will end. Saves are kept.</p>}
               </>
             )}
             {(dialog.action === 'add' || dialog.action === 'edit') && (
               <>
-                <label className="field"><span>Role</span><select aria-label="Role" name="role" defaultValue={dialog.user?.role || 'player'} disabled={!!dialog.user && (lastAdmin(dialog.user) || dialog.user.roleManaged)} className={accountInput}><option value="player">Player</option><option value="admin">Admin</option></select></label>
-                <label className="field"><span>Adult games, at most</span><select aria-label="Adult games, at most" name="adultCeiling" disabled={dialog.user?.adultManaged} defaultValue={dialog.user ? ceilingOf(dialog.user) : users.data?.adultDefault ?? 'off'} className={accountInput}>{ADULT_LEVELS.map((level) => <option key={level} value={level}>{adultLabels[level]}</option>)}</select></label>
+                <label className="field"><span>Role</span><select aria-label="Role" name="role" defaultValue={dialog.user?.role || 'player'} disabled={!!dialog.user && (lastAdmin(dialog.user) || dialog.user.roleManaged)} className="input"><option value="player">Player</option><option value="admin">Admin</option></select></label>
+                <label className="field"><span>Adult games, at most</span><select aria-label="Adult games, at most" name="adultCeiling" disabled={dialog.user?.adultManaged} defaultValue={dialog.user ? ceilingOf(dialog.user) : users.data?.adultDefault ?? 'off'} className="input">{ADULT_LEVELS.map((level) => <option key={level} value={level}>{adultLabels[level]}</option>)}</select></label>
                 {dialog.action === 'edit' && <label className="row" style={{ minHeight: 44 }}><input name="disabled" type="checkbox" defaultChecked={!!dialog.user?.disabled} disabled={!!dialog.user && lastAdmin(dialog.user)} style={{ width: 20, height: 20 }} />Disabled</label>}
                 {dialog.user && lastAdmin(dialog.user) && <p className="small muted">Users cannot demote or disable the last enabled admin. Provider sign-in can still revoke its grant.</p>}
                 {(dialog.user?.roleManaged || dialog.user?.adultManaged) && <p className="small muted">Locked permissions are set by the sign-in provider at every sign-in.</p>}
@@ -156,20 +156,20 @@ export default function Users() {
               </>
             )}
             {['copy', 'import'].includes(dialog.action) && !dialog.user && (
-              <label className="field"><span>{dialog.action === 'import' ? 'Import into' : 'From'}</span><select aria-label={dialog.action === 'import' ? 'Import into' : 'From'} name="source" required className={accountInput}>{all.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.username})</option>)}</select></label>
+              <label className="field"><span>{dialog.action === 'import' ? 'Import into' : 'From'}</span><select aria-label={dialog.action === 'import' ? 'Import into' : 'From'} name="source" required className="input">{all.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.username})</option>)}</select></label>
             )}
             {(dialog.action === 'copy' || dialog.action === 'merge') && (
               <>
-                <label className="field"><span>To</span><select aria-label="To" name="target" required defaultValue={destinations.find((u) => u.id !== (dialog.user?.id ?? all[0]?.id))?.id} className={accountInput}>{destinations.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.username})</option>)}</select></label>
+                <label className="field"><span>To</span><select aria-label="To" name="target" required defaultValue={destinations.find((u) => u.id !== (dialog.user?.id ?? all[0]?.id))?.id} className="input">{destinations.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.username})</option>)}</select></label>
                 {dialog.action === 'copy' && (
-                  <label className="field"><span>Game</span><select aria-label="Game" name="game" className={accountInput}><option value="">All save folders</option>{games?.filter((g) => g.saveDir).map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
+                  <label className="field"><span>Game</span><select aria-label="Game" name="game" className="input"><option value="">All save folders</option>{games?.filter((g) => g.saveDir).map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
                 )}
                 <p className="small muted-2">{historyNotice}</p>
               </>
             )}
             {dialog.action === 'import' && (
               <>
-                <label className="field"><span>Save folder zip</span><input name="file" type="file" accept=".zip" required className={accountInput} style={{ paddingTop: 12 }} /></label>
+                <label className="field"><span>Save folder zip</span><input name="file" type="file" accept=".zip" required className="input" style={{ paddingTop: 12 }} /></label>
                 <p className="small muted">Choose a whole save-folder export. {historyNotice}</p>
               </>
             )}

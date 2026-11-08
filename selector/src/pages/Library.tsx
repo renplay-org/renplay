@@ -12,7 +12,8 @@ import TagFilters from '../components/TagFilters'
 import Shelf from '../components/Shelf'
 import SortMenu from '../components/SortMenu'
 import { Button, Empty, errorText, useToast } from '../components/ui'
-import { del, post, slotName } from '../lib/api'
+import { del, post } from '../lib/api'
+import { slotName } from '../lib/format'
 import type { Game } from '@shared/api'
 import { ago, capitalize, pct, playedTime } from '../lib/format'
 import { useCatalog, useGames, useJobs } from '../lib/queries'
@@ -52,7 +53,7 @@ function tileExtra(g: Game) {
   return parts.length ? <>{parts}</> : undefined
 }
 
-export function GameTile({ game, kind = 'grid', on, onFocus, onMouseEnter }: { game: Game; kind?: 'grid' | 'wide'; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
+function GameTile({ game, kind = 'grid', on, onFocus, onMouseEnter }: { game: Game; kind?: 'grid' | 'wide'; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
   const installed = game.status === 'installed'
   return <Card game={game} kind={kind} href={`/game/${game.id}`} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} onFocus={onFocus} onMouseEnter={onMouseEnter} />
 }

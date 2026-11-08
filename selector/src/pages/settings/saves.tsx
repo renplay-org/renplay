@@ -44,7 +44,7 @@ export function SavesPanel() {
 }
 
 /** Save backups: a daily zip of everyone's saves, the last few kept, and Back up now. */
-export function SaveBackups() {
+function SaveBackups() {
   const qc = useQueryClient()
   const toast = useToast()
   const [busy, setBusy] = useState(false)

@@ -3,8 +3,8 @@
  * narrow: `api()` sends it with every request and the server applies it, so a level below Shown
  * on a phone used in public hides on every list, page and count, not only in the interface.
  */
-export type DeviceLevel = 'off' | 'blurred'
-export const DEVICE_KEY = 'renplay:adult-device'
+type DeviceLevel = 'off' | 'blurred'
+const DEVICE_KEY = 'renplay:adult-device'
 export const DEVICE_EVENT = 'renplay:adult-device'
 const MIGRATED = 'renplay:adult-device-migrated'
 
