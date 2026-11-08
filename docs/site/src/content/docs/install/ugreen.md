@@ -34,4 +34,4 @@ See [storage folders](/install/docker/#storage-folders) for the full layout. Put
 internet: [Reverse proxy and HTTPS](/install/reverse-proxy/).
 
 The image names, ports, paths and upgrade promise are covered by the
-[3.x stability contract](/stability/).
+[4.x stability contract](/stability/).

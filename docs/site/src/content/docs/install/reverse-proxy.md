@@ -61,4 +61,4 @@ sign-on, Renplay's own sign-in uses OIDC or LDAP. See [Accounts and sign-in](/ac
 - Scale-to-zero proxies: see `RENPLAY_KEEPALIVE_URL` in [Configuration](/configuration/).
 
 The image names, ports, paths and upgrade promise are covered by the
-[3.x stability contract](/stability/).
+[4.x stability contract](/stability/).

@@ -157,4 +157,4 @@ cosign verify ghcr.io/renplay-org/charts/renplay:__RENPLAY_VERSION__ \
 ```
 
 The image names, ports, paths and upgrade promise are covered by the
-[3.x stability contract](/stability/). See [Upgrading and backups](/upgrading/) for recovery guidance.
+[4.x stability contract](/stability/). See [Upgrading and backups](/upgrading/) for recovery guidance.

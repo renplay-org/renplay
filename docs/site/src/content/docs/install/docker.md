@@ -104,4 +104,4 @@ docker logs renplay
 Next: [Add a game](/guides/adding-games/).
 
 The image names, ports, paths and upgrade promise are covered by the
-[3.x stability contract](/stability/).
+[4.x stability contract](/stability/).
