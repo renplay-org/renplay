@@ -14,8 +14,8 @@ phone.
 
 - **Ren’Py games**, the focus. Ren’Py 8 games, and most Ren’Py 7 games, which run on the Ren’Py 8
   engine. Only games with Python 2-only code have trouble.
-- **HTML games**, such as Twine stories, shown as Beta. Godot and Unity web builds install too.
-  See [Engines](/engines/) for what works and what does not.
+- **HTML games**, such as Twine stories, shown as Beta. See [Engines](/engines/) for what works and
+  what does not.
 
 Games come from their developers (itch.io, Patreon, Steam and so on). Renplay and its catalog never
 host game files.
@@ -28,13 +28,17 @@ host game files.
   game are cached in the browser.
 - Saves, autosaves and progress sync to the server as you play, with earlier versions kept. They
   are laid out like desktop Ren’Py’s, so you can export them to the desktop version and back.
-- The [catalog](/catalog/) gives known games their title, developer, cover and tested settings.
+- The [catalog](/catalog/) gives known games their title, developer, art and tested settings.
+- A game can be kept in a browser and played with no network, and a controller plays it like a
+  console. See [Playing](/guides/playing/).
+- Several people can share one server, each with their own saves, levels for adult games and play
+  history. See [Accounts](/accounts/).
 
 ## What it does not do
 
-- It does not include OIDC or LDAP yet. Local [accounts](/accounts/) keep saves separate;
-  use [HTTPS](/install/reverse-proxy/) outside your trusted network.
 - It does not download games for you. Add the file yourself.
+- It is not a public service. Run it for yourself and the people you trust, and use
+  [HTTPS](/install/reverse-proxy/) outside your own network.
 - It does not play every engine. Programs made for Windows only, such as RPG Maker XP or Wolf RPG,
   cannot run in a browser.
 

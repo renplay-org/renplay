@@ -29,7 +29,7 @@ Copy a game’s PC download (zip, 7z or rar) into `/path/to/games/_archives/`, o
 ## Play
 
 Open the game from the library and press **Play**. Saving works as in the desktop game, and the
-save goes to your server at once.
+save goes to your server at once. Next time, **Resume** opens your latest save.
 
 ## Play on your phone
 

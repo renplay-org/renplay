@@ -12,13 +12,13 @@
 
 <p align="center"><a href="https://renplay.org/docs">Docs</a> · <a href="https://renplay.org">Website</a> · <a href="https://renplay.org/catalog">Catalog</a> · <a href="https://renplay.org/releases">Release notes</a> · <a href="https://renplay.org/support">Support</a></p>
 
-<p align="center"><img src="docs/screenshots/desktop-library.webp" alt="The Renplay library with two games and a Continue playing banner" width="880"></p>
+<p align="center"><img src="docs/screenshots/desktop-library.webp" alt="The Renplay library: the game in play on the stage, Up next below, adult games blurred" width="880"></p>
 
 Renplay is a self-hosted library for the visual novels you download: [Ren’Py](https://www.renpy.org/)
 games first, and HTML games such as Twine stories too. Add a game’s normal PC download, press
 Install, and play it in any browser: on your computer, your tablet or your phone. Every save lands
 on your server the moment you make it, so you can stop on the laptop and continue on the phone.
-Other engines are added only when their normal download plays as easily; the
+Other engines are added only when their normal download plays as easily. The
 [docs](https://docs.renplay.org/engines/) say what works.
 
 <p align="center">
@@ -31,8 +31,12 @@ Other engines are added only when their normal download plays as easily; the
 
 - **Play anywhere.** Smooth, full-speed playback in the browser. On phones the game fills the
   screen around the camera cutout, and on iPhone it runs full screen from the home screen.
-- **Separate accounts.** Local sign-in, OpenID Connect and LDAP keep each person's saves and progress separate. Admins
-  manage the shared library; players play. Sign-in can be switched off for a trusted home network.
+- **Offline, and with a controller.** Keep a game in a browser and play it with no network: saves
+  made offline are sent when you are back. A controller moves around the library and plays the
+  game through Ren’Py’s own buttons.
+- **Separate accounts.** Local sign-in, OpenID Connect and LDAP keep each person's saves and progress
+  separate. Admins manage the shared library, and players play. On a shared tablet **Who is
+  playing?** switches person with a PIN. Sign-in can be switched off for a trusted home network.
 - **Saves on your server.** Saves, autosaves and progress sync as you play, with earlier versions
   kept. Sequels find the previous season’s saves, just like on desktop. Import saves from the
   desktop version, export them back, or copy them between games.
@@ -42,19 +46,21 @@ Other engines are added only when their normal download plays as easily; the
   the [catalog](https://renplay.org/catalog), and Renplay tells you when a newer tested
   version exists.
 - **Resume in one tap.** Up next opens your latest save straight away, with play time and your
-  last save on the library home. Mark a story Finished on its game page to leave it out of Up next;
-  its saves stay safe.
+  last save on the library home. Mark a story Finished on its game page to leave it out of Up next.
+  Its saves stay safe.
 - **Adult games, your way.** Three levels, Off, Blurred and Shown. Off leaves adult games out
   completely, Blurred shows them without their pictures, and the server never sends a picture a
-  person is not meant to see. The installation, each account, each person and each device can only
-  go lower than the layer above. Account shows all four and says why you see what you see.
+  person is not meant to see. Each person chooses on their account page, within the admin's limit,
+  and **Hide adult games here** covers a shared screen.
 - **Find your next game.** Keep favourites at the top of your library, sort by last played,
   title or recently added, and search titles, developers and tags. Recent combines last played and
   recently added. Library filters stay in the
-  address so Back brings them back. The catalog has search and tag filters too; game pages show
+  address so Back brings them back. The catalog has search and tag filters too. Game pages show
   summaries, development state and optional content tags.
-- **Mods.** Browse a game’s files, edit scripts in the browser, or upload a mod. Your changes stay
-  separate from the game and survive updates.
+- **Mods.** Install a mod zip, browse a game’s files, or edit scripts in the browser. Your changes
+  stay separate from the game and survive updates.
+- **Your own recipes and dashboards.** A folder of recipe files fixes or adds games without waiting
+  for the catalog. Prometheus metrics and a Homepage widget show what your server is doing.
 - **Fast to start.** Games and the engine are cached in your browser, assets stream as the game
   needs them, and compiled scripts are kept, so a big game starts in seconds.
 
@@ -75,7 +81,7 @@ it under **Add games**, and press **Install**. The first install also downloads 
 engine (about 16 MB).
 
 The same image is on Docker Hub as `renplay/renplay`. Pin a version
-(`ghcr.io/renplay-org/renplay:2.9.1`) for production; [releases](https://renplay.org/releases)
+(`ghcr.io/renplay-org/renplay:4.3.0`) for production. The [releases](https://renplay.org/releases)
 list what changed. Use HTTPS outside a trusted local network. See [Accounts](#accounts) before
 sharing an upgraded install.
 
@@ -104,22 +110,22 @@ Admins can use **Delete download** on a game's Details tab to free space without
 Reinstalling then needs the download again.
 
 The image defaults to user `1000:1000`. You can use any non-root IDs with `--user 568:568`, or
-start as root with `--user 0:0 -e PUID=99 -e PGID=100`; the entrypoint drops root before starting
+start as root with `--user 0:0 -e PUID=99 -e PGID=100`. The entrypoint drops root before starting
 the app. Root without these variables drops to `1000:1000`. Make both mounted folders writable
-by the chosen user first; Renplay does not change their ownership. A read-only root filesystem
+by the chosen user first. Renplay does not change their ownership. A read-only root filesystem
 works with writable `/data`, `/games` and a `/tmp` tmpfs. The image includes a health check through
 nginx on port 8080. See the [Docker guide](https://docs.renplay.org/install/docker/).
 
 ## Accounts
 
 New data folders require sign-in. Upgrades keep sign-in off and show an admin reminder. Set
-`RENPLAY_AUTH=on` to turn it on; the first admin claims the owner and all existing saves. You can
+`RENPLAY_AUTH=on` to turn it on. The first admin claims the owner and all existing saves. You can
 seed the owner with `RENPLAY_ADMIN_USERNAME` and `RENPLAY_ADMIN_PASSWORD_FILE` instead of a setup
 code. Passwords must have at least 10 characters. The account menu shows your name and Sign out.
 
 `RENPLAY_AUTH=off` lets everyone play as the owner, or the account id in `RENPLAY_AUTH_USER`.
 Changing modes never moves or deletes other people's saves. All saves and history live under
-`/data/users/<id>/`; old owner paths remain symlinks for rollback to 2.10. The upgrade first backs
+`/data/users/<id>/`. Old owner paths remain symlinks for rollback to 2.10. The upgrade first backs
 up saves, save history and the database under `/data/backups/pre-3.0/`. Back up `/data` yourself too.
 
 Cookies work on plain HTTP for a local NAS and are marked `Secure` over HTTPS. Behind HTTPS
@@ -128,13 +134,13 @@ with `RENPLAY_TRUSTED_HOPS` (the included nginx is one hop).
 
 Single sign-on supports OIDC providers such as Pocket ID, Authentik, Authelia and Keycloak, plus
 LDAP directories such as LLDAP. Groups can control roles and adult games levels. Register OIDC's exact
-callback `/api/auth/oidc/callback`; see the [provider examples](https://docs.renplay.org/accounts/).
+callback `/api/auth/oidc/callback`. See the [provider examples](https://docs.renplay.org/accounts/).
 Local usernames take precedence over LDAP and accounts are only linked explicitly while signed in.
 
 Open **Account** from the account menu (the **You** tab on phones) to upload a profile picture, link sign-ins, change your name, password
 and adult games level, manage sessions and script tokens, or export your saves. Admins use
 **Settings → Users** to add users, change roles and adult games levels, disable accounts, reset passwords,
-and copy, merge, export or import save folders. Overwrites keep history; removing a user archives
+and copy, merge, export or import save folders. Overwrites keep history. Removing a user archives
 their folder. These tools work with sign-in off too. More in [Accounts](https://docs.renplay.org/accounts/)
 and the [Accounts API](https://docs.renplay.org/developers/accounts-api/).
 
@@ -166,7 +172,7 @@ More in the [FAQ](https://docs.renplay.org/faq/).
 ## Support
 
 Questions, such as whether a game works, go to
-[Discussions](https://renplay.org/discussions); bugs to
+[Discussions](https://renplay.org/discussions). Report bugs in
 [issues](https://renplay.org/issues).
 
 Renplay is made by the Renplay Team. It is free and open source. If it is useful to you, you can

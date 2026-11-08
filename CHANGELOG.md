@@ -7,6 +7,16 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-11-08
+
+The docs describe Renplay 4.0 to 4.3, with new screenshots, and **Import from a computer** is on
+every person's Account page.
+
+### Changed
+
+- **Import from a computer** is on every person's **Account** page, next to **Export all my saves**. It was only in the admin's **Settings**.
+- The docs cover Renplay 4.0 to 4.3: offline play, controllers, Who is playing, Defaults for everyone, Your recipes, the adult games choice, the player's new controls and a new **Dashboards** page for Prometheus and Homepage.
+
 ## [4.3.0] - 2026-11-08
 
 Renplay 4.3 is a polish release. The player loads with one honest progress bar and lets you mute,
@@ -550,7 +560,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.3.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.3.1...dev
+[4.3.1]: https://github.com/renplay-org/renplay/compare/v4.3.0...v4.3.1
 [4.3.0]: https://github.com/renplay-org/renplay/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/renplay-org/renplay/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/renplay-org/renplay/compare/v4.0.1...v4.1.0

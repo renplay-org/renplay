@@ -72,7 +72,17 @@ off. A server that sleeps when idle makes the backup the next time it runs. **Se
 backups with a download link and has **Back up now**. To restore a game's saves, import its folder
 from the zip on the game's page, under **Saves**.
 
-## An important change in this release line
+## Upgrading to 4.x
+
+No action is needed: the database updates itself on the first start.
+
+- **4.0** turns the 3.x adult games settings into the three levels (see
+  [Adult games](/start-here/adult-games/#upgrading-from-3x)) and makes every game's art again in
+  the new formats. 3.2 still runs on a database 4.0 migrated.
+- **4.1** to **4.3** add a PIN for each person, the list of who signed in on each browser, and make
+  every game's art once more after the upgrade, in the background.
+
+## An important change in an earlier release line
 
 Older versions read the catalog and engines from addresses that no longer exist (they moved to
 `catalog.renplay.org` and `engines.renplay.org`). Upgrade to the first version with the new
