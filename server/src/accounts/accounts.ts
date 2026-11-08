@@ -16,6 +16,7 @@ import { always, log } from '../util/log.js'
 import { readDefaults } from '../defaults/defaults.js'
 import { PASSWORD_PREFIX, equal, hash, passwordHash, passwordMatches, random, secretHash } from './passwords.js'
 import { demoCheck, playerRoute } from './access.js'
+import type { AdultState, Identities, Me, Providers, Session, Sessions, SwitchPeople, TagPrefs, Token, TokenCreated, Tokens } from '../shared/api.js'
 
 const DAYS30 = 30 * 86400_000
 
@@ -344,7 +345,7 @@ export class Accounts {
   }
   router(): Router {
     const r = Router({ caseSensitive: true, strict: true })
-    r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.cfg.authLocal && this.unclaimed && !this.cfg.demo, local: this.cfg.authLocal || !!this.cfg.ldapUrl, oidc: this.cfg.oidcIssuer ? this.cfg.oidcName : null, ldap: !!this.cfg.ldapUrl, demo: this.cfg.demo }))
+    r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.cfg.authLocal && this.unclaimed && !this.cfg.demo, local: this.cfg.authLocal || !!this.cfg.ldapUrl, oidc: this.cfg.oidcIssuer ? this.cfg.oidcName : null, ldap: !!this.cfg.ldapUrl, demo: this.cfg.demo } satisfies Providers))
     // In a demo the guest is the only way in: no password, setup code, single sign-on or directory.
     if (this.cfg.demo) {
       r.use((req, _res, next) => next(/^\/auth\/(login|setup(\/verify)?|oidc\/(start|callback))$/.test(req.path) ? new HttpError(403, 'The demo signs you in with Try the demo') : undefined))
@@ -384,8 +385,8 @@ export class Accounts {
       res.json({ ok: true })
     })
     r.get('/me/identities', (_req, res) => {
-      const id = this.current().id, methods = this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(id)
-      res.json({ identities: methods.map(i => ({ ...i, name: i.provider === 'local' ? 'Password' : String(i.provider).startsWith('oidc:') ? this.cfg.oidcName : 'LDAP', available: this.methodAvailable(id, String(i.provider), String(i.subject)), removable: methods.some(other => (other.provider !== i.provider || other.subject !== i.subject) && this.methodAvailable(id, String(other.provider), String(other.subject), i.provider === 'local' ? String(i.subject) : '')) })) })
+      const id = this.current().id, methods = this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(id) as Array<{ provider: string; subject: string }>
+      res.json({ identities: methods.map((i): Identities['identities'][number] => ({ ...i, name: i.provider === 'local' ? 'Password' : String(i.provider).startsWith('oidc:') ? this.cfg.oidcName : 'LDAP', available: this.methodAvailable(id, String(i.provider), String(i.subject)), removable: methods.some(other => (other.provider !== i.provider || other.subject !== i.subject) && this.methodAvailable(id, String(other.provider), String(other.subject), i.provider === 'local' ? String(i.subject) : '')) })) } satisfies Identities)
     })
     r.delete('/me/identities', (req, res) => {
       const id = this.current().id, provider = req.body?.provider, subject = req.body?.subject
@@ -481,9 +482,9 @@ export class Accounts {
       const me = this.current()
       const device = this.enabled && !viewer()?.bearer ? this.device(req) : ''
       const people = device
-        ? this.db.raw.prepare("SELECT u.id, u.name, u.avatar FROM device_people d JOIN users u ON u.id = d.user_id WHERE d.device = ? AND u.id != ? AND u.disabled = 0 AND u.role != 'admin' AND u.pin_hash != '' ORDER BY d.seen_at DESC LIMIT 20").all(device, me.id)
+        ? this.db.raw.prepare("SELECT u.id, u.name, u.avatar FROM device_people d JOIN users u ON u.id = d.user_id WHERE d.device = ? AND u.id != ? AND u.disabled = 0 AND u.role != 'admin' AND u.pin_hash != '' ORDER BY d.seen_at DESC LIMIT 20").all(device, me.id) as unknown as SwitchPeople['people']
         : []
-      res.json({ people })
+      res.json({ people } satisfies SwitchPeople)
     })
 
     /**
@@ -525,7 +526,7 @@ export class Accounts {
       this.invalidate(); this.cookie(req, res, '')
       res.json({ ok: true })
     })
-    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: this.cfg.demo && this.current().id === this.demoGuest(), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) }))
+    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: this.cfg.demo && this.current().id === this.demoGuest(), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) } satisfies Me))
     r.put('/me', async (req, res) => {
       this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(validName(req.body?.name), this.current().id)
       await this.tag(this.user(this.current().id)); res.json({ ok: true })
@@ -545,10 +546,10 @@ export class Accounts {
       // Until a person chooses, the admin's default for everyone.
       if (!tags) {
         const d = readDefaults(this.db)
-        res.json({ include: [], exclude: d.tagsExclude, source: d.tagsExclude.length ? 'admin' : 'default' })
+        res.json({ include: [], exclude: d.tagsExclude, source: d.tagsExclude.length ? 'admin' : 'default' } satisfies TagPrefs)
         return
       }
-      res.json({ include: tags.include ?? [], exclude: tags.exclude ?? [], source: 'you' })
+      res.json({ include: tags.include ?? [], exclude: tags.exclude ?? [], source: 'you' } satisfies TagPrefs)
     })
     r.put('/me/tags', (req, res) => {
       const list = (v: unknown): string[] => {
@@ -560,7 +561,7 @@ export class Accounts {
       const u = this.current()
       const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), tags: { include, exclude } }
       this.db.raw.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify(prefs), u.id)
-      res.json({ include, exclude, source: 'you' })
+      res.json({ include, exclude, source: 'you' } satisfies TagPrefs)
     })
     r.get('/me/adult', (_req, res) => {
       const u = this.current()
@@ -571,7 +572,7 @@ export class Accounts {
         ceiling: { level: ceiling, managed: this.managed(u.id).adultManaged ? 'group' : null },
         choice,
         effective: lowestLevel(this.content.level, ceiling, choice),
-      })
+      } satisfies AdultState)
     })
     r.put('/me/adult', (req, res) => {
       const level = parseAdultLevel(req.body?.level)
@@ -582,14 +583,14 @@ export class Accounts {
       this.writeLevels(u.id, { choice: level })
       res.json({ ok: true, choice: level })
     })
-    r.get('/me/sessions', (_req, res) => res.json({ sessions: this.db.raw.prepare('SELECT hash AS id, created_at, touched_at, expires_at, label FROM sessions WHERE user_id = ? AND expires_at > ?').all(this.current().id, Date.now()).map((s) => ({ ...s, current: s.id === viewer()?.session })) }))
+    r.get('/me/sessions', (_req, res) => res.json({ sessions: (this.db.raw.prepare('SELECT hash AS id, created_at, touched_at, expires_at, label FROM sessions WHERE user_id = ? AND expires_at > ?').all(this.current().id, Date.now()) as unknown as Array<Omit<Session, 'current'>>).map((s) => ({ ...s, current: s.id === viewer()?.session })) } satisfies Sessions))
     r.delete('/me/sessions', (req, res) => { this.revoke(this.current().id, viewer()!.session, this.device(req)); res.json({ ok: true }) })
     r.delete('/me/sessions/:id', (req, res) => { this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash = ?').run(this.current().id, req.params.id); this.invalidate(); res.json({ ok: true }) })
-    r.get('/me/tokens', (_req, res) => res.json({ tokens: this.db.raw.prepare('SELECT id, name, created_at FROM tokens WHERE user_id = ?').all(this.current().id) }))
+    r.get('/me/tokens', (_req, res) => res.json({ tokens: this.db.raw.prepare('SELECT id, name, created_at FROM tokens WHERE user_id = ?').all(this.current().id) as unknown as Token[] } satisfies Tokens))
     r.post('/me/tokens', (req, res) => {
       const token = random(), id = randomBytes(12).toString('hex')
       this.db.raw.prepare('INSERT INTO tokens VALUES (?, ?, ?, ?, ?)').run(hash(token), id, this.current().id, validName(req.body?.name), Date.now())
-      res.json({ id, token })
+      res.json({ id, token } satisfies TokenCreated)
     })
     r.delete('/me/tokens/:id', (req, res) => { this.db.raw.prepare('DELETE FROM tokens WHERE user_id = ? AND id = ?').run(this.current().id, req.params.id); res.json({ ok: true }) })
     return r

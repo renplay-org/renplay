@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, post } from '../lib/api'
 import { Button, Modal, errorText, accountInput } from './ui'
+import type { Identities, Providers } from '@shared/api'
 
 export default function LinkedSignIns() {
   const qc = useQueryClient(), [open, setOpen] = useState(false), [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ oidc: string | null; ldap: boolean }>('/api/auth/providers') })
-  const identities = useQuery({ queryKey: ['identities'], queryFn: () => api<{ identities: { provider: string; subject: string; name: string; available: boolean; removable: boolean }[] }>('/api/me/identities') })
+  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<Providers>('/api/auth/providers') })
+  const identities = useQuery({ queryKey: ['identities'], queryFn: () => api<Identities>('/api/me/identities') })
   const run = async (fn: () => Promise<unknown>) => { setBusy(true); setError(''); try { await fn(); await qc.invalidateQueries() } catch (e) { setError(errorText(e)) } finally { setBusy(false) } }
   return <div className="space-y-3"><p className="text-sm text-zinc-400">Any linked sign-in opens this account. Keep at least one enabled way to sign in. Unlinking ends your other sessions and removes the admin access and the adult games level that sign-in gave you. Admin access set in Users is kept.</p>
     {identities.data?.identities.map(i => <div key={i.provider + i.subject} className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 py-3"><div className="min-w-0"><p className="text-sm text-white">{i.name}{!i.available && ' · Unavailable'}</p><p className="break-all text-xs text-zinc-400">{i.subject}</p></div><Button className="min-h-11" disabled={busy || !i.removable} onClick={() => void run(() => api('/api/me/identities', { method: 'DELETE', json: { provider: i.provider, subject: i.subject } }))}>Unlink</Button></div>)}

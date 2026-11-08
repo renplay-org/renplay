@@ -10,6 +10,7 @@ import type { Services } from '../services.js'
 import { SYNC_SETTING, downloadSync, syncCodesOn, uploadSync } from './sync.js'
 import { dirSize, sha1 } from '../util/fsx.js'
 import { HttpError, assertSlug, cleanRelPath, isSaveDirName } from '../util/paths.js'
+import type { SaveSlot, SaveVersions, SavesResponse, SyncDownloaded } from '../shared/api.js'
 
 
 /** A person's saves of one game, at /api/saves/<game>. */
@@ -160,13 +161,13 @@ function gameSaves(s: Services): Router {
   router.get('/:id', async (req, res) => {
     const g = game(req)
     if (!g.save_dir) {
-      res.json({ saveDir: null, slots: [], other: [], conflicts: [] })
+      res.json({ saveDir: null, slots: [], other: [], conflicts: [] } satisfies SavesResponse)
       return
     }
     const files = await s.saves.list(g.save_dir)
     const notes = saveStores.notes(me(), g.save_dir)
-    const slots = []
-    const other = []
+    const slots: SaveSlot[] = []
+    const other: SavesResponse['other'] = []
     for (const f of files) {
       if (!f.name.endsWith('.save') || f.name.includes('/')) {
         other.push({ name: f.name, size: f.size, mtime: f.mtimeMs })
@@ -199,7 +200,7 @@ function gameSaves(s: Services): Router {
     slots.sort((a, b) => b.ctime - a.ctime)
     // Second versions the conflict rule kept in History during the last two weeks.
     const conflicts = await s.saves.conflicts(g.save_dir, Date.now() - 14 * 24 * 3600_000)
-    res.json({ saveDir: g.save_dir, slots, other, conflicts, sync: g.family === 'renpy' && syncCodesOn(db) })
+    res.json({ saveDir: g.save_dir, slots, other, conflicts, sync: g.family === 'renpy' && syncCodesOn(db) } satisfies SavesResponse)
   })
 
   // ---- Ren'Py Sync codes ------------------------------------------------------
@@ -218,7 +219,7 @@ function gameSaves(s: Services): Router {
 
   /** Fetches the saves for a code made on another device. */
   router.post('/:id/sync/download', async (req, res) => {
-    res.json(await downloadSync(syncServer, s.saves, syncGame(req), req.body?.code))
+    res.json(await downloadSync(syncServer, s.saves, syncGame(req), req.body?.code) satisfies SyncDownloaded)
   })
 
   /** A save's name, note and pin for this person. The save file itself is not touched. */
@@ -306,7 +307,7 @@ function gameSaves(s: Services): Router {
   router.get('/:id/history', async (req, res) => {
     const g = game(req)
     const name = typeof req.query['file'] === 'string' ? cleanRelPath(req.query['file']) : undefined
-    res.json({ versions: await s.saves.history(requireSaveDir(g), name) })
+    res.json({ versions: await s.saves.history(requireSaveDir(g), name) } satisfies SaveVersions)
   })
 
   router.post('/:id/history/restore', async (req, res) => {

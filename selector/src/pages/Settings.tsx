@@ -9,7 +9,8 @@ import { LevelSeg, DeviceAdultRow } from '../components/AdultLadder'
 import { Seg, SourceLabel, LanternSwitch } from '../lantern/controls'
 import CatalogTags from '../components/CatalogTags'
 import { useRoom } from '../lantern/Room'
-import { api, del, post, put, type CatalogSource, type SystemInfo } from '../lib/api'
+import { api, del, post, put } from '../lib/api'
+import type { CatalogSource, SystemInfo } from '@shared/api'
 import { setLighterBackground, useLighterBackground } from '../lib/backdrop'
 import { ago, bytes } from '../lib/format'
 import { useAuth } from '../lib/auth'
@@ -17,6 +18,7 @@ import { adultLabels } from '../lib/adult'
 import { ADULT_LEVELS, type AdultLevel } from '@shared/levels'
 import { useCatalog, useContent, useDefaults, useGames, useSetInstallationLevel, useSystem } from '../lib/queries'
 import type { Defaults } from '@shared/defaults'
+import type { BackupInfo, StorageReport } from '@shared/api'
 
 function DiskBar({ label, disk }: { label: string; disk: { total: number; free: number } | null }) {
   if (!disk) return null
@@ -389,16 +391,6 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
   )
 }
 
-interface BackupInfo {
-  dir: string | null
-  keep: number
-  files: Array<{ name: string; size: number; at: number }>
-  last: number | null
-  next: number | null
-  running: boolean
-  error: string | null
-}
-
 /** Where a server setting comes from: its variable on the server, or the default. */
 function setBy(sys: SystemInfo | undefined, variable: string) {
   return sys?.setBy?.[variable] === 'server' ? <SourceLabel kind="server" label={variable} /> : <SourceLabel kind="def" />
@@ -510,14 +502,6 @@ function CatalogSources({ sources, label }: { sources: CatalogSource[]; label: (
       ))}
     </div>
   )
-}
-
-interface StorageReport {
-  games: Array<{ id: string; title: string; status: string; builds: Array<{ name: string; current: boolean; bytes: number }>; download: { name: string; bytes: number } | null; bytes: number }>
-  engines: Array<{ version: string; bytes: number; used: boolean }>
-  orphans: Array<{ name: string; bytes: number }>
-  totals: { builds: number; downloads: number; engines: number }
-  freeable: { downloads: number; engines: number }
 }
 
 /** What uses space, game by game, and what Renplay can free. */

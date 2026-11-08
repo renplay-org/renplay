@@ -10,6 +10,7 @@ import type { GameRow } from '../db.js'
 import { PackReader } from '../pipeline/pack.js'
 import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
 import type { Services } from '../services.js'
+import type { OfflineManifest } from '../shared/api.js'
 
 /** A build's presplash, at its top level: /g/<game>/<build>/web-presplash.jpg. */
 export const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
@@ -113,7 +114,7 @@ export function createPlayRouter(s: Services, runtimePath: string | undefined): 
     const streamed = JSON.parse(await readFile(at(base, 'assets.json'), 'utf-8').catch(() => '{}')) as Record<string, [number, number]>
     for (const [name, [, bytes]] of Object.entries(streamed)) files.push({ url: `${page}game/${name.split('/').map(encodeURIComponent).join('/')}`, bytes })
     res.setHeader('Cache-Control', 'private, no-store')
-    res.json({ id, build: game.build, page, bytes: files.reduce((n, f) => n + f.bytes, 0), files })
+    res.json({ id, build: game.build, page, bytes: files.reduce((n, f) => n + f.bytes, 0), files } satisfies OfflineManifest)
   })
 
   /**

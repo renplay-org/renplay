@@ -5,7 +5,8 @@ import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
 import { KEEP_DOWNLOADS, archiveIdentity, publishUpload } from './archives.js'
 import { parseJson, type GameSource } from '../db.js'
-import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
+import { INSPECT_VERSION, inspectArchive } from '../pipeline/import.js'
+import type { Archive, ArchiveInfo, ArchivesResponse, InspectResponse, UploadStarted } from '../shared/api.js'
 import { exists, newId } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
 import { viewer } from '../accounts/context.js'
@@ -61,7 +62,7 @@ export function createLibraryRouter(deps: Services): Router {
     for (const k of known.keys()) if (!files.some((f) => f.rel === k)) db.deleteArchive(k)
     res.json({
       dir: cfg.archivesDir,
-      archives: files.map((f) => {
+      archives: files.map((f): Archive | null => {
         const row = known.get(f.rel)
         const fresh = row && row.size === f.size && row.mtime_ms === f.mtimeMs
         const parsed = fresh ? parseJson<ArchiveInfo | null>(row.info, null) : null
@@ -93,7 +94,7 @@ export function createLibraryRouter(deps: Services): Router {
           existingGame: [match ? db.gameByRecipe(match.recipe.id) : null, info?.saveDir ? db.gameBySaveDir(info.saveDir) : null].find((g) => g && !catalog.content.hides(g))?.id ?? null,
         }
       }).filter((a) => a !== null),
-    })
+    } satisfies ArchivesResponse)
   })
 
   router.post('/archives/inspect', async (req, res) => {
@@ -112,7 +113,7 @@ export function createLibraryRouter(deps: Services): Router {
       info: JSON.stringify(info),
     })
     const existing = info.saveDir ? db.gameBySaveDir(info.saveDir) : null
-    res.json({ info, existingGame: existing && !catalog.content.hides(existing) ? existing.id : null })
+    res.json({ info, existingGame: existing && !catalog.content.hides(existing) ? existing.id : null } satisfies InspectResponse)
   })
 
   router.post('/archives/hash', (req, res) => {
@@ -183,7 +184,7 @@ export function createLibraryRouter(deps: Services): Router {
     const id = newId('u')
     await writeFile(uploadMeta(id), JSON.stringify({ name, size }))
     await writeFile(uploadPart(id), '')
-    res.json({ id, chunkSize: CHUNK, received: 0 })
+    res.json({ id, chunkSize: CHUNK, received: 0 } satisfies UploadStarted)
   })
 
   router.get('/uploads/:id', async (req, res) => {

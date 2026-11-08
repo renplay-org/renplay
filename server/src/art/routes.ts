@@ -3,6 +3,7 @@ import type { GameRow } from '../db.js'
 import { ART_KINDS, type ArtKind } from '../shared/recipe.js'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
+import type { ArtCandidates, ArtUploaded } from '../shared/api.js'
 
 /** A game's pictures: the choices and uploads for each format, and the made pictures themselves. */
 export function createArtRouter(s: Services): Router {
@@ -39,7 +40,7 @@ export function createArtRouter(s: Services): Router {
       return
     }
     const kind = kindOf(req.query['kind'])
-    res.json({ kind, candidates: await art.candidates(subject, kind, scope) })
+    res.json({ kind, candidates: await art.candidates(subject, kind, scope) } satisfies ArtCandidates)
   })
 
   router.put('/games/:id/art', async (req, res) => {
@@ -80,7 +81,7 @@ export function createArtRouter(s: Services): Router {
     art.choose(g.id, kind, id, scope)
     const subject = catalog.gameSubject(g)
     await art.ready(subject, scope)
-    res.json({ id, warning, art: art.forSubject(subject) })
+    res.json({ id, warning, art: art.forSubject(subject) } satisfies ArtUploaded)
   })
 
   /** Deletes one's own upload (scope me), or an admin's upload for everyone (scope everyone). */

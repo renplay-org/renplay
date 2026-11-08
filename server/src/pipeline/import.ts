@@ -17,7 +17,8 @@ import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, s
 import { defaultImagePolicy, imageConcurrency } from './optimize.js'
 import { PackWriter, writeIndex } from './pack.js'
 import { DEFAULT_PROGRESSIVE_RULES, buildRules, excluder, parseRules } from './progressive.js'
-import { detectEngine, type EngineInfo } from './family.js'
+import { detectEngine } from './family.js'
+import type { ArchiveInfo, EngineInfo } from '../shared/api.js'
 import { extractHtml, storyId, versionFromName } from './html.js'
 import { detectLayout, extractProject } from './project.js'
 import { readRpaIndex, splitRpa } from './rpa.js'
@@ -409,20 +410,6 @@ async function modsInfo(deps: ImportDeps, id: string): Promise<BuildInfo['mods']
 }
 
 // ---- Archive inspection (fast, no extraction) ------------------------------
-
-export interface ArchiveInfo {
-  type: string
-  layout: 'project' | 'web' | null
-  title?: string
-  version?: string
-  saveDir?: string
-  renpyVersion?: string
-  files: number
-  /** What made the game (Ren'Py, Twine, Godot…), and whether it installs. */
-  engine?: EngineInfo
-  /** INSPECT_VERSION of the inspection; older results are inspected again. */
-  v?: number
-}
 
 /** Bump when inspectArchive learns to find more. 2: Ren'Py 7 versions. 3: other engines. */
 export const INSPECT_VERSION = 3

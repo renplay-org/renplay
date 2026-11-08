@@ -29,7 +29,8 @@ import { Bar, Seg, SourceLabel } from '../lantern/controls'
 import { flyGhost, takeTravel } from '../lantern/travel'
 import { Button, Confirm, IconButton, Progress, Spinner, Switch, cx, useToast } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { api, slotName, type Game } from '../lib/api'
+import { api, slotName } from '../lib/api'
+import type { Game } from '@shared/api'
 import {
   NO_INSETS,
   frameRect,
@@ -49,6 +50,7 @@ import type { Defaults } from '@shared/defaults'
 import { queueHtmlSave, uploadHtmlSave, replayHtmlSaves } from '../lib/html-save-queue'
 import { keptGame, useOnline } from '../lib/offline'
 import { setGameHasPad } from '../lib/gamepad'
+import type { Me } from '@shared/api'
 
 type Panel = null | 'fullscreen'
 
@@ -585,7 +587,7 @@ export default function Player() {
   return (
     <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white outline-none">
       {signedOut && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center"><section role="dialog" aria-modal="true" aria-label="You were signed out" className="safe-bottom w-full max-w-md space-y-4 rounded-3xl bg-ink-950 p-6 ring-1 ring-white/10"><h2 className="text-xl font-semibold">You were signed out.</h2><p className="text-sm text-zinc-400">Your saves are kept on this device until you sign in to the same account.</p><a className="btn p" style={{ display: 'inline-flex' }} href="/signin" target="_blank" rel="noreferrer">Sign in</a><Button className="ml-3" onClick={async () => {
-        try { const me = await api<{ user: { id: number } }>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
+        try { const me = await api<Me>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
       }}>Continue</Button>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
       {/* Game stage */}
       {/* A click in the bars around the game gives the keyboard back to the game. */}

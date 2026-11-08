@@ -6,11 +6,12 @@ import { Pill } from '../lantern/controls'
 import { errorText } from '../components/ui'
 import { api, post } from '../lib/api'
 import { signInReturnUrl } from '../lib/sign-in-return'
+import type { Providers } from '@shared/api'
 
 export default function SignIn() {
   const [params] = useSearchParams()
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ enabled: boolean; setup: boolean; local: boolean; oidc: string | null; demo?: boolean }>('/api/auth/providers') })
+  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<Providers>('/api/auth/providers') })
   if (providers.data && !providers.data.enabled) return <Navigate to="/" replace />
   // The public demo: one button, no account to make.
   if (providers.data?.demo)

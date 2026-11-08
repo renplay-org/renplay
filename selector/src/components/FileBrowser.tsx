@@ -20,7 +20,8 @@ import {
   Wand2,
 } from 'lucide-react'
 import { Suspense, lazy, useRef, useState } from 'react'
-import { api, del, post, type FileEntry, type Game } from '../lib/api'
+import { api, del, post } from '../lib/api'
+import type { FileEntry, Game } from '@shared/api'
 import { bytes } from '../lib/format'
 import { useFiles, useJobs } from '../lib/queries'
 import { Button, Confirm, Empty, Menu, MenuItem, Modal, Progress, Spinner, accountInput, cx, errorText, useToast } from './ui'

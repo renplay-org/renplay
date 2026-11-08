@@ -9,28 +9,28 @@ import { useRoom } from '../lantern/Room'
 import { adultLabels } from '../lib/adult'
 import { ADULT_LEVELS, parseAdultLevel, type AdultLevel } from '@shared/levels'
 import { api, del, post, put } from '../lib/api'
-import { useAuth, type Account } from '../lib/auth'
+import { useAuth } from '../lib/auth'
 import { useGames } from '../lib/queries'
 import { AccountSection } from './Account'
+import type { People, PersonListed, Providers } from '@shared/api'
 
-interface User extends Account { disabled: number; games: number; saves: number; protected: boolean }
 type Action = 'add' | 'edit' | 'password' | 'copy' | 'merge' | 'import' | 'remove'
 const historyNotice = 'Nothing is overwritten without a copy in the destination’s save history.'
 
 export default function Users() {
   const { data: me } = useAuth(), qc = useQueryClient(), toast = useToast()
-  const users = useQuery({ queryKey: ['users'], queryFn: () => api<{ users: User[]; adultDefault: AdultLevel }>('/api/users') })
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ enabled: boolean; local: boolean; oidc: string | null; ldap: boolean }>('/api/auth/providers') })
+  const users = useQuery({ queryKey: ['users'], queryFn: () => api<People>('/api/users') })
+  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<Providers>('/api/auth/providers') })
   const { data: games } = useGames()
-  const [dialog, setDialog] = useState<{ action: Action; user?: User } | null>(null)
-  const [menu, setMenu] = useState<User | null>(null)
+  const [dialog, setDialog] = useState<{ action: Action; user?: PersonListed } | null>(null)
+  const [menu, setMenu] = useState<PersonListed | null>(null)
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   useRoom({ game: null, quiet: true })
   const all = users.data?.users ?? []
-  const ceilingOf = (user: User): AdultLevel => parseAdultLevel(user.adult_ceiling) ?? users.data?.adultDefault ?? 'off'
-  const choiceOf = (user: User): AdultLevel => parseAdultLevel(user.adult_choice) ?? ceilingOf(user)
-  const lastAdmin = (user: User) => user.role === 'admin' && !user.disabled && all.filter((u) => u.role === 'admin' && !u.disabled).length === 1
-  const open = (action: Action, user?: User) => { setMenu(null); setError(''); setDialog({ action, user }) }
+  const ceilingOf = (user: PersonListed): AdultLevel => parseAdultLevel(user.adult_ceiling) ?? users.data?.adultDefault ?? 'off'
+  const choiceOf = (user: PersonListed): AdultLevel => parseAdultLevel(user.adult_choice) ?? ceilingOf(user)
+  const lastAdmin = (user: PersonListed) => user.role === 'admin' && !user.disabled && all.filter((u) => u.role === 'admin' && !u.disabled).length === 1
+  const open = (action: Action, user?: PersonListed) => { setMenu(null); setError(''); setDialog({ action, user }) }
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true); setError('')
     try { await fn(); await qc.invalidateQueries(); setDialog(null); toast('Changes saved', 'success') }
@@ -99,7 +99,7 @@ export default function Users() {
           <a className="link small" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }} href="https://renplay.org/docs/accounts/" target="_blank" rel="noreferrer">About accounts and sign-in ↗</a>
         </AccountSection>
       </div>
-      <Modal open={!!menu} onClose={() => setMenu(null)} title={menu ? `Actions for ${menu.name}` : 'User actions'}>
+      <Modal open={!!menu} onClose={() => setMenu(null)} title={menu ? `Actions for ${menu.name}` : 'PersonListed actions'}>
         {menu && (
           <div className="stack">
             <div className="stack" style={{ gap: 8 }}>

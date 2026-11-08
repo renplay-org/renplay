@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Heart } from 'lucide-react'
 import { useState } from 'react'
-import { api, type Game } from '../lib/api'
+import { api } from '../lib/api'
+import type { Game } from '@shared/api'
 import { errorText, useToast } from './ui'
 
 export default function FavoriteButton({ game }: { game: Game }) {

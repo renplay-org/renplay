@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
-import { api, type Game } from './api'
+import { api } from './api'
+import type { Game } from '@shared/api'
+import type { OfflineManifest } from '@shared/api'
 
 /*
  * Keeping a game offline: its files go into this browser's Cache Storage, where the service worker
@@ -12,14 +14,6 @@ const GAMEZIP = 'renplay-gamezip-v1'
 const SHELL = 'renplay-shell-v1'
 const API = 'renplay-api-v1'
 const STATE = 'renplay:offline'
-
-export interface OfflineManifest {
-  id: string
-  build: string
-  page: string
-  bytes: number
-  files: Array<{ url: string; bytes: number }>
-}
 
 /** A game kept in this browser: its build, size, and when it was kept. */
 export interface KeptGame {

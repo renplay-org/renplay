@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useCatalog, useGames } from '../lib/queries'
 import { matchesSearch } from '../lib/tags'
-import { slotName, type Recipe } from '../lib/api'
+import { slotName } from '../lib/api'
+import type { CatalogGame } from '@shared/api'
 import RecipeCard from './RecipeCard'
 import { Frame } from '../lantern/art'
 import { Modal, cx } from './ui'
@@ -45,7 +46,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
     navigate = useNavigate()
   const [query, setQuery] = useState(''),
     [active, setActive] = useState(0),
-    [recipe, setRecipe] = useState<Recipe | null>(null)
+    [recipe, setRecipe] = useState<CatalogGame | null>(null)
   const list = useRef<HTMLDivElement>(null),
     input = useRef<HTMLInputElement>(null)
   const go = (url: string) => {

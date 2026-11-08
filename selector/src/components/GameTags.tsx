@@ -1,4 +1,4 @@
-import type { Game } from '../lib/api'
+import type { Game } from '@shared/api'
 import type { Vocabulary } from '@shared/recipe'
 import { gameTags } from '../lib/tags'
 import { TagPill } from '../lantern/controls'

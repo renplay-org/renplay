@@ -6,6 +6,7 @@ import { baseFiles, readBaseFile } from '../pipeline/applymods.js'
 import { isZip, readZipEntries } from '../saves/savefile.js'
 import { HttpError, cleanRelPath } from '../util/paths.js'
 import type { Services } from '../services.js'
+import type { FileEntry, FilesResponse } from '../shared/api.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 256 << 20, files: 500 } })
 const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|css|js)$/i
@@ -45,8 +46,8 @@ export function createFilesRouter(s: Services): Router {
     const added = new Map(ov.files.map((f) => [f.path, f]))
     const deleted = new Set(ov.deleted)
     const dirs = new Map<string, { count: number; changed: boolean }>()
-    const entries: Array<{ name: string; path: string; type: 'file'; size: number; state: string; text: boolean }> = []
-    const consider = (path: string, size: number, state: string) => {
+    const entries: FileEntry[] = []
+    const consider = (path: string, size: number, state: NonNullable<FileEntry['state']>) => {
       if (!path.startsWith(prefix)) return
       const rest = path.slice(prefix.length)
       const slash = rest.indexOf('/')
@@ -67,10 +68,10 @@ export function createFilesRouter(s: Services): Router {
     const summary = await overlays.summary(g.id)
     res.json({
       dir,
-      dirs: [...dirs].map(([name, d]) => ({ name, path: `${prefix}${name}`, type: 'dir', count: d.count, changed: d.changed })).sort((a, b) => a.name.localeCompare(b.name)),
+      dirs: [...dirs].map(([name, d]): FileEntry => ({ name, path: `${prefix}${name}`, type: 'dir', count: d.count, changed: d.changed })).sort((a, b) => a.name.localeCompare(b.name)),
       files: entries.sort((a, b) => a.name.localeCompare(b.name)),
       mods: { ...summary, applied: g.build.endsWith(`.m${summary.hash}`) || (!summary.hash && !g.build.includes('.m')), job: jobs.activeFor(g.id)?.type === 'apply-mods' },
-    })
+    } satisfies FilesResponse)
   })
 
   router.get('/games/:id/files/raw', async (req, res) => {

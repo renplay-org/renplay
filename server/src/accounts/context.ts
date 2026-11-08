@@ -8,7 +8,7 @@ export interface User {
   admin_source: 'manual' | 'provider' | 'allowlist'
   admin_provider: string
   admin_subject: string
-  /** 3.x column, kept in step with adult_ceiling so a downgrade reads the same access (content.ts legacyMirror). */
+  /** 3.x column, no longer written. It stays so going back to 4.5 works. */
   adult_access: number
   /** Ceiling set by an admin or recomputed from sign-in groups: off, blurred or shown. */
   adult_ceiling: string

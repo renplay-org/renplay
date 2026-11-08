@@ -12,6 +12,7 @@ import { slotInfo } from '../saves/savefile.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
 import type { Services } from '../services.js'
+import type { Game } from '../shared/api.js'
 
 /** What a walkthrough file is, from its first bytes (and its name for text), or null. */
 export function walkthroughKind(data: Buffer, name = ''): { kind: 'pdf' | 'image' | 'text'; ext: string } | null {
@@ -42,7 +43,7 @@ function cacheName(raw: unknown): string {
 
 
 
-export async function toGame(game: GameRow, deps: Services) {
+export async function toGame(game: GameRow, deps: Services): Promise<Game> {
   const row = deps.progress.of(deps.accounts.current().id, game)
   const source = parseJson<GameSource>(row.source, {})
   const job = deps.jobs.activeFor(row.id)

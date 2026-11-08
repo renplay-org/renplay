@@ -5,11 +5,10 @@ import Sheet from '../lantern/Sheet'
 import { api, put } from '../lib/api'
 import type { Vocabulary } from '@shared/recipe'
 import { gameTags } from '../lib/tags'
+import type { TagPrefs as TagPrefsAnswer } from '@shared/api'
 
-export interface TagPrefs {
-  include: string[]
-  exclude: string[]
-}
+/** The tags a person includes and leaves out, as the Catalog page works with them. */
+export type TagPrefs = Pick<TagPrefsAnswer, 'include' | 'exclude'>
 
 type Tagged = Parameters<typeof gameTags>[0]
 type State = 'off' | 'include' | 'exclude'
@@ -35,7 +34,7 @@ export function matchesTags(game: Tagged, prefs: TagPrefs, vocabulary: Vocabular
  */
 export function useTagPrefs(): [TagPrefs, (next: TagPrefs) => void] {
   const qc = useQueryClient()
-  const { data } = useQuery({ queryKey: ['me-tags'], queryFn: () => api<TagPrefs>('/api/me/tags'), staleTime: 60_000 })
+  const { data } = useQuery({ queryKey: ['me-tags'], queryFn: () => api<TagPrefsAnswer>('/api/me/tags'), staleTime: 60_000 })
   const [local, setLocal] = useState<TagPrefs | null>(null)
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(timer.current), [])
@@ -43,7 +42,7 @@ export function useTagPrefs(): [TagPrefs, (next: TagPrefs) => void] {
     setLocal(next)
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
-      void put<TagPrefs>('/api/me/tags', next).then((saved) => qc.setQueryData(['me-tags'], saved)).catch(() => {})
+      void put<TagPrefsAnswer>('/api/me/tags', next).then((saved) => qc.setQueryData(['me-tags'], saved)).catch(() => {})
     }, 600)
   }
   return [local ?? data ?? { include: [], exclude: [] }, set]

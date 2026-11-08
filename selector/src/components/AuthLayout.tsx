@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { api } from '../lib/api'
 import { RoomProvider, useRoom } from '../lantern/Room'
+import type { Health } from '@shared/api'
 
 function BrandRoom() {
   useRoom({ game: null, brand: true })
@@ -10,7 +11,7 @@ function BrandRoom() {
 
 /** Sign-in and setup: the logo on the brand room, one narrow column. */
 export default function AuthLayout({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-  const { data } = useQuery({ queryKey: ['health'], queryFn: () => api<{ version: string }>('/api/health') })
+  const { data } = useQuery({ queryKey: ['health'], queryFn: () => api<Health>('/api/health') })
   return (
     <RoomProvider>
       <BrandRoom />

@@ -4,29 +4,13 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Sheet from '../lantern/Sheet'
 import { ArtPicture, Frame, creditText } from '../lantern/art'
 import { Pill, Seg } from '../lantern/controls'
-import { api, del, type Game } from '../lib/api'
-import type { ArtCredit, ArtFormat } from '@shared/art'
+import { api, del } from '../lib/api'
+import type { Game } from '@shared/api'
+import type { ArtFormat } from '@shared/art'
 import type { ArtKind } from '@shared/recipe'
 import { useAuth } from '../lib/auth'
 import { errorText, useToast } from './ui'
-
-interface Candidate {
-  id: string
-  current: boolean
-  everyone: boolean
-  mine: boolean
-  inShape: boolean
-  width: number
-  height: number
-  source: string
-  credit: ArtCredit
-  upload: boolean
-  /** Uploaded by this person, and so theirs to delete. */
-  ownUpload: boolean
-  /** Uploaded for everyone, which an admin may delete. */
-  sharedUpload: boolean
-  preview: ArtFormat | null
-}
+import type { ArtCandidate, ArtCandidates, ArtUploaded } from '@shared/api'
 
 const KINDS: Array<{ value: ArtKind; label: string }> = [
   { value: 'grid', label: 'Grid' },
@@ -53,7 +37,7 @@ const WHERE: Record<ArtKind, string> = {
 const MADE: Record<string, string> = { crop: 'cropped to fit', composed: 'composed on its glow', glow: 'blurred into a background', whole: 'whole on its glow' }
 
 /** One line on where a candidate came from and how it fits. */
-function about(c: Candidate, kind: ArtKind): ReactNode {
+function about(c: ArtCandidate, kind: ArtKind): ReactNode {
   const made = c.preview?.made ? `, ${MADE[c.preview.made]}` : ''
   const size = kind === 'logo' ? `${c.width} × ${c.height}` : c.inShape ? `${c.width} × ${c.height}` : `${c.width} × ${c.height}${made}`
   return (
@@ -127,7 +111,7 @@ export default function ArtPicker({ game, open, onClose, initialKind = 'grid', s
   const list = useQuery({
     queryKey: ['art', game.id, kind],
     enabled: open,
-    queryFn: () => api<{ candidates: Candidate[] }>(`/api/games/${game.id}/art?kind=${kind}`).then((r) => r.candidates),
+    queryFn: () => api<ArtCandidates>(`/api/games/${game.id}/art?kind=${kind}`).then((r) => r.candidates),
   })
   const refresh = async () => {
     await Promise.all([qc.invalidateQueries({ queryKey: ['art', game.id] }), qc.invalidateQueries({ queryKey: ['game', game.id] }), qc.invalidateQueries({ queryKey: ['games'] })])
@@ -143,12 +127,12 @@ export default function ArtPicker({ game, open, onClose, initialKind = 'grid', s
       setBusy(false)
     }
   }
-  const choose = (c: Candidate) => run(() => api(`/api/games/${game.id}/art`, { method: 'PUT', json: { kind, candidate: c.id, scope } }))
+  const choose = (c: ArtCandidate) => run(() => api(`/api/games/${game.id}/art`, { method: 'PUT', json: { kind, candidate: c.id, scope } }))
   const useDefault = () => run(() => del(`/api/games/${game.id}/art?kind=${kind}&scope=${scope}`))
   const upload = () =>
     file &&
     run(async () => {
-      const r = await api<{ warning: { width: number; height: number } | null }>(`/api/games/${game.id}/art/upload?kind=${kind}&scope=${scope}&focal=${focal.map((v) => v.toFixed(3)).join(',')}`, {
+      const r = await api<ArtUploaded>(`/api/games/${game.id}/art/upload?kind=${kind}&scope=${scope}&focal=${focal.map((v) => v.toFixed(3)).join(',')}`, {
         method: 'POST',
         body: file.blob,
         headers: { 'content-type': file.blob.type || 'application/octet-stream' },
@@ -159,10 +143,10 @@ export default function ArtPicker({ game, open, onClose, initialKind = 'grid', s
 
   const candidates = list.data ?? []
   const uploads = candidates.filter((c) => c.upload)
-  const uploadName = (c: Candidate) => (uploads.length > 1 ? `Your upload ${uploads.indexOf(c) + 1}` : 'Your upload')
+  const uploadName = (c: ArtCandidate) => (uploads.length > 1 ? `Your upload ${uploads.indexOf(c) + 1}` : 'Your upload')
   // Each upload once, at the scope it was made for: one's own, or for everyone when an admin.
   const removable = uploads.filter((c) => c.ownUpload || (admin && c.sharedUpload))
-  const remove = (c: Candidate) =>
+  const remove = (c: ArtCandidate) =>
     run(() => del(`/api/games/${game.id}/art/uploads/${c.id}?kind=${kind}&scope=${c.ownUpload ? 'me' : 'everyone'}`))
   const current = candidates.find((c) => c.current) ?? null
   const shown = candidates.find((c) => c.id === previewing) ?? current
