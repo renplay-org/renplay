@@ -11,7 +11,7 @@ import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
 import { secretboxDecrypt, secretboxEncrypt } from '../saves/hydrogen.js'
 import { readZipEntries } from '../saves/savefile.js'
-import { hashGame, keyAndHash, normalizeSyncCode } from '../saves/sync.js'
+import { hashGame, keyAndHash, newSyncCode, normalizeSyncCode } from '../saves/sync.js'
 
 // Made by Ren'Py 8.5.3's own renpy.encryption.secretbox_encrypt and renpy.store._sync in the web
 // engine, with the key bytes 0 to 31 and the messages (i * 7 + 3) % 256.
@@ -42,6 +42,19 @@ describe('Ren’Py Sync encryption', () => {
     expect(normalizeSyncCode(' abcde12345 ')).toBe('ABCDE-12345')
     expect(normalizeSyncCode('ABCDE-1234')).toBeNull()
     expect(normalizeSyncCode('ABCDE-1234!')).toBeNull()
+  })
+})
+
+describe('New sync codes', () => {
+  it('are five and five of the 36 characters Ren’Py reads, every one of them possible', () => {
+    const seen = new Set<string>()
+    for (let i = 0; i < 2000; i++) {
+      const code = newSyncCode()
+      expect(code).toMatch(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/)
+      expect(normalizeSyncCode(code)).toBe(code)
+      for (const c of code.replace('-', '')) seen.add(c)
+    }
+    expect(seen.size).toBe(36)
   })
 })
 
