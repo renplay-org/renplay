@@ -1,10 +1,10 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Config } from './config.js'
-import type { Db } from './db.js'
-import { exists, walkFiles, writeFileAtomic } from './util/fsx.js'
-import { isSlug, slugify } from './util/paths.js'
-import type { Purger } from './util/purge.js'
+import type { Config } from '../config.js'
+import type { Db } from '../db.js'
+import { exists, walkFiles, writeFileAtomic } from '../util/fsx.js'
+import { isSlug, slugify } from '../util/paths.js'
+import type { Purger } from '../util/purge.js'
 
 /**
  * Builds live in /games/<game>/<build>/ and never change once written:

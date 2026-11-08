@@ -259,7 +259,7 @@ instance's cache.
 
 ## Mods
 
-`mods.ts` keeps the user's files in `/data/overlays/<id>/`. Applying mods (`applymods.ts`) builds a
+`games/mods.ts` keeps the user's files in `/data/overlays/<id>/`. Applying mods (`applymods.ts`) builds a
 new `game.zip` from the base build plus the overlay into `<build>.m<hash>/`; streamed files still
 come from the base build's pack. Updating a game can re-apply mods or move them aside.
 

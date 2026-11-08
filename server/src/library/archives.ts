@@ -2,12 +2,12 @@ import type { Stats } from 'node:fs'
 import { copyFile, rename, stat, unlink } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
-import type { Catalog } from './catalog/catalog.js'
-import type { Config } from './config.js'
-import { parseJson, type Db, type GameSource } from './db.js'
-import type { JobContext } from './jobs/manager.js'
-import { sha256File } from './util/fsx.js'
-import { cleanRelPath, safeJoin } from './util/paths.js'
+import type { Catalog } from '../catalog/catalog.js'
+import type { Config } from '../config.js'
+import { parseJson, type Db, type GameSource } from '../db.js'
+import type { JobContext } from '../jobs/manager.js'
+import { sha256File } from '../util/fsx.js'
+import { cleanRelPath, safeJoin } from '../util/paths.js'
 
 /** A replaced or edited download is no longer an upload we own, even at the same path. */
 export function archiveIdentity(st: Stats): string {
@@ -47,4 +47,10 @@ export async function hashArchive(ctx: JobContext<{ path: string }>, s: { cfg: C
   }
   const match = catalog.match({ name: rel, size: st.size, sha256 })
   return { sha256, recipe: match?.recipe.id ?? null, exact: match?.exact ?? false }
+}
+
+/** The admin's choice to keep downloads after an install, unless the server configuration fixes it. */
+export const KEEP_DOWNLOADS = 'keep_downloads'
+export function keepDownloads(cfg: Config, db: Db): boolean {
+  return cfg.keepDownloadsLocked ? cfg.keepDownloads : db.getSetting(KEEP_DOWNLOADS, cfg.keepDownloads)
 }

@@ -6,7 +6,7 @@ import multer from 'multer'
 import { viewer } from '../accounts/context.js'
 import { installedRelease } from '../recipes/recipe.js'
 import { parseJson, type GameRow, type GameSource } from '../db.js'
-import { playPath } from './play.js'
+import { playPath } from '../play/routes.js'
 import { cachedSaveMeta, cachedSceneHash } from '../saves/cache.js'
 import { slotInfo } from '../saves/savefile.js'
 import { exists, writeFileAtomic } from '../util/fsx.js'
@@ -150,16 +150,16 @@ export function createGamesRouter(deps: Services): Router {
 
   const get = (req: Request): GameRow => deps.content.game(req.params.id)
 
-  router.get('/', async (_req, res) => {
+  router.get('/games', async (_req, res) => {
     res.json({ games: await Promise.all(db.allGames().filter((r) => !deps.catalog.content.hides(r)).map((r) => toGame(r, deps))) })
   })
 
-  router.get('/:id', async (req, res) => {
+  router.get('/games/:id', async (req, res) => {
     res.json({ game: await toGame(get(req), deps) })
   })
 
   /** Uninstalls (files go, saves and mods stay); `forget=1` also removes the library entry. */
-  router.delete('/:id', async (req, res) => {
+  router.delete('/games/:id', async (req, res) => {
     const g = get(req)
     if (jobs.activeFor(g.id)) throw new HttpError(409, 'A job is running for this game')
     await builds.remove(g.id)
@@ -178,7 +178,7 @@ export function createGamesRouter(deps: Services): Router {
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
-  router.delete('/:id/download', async (req, res) => {
+  router.delete('/games/:id/download', async (req, res) => {
     const g = get(req)
     if (jobs.isBusy() || jobs.activeFor(g.id)) throw new HttpError(409, 'Wait for install jobs to finish before deleting a download')
     const source = parseJson<GameSource>(g.source, {})
@@ -192,7 +192,7 @@ export function createGamesRouter(deps: Services): Router {
     res.json({ ok: true })
   })
 
-  router.post('/:id/reinstall', async (req, res) => {
+  router.post('/games/:id/reinstall', async (req, res) => {
     const g = get(req)
     const src = parseJson<GameSource>(g.source, {})
     if (!src.archive) throw new HttpError(409, 'No source archive is known for this game. Add its archive to install it.')
@@ -215,7 +215,7 @@ export function createGamesRouter(deps: Services): Router {
    * Python bytecode caches compiled by the browser on a game's first start.
    * Stored with the current build, they spare later starts the compile.
    */
-  router.put('/:id/cache', express.raw({ type: () => true, limit: '64mb' }), async (req, res) => {
+  router.put('/games/:id/cache', express.raw({ type: () => true, limit: '64mb' }), async (req, res) => {
     const g = get(req)
     const name = cacheName(req.query['name'])
     if (req.query['build'] !== g.build || !g.build) throw new HttpError(409, 'Build changed')
@@ -239,7 +239,7 @@ export function createGamesRouter(deps: Services): Router {
 
   // Several walkthrough files per game: PDFs, pictures and plain text. Not HTML: it would run as
   // part of Renplay's own page.
-  router.post('/:id/walkthroughs', async (req, res) => {
+  router.post('/games/:id/walkthroughs', async (req, res) => {
     const g = get(req)
     // multer runs inside the handler and is awaited: as route middleware its stream callbacks would
     // lose the request's context, and with it who is asking (accounts-context.ts).
@@ -259,7 +259,7 @@ export function createGamesRouter(deps: Services): Router {
   })
 
   /** Renames a walkthrough, or moves it to another place in the list. */
-  router.put('/:id/walkthroughs/:file', async (req, res) => {
+  router.put('/games/:id/walkthroughs/:file', async (req, res) => {
     const g = get(req)
     const w = walkthroughOf(g, req.params.file)
     if (req.body?.title !== undefined) {
@@ -276,13 +276,19 @@ export function createGamesRouter(deps: Services): Router {
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 
-  router.delete('/:id/walkthroughs/:file', async (req, res) => {
+  router.delete('/games/:id/walkthroughs/:file', async (req, res) => {
     const g = get(req)
     const w = walkthroughOf(g, req.params.file)
     db.raw.prepare('DELETE FROM walkthroughs WHERE file = ?').run(w.file)
     await unlink(join(cfg.walkthroughsDir, w.file)).catch(() => {})
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
+
+  // Text walkthroughs are served as plain text, never sniffed as anything else.
+  router.use('/walkthroughs', express.static(cfg.walkthroughsDir, { cacheControl: false, fallthrough: false, setHeaders: (res, path) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    if (path.endsWith('.txt')) res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  } }))
 
   return router
 }

@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { hashArchive } from './archive-origin.js'
+import { hashArchive } from './library/archives.js'
 import { ArtStore } from './art/store.js'
 import { Accounts } from './accounts/accounts.js'
 import { SaveBackups } from './saves/backups.js'
-import { Builds } from './builds.js'
+import { Builds } from './games/builds.js'
 import { Catalog } from './catalog/catalog.js'
 import type { Config } from './config.js'
 import { ContentMode } from './content/mode.js'
@@ -14,7 +14,7 @@ import { Db } from './db.js'
 import { EngineStore } from './engines.js'
 import { JobManager } from './jobs/manager.js'
 import { ProgressStore } from './progress/store.js'
-import { Overlays } from './mods.js'
+import { Overlays } from './games/mods.js'
 import { applyMods } from './pipeline/applymods.js'
 import { runImport } from './pipeline/import.js'
 import type { SaveStore } from './saves/store.js'
@@ -23,7 +23,7 @@ import { Purger } from './util/purge.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-export function packageVersion(): string {
+function packageVersion(): string {
   try {
     return JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf-8')).version
   } catch {

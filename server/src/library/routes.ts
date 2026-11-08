@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/p
 import { basename, join, relative } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
-import { archiveIdentity, publishUpload } from '../archive-origin.js'
+import { KEEP_DOWNLOADS, archiveIdentity, publishUpload } from './archives.js'
 import { parseJson, type GameSource } from '../db.js'
 import { INSPECT_VERSION, inspectArchive, type ArchiveInfo } from '../pipeline/import.js'
 import { exists, newId } from '../util/fsx.js'
@@ -231,6 +231,13 @@ export function createLibraryRouter(deps: Services): Router {
   })
 
   // ---- catalog --------------------------------------------------------------
+
+  router.put('/system/downloads', (req, res) => {
+    if (cfg.keepDownloadsLocked) throw new HttpError(409, 'Download retention is set by the server configuration')
+    if (typeof req.body?.keepDownloads !== 'boolean') throw new HttpError(400, 'Keep downloads must be a boolean')
+    db.setSetting(KEEP_DOWNLOADS, req.body.keepDownloads)
+    res.json({ ok: true })
+  })
 
   return router
 }

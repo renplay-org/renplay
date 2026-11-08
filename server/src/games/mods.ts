@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, stat, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import type { Config } from './config.js'
-import { exists, walkFiles, writeFileAtomic } from './util/fsx.js'
-import { HttpError, cleanRelPath, safeJoin } from './util/paths.js'
+import type { Config } from '../config.js'
+import { exists, walkFiles, writeFileAtomic } from '../util/fsx.js'
+import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
 
 export interface OverlayEntry {
   path: string

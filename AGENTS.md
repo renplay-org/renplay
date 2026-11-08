@@ -65,32 +65,35 @@ These decide most review comments. Follow them without being asked.
 
 ```
 server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). Tests: vitest.
-  src/app.ts         HTTP app; src/index.ts starts it
+  src/app.ts         The HTTP app, mounting each part's routes. src/index.ts starts it
   src/services.ts    The server's parts, made once at start and given to every router and job
-  src/config.ts      Environment variables (all documented in README.md)
+  src/config.ts      Environment variables, read from the table in envvars.ts
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
+                     Each folder below is one part of the server, with its routes in routes.ts:
   src/accounts/      Sign-in: sessions, passwords and PINs, OIDC and LDAP, tokens, who may call what
                      (access.ts), a person's own settings
   src/people/        An admin's work with people: adding, changing, removing, merging, the owner
-  src/content/       The adult levels (levels.ts), what each person may see (mode.ts), their routes
+  src/content/       The adult levels (levels.ts) and what each person may see (mode.ts)
+  src/defaults/      The defaults for everyone
+  src/library/       Adding games: the archives folder, uploads, installs, keeping downloads
+  src/games/         The library's games, their build folders (builds.ts), the mod overlay (mods.ts)
+                     with its file browser (files.ts), and walkthroughs
+  src/play/          Game pages, the runtimes and the files a game streams
+  src/progress/      Each person's progress with each game and their play history
+  src/saves/         Everyone's saves: the store with history (store.ts), each person's store, notes
+                     and pins (stores.ts), import, sync codes, backups. savefile.ts reads Ren'Py
+                     save metadata
   src/recipes/       The recipe format (recipe.ts, read by everything) and Your recipes (local.ts)
-  src/catalog/       Catalog index: recipe matching, linking games to recipes, updates, its routes
+  src/catalog/       Catalog index: recipe matching, linking games to recipes, updates
   src/art/           The art cache (store.ts): five formats per game, the making order, choices,
-                     uploads, and its routes
+                     uploads
+  src/jobs/          Background job queue (installs, mod builds, hashing), its logs and keepalive
+  src/system/        Health, storage, the system page, metrics and the dashboard widget
   src/engines.ts     Engine packs: index, download on demand, checksum, pruning
-  src/builds.ts      Build folders /games/<id>/<build>/, build.json, caches
-  src/jobs/          Background job queue (installs, mod builds, hashing), its logs, routes and keepalive
-  src/mods.ts        The mod overlay (user files layered over a build)
-  src/progress/      Each person's progress with each game and their play history, with its routes
   src/pipeline/      Install pipeline: archive.ts (zip/7z/rar reading), rpa.ts (RPA split, data-only
                      pickle in util/pickle.ts), project.ts (extraction), optimize.ts (WebP),
                      progressive.ts (what streams), pack.ts (asset packs), assemble.ts (game.zip),
                      import.ts (the whole install), applymods.ts (mod builds), detect.ts
-  src/routes/        REST API: games, library (imports, uploads, archives, catalog), files
-                     (mod file browser), play (game pages and streamed assets), system
-  src/saves/         Everyone's saves: the store with history (store.ts), each person's store, notes
-                     and pins (stores.ts), routes, import, sync codes, backups. savefile.ts reads
-                     Ren'Py save metadata
   scripts/           screenshots.mjs (Playwright, phone and desktop)
 selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. No tests; type-checked.
   src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
