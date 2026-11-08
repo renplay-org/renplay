@@ -2,9 +2,9 @@ import { Package } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import DocsLink from '../../components/DocsLink'
-import { Button, Confirm } from '../../components/ui'
+import { Confirm } from '../../lantern/ui'
 import { LevelSeg } from '../../components/AdultLadder'
-import { SourceLabel } from '../../lantern/controls'
+import { SourceLabel, Pill } from '../../lantern/controls'
 import { post } from '../../lib/api'
 import { bytes } from '@shared/format'
 import { adultLabels } from '../../lib/adult'
@@ -28,9 +28,9 @@ export function SignInOff({ userName }: { userName: string }) {
           hint={`Everyone who opens this address plays as ${userName}. That is fine on a private network. Turn it on when more people or the internet can reach it.`}
           source={sys?.setBy?.['RENPLAY_AUTH'] === 'server' ? <SourceLabel kind="server" label="RENPLAY_AUTH" /> : <SourceLabel kind="def" />}
         >
-          <Button size="sm" onClick={() => window.open('https://renplay.org/docs/accounts/', '_blank', 'noreferrer')}>
+          <Pill size="sm" onClick={() => window.open('https://renplay.org/docs/accounts/', '_blank', 'noreferrer')}>
             How to turn it on
-          </Button>
+          </Pill>
         </Setting>
       </section>
   )
@@ -128,9 +128,9 @@ export function EnginesPanel() {
       </p>
       {sys.engines.installed.some((e) => !e.usedBy.length) && (
         <div style={{ marginTop: 12 }}>
-          <Button size="sm" onClick={() => run(() => post('/api/system/prune'), 'Unused engines removed')}>
+          <Pill size="sm" onClick={() => run(() => post('/api/system/prune'), 'Unused engines removed')}>
             Remove unused engines
-          </Button>
+          </Pill>
         </div>
       )}
     </section>

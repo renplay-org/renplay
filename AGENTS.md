@@ -102,9 +102,11 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   scripts/           screenshots.mjs (Playwright, phone and desktop)
 selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. No tests; type-checked.
   src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
-  src/lantern/       The 4.0 design system: Tile, Stage, the room, Sheet, controls, focus, travel
+  src/lantern/       The design system, the only UI kit: Tile, Stage, the room, Sheet, controls (Pill,
+                     IconBtn, Bar, Seg, switches), ui.tsx (Spinner, Empty, Confirm, Menu, toasts),
+                     focus, travel
                      (tokens and styles in src/index.css)
-  src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
+  src/components/    AppShell (header, tab bar, footer), AuthGuard, SaveGallery, FileBrowser, ActionMenu
   src/lib/           api.ts (fetching), queries.ts, display.ts (screen geometry), platform.ts (what
                      device and browser this is), format.ts
 runtime/           Plain ES5-style scripts for the game pages: renplay-runtime.js (Ren'Py) and

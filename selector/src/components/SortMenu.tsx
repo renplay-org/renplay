@@ -1,6 +1,6 @@
 import { Check, ChevronDown } from 'lucide-react'
 import ActionMenu from './ActionMenu'
-import { MenuItem } from './ui'
+import { MenuItem } from '../lantern/ui'
 
 const options = [
   { value: 'recent', label: 'Recent' },

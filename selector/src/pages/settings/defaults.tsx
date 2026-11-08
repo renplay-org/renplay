@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { errorText, useToast } from '../../components/ui'
+import { errorText, useToast } from '../../lantern/ui'
 import { Seg } from '../../lantern/controls'
 import CatalogTags from '../../components/CatalogTags'
 import { put } from '../../lib/api'

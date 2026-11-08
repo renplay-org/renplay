@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type ReactNode } from 'react'
-import { errorText, useToast } from '../../components/ui'
+import { errorText, useToast } from '../../lantern/ui'
 import { SourceLabel } from '../../lantern/controls'
 import type { SystemInfo } from '@shared/api'
 

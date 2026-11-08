@@ -10,9 +10,10 @@ import type { Game, SaveSlot } from '@shared/api'
 import { ago, dateTime, duration, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
 import { useGames, useSaves } from '../lib/queries'
-import { Seg } from '../lantern/controls'
-import { Button, Confirm, Empty, MenuItem, Modal, Spinner, errorText, useToast } from './ui'
+import { Seg, Pill } from '../lantern/controls'
+import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveVersions, SyncDownloaded } from '@shared/api'
+import Sheet from '../lantern/Sheet'
 
 type Kind = 'all' | 'manual' | 'auto' | 'quick'
 
@@ -106,12 +107,12 @@ export default function SaveGallery({ game }: { game: Game }) {
             )}
           </div>
           <div className="row" style={{ gap: 8 }}>
-            <Button size="sm" variant="ghost" onClick={() => (seeConflicts(), setHistory(conflictFiles === 1 && conflictSlot ? conflictSlot : 'all'))}>
+            <Pill size="sm" variant="q" onClick={() => (seeConflicts(), setHistory(conflictFiles === 1 && conflictSlot ? conflictSlot : 'all'))}>
               Show in History
-            </Button>
-            <Button size="sm" variant="ghost" onClick={seeConflicts}>
+            </Pill>
+            <Pill size="sm" variant="q" onClick={seeConflicts}>
               OK
-            </Button>
+            </Pill>
           </div>
         </div>
       )}
@@ -128,19 +129,19 @@ export default function SaveGallery({ game }: { game: Game }) {
         />
         <span className="grow" />
         <input ref={fileRef} type="file" multiple accept=".save,.zip,application/zip" className="hidden" onChange={(e) => void onImport(e.target.files)} />
-        <Button size="sm" icon={<Upload />} loading={importing} onClick={() => fileRef.current?.click()}>
+        <Pill size="sm" icon={<Upload />} loading={importing} onClick={() => fileRef.current?.click()}>
           Import
-        </Button>
-        <Button size="sm" icon={<FileArchive />} href={`/api/saves/${game.id}/export`}>
+        </Pill>
+        <Pill size="sm" icon={<FileArchive />} href={`/api/saves/${game.id}/export`}>
           Export all
-        </Button>
-        <Button size="sm" variant="ghost" icon={<History />} onClick={() => setHistory('all')}>
+        </Pill>
+        <Pill size="sm" variant="q" icon={<History />} onClick={() => setHistory('all')}>
           History
-        </Button>
+        </Pill>
         {data?.sync && (
-          <Button size="sm" variant="ghost" icon={<ArrowLeftRight />} onClick={() => setSyncing(true)}>
+          <Pill size="sm" variant="q" icon={<ArrowLeftRight />} onClick={() => setSyncing(true)}>
             Sync code
-          </Button>
+          </Pill>
         )}
       </div>
 
@@ -216,14 +217,14 @@ export default function SaveGallery({ game }: { game: Game }) {
         Every save is stored on the server. Overwrites and deletes keep a previous version you can restore from History. A pinned save keeps all of them.
       </p>
 
-      <Modal
+      <Sheet
         open={!!editing}
         onClose={() => setEditing(null)}
         title="Name and note"
         footer={
-          <Button variant="primary" onClick={() => { const e = editing!; setEditing(null); void saveMeta(e.slot, { title: e.title, note: e.note }, 'Saved') }}>
+          <Pill variant="p" onClick={() => { const e = editing!; setEditing(null); void saveMeta(e.slot, { title: e.title, note: e.note }, 'Saved') }}>
             Save
-          </Button>
+          </Pill>
         }
       >
         <div className="stack" style={{ gap: 12 }}>
@@ -237,7 +238,7 @@ export default function SaveGallery({ game }: { game: Game }) {
             <textarea className="input" style={{ marginTop: 8, width: '100%', minHeight: 96, paddingTop: 10 }} maxLength={500} value={editing?.note ?? ''} onChange={(e) => setEditing((x) => (x ? { ...x, note: e.target.value } : x))} />
           </label>
         </div>
-      </Modal>
+      </Sheet>
 
       <Confirm
         open={!!confirmDelete}
@@ -273,7 +274,7 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
   const [busy, setBusy] = useState<string | null>(null)
   const targets = (games ?? []).filter((g) => g.id !== game.id && g.saveDir)
   return (
-    <Modal open onClose={onClose} title="Copy save to another game">
+    <Sheet open onClose={onClose} title="Copy save to another game">
       <p className="small muted" style={{ marginBottom: 14 }}>
         For sequels that continue from an earlier season. The save keeps its slot if it is free, otherwise it goes into the next free slot.
       </p>
@@ -303,7 +304,7 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
           </button>
         ))}
       </div>
-    </Modal>
+    </Sheet>
   )
 }
 
@@ -316,7 +317,7 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
   const reason = (r: string) =>
     ({ overwrite: 'Replaced in game', game: 'Replaced in game', 'game-delete': 'Deleted in game', 'user-delete': 'Deleted here', import: 'Replaced by import', restore: 'Before a restore', copy: 'Replaced by a copy', conflict: 'Older of two versions' })[r] ?? r
   return (
-    <Modal open onClose={onClose} title={file ? `Previous versions of ${file}` : 'Save history'} wide fullPhone>
+    <Sheet open onClose={onClose} title={file ? `Previous versions of ${file}` : 'Save history'} wide fullPhone>
       {isLoading ? (
         <Spinner />
       ) : !data?.versions.length ? (
@@ -331,7 +332,7 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
                   {reason(v.reason)} · {dateTime(v.savedAt)} · {bytes(v.size)}
                 </div>
               </div>
-              <Button
+              <Pill
                 size="sm"
                 onClick={async () => {
                   try {
@@ -344,12 +345,12 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
                 }}
               >
                 Restore
-              </Button>
+              </Pill>
             </div>
           ))}
         </div>
       )}
-    </Modal>
+    </Sheet>
   )
 }
 
@@ -391,7 +392,7 @@ function SyncDialog({ game, onClose, onDownloaded }: { game: Game; onClose: () =
     }
   }
   return (
-    <Modal open onClose={onClose} title="Move saves with a Sync code" fullPhone>
+    <Sheet open onClose={onClose} title="Move saves with a Sync code" fullPhone>
       <div className="stack" style={{ gap: 24 }}>
         {!hasSync(game.renpyVersion) && (
           <p className="notice amber small">
@@ -415,9 +416,9 @@ function SyncDialog({ game, onClose, onDownloaded }: { game: Game; onClose: () =
                 the server deletes them after an hour.
               </p>
               <div>
-                <Button variant="primary" loading={making} onClick={() => void make()}>
+                <Pill variant="p" loading={making} onClick={() => void make()}>
                   Make a code
-                </Button>
+                </Pill>
               </div>
             </>
           )}
@@ -445,12 +446,12 @@ function SyncDialog({ game, onClose, onDownloaded }: { game: Game; onClose: () =
               maxLength={11}
               style={{ width: 180, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', letterSpacing: '0.08em' }}
             />
-            <Button type="submit" loading={fetching} disabled={code.replace(/-/g, '').trim().length !== 10}>
+            <Pill type="submit" loading={fetching} disabled={code.replace(/-/g, '').trim().length !== 10}>
               Bring in the saves
-            </Button>
+            </Pill>
           </form>
         </section>
       </div>
-    </Modal>
+    </Sheet>
   )
 }

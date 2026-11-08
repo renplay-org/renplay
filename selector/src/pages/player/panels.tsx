@@ -10,8 +10,8 @@ import {
 import SceneCard from '../../components/SceneCard'
 import DocsLink from '../../components/DocsLink'
 import { useEffect, useState } from 'react'
-import { Seg } from '../../lantern/controls'
-import { Button, IconButton, Spinner, Switch, cx } from '../../components/ui'
+import { Seg, IconBtn, Pill } from '../../lantern/controls'
+import { Spinner, Switch, cx } from '../../lantern/ui'
 import { slotName } from '../../lib/format'
 import {
   type DisplayPrefs,
@@ -27,9 +27,9 @@ export function SidePanel({ title, onClose, children, top, narrow }: { title: st
       <aside className={cx('safe-x safe-bottom absolute bg-ink-900/95 backdrop-blur-xl bottom-0 right-0 max-h-[85%] sm:max-h-none sm:top-0 flex w-full animate-rise flex-col rounded-t-3xl sm:rounded-none border-l border-white/10', narrow ? 'sm:w-96' : 'sm:w-[440px]')}>
         <div className="flex items-center justify-between px-5 py-4">
           <h2 className="text-[15px] font-semibold">{title}</h2>
-          <IconButton label="Close" onClick={onClose}>
+          <IconBtn label="Close" onClick={onClose}>
             <X className="size-4" />
-          </IconButton>
+          </IconBtn>
         </div>
         <div className="scrollbar-thin min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pb-6">{children}</div>
       </aside>
@@ -186,9 +186,9 @@ export function DisplayPanel({
       )}
       {fsMode === 'api' && (
         <div>
-          <Button variant="secondary" className="w-full" icon={fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />} onClick={onFullscreen}>
+          <Pill variant="s" className="w-full" icon={fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />} onClick={onFullscreen}>
             {fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          </Button>
+          </Pill>
           <p className="mt-2 text-[11px] leading-snug text-zinc-500">
             {canLockEscape()
               ? 'In fullscreen, Esc opens the game’s menu. Hold Esc to leave fullscreen.'

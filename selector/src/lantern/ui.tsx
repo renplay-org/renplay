@@ -7,62 +7,16 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type ButtonHTMLAttributes,
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import Sheet from '../lantern/Sheet'
-import { Pill, IconBtn, TagPill, LanternSwitch } from '../lantern/controls'
+import Sheet from './Sheet'
+import { Pill, TagPill, LanternSwitch } from './controls'
 
 export function cx(...c: Array<string | false | null | undefined>): string {
   return c.filter(Boolean).join(' ')
 }
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'glass'
-type Size = 'sm' | 'md' | 'lg'
-
-export function Button({
-  variant = 'secondary',
-  size = 'md',
-  loading,
-  icon,
-  className,
-  children,
-  disabled,
-  href,
-  to,
-  ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; loading?: boolean; icon?: ReactNode; href?: string; to?: string; target?: string; rel?: string }) {
-  const v = variant === 'primary' ? 'p' : variant === 'ghost' ? 'q' : variant === 'danger' ? 'd' : 's'
-  return (
-    <Pill
-      variant={v}
-      size={size === 'md' ? undefined : size}
-      icon={loading ? <Loader2 className="animate-spin" /> : icon}
-      className={cx(variant === 'glass' && 'glass', className)}
-      disabled={disabled || loading}
-      href={href}
-      to={to}
-      {...rest}
-    >
-      {children}
-    </Pill>
-  )
-}
-
-export function IconButton({
-  label,
-  className,
-  children,
-  active,
-  ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; active?: boolean }) {
-  return (
-    <IconBtn label={label} className={cx(active && 'on', className)} style={active ? { background: 'var(--plate-2)', color: 'var(--fg)' } : undefined} {...rest}>
-      {children}
-    </IconBtn>
-  )
-}
 
 /** Games of engines other than Ren'Py play as a beta: they work, with fewer features (docs.renplay.org/engines). */
 export function BetaBadge({ engine }: { engine?: string | null }) {
@@ -71,20 +25,6 @@ export function BetaBadge({ engine }: { engine?: string | null }) {
     <span className="inline-flex shrink-0" title="Renplay plays games of engines other than Ren’Py as a beta: they work, with fewer features.">
       <TagPill tone="vio">Beta</TagPill>
     </span>
-  )
-}
-
-export function Progress({ value, className, indeterminate }: { value: number; className?: string; indeterminate?: boolean }) {
-  if (indeterminate)
-    return (
-      <div className={cx('bar', className)}>
-        <div className="skeleton" style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} />
-      </div>
-    )
-  return (
-    <div className={cx('bar', className)}>
-      <i style={{ width: `${Math.max(2, Math.min(100, value * 100))}%` }} />
-    </div>
   )
 }
 
@@ -102,18 +42,6 @@ export function Empty({ icon, title, children, action }: { icon?: ReactNode; tit
       {action && <div className="actions" style={{ justifyContent: 'center', marginTop: 16 }}>{action}</div>}
     </div>
   )
-}
-
-export function Modal(props: {
-  open: boolean
-  onClose: () => void
-  title?: ReactNode
-  children: ReactNode
-  footer?: ReactNode
-  wide?: boolean | 'xl'
-  fullPhone?: boolean
-}) {
-  return <Sheet {...props} />
 }
 
 export function Confirm({
@@ -138,23 +66,23 @@ export function Confirm({
   busy?: boolean
 }) {
   return (
-    <Modal
+    <Sheet
       open={open}
       onClose={onClose}
       title={title}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Pill variant="q" onClick={onClose}>
             {cancelLabel}
-          </Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy}>
+          </Pill>
+          <Pill variant={danger ? 'd' : 'p'} onClick={onConfirm} loading={busy}>
             {confirmLabel}
-          </Button>
+          </Pill>
         </>
       }
     >
       <div className="small muted-2" style={{ lineHeight: 1.6, fontSize: 14 }}>{children}</div>
-    </Modal>
+    </Sheet>
   )
 }
 

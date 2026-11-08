@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { Button } from '../../components/ui'
 import { DeviceAdultRow } from '../../components/AdultLadder'
-import { SourceLabel, LanternSwitch } from '../../lantern/controls'
+import { SourceLabel, LanternSwitch, Pill } from '../../lantern/controls'
 import { setLighterBackground, useLighterBackground } from '../../lib/backdrop'
 import { Setting } from './common'
 
@@ -36,7 +35,7 @@ export function KeepCache() {
   const [persisted, setPersisted] = useState<boolean | null>(null)
   return (
     <Setting title="Keep game cache" hint="Game data (not saves) is cached in the browser so games start instantly the next time. Ask the browser to keep that cache from being cleared automatically.">
-      <Button
+      <Pill
         size="sm"
         onClick={async () => {
           const ok = (await navigator.storage?.persist?.()) ?? false
@@ -44,7 +43,7 @@ export function KeepCache() {
         }}
       >
         Keep game cache
-      </Button>
+      </Pill>
       {persisted !== null && <span className="xs muted">{persisted ? 'The browser will keep the cache.' : 'The browser declined. It may still keep it.'}</span>}
     </Setting>
   )

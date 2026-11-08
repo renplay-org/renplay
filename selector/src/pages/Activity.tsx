@@ -2,8 +2,8 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { Check, Clock, Loader2, RotateCw, ScrollText, Square, Trash2, XCircle, CircleSlash } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import DocsLink from '../components/DocsLink'
-import { Button, Empty, Modal, Progress, Spinner, errorText, useToast } from '../components/ui'
-import { TagPill } from '../lantern/controls'
+import { Empty, Spinner, errorText, useToast } from '../lantern/ui'
+import { TagPill, Bar, Pill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { api, del, post } from '../lib/api'
 import { jobTitle } from '../lib/format'
@@ -11,6 +11,7 @@ import type { Job, JobsResponse } from '@shared/api'
 import { ago, pct, capitalize } from '../lib/format'
 import { bytes } from '@shared/format'
 import { useGames, useJobs } from '../lib/queries'
+import Sheet from '../lantern/Sheet'
 
 const icon = {
   queued: <Clock />,
@@ -101,9 +102,9 @@ export default function Activity() {
           <h1 className="h1">Activity</h1>
           <p className="lead" style={{ marginTop: 6 }}>Installs, updates and optimizations. One job runs at a time.</p>
         </div>
-        <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => act(() => del('/api/jobs'))}>
+        <Pill size="sm" variant="q" icon={<Trash2 />} onClick={() => act(() => del('/api/jobs'))}>
           Clear finished
-        </Button>
+        </Pill>
       </div>
       {!jobs.length ? (
         <div style={{ marginTop: 18 }}>
@@ -140,22 +141,22 @@ export default function Activity() {
                         </>
                       )}
                     </div>
-                    {j.status === 'running' && <Progress value={j.progress} className="thin" />}
+                    {j.status === 'running' && <Bar value={j.progress} thin />}
                   </div>
                   {j.status === 'running' && <span className="tnum muted-2 small">{pct(j.progress)}</span>}
                   <div className="end">
-                    <Button size="sm" variant="ghost" icon={<ScrollText />} onClick={() => setLogFor(j)}>
+                    <Pill size="sm" variant="q" icon={<ScrollText />} onClick={() => setLogFor(j)}>
                       Log
-                    </Button>
+                    </Pill>
                     {active && (
-                      <Button size="sm" variant="ghost" icon={<Square />} onClick={() => act(() => post(`/api/jobs/${j.id}/cancel`))}>
+                      <Pill size="sm" variant="q" icon={<Square />} onClick={() => act(() => post(`/api/jobs/${j.id}/cancel`))}>
                         Cancel
-                      </Button>
+                      </Pill>
                     )}
                     {(j.status === 'failed' || j.status === 'interrupted' || j.status === 'cancelled') && (
-                      <Button size="sm" icon={<RotateCw />} onClick={() => act(() => post(`/api/jobs/${j.id}/retry`))}>
+                      <Pill size="sm" icon={<RotateCw />} onClick={() => act(() => post(`/api/jobs/${j.id}/retry`))}>
                         Retry
-                      </Button>
+                      </Pill>
                     )}
                   </div>
                 </div>
@@ -166,7 +167,7 @@ export default function Activity() {
       )}
       {hasNextPage && (
         <div className="center" style={{ marginTop: 18 }}>
-          <Button loading={isFetchingNextPage} onClick={() => void fetchNextPage()}>Show more</Button>
+          <Pill loading={isFetchingNextPage} onClick={() => void fetchNextPage()}>Show more</Pill>
         </div>
       )}
       {logFor && <LogDialog job={logFor} onClose={() => setLogFor(null)} />}
@@ -181,8 +182,8 @@ function LogDialog({ job, onClose }: { job: Job; onClose: () => void }) {
     refetchInterval: job.status === 'running' ? 2000 : false,
   })
   return (
-    <Modal open onClose={onClose} title="Job log" wide>
+    <Sheet open onClose={onClose} title="Job log" wide>
       <pre style={{ maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', borderRadius: 12, background: 'rgba(0,0,0,.4)', padding: 16, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, lineHeight: 1.6, color: 'var(--fg-2)' }}>{data || 'No output yet.'}</pre>
-    </Modal>
+    </Sheet>
   )
 }
