@@ -1,6 +1,7 @@
 # Weekly, into dev, grouped so a week's updates are one pull request per ecosystem. A new version
 # waits a week before it is proposed (cooldown), so a bad release is usually pulled before it reaches
-# us. Security updates come at once, outside this schedule.
+# us. Security updates come at once, outside this schedule, together in one pull request.
+# Major versions of npm packages come one per pull request: each needs its own look.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -28,9 +29,14 @@ updates:
       prefix: chore
       include: scope
     groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
       minor-and-patch:
+        applies-to: version-updates
         update-types: [minor, patch]
 
+  # The base image stays on its Node LTS line. Moving to the next one is a decision, not an update.
   - package-ecosystem: docker
     directory: /
     schedule:
@@ -38,6 +44,9 @@ updates:
       day: monday
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: node
+        update-types: [version-update:semver-major]
     commit-message:
       prefix: chore
       include: scope
