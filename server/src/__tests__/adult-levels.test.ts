@@ -293,7 +293,7 @@ describe('the levels on every route', () => {
     ['POST /me/identities/oidc', 'person'], ['POST /me/identities/ldap', 'person'], ['GET /me/identities', 'person'], ['DELETE /me/identities', 'person'],
     ['POST /me/avatar', 'person'], ['GET /avatars/:file', 'person'], ['POST /auth/setup/verify', 'none'], ['POST /auth/setup', 'person'],
     ['POST /auth/login', 'person'], ['POST /auth/logout', 'person'], ['GET /me', 'person'], ['PUT /me', 'person'], ['POST /me/password', 'person'],
-    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/tags', 'person'], ['PUT /me/tags', 'person'], ['PUT /me/pin', 'person'], ['GET /auth/switch', 'person'], ['POST /auth/switch', 'person'],
+    ['GET /me/adult', 'person'], ['PUT /me/adult', 'person'], ['GET /me/tags', 'person'], ['PUT /me/tags', 'person'], ['PUT /me/pin', 'person'], ['GET /auth/switch', 'person'], ['POST /auth/switch', 'person'], ['POST /auth/demo', 'person'],
     // Dashboards: metrics are counts for admins, never titles. The widget lists only what the person may see.
     ['GET /metrics', 'tool'], ['GET /widget', 'list'], ['GET /me/sessions', 'person'], ['DELETE /me/sessions', 'person'], ['DELETE /me/sessions/:id', 'person'],
     ['GET /me/tokens', 'person'], ['POST /me/tokens', 'person'], ['DELETE /me/tokens/:id', 'person'],

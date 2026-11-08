@@ -94,6 +94,33 @@ export function playerRoute(method: string, path: string): boolean {
   return /^(PUT \/api\/games\/[^/]+\/(favorite|finished|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
 }
 
+/**
+ * What the demo's guest may not do, on top of a player's limits: anything that changes the shared
+ * account or adds files to the server. Everything a visitor tries goes at the next restart anyway.
+ */
+const DEMO_REFUSED: Array<[method: string, path: RegExp]> = [
+  ['PUT', /^\/api\/me$/],
+  ['POST', /^\/api\/me\/(password|avatar|tokens|claim-owner)$/],
+  ['PUT', /^\/api\/me\/pin$/],
+  ['DELETE', /^\/api\/me\/(tokens|sessions)(\/.*)?$/],
+  // The shared account's sessions are other visitors' browsers.
+  ['GET', /^\/api\/me\/sessions$/],
+  ['*', /^\/api\/me\/identities(\/.*)?$/],
+  ['POST', /^\/api\/games\/[^/]+\/art\/upload$/],
+  ['DELETE', /^\/api\/games\/[^/]+\/art\/uploads\/.+$/],
+  ['POST', /^\/api\/saves-import$/],
+  // Choices everyone shares, since everyone is the same guest.
+  ['PUT', /^\/api\/me\/(tags|adult)$/],
+]
+/** The guest's save writes: a game's own saving, a save's name and note, deleting one, restoring one. */
+const DEMO_SAVE_WRITES = /^\/api\/saves\/[^/]+\/(file|meta|slot|history\/restore)$/
+export function demoCheck(req: Request): void {
+  const refused = DEMO_REFUSED.some(([m, p]) => (m === '*' || m === req.method) && p.test(req.path))
+  // Imports, copies, Sync codes and the save folder are not among them: they bring in files or change the game for everyone.
+  const saveWrite = req.method !== 'GET' && req.method !== 'HEAD' && /^\/api\/saves\//.test(req.path) && !DEMO_SAVE_WRITES.test(req.path)
+  if (refused || saveWrite) throw new HttpError(403, 'The demo cannot do this. Install your own Renplay to try it.')
+}
+
 export class Accounts {
   readonly enabled: boolean
   readonly providers: SignInProviders
@@ -108,7 +135,8 @@ export class Accounts {
   private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
   private dummyPassword = ''
   constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode) {
-    this.enabled = (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
+    // A demo needs its guest, so sign-in is always on there.
+    this.enabled = cfg.demo || (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
   }
   get unclaimed(): boolean { return !this.db.raw.prepare('SELECT 1 FROM identities WHERE user_id = 1').get() && !this.db.raw.prepare("SELECT 1 FROM settings WHERE key = 'owner_claim'").get() }
@@ -153,11 +181,26 @@ export class Accounts {
     if (this.unclaimed && this.cfg.adminUsername) await this.claim(this.cfg.adminUsername, this.cfg.adminUsername, this.cfg.adminPassword)
     if (this.enabled && this.cfg.authLocal && this.unclaimed) always('sign-in', `Setup code: ${this.setupCode}`)
     if (!this.enabled && this.user(this.cfg.authUser).disabled) throw new Error('RENPLAY_AUTH_USER is disabled')
+    if (this.cfg.demo) this.ensureGuest()
     for (const u of this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]) await this.tag(u)
     for (const [legacy, target] of [[this.cfg.savesDir, this.store(1).root], [this.cfg.saveHistoryDir, this.store(1).historyRoot]]) {
       await mkdir(target!, { recursive: true })
       if (!await lstat(legacy!).catch(() => null)) { await mkdir(join(legacy!, '..'), { recursive: true }); await symlink(pathRelative(pathDirname(legacy!), target!), legacy!, 'dir') }
     }
+  }
+  /**
+   * The demo's guest: a player everyone signs in as with Try the demo. It has no password, and its
+   * level for adult games is Blurred, so the catalog shows adult games without a picture of them.
+   */
+  private ensureGuest(): void {
+    if (this.demoGuest()) return
+    const id = Number(this.db.raw.prepare("INSERT INTO users (username, name, role, created_at) VALUES ('demo', 'Guest', 'player', ?)").run(new Date().toISOString()).lastInsertRowid)
+    this.writeLevels(id, { ceiling: 'blurred', choice: 'blurred' })
+  }
+  demoGuest(): number | null {
+    if (!this.cfg.demo) return null
+    const row = this.db.raw.prepare("SELECT id FROM users WHERE username = 'demo'").get() as { id: number } | undefined
+    return row?.id ?? null
   }
   /** Writes a person's ceiling and choice, and the 3.x columns a downgrade to 3.2 still reads. */
   private writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
@@ -290,6 +333,7 @@ export class Accounts {
         const runtimeUser = req.get('x-renplay-user')
         if (runtimeUser !== undefined && runtimeUser !== String(v.user.id)) throw new HttpError(401, 'You were signed out')
         if (req.path !== '/api/auth/check' && v.user.role !== 'admin' && !playerRoute(req.method, req.path)) throw new HttpError(403, 'Only an admin can do this')
+        if (this.cfg.demo && v.user.id === this.demoGuest()) demoCheck(req)
         next()
       } catch (e) { next(e) }
     })
@@ -475,7 +519,19 @@ export class Accounts {
   }
   router(): Router {
     const r = Router({ caseSensitive: true, strict: true })
-    r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.cfg.authLocal && this.unclaimed, local: this.cfg.authLocal || !!this.cfg.ldapUrl, oidc: this.cfg.oidcIssuer ? this.cfg.oidcName : null, ldap: !!this.cfg.ldapUrl }))
+    r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.cfg.authLocal && this.unclaimed && !this.cfg.demo, local: this.cfg.authLocal || !!this.cfg.ldapUrl, oidc: this.cfg.oidcIssuer ? this.cfg.oidcName : null, ldap: !!this.cfg.ldapUrl, demo: this.cfg.demo }))
+    // In a demo the guest is the only way in: no password, setup code, single sign-on or directory.
+    if (this.cfg.demo) {
+      r.use((req, _res, next) => next(/^\/auth\/(login|setup(\/verify)?|oidc\/(start|callback))$/.test(req.path) ? new HttpError(403, 'The demo signs you in with Try the demo') : undefined))
+    }
+    /** Try the demo: a session as the shared guest, no password. Only in a demo. */
+    r.post('/auth/demo', (req, res) => {
+      const guest = this.demoGuest()
+      if (!guest) throw new HttpError(404, 'This is not a demo')
+      this.limit(`ip:${req.ip}`)
+      this.newSession(req, res, guest)
+      res.json({ ok: true })
+    })
     r.get('/auth/oidc/start', (req, res) => res.redirect(this.beginOidc(req, res)))
     r.get('/auth/oidc/callback', async (req, res) => {
       if (!this.enabled || !this.cfg.oidcIssuer) throw new HttpError(403, 'Single sign-on is off')
@@ -645,7 +701,7 @@ export class Accounts {
       this.invalidate(); this.cookie(req, res, '')
       res.json({ ok: true })
     })
-    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) }))
+    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: this.cfg.demo && this.current().id === this.demoGuest(), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) }))
     r.put('/me', async (req, res) => {
       this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(name(req.body?.name), this.current().id)
       await this.tag(this.user(this.current().id)); res.json({ ok: true })

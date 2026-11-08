@@ -5,19 +5,10 @@ description: Run Renplay with Docker or Docker Compose.
 
 ## Docker Compose
 
-Create a folder for Renplay, and in it a `compose.yaml`:
+Create a folder for Renplay, and in it a `compose.yaml` (or download
+[deploy/compose.yaml](https://github.com/renplay-org/renplay/blob/main/deploy/compose.yaml)):
 
-```yaml
-services:
-  renplay:
-    image: ghcr.io/renplay-org/renplay:__RENPLAY_VERSION__
-    container_name: renplay
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./games:/games
-      - ./data:/data
+```yaml file=deploy/compose.yaml
 ```
 
 Then:
@@ -36,8 +27,8 @@ Open `http://<your server>:8080`.
   [releases](https://renplay.org/releases)) instead of `latest`, so an upgrade
   happens when you decide. See [Upgrading](/upgrading/).
 - The same image is on Docker Hub as `renplay/renplay`.
-- `ghcr.io/renplay-org/renplay:edge` is built from every change on the `dev` branch. It is for
-  trying things, not for a library you care about.
+- `ghcr.io/renplay-org/renplay:edge` is an unreleased build the Renplay Team makes now and then to
+  try a change. It is not for a library you care about.
 
 ## Plain Docker
 

@@ -8,6 +8,6 @@
 
 ## Checklist
 
-- [ ] I tested the change locally (`make dev`, or the server and `npm run dev` in `selector/`)
-- [ ] `make test` passes (server tests, UI type check)
+- [ ] I tried the change locally (`mise run dev`)
+- [ ] `mise run check` passes
 - [ ] I updated the README if the change affects setup or usage

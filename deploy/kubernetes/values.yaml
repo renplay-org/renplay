@@ -1,0 +1,31 @@
+# Values for the Renplay chart: its own disk for data, games on NFS, and an ingress with HTTPS.
+# https://docs.renplay.org/install/kubernetes/
+#
+#   helm install renplay oci://ghcr.io/renplay-org/charts/renplay --version 4.4.0 \
+#     --namespace renplay --create-namespace -f values.yaml
+#
+# Every value: https://github.com/renplay-org/renplay/tree/dev/charts/renplay
+persistence:
+  data:
+    size: 5Gi
+  games:
+    nfs:
+      server: nas.example.com
+      path: /exports/renplay/games
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: renplay.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: renplay-tls
+      hosts: [renplay.example.com]
+
+config:
+  extraEnv:
+    - name: RENPLAY_PUBLIC_URL
+      value: https://renplay.example.com

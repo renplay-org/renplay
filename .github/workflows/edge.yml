@@ -1,0 +1,21 @@
+name: Edge image
+
+# By hand, when a build of a branch should be tried on a server before it is released: pushes
+# ghcr.io/renplay-org/renplay:edge and :<commit>. Pin the digest it prints, never the tag.
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  image:
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/image.yml
+    with:
+      cache: true
+      tags: |
+        ghcr.io/renplay-org/renplay:edge
+        ghcr.io/renplay-org/renplay:${{ github.sha }}

@@ -10,8 +10,9 @@ versions or changelog do not match; `release.yml` does the tagging and publishin
 
 ## 1. Check that dev is ready
 
-- `dev` is green in CI and its latest `edge` image has been tried on a running instance (ideally
-  the reference deployment, pinned to the `edge@sha256:…` digest).
+- The last pull requests into `dev` were green in CI, and what changed has been tried on a running
+  instance (for the reference deployment: run the **Edge image** workflow on `dev` and pin the
+  `edge@sha256:…` digest it prints).
 - `CHANGELOG.md` has entries under `## [Unreleased]` for every user-visible change since the last
   release (`git log vLAST..origin/dev --oneline`). Write missing ones for users, not developers.
 
@@ -31,17 +32,15 @@ git checkout -b release-X.Y.Z origin/dev
 # main only holds squashed releases, whose content dev already has. Record it as merged without
 # taking anything from it, or the release PR conflicts:
 git merge -s ours origin/main -m "Merge main (PREVIOUS) into release-X.Y.Z"
-# server/package.json and selector/package.json: "version": "X.Y.Z"
-# charts/renplay/Chart.yaml: version and appVersion both X.Y.Z
-# Regenerate the chart values reference: helm-docs --chart-search-root charts/renplay
-# CHANGELOG.md: rename "## [Unreleased]" to "## [X.Y.Z] - YYYY-MM-DD" (today),
-#   add a fresh empty "## [Unreleased]" above it,
-#   and update the compare links at the bottom:
-#   [Unreleased]: …/compare/vX.Y.Z...dev
-#   [X.Y.Z]: …/compare/vPREVIOUS...vX.Y.Z
-# package-lock.json files: change only their two "version" fields (npm install would churn them)
+# The versions (server, selector, lockfiles, Chart.yaml, deploy/), the dated changelog section
+# and its compare links. It refuses when something is not where it expects it.
+mise run release X.Y.Z
+git diff                       # read the X.Y.Z section of CHANGELOG.md: it is the release notes
 git commit -am "chore: release X.Y.Z"
 ```
+
+CI's release-check runs `node scripts/release.mjs check X.Y.Z`, so a release PR with a version
+left behind fails.
 
 Push the branch and open a pull request into `main` titled `Release X.Y.Z`, with the changelog
 section as the body (`awk` it out of CHANGELOG.md as `release.yml` does). Release branches require
@@ -54,7 +53,7 @@ The maintainer squash-merges with the subject `Release X.Y.Z (#N)`. Agents do no
 ## 5. Check what was published
 
 ```sh
-gh run list --repo renplay-org/renplay --branch main --limit 1          # Release workflow passed
+gh run list --repo renplay-org/renplay --branch main --workflow release.yml --limit 1  # passed: image, chart, release, docs, demo
 gh release view vX.Y.Z --repo renplay-org/renplay                        # notes = changelog section
 docker buildx imagetools inspect ghcr.io/renplay-org/renplay:X.Y.Z       # image exists; note the digest
 helm show chart oci://ghcr.io/renplay-org/charts/renplay --version X.Y.Z # chart version matches

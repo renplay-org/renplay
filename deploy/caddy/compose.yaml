@@ -1,0 +1,36 @@
+# Renplay with HTTPS from Caddy: https://docs.renplay.org/install/reverse-proxy/
+#
+# Point your domain at this server, put it in the Caddyfile and below, then:
+#
+#   mkdir -p games data
+#   sudo chown 1000:1000 games data
+#   docker compose up -d
+#
+# Caddy gets the certificate by itself. Ports 80 and 443 must reach this server.
+services:
+  renplay:
+    image: ghcr.io/renplay-org/renplay:4.4.0
+    container_name: renplay
+    restart: unless-stopped
+    environment:
+      RENPLAY_PUBLIC_URL: https://renplay.example.com
+      # Caddy, then the nginx inside the image.
+      RENPLAY_TRUSTED_HOPS: "2"
+    volumes:
+      - ./games:/games
+      - ./data:/data
+
+  caddy:
+    image: caddy:2.11
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:

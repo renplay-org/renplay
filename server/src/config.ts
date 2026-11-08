@@ -133,6 +133,8 @@ export interface Config {
   catalogUrls: string[]
   /** RENPLAY_ADULT_GAMES: a level fixes the installation; empty leaves it to the stored setting (content.ts). */
   adultGames: '' | AdultLevel
+  /** A public demo: a shared guest, no uploads or account changes, a stop after 4 hours (RENPLAY_DEMO). */
+  demo: boolean
   /** Pin every build to this engine version instead of the latest 8.x. */
   defaultEngine: string
   /** Optional URL that routes back to this pod through the scale-to-zero proxy. */
@@ -223,6 +225,7 @@ export function loadConfig(): Config {
       .map((s) => s.trim())
       .filter(Boolean),
     adultGames: adultGames(),
+    demo: envBool('RENPLAY_DEMO', false),
     defaultEngine: env('RENPLAY_ENGINE', fallbackOf('RENPLAY_ENGINE')),
     keepaliveUrl: env('RENPLAY_KEEPALIVE_URL', fallbackOf('RENPLAY_KEEPALIVE_URL')),
     keepaliveHost: env('RENPLAY_KEEPALIVE_HOST', fallbackOf('RENPLAY_KEEPALIVE_HOST')),

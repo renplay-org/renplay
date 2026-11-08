@@ -22,35 +22,35 @@ You can also put Renplay behind a VPN or your proxy's authentication.
 - **Serve HTTPS.** Browsers only keep the game’s offline cache, and iPhone only treats Renplay as a
   home-screen app, over HTTPS or on `localhost`.
 
-## Examples
+## Caddy
 
-Caddy:
+Caddy gets a certificate for your domain by itself. This `compose.yaml` runs Renplay and Caddy
+together, with a `Caddyfile` next to it (both in
+[deploy/caddy](https://github.com/renplay-org/renplay/tree/main/deploy/caddy)). Put your domain in
+both, point the domain at the server, and open ports 80 and 443 to it.
 
+```yaml file=deploy/caddy/compose.yaml
 ```
-renplay.example.com {
-  reverse_proxy renplay:8080
-}
+
+```text file=deploy/caddy/Caddyfile
 ```
 
-nginx:
+## nginx
 
-```nginx
-location / {
-  proxy_pass http://renplay:8080;
-  proxy_set_header Host $host;
-  proxy_set_header X-Forwarded-Proto $scheme;
-  proxy_request_buffering off;
-  proxy_buffering off;
-  proxy_read_timeout 300s;
-  client_max_body_size 40m;
-}
+An nginx site in front of Renplay
+([deploy/nginx/renplay.conf](https://github.com/renplay-org/renplay/blob/main/deploy/nginx/renplay.conf)).
+Set `RENPLAY_PUBLIC_URL` to the `https://` address and `RENPLAY_TRUSTED_HOPS` to `2`.
+
+```nginx file=deploy/nginx/renplay.conf
 ```
+
+## Others
 
 Traefik, Cloudflare Tunnel and others work the same way: one service on port 8080.
 
 Optional proxy sign-in (basic auth, Authelia, Authentik or Cloudflare Access) is an extra boundary,
-not a Renplay identity provider. Keep Renplay sign-in on to separate people's saves. OIDC and LDAP
-are not included in this stage.
+not a Renplay identity provider. Keep Renplay sign-in on to separate people's saves. For single
+sign-on, Renplay's own sign-in uses OIDC or LDAP. See [Accounts and sign-in](/accounts/).
 
 ## Notes
 

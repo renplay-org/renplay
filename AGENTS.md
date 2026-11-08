@@ -4,7 +4,8 @@ Renplay is a self-hosted web app that plays the PC releases of Ren'Py visual nov
 on desktops and phones, with saves stored on the server. A user adds a game's normal PC download;
 Renplay builds it for the web (no Ren'Py SDK, the game's code never runs on the server), streams
 its assets, and syncs every save to the server so play continues on any device. HTML games (Twine
-and similar) play too, as second-class citizens; other engines are planned (`docs/site/src/content/docs/engines.md`).
+and similar) play too, as second-class citizens. Other engines are added only when their normal download plays as easily
+(`docs/site/src/content/docs/engines.md`).
 
 Read this file before changing anything. `README.md` is for users, `CONTRIBUTING.md` for human
 contributors, `docs/site/src/content/docs/developers/architecture.md` explains the internals in depth, `CHANGELOG.md` records every
@@ -32,7 +33,8 @@ These decide most review comments. Follow them without being asked.
 - **Ren'Py first.** Renplay is a Ren'Py player. Other engines are second-class and shown as Beta:
   recognized, and supported only when their normal download plays easily (HTML games today), with
   the features that come cheap. A feature may work only for Ren'Py; never make Ren'Py worse for
-  another engine. Plan and status: `docs/site/src/content/docs/engines.md`.
+  another engine. Unity and Godot web builds still install (the code stays) but are unsupported: never in the catalog,
+  the docs, the website or the app's messaging. Status: `docs/site/src/content/docs/engines.md`.
 - **Saves are sacred.** Never delete or rewrite save data as a side effect. Every overwrite and
   delete keeps history. Uninstall and reinstall leave saves alone.
 - **Works on phones.** Every screen must work at 390 px wide in portrait and in landscape, with
@@ -87,9 +89,16 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. N
   src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
   src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
 runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
-deploy/            nginx.conf.template and entrypoint.sh for the container
+image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it)
+charts/renplay/    The Helm chart
+deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
+                     these files (a code block marked file=deploy/<path>), CI checks them (tests/examples.sh)
+demo/              The public demo's image (demo.renplay.org, on Render)
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
+tests/             The image's install contract, the chart's tests, the deploy/ examples
+scripts/           Repo checks (writing rule, built library), release.mjs, package-chart.py
+mise.toml          Pinned tools and every task, locally and in CI
 ```
 
 ## How it fits together
@@ -159,32 +168,22 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
 
 ## Commands
 
+`mise.toml` pins the tools and holds every task. CI runs the same tasks.
+
 ```sh
-# Server
-cd server && npm ci
-npx tsc -p .            # type check and build to dist/
-npx vitest run          # tests (fixtures in src/__tests__)
-
-# UI
-cd selector && npm ci
-npx tsc -b --noEmit     # type check
-npm run build           # production build to selector/dist
-
-# Run locally (two terminals)
-cd server && DATA_DIR=/tmp/rp/data GAMES_DIR=/tmp/rp/games PORT=3999 \
-  RENPLAY_RUNTIME_PATH=$PWD/../runtime/renplay-runtime.js node dist/index.js
-cd selector && npm run dev                                   # http://localhost:5199
-cd selector && RENPLAY_BACKEND=https://renplay.example npm run dev   # UI against a deployed server
-
-# Container
-docker build -t renplay:dev . && docker run -p 8080:8080 -v $PWD/games:/games -v $PWD/data:/data renplay:dev
-
-# Screenshots (phone and desktop) of a running instance, read-only; --sfw for anything published
-cd server && npx playwright install chromium webkit && npm run screenshots -- http://localhost:5199 /tmp/shots --sfw
+mise install && mise run install    # tools and npm packages
+mise run dev                        # server on :3999 (data in /tmp/rp) and library on http://localhost:5199
+RENPLAY_BACKEND=https://renplay.example mise run dev:ui   # library against a deployed server
+mise run check                      # everything CI checks, or one part: check:server, check:ui,
+                                    # check:docs, check:chart, check:copy, check:workflows, check:examples
+mise run test                       # server tests only
+mise run image && mise run contract # the image as renplay:dev, its install contract, deploy/compose.yaml
+mise run screenshots http://localhost:5199 /tmp/shots --sfw   # phone and desktop, read-only
+mise run release 4.4.0              # a release branch's versions and changelog (release skill)
 ```
 
-`node --check runtime/renplay-runtime.js` checks the runtime's syntax. CI runs all of the above
-except screenshots.
+Inside `server/`: `npx tsc -p .` builds to `dist/`, `npx vitest run src/__tests__/x.test.ts` runs one
+test file. Screenshots need `npx playwright install chromium webkit` once.
 
 ## Definition of done
 
@@ -202,14 +201,21 @@ except screenshots.
   branch from `dev` (`feat-…`, `fix-…`), open a pull request against `dev`, squash-merge.
 - **Commits and PR titles:** Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`, `chore:`).
   The body says why, and what was tested.
-- **CI** (`.github/workflows/ci.yml`): type checks, tests, UI build, and a container image per
-  `dev` push, tagged `edge` and the commit sha.
+- **CI** (`.github/workflows/ci.yml`) runs on pull requests into `dev` and `main`, and the
+  rulesets require it: `check` (type checks, tests, the interface, docs, chart and workflow lint),
+  `Install contract (amd64, arm64)` (the image from a build cache, the contract, the chart on kind),
+  and `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
+- **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
+  release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
+  `sites.yml` (the docs, with each release or by hand), `demo.yml` (the demo, with each release or
+  by hand). Actions are pinned by commit SHA, Dependabot keeps them and the npm and Docker
+  dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
 - **Releases:** see the `release` skill. A `release-X.Y.Z` branch from `dev` bumps
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated
   `## [X.Y.Z] - YYYY-MM-DD` section, and is squash-merged into `main`. CI checks versions and the
-  changelog; `release.yml` then tags `vX.Y.Z`, publishes the GitHub release with that changelog
-  section, and pushes the image as `X.Y.Z` and `latest`. Afterwards `dev` fast-forwards to the
-  release branch. (`main` only gets squashed releases, so it never shares history with `dev`; the
+  changelog. `release.yml` then builds the image (`X.Y.Z` and `latest`, GHCR and Docker Hub),
+  publishes and signs the chart, tags `vX.Y.Z` with the changelog section as the GitHub release,
+  deploys the docs and rebuilds the demo. Afterwards `dev` fast-forwards to the release branch. (`main` only gets squashed releases, so it never shares history with `dev`; the
   release branch records it with `git merge -s ours`.)
 - **Cadence:** release when a coherent set of changes is done and verified on a running instance,
   at least every few weeks while there are changes; patch releases for fixes any time.
@@ -219,8 +225,9 @@ except screenshots.
 ## Deployment
 
 The reference deployment runs on Kubernetes (Flux) and pins a released image by tag and digest
-(`ghcr.io/renplay-org/renplay:X.Y.Z@sha256:…`); Renovate proposes new releases. To try a `dev`
-build there first, pin its `edge@sha256:…` digest temporarily, then pin the release. Data lives in
+(`ghcr.io/renplay-org/renplay:X.Y.Z@sha256:…`); Renovate proposes new releases. To try a build
+there first, run **Edge image** (`edge.yml`) on the branch, pin the `edge@sha256:…` digest it prints
+temporarily, then pin the release. Data lives in
 `/data` (a persistent volume, backed up); `/games` can be rebuilt from `/games/_archives`.
 
 Agents never push to `main`, merge releases, or change a deployment on their own; they prepare

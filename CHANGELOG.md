@@ -7,6 +7,28 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-11-08
+
+### Added
+
+- Ready-to-copy files for running Renplay in the repository's `deploy` folder: Docker Compose, Compose with Caddy for HTTPS, an nginx site, Helm chart values and bjw-s app-template values. The docs show the same files, and every release pins them to its version.
+- `RENPLAY_DEMO=on` runs Renplay as a public demo. The sign-in page offers **Try the demo**, a shared guest who can play, save, rate and keep games offline, but cannot upload, install, change the account or see Settings, and no other sign-in works. Its saves are limited, so nobody can fill the demo's disk. A banner says it is a demo. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.
+
+### Changed
+
+- The `edge` image is no longer built from every change. The Renplay Team builds one when a change needs trying on a server. Use a released version.
+
+### Fixed
+
+- **Refresh** on the Catalog page shows only to admins, who are the only ones it works for.
+- The library no longer shows **Added this week** above **All games** when the two hold the same games.
+
+### Security
+
+- An HTML game sends its messages to the player only on Renplay's own address, so another site that embeds the game cannot read them.
+- Sync codes use each of their 36 characters equally often.
+- The server's dependencies are updated with their security fixes: proxy-addr (under Express), multer, body-parser, qs and others.
+
 ## [4.3.1] - 2026-11-08
 
 The docs describe Renplay 4.0 to 4.3, with new screenshots, and **Import from a computer** is on
@@ -560,7 +582,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.3.1...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.4.0...dev
+[4.4.0]: https://github.com/renplay-org/renplay/compare/v4.3.1...v4.4.0
 [4.3.1]: https://github.com/renplay-org/renplay/compare/v4.3.0...v4.3.1
 [4.3.0]: https://github.com/renplay-org/renplay/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/renplay-org/renplay/compare/v4.1.0...v4.2.0

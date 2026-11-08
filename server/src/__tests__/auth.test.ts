@@ -299,6 +299,58 @@ describe('accounts authentication and security', () => {
     expect(benId).toBeGreaterThan(anna)
   })
 
+  it('runs as a demo: Try the demo signs in the shared guest, who plays but changes nothing of the server', async () => {
+    // Not a demo: no guest, no route.
+    const plain = await start()
+    expect((await request(plain.app).get('/api/auth/providers').expect(200)).body.demo).toBe(false)
+    await request(plain.app).post('/api/auth/demo').set(site).expect(404)
+    const cfg = config()
+    cfg.demo = true
+    cfg.auth = 'off'
+    const a = await start(cfg)
+    game(a)
+    const providers = (await request(a.app).get('/api/auth/providers').expect(200)).body
+    expect(providers).toMatchObject({ enabled: true, demo: true, setup: false })
+    const res = await request(a.app).post('/api/auth/demo').set(site).expect(200)
+    const guest = ([] as string[]).concat(res.headers['set-cookie']).map((c) => c.split(';')[0]!).find((c) => c.startsWith('renplay_session='))!
+    const me = (await request(a.app).get('/api/me').set('Cookie', guest).expect(200)).body
+    expect(me).toMatchObject({ demo: true, user: { username: 'demo', role: 'player' } })
+    expect((await request(a.app).get('/api/me/adult').set('Cookie', guest).expect(200)).body).toMatchObject({ choice: 'blurred', ceiling: { level: 'blurred' } })
+    // A visitor plays: lists games, rates, saves a small file.
+    await request(a.app).get('/api/games').set('Cookie', guest).expect(200)
+    await request(a.app).put('/api/games/safe/rating').set(site).set('Cookie', guest).send({ rating: 4 }).expect(200)
+    await request(a.app).put('/api/saves/safe/file?path=safe/1-1-LT1.save').set(site).set('Cookie', guest).set('Content-Type', 'application/octet-stream').send(Buffer.from('a save')).expect(200)
+    // A huge file is not a save, and it is refused before it is read whole.
+    await request(a.app).put('/api/saves/safe/file?path=safe/big.save').set(site).set('Cookie', guest).set('Content-Type', 'application/octet-stream').send(Buffer.alloc(9 << 20)).expect(413)
+    // Nothing that changes the shared account or adds files to the server.
+    for (const [method, path, body] of [
+      ['put', '/api/me', { name: 'Mine now' }],
+      ['post', '/api/me/password', { current: 'x', password: 'another password' }],
+      ['put', '/api/me/pin', { pin: '1234' }],
+      ['post', '/api/me/tokens', { name: 'keep' }],
+      ['delete', '/api/me/sessions', undefined],
+      ['get', '/api/me/sessions', undefined],
+      ['post', '/api/games/safe/art/upload?kind=grid', undefined],
+      ['post', '/api/saves/safe/sync', { tz: 'UTC' }],
+      // Saves come only from playing: no imports, copies or a new save folder for everyone.
+      ['post', '/api/saves/safe/import', undefined],
+      ['post', '/api/saves/safe/copy', { from: 'safe', to: 'other' }],
+      ['post', '/api/saves/safe/save-dir', { saveDir: 'x', screen: [19999, 19999] }],
+      // Choices every visitor would share.
+      ['put', '/api/me/tags', { include: [], exclude: ['romance'] }],
+      ['put', '/api/me/adult', { level: 'off' }],
+    ] as const) await (request(a.app) as any)[method](path).set(site).set('Cookie', guest).send(body).expect(403)
+    // No other way in: not even the admin's password works in a demo.
+    await request(a.app).post('/api/auth/login').set(site).send({ username: 'admin', password: 'correct password' }).expect(403)
+    await request(a.app).post('/api/auth/setup/verify').set(site).send({ code: 'X' }).expect(403)
+    // Admin pages stay closed, as for any player.
+    await request(a.app).get('/api/system').set('Cookie', guest).expect(403)
+    await request(a.app).post('/api/imports').set(site).set('Cookie', guest).send({}).expect(403)
+    // The guest is made once.
+    const again = await createApp(cfg, { startJobs: false }); apps.push(again)
+    expect(again.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE username = 'demo'").get()).toMatchObject({ n: 1 })
+  })
+
   it('maps all management route families to admins and keeps the last admin', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password'); game(a)
     const routes: [string, string][] = [['get', '/api/archives'], ['post', '/api/archives/inspect'], ['post', '/api/archives/hash'], ['delete', '/api/archives'], ['post', '/api/imports'], ['post', '/api/uploads'], ['get', '/api/uploads/u1'], ['put', '/api/uploads/u1'], ['post', '/api/uploads/u1/complete'], ['delete', '/api/uploads/u1'], ['get', '/api/games/safe/files'], ['put', '/api/games/safe/files/raw'], ['delete', '/api/games/safe/files/raw'], ['get', '/api/games/safe/files/raw'], ['post', '/api/games/safe/files/upload'], ['post', '/api/games/safe/files/revert'], ['post', '/api/games/safe/files/apply'], ['post', '/api/games/safe/files/reset'], ['delete', '/api/games/safe'], ['post', '/api/games/safe/reinstall'], ['post', '/api/games/safe/walkthroughs'], ['delete', '/api/games/safe/walkthroughs/safe.pdf'], ['put', '/api/games/safe/cache'], ['get', '/api/games/safe/recipe'], ['get', '/api/system'], ['post', '/api/system/prune'], ['post', '/api/system/engines/refresh'], ['get', '/api/jobs'], ['get', '/api/jobs/j1/log'], ['post', '/api/jobs/j1/cancel'], ['post', '/api/jobs/j1/retry'], ['delete', '/api/jobs'], ['post', '/api/catalog/refresh'], ['put', '/api/content'], ['get', '/api/users'], ['post', '/api/users'], ['put', `/api/users/${id}`], ['delete', `/api/users/${id}`], ['post', `/api/users/${id}/password`], ['post', `/api/users/${id}/merge`], ['post', `/api/users/${id}/saves/copy`], ['get', `/api/users/${id}/saves/export`], ['post', `/api/users/${id}/saves/import`], ['post', '/api/games/safe/safe'], ['get', '/api/system/backups'], ['post', '/api/system/backups'], ['get', '/api/system/backups/saves-2026-01-01-000000.zip'], ['put', '/api/system/sync'], ['get', '/api/metrics'], ['get', '/api/system/storage'], ['put', '/api/defaults']]

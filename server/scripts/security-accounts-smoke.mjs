@@ -82,7 +82,7 @@ try {
     a.db.insertGame({ id, title: id, recipe_id: 'safe', status: 'installed', build: 'b1', save_dir: id, family: 'html', entry })
     for (const file of ['assets.pack', 'assets.json']) await writeFile(join(dir, file), await readFile(join(realHtmlFixtures, id, file)))
   }
-  const template = await readFile('../deploy/nginx.conf.template', 'utf-8')
+  const template = await readFile('../image/nginx.conf.template', 'utf-8')
   const rendered = template.replaceAll('${GAMES_DIR}', '/fixture/games').replaceAll('${DATA_DIR}', '/fixture/data').replaceAll('${RENPLAY_DIR}', '/fixture/games/_renplay').replaceAll('127.0.0.1:3000', 'host.docker.internal:3994')
   await writeFile(join(root, 'nginx.conf'), rendered)
   execFileSync('docker', ['run', '--rm', '-d', '--name', container, '-p', '127.0.0.1:8094:8080', '-v', `${root}:/fixture`, '-v', `${root}/nginx.conf:/etc/nginx/nginx.conf:ro`, '-v', `${resolve('../selector/dist')}:/app/web:ro`, '-v', `${resolve('../runtime')}:/app/runtime:ro`, 'nginx:alpine', 'sh', '-c', 'mkdir -p /tmp/nginx/client_body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi /tmp/nginx/auth && chmod -R 777 /tmp/nginx && nginx -g "daemon off;"'])

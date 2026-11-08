@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=https://catalog.renplay.org/recipe.schema.json
+# The demo's own recipe (Your recipes): Ren'Py's sample game, built from the Ren'Py SDK without its
+# music, whose license is unclear. Its art is made from the game's own pictures (make-art.mjs).
+id: the-question
+title: The Question
+developer: The Ren'Py Team
+tags: [romance, school-setting, multiple-endings, 2dcg]
+content: []
+state: completed
+summary: Ren'Py's own sample game. After class, you ask your childhood friend Sylvie a question, and her answer leads somewhere new.
+nsfw: false
+free: true
+saveDir: the_question-7
+match: [the_question-*-pc.zip]
+art:
+  - kind: grid
+    file: art/the-question/grid.webp
+    source: developer
+  - kind: hero
+    file: art/the-question/hero.webp
+    source: developer
+    focal: [0.72, 0.45]
+  - kind: logo
+    file: art/the-question/logo.png
+    source: developer
+links:
+  website: https://www.renpy.org
+releases:
+  - version: "7.0"
+    status: verified
+    archives: []

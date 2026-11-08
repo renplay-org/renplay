@@ -12,24 +12,21 @@ Thanks for helping with Renplay. The long version is in the
 
 ## Development
 
-You need Node 24 and, for the container, Docker.
+You need [mise](https://mise.jdx.dev) and, for the image, Docker. mise installs the pinned tools
+(Node 24, Python, Helm and the linters) and runs the tasks in `mise.toml`, the same ones CI runs.
 
 ```sh
-# Server: type check, tests, build
-cd server && npm ci && npx tsc -p . && npx vitest run
-
-# Run it
-DATA_DIR=/tmp/rp/data GAMES_DIR=/tmp/rp/games PORT=3999 \
-  RENPLAY_RUNTIME_PATH=$PWD/../runtime/renplay-runtime.js node dist/index.js
-
-# UI with hot reload, proxying the API to :3999 (http://localhost:5199)
-cd selector && npm ci && npm run dev
-# …or against a deployed Renplay
-RENPLAY_BACKEND=https://renplay.example npm run dev
+mise install          # the tools
+mise run install      # the npm packages
+mise run dev          # the server on port 3999 and the library on http://localhost:5199
+mise run check        # everything CI checks
+mise tasks            # every task: test, docs, image, contract, screenshots, release
 ```
 
-Put a game's PC zip into `/tmp/rp/games/_archives/` and install it from the UI. `make test` runs
-the server tests and the UI type check; `make dev` runs the container with `./games` and `./data`.
+`RENPLAY_BACKEND=https://renplay.example mise run dev:ui` runs the library against a deployed
+Renplay. Without mise, each task is a plain npm or node command you can read in `mise.toml`.
+
+Put a game's PC zip into `/tmp/rp/games/_archives/` and install it from the library.
 
 [How Renplay works](https://docs.renplay.org/developers/architecture/) explains how the pieces fit together, and
 [AGENTS.md](AGENTS.md) lists the product rules and lessons learned (useful for humans too).
@@ -51,7 +48,8 @@ Pull requests are squash-merged.
 
 ## Releases and deployment
 
-`dev` is built into the `edge` image on every merge. Releases are cut from `dev` when a set of
+Pull requests run CI, and a pull request merges when it is green. An `edge` image of any branch can be
+built by hand (the **Edge image** workflow). Releases are cut from `dev` when a set of
 changes is done and tested on a running instance, at least every few weeks while there is
 something to release; fixes can ship as patch releases any time. Versions follow SemVer: minor for
 features, patch for fixes, major when upgrading needs action from you (the changelog says what).

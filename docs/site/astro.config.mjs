@@ -1,12 +1,13 @@
 import { defineConfig } from 'astro/config'
 import starlight from '@astrojs/starlight'
 import starlightLinksValidator from 'starlight-links-validator'
+import remarkInclude from './scripts/remark-include.mjs'
 import remarkVersion from './scripts/remark-version.mjs'
 import { unified } from '@astrojs/markdown-remark'
 
 export default defineConfig({
   site: 'https://docs.renplay.org',
-  markdown: { processor: unified({ remarkPlugins: [remarkVersion] }) },
+  markdown: { processor: unified({ remarkPlugins: [remarkInclude, remarkVersion] }) },
   integrations: [
     starlight({
       title: 'Renplay docs',
