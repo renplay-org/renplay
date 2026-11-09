@@ -9,7 +9,7 @@ import { exists } from '../util/fsx.js'
 import type { CatalogGame, CatalogResponse, DraftRecipe } from '../shared/api.js'
 
 /** The catalog's recipe schema, for editors that validate YAML (yaml-language-server). */
-export const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json'
+const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json'
 
 /** The catalog as this person may see it, its refresh, and a draft recipe for a library game. */
 export function createCatalogRouter(s: Services): Router {

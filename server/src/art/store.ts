@@ -27,18 +27,18 @@ import type { ArtCandidate } from '../shared/api.js'
 
 type Shaped = Exclude<ArtKind, 'logo'>
 /** The formats at 1x. A logo has no shape: any transparent picture. */
-export const SHAPES: Record<Shaped, readonly [number, number]> = { grid: [600, 900], wide: [920, 430], hero: [1920, 620], icon: [512, 512] }
+const SHAPES: Record<Shaped, readonly [number, number]> = { grid: [600, 900], wide: [920, 430], hero: [1920, 620], icon: [512, 512] }
 const LOGO_WIDTH = 640
 /** Raised when the making changes, so every picture is made again. */
 const ART_VERSION = 4
 const MAX_SOURCE_BYTES = 16 << 20
 /** A crop must keep this share of the picture, unless the recipe gives a focal point. */
-export const MIN_CROP = 0.6
+const MIN_CROP = 0.6
 /**
  * A crop may enlarge its piece of the picture at most this much: more is a blur, not art. A Steam
  * capsule (920 wide) behind a 1920 hero is 2.1 times, and fine under the stage's shade.
  */
-export const MAX_ENLARGE = 2.25
+const MAX_ENLARGE = 2.25
 /** The icon cut from a grid: this share of the grid's short side. */
 const ICON_SHARE = 0.62
 
@@ -153,7 +153,7 @@ function planKey(plan: Plan, focal: [number, number] | null): string {
 const hex = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')
 
 /** ThumbHash and tint of a picture, from a copy at most 100 pixels wide or high. */
-export async function hashOf(data: Buffer): Promise<{ thumbhash: string; tint: string }> {
+async function hashOf(data: Buffer): Promise<{ thumbhash: string; tint: string }> {
   const { data: rgba, info } = await sharp(data, { failOn: 'none', limitInputPixels: MAX_IMAGE_PIXELS })
     .resize(100, 100, { fit: 'inside' })
     .ensureAlpha()
@@ -203,7 +203,7 @@ export function tintOf(rgba: Uint8Array | Buffer): string {
 }
 
 /** Whether a transparent picture is dark lettering: the visible pixels average under a third of full brightness. */
-export async function isDarkLettering(data: Buffer): Promise<boolean> {
+async function isDarkLettering(data: Buffer): Promise<boolean> {
   const { data: rgba } = await sharp(data, { failOn: 'none' }).resize(200, 200, { fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   let sum = 0
   let weight = 0
@@ -322,7 +322,7 @@ async function makeAt(plan: Plan, data: Buffer, meta: { width: number; height: n
  * A 2x picture only when the source has the detail for it (at least 1.5 source pixels per 1x
  * pixel). Otherwise the 2x address is the 1x picture: enlarging adds nothing the browser cannot.
  */
-export function needs2x(plan: Plan, meta: { width: number; height: number }, focal: [number, number] = [0.5, 0.5]): boolean {
+function needs2x(plan: Plan, meta: { width: number; height: number }, focal: [number, number] = [0.5, 0.5]): boolean {
   const detail = (): number => {
     if (plan.kind === 'logo') return meta.width / LOGO_WIDTH
     const [W, H] = SHAPES[plan.kind]

@@ -1,9 +1,9 @@
 import yauzl from 'yauzl'
 import { HttpError, cleanRelPath } from '../util/paths.js'
 
-export const ZIP_MAX_ENTRIES = 2048
-export const ZIP_MAX_ENTRY_BYTES = 64 << 20
-export const ZIP_MAX_TOTAL_BYTES = 128 << 20
+const ZIP_MAX_ENTRIES = 2048
+const ZIP_MAX_ENTRY_BYTES = 64 << 20
+const ZIP_MAX_TOTAL_BYTES = 128 << 20
 
 export interface SaveMeta {
   /** Name given by the player (extra_info). */

@@ -126,6 +126,31 @@ scripts/           Repo checks (writing rule, built library, website links), rel
 mise.toml          Pinned tools and every task, locally and in CI
 ```
 
+## Structure rules
+
+The code was untangled so that a change lands in one place. `scripts/check-structure.mjs`
+(`mise run check:structure`) enforces the parts a script can see, and CI runs it. Keep to all of them.
+
+- **One part, one folder.** Each part of the server (accounts, saves, art, catalog and the rest in
+  Layout) holds its storage, its logic and its routes. A new feature goes into the part it belongs
+  to, not into a folder for its layer.
+- **One wiring.** `services.ts` makes every part once. Only `app.ts` and routers (a
+  `create…Router`) get the `Services`. Lower modules take the few parts they use as parameters.
+- **One contract.** What the server and the library share is in `server/src/shared/`, which imports
+  nothing outside itself. The library imports it as `@shared`, and reaches the server only that way.
+  Every API answer has its type in `shared/api.ts`, and the server builds it with `satisfies`.
+- **Layers point down.** `util/` imports only `util/` and `shared/`. `pipeline/` and `util/` never
+  import routes, `services.ts` or `app.ts`. In the library, `lantern/` (the one UI kit) and `lib/`
+  never import `components/` or `pages/`. No import cycles anywhere.
+- **No dead code.** Unused locals fail the type check. A function or constant is exported only when
+  another file uses it.
+- **Small files.** At most 600 lines. A few older files are larger, listed in
+  `scripts/check-structure.mjs` at their size: they may only shrink.
+- **Tests test behaviour.** Tests are type-checked (`server/tsconfig.test.json`). Drive the code the
+  way it is used (requests, messages, the built runtime), never by cutting its source text apart.
+- **Write things once.** A device check goes in `selector/src/lib/platform.ts`, a size for people is
+  `bytes` in `shared/format.ts`, a control comes from `lantern/`. Look for the existing one first.
+
 ## How it fits together
 
 ```
@@ -216,7 +241,8 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
 
 ## Definition of done
 
-1. Server type check and tests pass; new behavior has a test (`server/src/__tests__`).
+1. `mise run check` passes: type checks (the tests' too), tests, the structure rules and the writing
+   rule. New behavior has a test (`server/src/__tests__`).
 2. The UI type-checks and builds.
 3. UI changes are looked at on a phone size (WebKit, iPhone) and a desktop size, using
    `npm run screenshots` or Playwright directly. No page errors.
@@ -230,6 +256,9 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
   branch from `dev` (`feat-…`, `fix-…`), open a pull request against `dev`, squash-merge.
 - **Commits and PR titles:** Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`, `chore:`).
   The body says why, and what was tested.
+- **The pre-push hook** (`.githooks/pre-push`, set up by `mise run install`) runs
+  `mise run check:fast` before a push: types, structure, the runtimes and the writing rule, in a few
+  seconds. Fix what it reports rather than pushing with `--no-verify`. CI runs it all again.
 - **CI** (`.github/workflows/ci.yml`) runs on pull requests into `dev` and `main`, and the
   rulesets require it: `check` (type checks, tests, the interface, docs, chart, workflow and
   deploy/ examples lint), `Install contract` (on amd64 and arm64: the image from a build cache, users

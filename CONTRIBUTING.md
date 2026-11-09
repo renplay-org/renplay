@@ -17,7 +17,7 @@ You need [mise](https://mise.jdx.dev) and, for the image, Docker. mise installs 
 
 ```sh
 mise install          # the tools
-mise run install      # the npm packages
+mise run install      # the npm packages, and a pre-push hook with the quick checks
 mise run dev          # the server on port 3999 and the library on http://localhost:5199
 mise run check        # everything CI checks
 mise tasks            # every task: test, docs, image, contract, screenshots, release
@@ -35,8 +35,8 @@ Put a game's PC zip into `/tmp/rp/games/_archives/` and install it from the libr
 
 1. Branch from `dev` and open the pull request against `dev`.
 2. Keep it focused; the title follows Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`).
-3. `npx tsc -p . && npx tsc -p tsconfig.test.json && npx vitest run` in `server`, `npx tsc -b --noEmit && npm run build` in
-   `selector`. Add a test for new server behavior.
+3. `mise run check` passes: type checks, tests, the structure rules in AGENTS.md and the writing
+   rule. Add a test for new server behavior.
 4. For UI changes, look at them on a phone size and a desktop size
    (`cd server && npm run screenshots -- http://localhost:5199 /tmp/shots`).
 5. Add a line to `CHANGELOG.md` under `Unreleased` for anything users notice.

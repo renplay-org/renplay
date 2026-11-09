@@ -19,7 +19,7 @@ export const SYNC_SETTING = 'renpy_sync'
 
 const DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const SIZE_LIMIT = 10 << 20
-export const SYNC_LIFETIME = 3600_000
+const SYNC_LIFETIME = 3600_000
 
 function sha256Rounds(data: Buffer, rounds: number): Buffer {
   let hashed = data
