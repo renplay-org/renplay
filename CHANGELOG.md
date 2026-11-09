@@ -16,6 +16,8 @@ release notes say what).
 - When Renplay starts and a game's files are missing, as when a network share is mounted late, the game shows as not installed and comes back by itself on a later start once the files are there. Before, it stayed not installed until it was installed again, and a share that could not be read at all made every game look missing.
 - What an admin's import of a person's saves replaced is kept in History for at least 30 days, like what any other import replaces.
 - A Ren'Py download installed over an HTML game of the same name now plays as a Ren'Py game.
+- A mod uploaded as a zip may hold files of up to 256 MB and up to 10,000 files. It was held to the limits of a zip of saves (64 MB a file, 128 MB in all), whatever the upload allowed.
+- The nginx and Kubernetes examples allow the 600 MB bodies Renplay takes. Behind them, uploads of mods, walkthroughs and zips of saves over 40 MB failed, and behind the Kubernetes example any upload over 1 MB did.
 - On a phone, tapping a text field no longer zooms the page in, and Renplay does not zoom with a double tap or a pinch.
 - A game's sheet in the catalog has a close button. On a phone it covered the page with no way to close it but the strip above it.
 - A game without a developer no longer shows a dot before its version on its page.

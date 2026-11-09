@@ -11,7 +11,8 @@ import { loadConfig, type Config } from '../config.js'
 import { groupCeiling, parseAdultGroups } from '../content/levels.js'
 import { adultFlag } from '../pipeline/import.js'
 import { Db } from '../db.js'
-import { readZipEntries } from '../saves/savefile.js'
+import { SAVES_ZIP } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
 import { groupCns } from '../accounts/sign-in.js'
 import { mockOidc, signInFixture, site } from './sign-in-fixture.js'
 
@@ -236,7 +237,7 @@ describe('the levels on every route', () => {
       res.on('data', (c: Buffer) => chunks.push(c))
       res.on('end', () => cb(null, Buffer.concat(chunks)))
     }).expect(200)
-    return [...(await readZipEntries(response.body, () => true, 128 << 20)).keys()]
+    return [...(await readZipEntries(response.body, () => true, SAVES_ZIP)).keys()]
   }
 
   const setLevel = async (level: string) => {
@@ -593,7 +594,7 @@ describe('the levels on every route', () => {
       res.on('data', (c: Buffer) => chunks.push(c))
       res.on('end', () => cb(null, Buffer.concat(chunks)))
     }).expect(200)).body
-    const names = [...(await readZipEntries(zip, () => true, 128 << 20)).keys()]
+    const names = [...(await readZipEntries(zip, () => true, SAVES_ZIP)).keys()]
     expect(names.some((n) => n.startsWith('adult'))).toBe(false)
     const other = (await request(app.app).post('/api/users').send({ username: 'reader', name: 'Reader', password: 'reader-password-1' })).body.user
     await request(app.app).post('/api/users/1/saves/copy').send({ target: other.id, game: 'adult' }).expect(404)

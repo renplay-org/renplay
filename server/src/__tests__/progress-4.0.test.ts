@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp, type App } from '../app.js'
 import sharp from 'sharp'
 import yazl from 'yazl'
-import { readZipEntries } from '../saves/savefile.js'
+import { SAVES_ZIP } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
 
 /** A minimal Ren'Py save holding a text, and the text back from one. */
 const renpySave = (text: string) =>
@@ -20,7 +21,7 @@ const renpySave = (text: string) =>
     z.outputStream.on('data', (c: Buffer) => chunks.push(c))
     z.outputStream.on('end', () => resolve(Buffer.concat(chunks)))
   })
-const saveText = async (data: Buffer) => JSON.parse((await readZipEntries(data, (n) => n === 'json')).get('json')!.toString())._save_name as string
+const saveText = async (data: Buffer) => JSON.parse((await readZipEntries(data, (n) => n === 'json', SAVES_ZIP)).get('json')!.toString())._save_name as string
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
 
