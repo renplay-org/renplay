@@ -56,9 +56,17 @@ export function Pill({
   )
 }
 
-export function IconBtn({ label, className, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+export function IconBtn({ label, className, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; href?: string; target?: string; rel?: string }) {
+  const cls = `ib ${className ?? ''}`.trim()
+  if (href) {
+    return (
+      <a href={href} aria-label={label} title={label} className={cls} {...(rest as Record<string, unknown>)}>
+        {children}
+      </a>
+    )
+  }
   return (
-    <button type="button" aria-label={label} title={label} className={`ib ${className ?? ''}`.trim()} {...rest}>
+    <button type="button" aria-label={label} title={label} className={cls} {...rest}>
       {children}
     </button>
   )

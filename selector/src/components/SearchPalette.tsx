@@ -11,6 +11,7 @@ import { Frame } from '../lantern/art'
 import { cx } from '../lantern/ui'
 import { isApple } from '../lib/platform'
 import Sheet from '../lantern/Sheet'
+import { IconBtn, Pill } from '../lantern/controls'
 
 export default function SearchPalette() {
   const [open, setOpen] = useState(false)
@@ -31,9 +32,9 @@ export default function SearchPalette() {
         <span className="lbl">Search</span>
         <kbd>{isApple() ? '⌘K' : 'Ctrl K'}</kbd>
       </button>
-      <button aria-label="Search" onClick={() => setOpen(true)} className="ib hide-desk">
+      <IconBtn label="Search" onClick={() => setOpen(true)} className="hide-desk">
         <Search />
-      </button>
+      </IconBtn>
       {open && <SearchDialog onClose={() => setOpen(false)} />}
     </>
   )
@@ -86,9 +87,9 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
       <div className="stack">
         {recipe ? (
           <>
-            <button className="btn q sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setRecipe(null); requestAnimationFrame(() => input.current?.focus()) }}>
+            <Pill variant="q" size="sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setRecipe(null); requestAnimationFrame(() => input.current?.focus()) }}>
               Back to search results
-            </button>
+            </Pill>
             <RecipeCard recipe={recipe} />
           </>
         ) : (

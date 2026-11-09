@@ -7,7 +7,7 @@ import ActionBar from '../components/ActionBar'
 import SceneCard from '../components/SceneCard'
 import UpdateCard from '../components/UpdateCard'
 import OfflineCard from '../components/OfflineCard'
-import { Seg, Pill, Stars, Bar } from '../lantern/controls'
+import { Seg, Pill, Stars, Bar, IconBtn } from '../lantern/controls'
 import Stage, { travelToDoor } from '../lantern/Stage'
 import { useRoom } from '../lantern/Room'
 import { creditText } from '../lantern/art'
@@ -443,7 +443,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
                     Open
                   </Pill>
                   {admin && (
-                    <Menu trigger={(open) => <button className="ib" aria-label={`More for ${w.title}`} onClick={open}><MoreHorizontal /></button>}>
+                    <Menu trigger={(open) => <IconBtn label={`More for ${w.title}`} onClick={open}><MoreHorizontal /></IconBtn>}>
                       {(close) => (
                         <>
                           <MenuItem onClick={() => { close(); setRename({ file: w.file, title: w.title }) }}>Rename</MenuItem>
