@@ -5,6 +5,9 @@
  *   node scripts/release.mjs 4.4.0          versions, chart, deploy/ files, changelog
  *   node scripts/release.mjs check 4.4.0    everything above says 4.4.0
  *
+ * The chart's Artifact Hub annotations follow the release too: its changes are the version's
+ * changelog section, and its category must be one Artifact Hub knows, or it skips the version.
+ *
  * The version it replaces is the one in server/package.json.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -27,6 +30,34 @@ const PLACES = [
   ['deploy/kubernetes/app-template.yaml', (v) => `repository: ghcr.io/renplay-org/renplay\n          tag: ${v}\n`],
 ]
 const PACKAGES = ['server', 'selector']
+const CHART = 'charts/renplay/Chart.yaml'
+
+/** Artifact Hub's categories (artifacthub.io/docs/topics/annotations/helm). */
+const CATEGORIES = ['ai-machine-learning', 'analytics', 'data-processing', 'database', 'integration-delivery', 'monitoring-logging', 'networking', 'security', 'storage', 'streaming-messaging', 'web-applications', 'skip-prediction']
+/** The changelog's headings, as Artifact Hub's kinds of change. */
+const KINDS = { Added: 'added', Changed: 'changed', Deprecated: 'deprecated', Removed: 'removed', Fixed: 'fixed', Security: 'security' }
+
+/** The artifacthub.io/changes annotation for a version: its changelog section, one entry a line. */
+function changes(changelog, version) {
+  const start = changelog.indexOf(`\n## [${version}] - `)
+  if (start < 0) return null
+  const end = changelog.indexOf('\n## [', start + 1)
+  const out = []
+  let kind = null
+  for (const line of changelog.slice(start, end < 0 ? undefined : end).split('\n')) {
+    const heading = line.match(/^### (\w+)$/)
+    if (heading) kind = KINDS[heading[1]] ?? null
+    else if (kind && line.startsWith('- ')) out.push(`    - kind: ${kind}\n      description: ${JSON.stringify(line.slice(2).trim())}\n`)
+  }
+  return `  artifacthub.io/changes: |\n${out.join('')}`
+}
+
+/** The chart with its changes annotation set to `block`, in place of the one it has. */
+function withChanges(chart, block) {
+  const old = chart.match(/^  artifacthub\.io\/changes: \|\n(?: {4}.*\n)*/m)
+  if (old) return chart.replace(old[0], block)
+  return chart.replace('  artifacthub.io/images: |\n', `${block}  artifacthub.io/images: |\n`)
+}
 
 function check(version) {
   const problems = []
@@ -42,6 +73,11 @@ function check(version) {
   if (!new RegExp(`^## \\[${esc(version)}\\] - \\d{4}-\\d{2}-\\d{2}$`, 'm').test(changelog)) problems.push(`CHANGELOG.md needs a "## [${version}] - YYYY-MM-DD" section`)
   if (!changelog.includes(`\n[Unreleased]: ${REPO}/compare/v${version}...dev\n`)) problems.push(`CHANGELOG.md's [Unreleased] link must compare v${version}...dev`)
   if (!new RegExp(`^\\[${esc(version)}\\]: ${esc(REPO)}/compare/v\\d+\\.\\d+\\.\\d+\\.\\.\\.v${esc(version)}$`, 'm').test(changelog)) problems.push(`CHANGELOG.md needs a [${version}] compare link`)
+  const chart = read(CHART)
+  const category = chart.match(/^  artifacthub\.io\/category: (.+)$/m)?.[1]
+  if (category && !CATEGORIES.includes(category)) problems.push(`${CHART}: artifacthub.io/category ${category} is not one of Artifact Hub's: ${CATEGORIES.join(', ')}`)
+  const block = changes(changelog, version)
+  if (block && !chart.includes(block)) problems.push(`${CHART}: artifacthub.io/changes is not the ${version} section of CHANGELOG.md`)
   return problems
 }
 
@@ -69,6 +105,7 @@ function prepare(version) {
     .replace('\n## [Unreleased]\n', `\n## [Unreleased]\n\n## [${version}] - ${today}\n`)
     .replace(`\n[Unreleased]: ${REPO}/compare/v${old}...dev\n`, `\n[Unreleased]: ${REPO}/compare/v${version}...dev\n[${version}]: ${REPO}/compare/v${old}...v${version}\n`)
   write('CHANGELOG.md', changelog)
+  write(CHART, withChanges(read(CHART), changes(changelog, version)))
   const problems = check(version)
   if (problems.length) throw new Error(problems.join('\n'))
   console.log(`Ready for ${version} (from ${old}). Read the ${version} section of CHANGELOG.md, then commit "chore: release ${version}".`)

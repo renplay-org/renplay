@@ -7,6 +7,12 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.6.2] - 2026-11-09
+
+### Added
+
+- The Helm chart is listed on Artifact Hub.
+
 ## [4.6.1] - 2026-11-09
 
 ### Changed
@@ -648,7 +654,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.6.1...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.6.2...dev
+[4.6.2]: https://github.com/renplay-org/renplay/compare/v4.6.1...v4.6.2
 [4.6.1]: https://github.com/renplay-org/renplay/compare/v4.6.0...v4.6.1
 [4.6.0]: https://github.com/renplay-org/renplay/compare/v4.5.1...v4.6.0
 [4.5.1]: https://github.com/renplay-org/renplay/compare/v4.5.0...v4.5.1

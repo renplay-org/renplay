@@ -1,5 +1,6 @@
 ---
-# Artifact Hub assigns repositoryID after registration. Add that ID here then.
+# The ID Artifact Hub gave the repository: it marks the chart's publisher as verified.
+repositoryID: e32a8775-8da0-4ab9-9469-1b86b853c0fb
 owners:
   - name: Renplay Team
     email: team@renplay.org
