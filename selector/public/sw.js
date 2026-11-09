@@ -199,7 +199,15 @@ async function fromKept(req, url, id) {
   }
   if (id && /^\/g\/[^/]+\/[^/]+\/(index\.html)?$/.test(url.pathname)) {
     const hit = await find()
-    const save = (res) => (res.redirected ? Promise.resolve() : caches.open(KEPT + id).then((c) => c.put(key, res)).then(() => refreshKept(id, url)))
+    // The kept copy's text, read here, because the offline path reads the copy itself.
+    const before = hit ? hit.clone().text() : Promise.resolve(null)
+    const save = async (res) => {
+      if (res.redirected) return
+      const text = await res.clone().text()
+      await caches.open(KEPT + id).then((c) => c.put(key, res))
+      // The copy is the same page: its files are kept already, and the game's whole file list is not walked again.
+      if (text !== (await before)) await refreshKept(id, url)
+    }
     try {
       return await network(req, save, !!hit)
     } catch (e) {

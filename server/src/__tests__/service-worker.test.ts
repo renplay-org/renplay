@@ -4,9 +4,13 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
+import { keptAnswers, keyOf } from '../../../selector/src/lib/offline.js'
 
 const source = readFileSync(new URL('../../../selector/public/sw.js', import.meta.url), 'utf-8')
 const origin = 'http://renplay.test'
+
+// The library's keyOf() reads the browser's address, so the tests give it one.
+;(globalThis as unknown as { location: { origin: string } }).location = { origin }
 
 type Answer = (url: string) => Response | undefined
 
@@ -97,5 +101,40 @@ describe('service worker', () => {
     expect(await (await sw.get('/api/me/adult')).json()).toEqual({ effective: 'shown' })
     sw.serve(null)
     expect(await (await sw.get('/api/me/adult')).json()).toEqual({ effective: 'shown' })
+  })
+
+  it('does not walk a kept game’s files again when its page did not change', async () => {
+    const sw = worker()
+    const page = '<script>window.__renplay={"userId":1}</script><script src="/renplay/runtime.js?v=1"></script>'
+    await sw.keep('renplay-offline-g1', '/g/g1/b1/', page)
+    sw.serve((path) => (path === '/g/g1/b1/' ? new Response(page) : undefined))
+    expect(await (await sw.get('/g/g1/b1/', 'navigate')).text()).toBe(page)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(sw.asked.filter((a) => a.includes('/offline'))).toEqual([])
+  })
+
+  it('answers the kept answers online and offline with the same body', async () => {
+    const sw = worker()
+    const answers = keptAnswers('g1')
+    sw.serve((path) => new Response(`the body of ${path}`))
+    const online = new Map<string, string>()
+    for (const a of answers) online.set(a, await (await sw.get(a)).text())
+    sw.serve(null)
+    for (const a of answers) expect(await (await sw.get(a)).text()).toBe(online.get(a))
+  })
+
+  it('keeps the files a new page names under the key the library reads', async () => {
+    const sw = worker()
+    await sw.keep('renplay-offline-g1', '/g/g1/b1/', '<script>window.__renplay={"userId":1}</script><script src="/renplay/runtime.js?v=old"></script>')
+    const files = ['/g/g1/b1/game/a%20b.png', '/g/g1/b1.mabc/game/x.png', '/g/g1/b1/?adult=blurred', '/renplay/runtime.js?v=1']
+    const page = '<script>window.__renplay={"userId":1}</script><script src="/renplay/runtime.js?v=1"></script>'
+    sw.serve((path) => ({
+      '/api/games/g1/offline?adult=blurred': Response.json({ files: files.map((url) => ({ url })) }),
+      ...Object.fromEntries(files.map((url) => [url, new Response(`the file of ${url}`)])),
+      '/g/g1/b1/?adult=blurred': new Response(page),
+    } as Record<string, Response>)[path])
+    expect(await (await sw.get('/g/g1/b1/?adult=blurred', 'navigate')).text()).toBe(page)
+    await vi.waitFor(() => expect(sw.kept('renplay-offline-g1', keyOf('/renplay/runtime.js?v=1'))).toBe(true))
+    for (const url of files) expect(sw.kept('renplay-offline-g1', keyOf(url))).toBe(true)
   })
 })

@@ -624,20 +624,20 @@ describe('review fixes outside the routes', () => {
     process.env['DATA_DIR'] = join(root, 'data')
     process.env['GAMES_DIR'] = join(root, 'games')
     const cfg = loadConfig()
+    cfg.catalogUrls = ['http://127.0.0.1:9/offline']
     const db = Db.open(cfg.dataDir)
     const content = new ContentMode(cfg, db)
     const catalog = new Catalog(cfg, db, content, new ArtStore(cfg, db, content))
-    // A catalog with one adult recipe and one safe recipe.
-    db.setSetting('catalog_cache', { at: Date.now(), vocabulary: {}, games: [
-      { id: 'adult', title: 'Adult', nsfw: true, engine: 'renpy', releases: [] },
-      { id: 'safe', title: 'Safe', engine: 'renpy', releases: [] },
-    ] })
+    // A catalog with one adult recipe and one safe recipe, in Your recipes.
+    mkdirSync(cfg.recipesDir, { recursive: true })
+    writeFileSync(join(cfg.recipesDir, 'adult.yaml'), 'id: adult\ntitle: Adult\nnsfw: true\nreleases: []\n')
+    writeFileSync(join(cfg.recipesDir, 'safe.yaml'), 'id: safe\ntitle: Safe\nnsfw: false\nreleases: []\n')
     db.insertGame({ id: 'from-adult', title: 'From adult', recipe_id: 'adult', adult: 0 })
     db.insertGame({ id: 'from-safe', title: 'From safe', recipe_id: 'safe', adult: 1 })
     db.insertGame({ id: 'no-recipe', title: 'No recipe', adult: 1 })
     db.insertGame({ id: 'no-recipe-safe', title: 'No recipe safe', adult: 0 })
     try {
-      await catalog.init()
+      await catalog.refresh()
       catalog.syncAdult()
       expect(db.getGame('from-adult')!.adult).toBe(1)
       expect(db.getGame('from-safe')!.adult).toBe(0)

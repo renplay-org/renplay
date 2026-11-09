@@ -46,7 +46,7 @@ export function newBuildId(): string {
 }
 
 export function baseOf(build: string): string {
-  return build.split('.m')[0]!
+  return BUILD_RE.exec(build)?.[1] ?? build
 }
 
 /** The folder name of a base build with the mods of this hash applied. */
