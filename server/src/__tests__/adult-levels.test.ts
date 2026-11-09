@@ -7,7 +7,9 @@ import sharp from 'sharp'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import yazl from 'yazl'
 import { createApp, type App } from '../app.js'
+import { ArtStore } from '../art/store.js'
 import { loadConfig, type Config } from '../config.js'
+import { ContentMode } from '../content/mode.js'
 import { groupCeiling, parseAdultGroups } from '../content/levels.js'
 import { Catalog } from '../catalog/catalog.js'
 import { Db } from '../db.js'
@@ -617,15 +619,36 @@ describe('the levels on every route', () => {
 })
 
 describe('review fixes outside the routes', () => {
-  it('marks an install adult from its recipe at once, and keeps a recipe-less game\'s mark', () => {
-    const catalog = new Catalog({} as never, {} as never, {} as never, {} as never)
-    const recipes = (catalog as unknown as { recipes: Map<string, unknown> }).recipes
-    recipes.set('adult', { id: 'adult', nsfw: true })
-    recipes.set('safe', { id: 'safe' })
-    expect(catalog.adultFlag('adult', 0)).toBe(1)
-    expect(catalog.adultFlag('safe', 1)).toBe(0)
-    expect(catalog.adultFlag('', 1)).toBe(1)
-    expect(catalog.adultFlag('', 0)).toBe(0)
+  it('marks an install adult from its recipe at once, and keeps a recipe-less game\'s mark', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'renplay-levels-adult-'))
+    process.env['DATA_DIR'] = join(root, 'data')
+    process.env['GAMES_DIR'] = join(root, 'games')
+    const cfg = loadConfig()
+    const db = Db.open(cfg.dataDir)
+    const content = new ContentMode(cfg, db)
+    const catalog = new Catalog(cfg, db, content, new ArtStore(cfg, db, content))
+    // A catalog with one adult recipe and one safe recipe.
+    db.setSetting('catalog_cache', { at: Date.now(), vocabulary: {}, games: [
+      { id: 'adult', title: 'Adult', nsfw: true, engine: 'renpy', releases: [] },
+      { id: 'safe', title: 'Safe', engine: 'renpy', releases: [] },
+    ] })
+    db.insertGame({ id: 'from-adult', title: 'From adult', recipe_id: 'adult', adult: 0 })
+    db.insertGame({ id: 'from-safe', title: 'From safe', recipe_id: 'safe', adult: 1 })
+    db.insertGame({ id: 'no-recipe', title: 'No recipe', adult: 1 })
+    db.insertGame({ id: 'no-recipe-safe', title: 'No recipe safe', adult: 0 })
+    try {
+      await catalog.init()
+      catalog.syncAdult()
+      expect(db.getGame('from-adult')!.adult).toBe(1)
+      expect(db.getGame('from-safe')!.adult).toBe(0)
+      expect(db.getGame('no-recipe')!.adult).toBe(1)
+      expect(db.getGame('no-recipe-safe')!.adult).toBe(0)
+    } finally {
+      catalog.stop()
+      db.close()
+      rmSync(root, { recursive: true, force: true })
+      for (const k of ['DATA_DIR', 'GAMES_DIR']) delete process.env[k]
+    }
   })
 
   it('reads a group mapping without one valid entry as everyone at Off, never as no mapping', () => {
