@@ -19,7 +19,10 @@ afterEach(() => {
 const FILES = Object.fromEntries(['renpy-pre.js', 'renpy.js', 'renpy.wasm.gz', 'renpy.data.gz', 'renpy.zip', 'index.html', 'web-presplash.jpg'].map((n) => [n, { size: 1, sha256: '0', url: `http://engines.test/${n}` }]))
 const entry = (version: string, extra: object = {}) => ({ version, renpy: version, python: 3, files: FILES, ...extra })
 
-/** An engine store whose index lists these engines, and whose folder holds these installed packs. */
+/**
+ * An engine store whose index lists these engines, as the engines site publishes them (pre-releases
+ * apart, under "prereleases"), and whose folder holds these installed packs.
+ */
 function store(index: object[], defaultEngine = '', installed: string[] = []): EngineStore {
   const root = mkdtempSync(join(tmpdir(), 'renplay-engines-')); roots.push(root)
   const enginesDir = join(root, 'engines')
@@ -28,7 +31,9 @@ function store(index: object[], defaultEngine = '', installed: string[] = []): E
     writeFileSync(join(enginesDir, v, '.ready'), '{}')
   }
   const db = new Db(join(root, 'library.db')); dbs.push(db)
-  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ schema: 1, engines: index })))
+  const early = (e: object) => (e as { prerelease?: boolean }).prerelease === true
+  const published = { schema: 1, engines: index.filter((e) => !early(e)), prereleases: index.filter(early).map(({ prerelease: _, ...e }: { prerelease?: boolean }) => e) }
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(published)))
   return new EngineStore({ enginesDir, enginesUrl: 'http://engines.test/index.json', defaultEngine } as Config, db, new Purger(join(root, 'purge')))
 }
 
