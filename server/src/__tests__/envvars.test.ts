@@ -6,15 +6,25 @@ import { loadConfig } from '../config.js'
 import { pagePath, render } from '../../../docs/site/scripts/gen-config.mjs'
 
 describe('environment variables', () => {
-  it('lists every variable config.ts and the container user switch read, once', () => {
-    const source = readFileSync(new URL('../config.ts', import.meta.url), 'utf8')
-    const read = [...source.matchAll(/\b(?:text|int|bool|secret)\('([A-Z_]+)'/g), ...source.matchAll(/process\.env\['([A-Z_]+)'\]/g)].map(
-      (m) => m[1],
-    )
+  it('lists every variable the server and the container read, once', () => {
+    const saved = process.env
+    const read = new Set<string>()
+    process.env = new Proxy({} as NodeJS.ProcessEnv, {
+      get: (env, name) => {
+        if (typeof name === 'string') read.add(name)
+        return env[name as string]
+      },
+    })
+    try {
+      loadConfig()
+    } finally {
+      process.env = saved
+    }
+    // The container's own script reads these before the server starts.
     const entrypoint = readFileSync(new URL('../../../image/entrypoint.sh', import.meta.url), 'utf8')
-    read.push(...[...entrypoint.matchAll(/\$\{(PUID|PGID|RENPLAY_LOG_LEVEL):-/g)].map((m) => m[1]))
+    for (const m of entrypoint.matchAll(/\$\{(PUID|PGID|RENPLAY_LOG_LEVEL):-/g)) read.add(m[1]!)
     const listed = ENV_VARS.map((v) => v.name)
-    expect([...new Set([...read, ...[...source.matchAll(/secret\('([A-Z_]+)'/g)].map((m) => `${m[1]}_FILE`)])].sort()).toEqual([...listed].sort())
+    expect([...read].sort()).toEqual([...listed].sort())
     expect(new Set(listed).size).toBe(listed.length)
   })
 

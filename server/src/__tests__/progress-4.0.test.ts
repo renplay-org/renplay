@@ -115,9 +115,12 @@ describe('status, rating, Not now and play history', () => {
     app.db.raw.prepare("DELETE FROM play_sessions WHERE game = 'third'").run()
     app.db.insertGame({ id: 'third', title: 'Third', status: 'installed', save_dir: 'Third-1' })
     const before = (await request(app.app).get('/api/games/third').expect(200)).body.game.playTime ?? 0
+    const started = Date.now()
     for (let i = 0; i < 4; i++) await request(app.app).post('/api/games/third/play-time').send({ seconds: 60 }).expect(200)
+    // The counted time may not exceed the reported time plus the time that passed while reporting.
+    const passed = Math.ceil((Date.now() - started) / 1000)
     const session = app.db.raw.prepare("SELECT seconds FROM play_sessions WHERE game = 'third'").get() as { seconds: number }
-    expect(session.seconds).toBeLessThanOrEqual(60 + 3 * 6)
+    expect(session.seconds).toBeLessThanOrEqual(60 + passed + 20)
     expect((await request(app.app).get('/api/games/third').expect(200)).body.game.playTime - before).toBe(session.seconds)
   })
 
@@ -126,7 +129,10 @@ describe('status, rating, Not now and play history', () => {
     const days = async (tz: string) => (await request(app.app).get(`/api/history?game=third&days=90&tz=${encodeURIComponent(tz)}`).expect(200)).body.days.map((d: { day: string }) => d.day)
     expect(await days('Asia/Tokyo')).toContain('2026-01-02')
     expect(await days('UTC')).toContain('2026-01-01')
-    expect(await days('Not/AZone')).toBeTruthy()
+    // An unknown time zone falls back to the server's own, so the day is the local one.
+    const at = new Date(Date.UTC(2026, 0, 1, 23, 30))
+    const local = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`
+    expect(await days('Not/AZone')).toContain(local)
     app.db.raw.prepare("DELETE FROM play_sessions WHERE game = 'third'").run()
   })
 
