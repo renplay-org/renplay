@@ -1,7 +1,7 @@
 import { BookOpen, Expand, ExternalLink, Maximize2, Shrink, Volume2, VolumeX, X } from 'lucide-react'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Frame } from '../lantern/art'
-import { Pill, Seg } from '../lantern/controls'
+import { Pill, Seg, IconBtn } from '../lantern/controls'
 import { useModal } from '../lantern/modal'
 import type { Game } from '@shared/api'
 import { isAppleTouch } from '../lib/platform'
@@ -88,17 +88,17 @@ export function PlayerDrawer({
             {game.version && <div className="xs muted truncate">{game.version}</div>}
           </div>
           <div className="pd-tools">
-            <button type="button" className="ib" aria-pressed={!muted} aria-label={muted ? 'Sound is off. Turn it on' : 'Sound is on. Turn it off'} onClick={onMute}>
+            <IconBtn label={muted ? 'Sound is off. Turn it on' : 'Sound is on. Turn it off'} aria-pressed={!muted} onClick={onMute}>
               {muted ? <VolumeX /> : <Volume2 />}
-            </button>
+            </IconBtn>
             {onFullscreen && (
-              <button type="button" className="ib" aria-label={fullscreen ? 'Leave full screen' : 'Full screen'} onClick={onFullscreen}>
+              <IconBtn label={fullscreen ? 'Leave full screen' : 'Full screen'} onClick={onFullscreen}>
                 {fullscreen ? <Shrink /> : <Expand />}
-              </button>
+              </IconBtn>
             )}
-            <button type="button" className="ib" aria-label="Back to the game" onClick={onClose} data-initial>
+            <IconBtn label="Back to the game" onClick={onClose} data-initial>
               <X />
-            </button>
+            </IconBtn>
           </div>
         </header>
         <Seg small label="Player menu" value={tab} onChange={onTab} options={tabs} className="pd-tabs" />
@@ -258,9 +258,9 @@ export function GuideWindow({ game, file, onFile, onClose, portrait, insets }: {
             Back to the game
           </Pill>
           <span className="grow" />
-          <a className="ib" href={current.url} target="_blank" rel="noreferrer" aria-label="Open in a new tab">
+          <IconBtn label="Open in a new tab" href={current.url} target="_blank" rel="noreferrer">
             <Maximize2 />
-          </a>
+          </IconBtn>
         </div>
         {tabs}
         <Reader w={current} />
@@ -271,12 +271,12 @@ export function GuideWindow({ game, file, onFile, onClose, portrait, insets }: {
       <div className="gw-bar" onPointerDown={drag('move')}>
         <span className="truncate grow" style={{ fontWeight: 650, fontSize: 13.5 }}>{current.title}</span>
         <Seg small label="See-through" value={opacity} onChange={setOpacity} options={[{ value: '1', label: 'Solid' }, { value: '0.85', label: '85%' }, { value: '0.7', label: '70%' }]} />
-        <a className="ib" href={current.url} target="_blank" rel="noreferrer" aria-label="Pop out into a new tab">
+        <IconBtn label="Pop out into a new tab" href={current.url} target="_blank" rel="noreferrer">
           <ExternalLink />
-        </a>
-        <button type="button" className="ib" aria-label="Close the walkthrough" onClick={onClose}>
+        </IconBtn>
+        <IconBtn label="Close the walkthrough" onClick={onClose}>
           <X />
-        </button>
+        </IconBtn>
       </div>
       {tabs}
       <Reader w={current} />

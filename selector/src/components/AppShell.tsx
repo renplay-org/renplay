@@ -13,6 +13,7 @@ import { useGames, useJobs } from '../lib/queries'
 import { RoomProvider } from '../lantern/Room'
 import { useArrowFocus } from '../lantern/focus'
 import type { Health } from '@shared/api'
+import { Pill } from '../lantern/controls'
 
 // Links go through renplay.org (redirects on the website), so moving GitHub or Ko-fi needs no release.
 const REPO_URL = 'https://renplay.org/github'
@@ -136,10 +137,10 @@ function Shell() {
           </nav>
           <div className="top-r">
             {admin && (
-              <Link to="/add" className="btn s sm hide-phone" aria-label="Add games">
+              <Pill variant="s" size="sm" to="/add" className="hide-phone" aria-label="Add games">
                 <Plus />
                 <span className="lbl">Add games</span>
-              </Link>
+              </Pill>
             )}
             {admin && <ActivityRing />}
             <SearchPalette />

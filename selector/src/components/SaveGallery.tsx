@@ -11,7 +11,7 @@ import { ago, dateTime, duration, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
 import { useGames, useSaves } from '../lib/queries'
 import { playLink } from '../lib/links'
-import { Seg, Pill } from '../lantern/controls'
+import { Seg, Pill, IconBtn } from '../lantern/controls'
 import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveVersions, SyncDownloaded } from '@shared/api'
 import Sheet from '../lantern/Sheet'
@@ -179,9 +179,9 @@ export default function SaveGallery({ game }: { game: Game }) {
                 </div>
                 <ActionMenu
                   trigger={(toggle) => (
-                    <button onClick={toggle} className="ib" style={{ width: 36, height: 36, marginRight: -6 }} aria-label="Save actions">
+                    <IconBtn label="Save actions" onClick={toggle} style={{ width: 36, height: 36, marginRight: -6 }}>
                       <MoreHorizontal />
-                    </button>
+                    </IconBtn>
                   )}
                 >
                   {(close) => (

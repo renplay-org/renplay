@@ -47,7 +47,7 @@ export default function History() {
   const days = pages.data.pages.flatMap((p) => p.days)
   if (!first.totals.sessions)
     return (
-      <Empty title="Nothing played yet" action={<Link to="/" className="btn">Library</Link>}>
+      <Empty title="Nothing played yet" action={<Pill to="/">Library</Pill>}>
         Your play history fills in as you play. It counts the time a game is open and in front of you, and stops after 15 minutes without a tap, click or key.
       </Empty>
     )
