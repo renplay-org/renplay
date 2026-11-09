@@ -23,6 +23,17 @@ export async function writeFileAtomic(path: string, data: Uint8Array | string, m
   }
 }
 
+/** Whether a file is there: false only when it is missing, null when it could not be told (a share that stalls). */
+export async function presence(path: string): Promise<boolean | null> {
+  try {
+    await lstat(path)
+    return true
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    return code === 'ENOENT' || code === 'ENOTDIR' ? false : null
+  }
+}
+
 export async function exists(path: string): Promise<boolean> {
   try {
     await lstat(path)

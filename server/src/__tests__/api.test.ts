@@ -1,14 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import yazl from 'yazl'
 import { archiveIdentity } from '../library/archives.js'
 import { createApp, type App } from '../app.js'
 import { loadConfig } from '../config.js'
 import { renderPage } from '../play/routes.js'
 import { cleanRelPath, safeJoin } from '../util/paths.js'
+import { runImport } from '../pipeline/import.js'
 
 function zipBuffer(entries: Record<string, Buffer | string>): Promise<Buffer> {
   return new Promise((resolve) => {
@@ -217,7 +218,7 @@ describe('HTTP API', () => {
     const unity = await request(app.app).get('/g/twine-story/h1/game/Build/Game.wasm.br').expect(200)
     expect(unity.headers['content-type']).toBe('application/wasm')
     expect(unity.headers['content-encoding']).toBeUndefined()
-    await app.saves.remove('story', 'localStorage.json', 'test')
+    await app.saves.remove('story', 'localStorage.json', 'user-delete')
     // The startup check knows HTML builds have no game.zip.
     const checked = await app.builds.verify()
     expect(checked.missing).not.toContain('twine-story')
@@ -332,6 +333,57 @@ describe('HTTP API', () => {
     const completed = await request(app.app).post(`/api/uploads/${r.body.id}/complete`).expect(200)
     const path = completed.body.path
     expect(app.db.isUploadedArchive(path, archiveIdentity(statSync(join(root, 'games', '_archives', path))))).toBe(true)
+  })
+
+  it('marks a game whose build went missing at start as not installed, and back when the folder returns', async () => {
+    const build = join(root, 'games', 'fixture-game', 'b1'), away = join(root, 'b1-away')
+    renameSync(build, away)
+    try {
+      expect((await app.builds.verify()).missing).toEqual(['fixture-game'])
+      expect(app.db.getGame('fixture-game')).toMatchObject({ status: 'not_installed', build: 'b1' })
+      // Nothing changes on a second start while it is still away.
+      expect((await app.builds.verify()).missing).toEqual([])
+    } finally {
+      renameSync(away, build)
+    }
+    expect((await app.builds.verify()).back).toEqual(['fixture-game'])
+    expect(app.db.getGame('fixture-game')).toMatchObject({ status: 'installed', build: 'b1' })
+  })
+
+  it('installs a Ren’Py download over an HTML game of the same id as a Ren’Py game', async () => {
+    const engine = join(root, 'games', '_renplay', 'engines', '8.5.3')
+    writeFileSync(join(engine, 'renpy.zip'), await zipBuffer({ 'renpy/__init__.py': '', 'main.py': '' }))
+    mkdirSync(join(root, 'games', '_archives'), { recursive: true })
+    writeFileSync(join(root, 'games', '_archives', 'Dual-1.0-pc.zip'), await zipBuffer({ 'Dual-1.0-pc/game/script.rpy': 'label start:\n    "Hi"\n', 'Dual-1.0-pc/renpy/__init__.py': '' }))
+    app.db.insertGame({ id: 'dual', title: 'Dual', status: 'installed', build: 'h1', family: 'html', engine_label: 'HTML (SugarCube 2.36.1)', entry: 'Dual.html' })
+    const ctx = { id: 'test-install', params: { source: { kind: 'archive' as const, path: 'Dual-1.0-pc.zip' }, game: 'dual', engine: '8.5.3' }, signal: new AbortController().signal, progress() {}, log() {}, checkAbort() {} }
+    await runImport(ctx, app.services)
+    expect(app.db.getGame('dual')).toMatchObject({ status: 'installed', family: 'renpy', engine_label: '', entry: '' })
+    expect((await request(app.app).get('/api/games/dual').expect(200)).body.game.playUrl).toMatch(/^\/g\/dual\/[a-z0-9]+\/$/)
+  })
+
+  it('starts a checksum for a draft recipe’s own download, not one whose name contains it', async () => {
+    const archives = join(root, 'games', '_archives')
+    mkdirSync(archives, { recursive: true })
+    for (const name of ['a.zip', 'data-a.zip']) writeFileSync(join(archives, name), name)
+    // A job that waits holds the queue, so both checksums stay queued while the drafts are asked for.
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    app.jobs.register('hold', 'Hold', () => gate)
+    app.jobs.enqueue('hold', '', {})
+    const other = app.jobs.enqueue('hash-archive', '', { path: 'data-a.zip' })
+    app.db.insertGame({ id: 'short-name', title: 'Short', status: 'installed', build: 'b1', source: JSON.stringify({ archive: 'a.zip', size: 5 }) })
+    try {
+      const draft = (await request(app.app).get('/api/games/short-name/recipe').expect(200)).body
+      expect(draft.hashJob).toBeTruthy()
+      expect(draft.hashJob).not.toBe(other)
+      // Asked again, it finds its own job.
+      expect((await request(app.app).get('/api/games/short-name/recipe').expect(200)).body.hashJob).toBe(draft.hashJob)
+    } finally {
+      release()
+      await vi.waitFor(() => expect(app.jobs.isBusy()).toBe(false))
+    }
+    expect((await request(app.app).get('/api/games/short-name/recipe').expect(200)).body).toMatchObject({ sha256Pending: false, hashJob: null })
   })
 
   it('keeps saves when a game is uninstalled', async () => {

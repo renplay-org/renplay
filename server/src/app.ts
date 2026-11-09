@@ -146,6 +146,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
   await purger.resume()
   const check = await builds.verify()
   if (check.missing.length) log('library', `Builds missing for ${check.missing.join(', ')}`, 'warn')
+  if (check.back.length) log('library', `Builds back for ${check.back.join(', ')}`)
   if (check.orphans.length) log('library', `Folders in ${cfg.gamesDir} that belong to no game: ${check.orphans.join(', ')}`, 'warn')
   if (opts.startJobs !== false) jobs.start()
 

@@ -2,7 +2,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Config } from '../config.js'
 import type { Db } from '../db.js'
-import { exists, walkFiles, writeFileAtomic } from '../util/fsx.js'
+import { presence, walkFiles, writeFileAtomic } from '../util/fsx.js'
 import { isSlug, slugify } from '../util/paths.js'
 import type { Purger } from '../util/purge.js'
 
@@ -127,18 +127,30 @@ export class Builds {
   }
 
   /**
-   * Startup check: games whose build folder is gone are marked not installed;
-   * folders of unknown games are reported, never deleted automatically.
+   * Startup check: a game whose build folder is gone is marked not installed. It keeps its build, so
+   * it comes back when the folder is there again, as when a network share is mounted after Renplay
+   * starts. Only a missing file counts: when it cannot be read at all, nothing changes. Folders of
+   * unknown games are reported, never deleted automatically.
    */
-  async verify(): Promise<{ missing: string[]; orphans: string[] }> {
-    const missing: string[] = []
+  async verify(): Promise<{ missing: string[]; back: string[]; orphans: string[] }> {
+    const missing: string[] = [], back: string[] = []
     for (const g of this.db.allGames()) {
-      if (g.status !== 'installed') continue
+      if (g.status === 'installed' && !g.build) {
+        this.db.updateGame(g.id, { status: 'not_installed', size_bytes: 0, file_count: 0 })
+        missing.push(g.id)
+        continue
+      }
+      // An uninstalled game has no build. One with a build was marked missing here before.
+      if (!g.build || (g.status !== 'installed' && g.status !== 'not_installed')) continue
       // Web games of other engines (docs.renplay.org/engines) have no game.zip, only the pack and its index.
       const marker = g.family && g.family !== 'renpy' ? 'assets.json' : 'game.zip'
-      if (!g.build || !(await exists(join(this.dir(g.id, g.build), marker)))) {
-        this.db.updateGame(g.id, { status: 'not_installed', build: '', size_bytes: 0, file_count: 0 })
+      const there = await presence(join(this.dir(g.id, g.build), marker))
+      if (g.status === 'installed' && there === false) {
+        this.db.updateGame(g.id, { status: 'not_installed' })
         missing.push(g.id)
+      } else if (g.status === 'not_installed' && there === true) {
+        this.db.updateGame(g.id, { status: 'installed' })
+        back.push(g.id)
       }
     }
     const orphans: string[] = []
@@ -148,6 +160,6 @@ export class Builds {
         if (!this.db.getGame(n)) orphans.push(n)
       }
     } catch {}
-    return { missing, orphans }
+    return { missing, back, orphans }
   }
 }

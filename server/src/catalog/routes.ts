@@ -44,7 +44,7 @@ export function createCatalogRouter(s: Services): Router {
     if (!sha256 && src.archive) sha256 = db.getArchive(src.archive)?.sha256 ?? ''
     let hashJob: string | null = null
     if (!sha256 && src.archive && (await exists(join(cfg.archivesDir, src.archive)))) {
-      const running = db.listJobs(100).find((j) => j.type === 'hash-archive' && (j.status === 'queued' || j.status === 'running') && j.params.includes(src.archive!))
+      const running = db.listJobs(100).find((j) => j.type === 'hash-archive' && (j.status === 'queued' || j.status === 'running') && parseJson<{ path?: string }>(j.params, {}).path === src.archive)
       hashJob = running?.id ?? jobs.enqueue('hash-archive', '', { path: src.archive })
     }
     const existing = g.recipe_id ? catalog.recipe(g.recipe_id) : null
