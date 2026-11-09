@@ -245,7 +245,7 @@ export function createGamesRouter(deps: Services): Router {
   router.post('/games/:id/walkthroughs', async (req, res) => {
     const g = get(req)
     // multer runs inside the handler and is awaited: as route middleware its stream callbacks would
-    // lose the request's context, and with it who is asking (accounts-context.ts).
+    // lose the request's context, and with it who is asking (accounts/context.ts).
     await new Promise<void>((resolve, reject) => pdfs.single('file')(req, res, (error) => (error ? reject(error) : resolve())))
     const f = req.file
     if (!f) throw new HttpError(400, 'No file uploaded')

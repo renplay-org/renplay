@@ -2697,7 +2697,7 @@ button.tag::before,
   height: max(100%, var(--hit));
   transform: translate(-50%, -50%);
 }
-/* The ring of the hold-Esc hint in the player (Player.tsx). */
+/* The ring of the hold-Esc hint in the player (player/EscapeHint.tsx). */
 @keyframes escape-hold {
   to {
     stroke-dashoffset: 0;
@@ -2852,7 +2852,7 @@ input[type="range"] {
   flex: 1 1 220px;
 }
 
-/* The player (DESIGN 2.4): two quiet pills over the game, one drawer, the walkthrough beside it. */
+/* The player: two quiet pills over the game, one drawer, the walkthrough beside it. */
 .rp-pill {
   position: absolute;
   z-index: 30;

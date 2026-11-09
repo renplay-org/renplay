@@ -7,7 +7,7 @@ import { useAuth } from '../lib/auth'
 const OFFERED = (game: string) => `renplay:art-step:${game}`
 
 /**
- * The Choose artwork step (DESIGN 0.8): opens once when an install finishes, on the device of the
+ * The Choose artwork step: opens once when an install finishes, on the device of the
  * admin who installed it. Below Shown an adult game's art is not offered, so the step stays closed.
  */
 export default function ChooseArtwork() {

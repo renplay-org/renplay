@@ -33,7 +33,7 @@ function packageVersion(): string {
 
 /**
  * What the server's parts share, made once at start. Every router and job gets it. The signed-in
- * person comes from the request (accounts-context.ts), so `saves` is that person's.
+ * person comes from the request (accounts/context.ts), so `saves` is that person's.
  */
 export interface Services {
   cfg: Config

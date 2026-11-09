@@ -54,7 +54,7 @@ export interface GameRow {
   build_options: string
   created_at: string
   installed_at: string
-  /** 1 when the game's recipe is adult: the last thing the catalog said, kept for when it can no longer say (content.ts). */
+  /** 1 when the game's recipe is adult: the last thing the catalog said, kept for when it can no longer say (content/mode.ts). */
   adult: number
   updated_at: string
 }

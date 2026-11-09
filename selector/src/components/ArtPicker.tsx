@@ -85,7 +85,7 @@ function Placement({ game, kind, format, ring }: { game: Game; kind: ArtKind; fo
 }
 
 /**
- * The art picker (DESIGN 0.7): one format at a time, every candidate as it will look in place,
+ * The art picker: one format at a time, every candidate as it will look in place,
  * a preview on hover or focus and a choice on a tap or Enter. A choice changes what this person
  * sees, an admin can choose for everyone. Uploads of another size are placed with a crop at the
  * point the uploader taps.
@@ -95,7 +95,7 @@ export default function ArtPicker({ game, open, onClose, initialKind = 'grid', s
   const qc = useQueryClient()
   const toast = useToast()
   const [kind, setKind] = useState<ArtKind>(initialKind)
-  // After an install (the Choose artwork step) an admin chooses for everyone (DESIGN 0.8).
+  // After an install (the Choose artwork step) an admin chooses for everyone.
   const [scope, setScope] = useState<'me' | 'everyone'>(step && admin ? 'everyone' : 'me')
   const [previewing, setPreviewing] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
