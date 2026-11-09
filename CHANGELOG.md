@@ -10,6 +10,7 @@ release notes say what).
 ### Fixed
 
 - Games that use `requests`, such as ones with a news feed or an update check, start on the web instead of failing with a missing `js` module.
+- A download that holds the developer's small launcher project next to the game, as Innocent Witches does, installs the game. Before, Renplay took the launcher and the game failed to start.
 
 ## [4.6.2] - 2026-11-09
 
