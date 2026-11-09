@@ -17,12 +17,22 @@ export type Layout = { kind: 'project'; root: string } | { kind: 'web'; root: st
 
 const SCRIPT_EXT = /\.(rpa|rpyc|rpy|rpymc|rpym)$/i
 
-/** Finds the Ren'Py project (folder holding game/) or a prebuilt web build inside an archive. */
+/**
+ * Finds the Ren'Py project (folder holding game/) or a prebuilt web build inside an archive.
+ * A distributed game has Ren'Py's own renpy/ folder beside its game/, a developer's small
+ * launcher project does not: such a root wins, and the one with the most scripts (packed
+ * .rpa files count) comes next.
+ */
 export function detectLayout(entries: SourceEntry[]): Layout | null {
   const scores = new Map<string, number>()
   const web = new Map<string, Set<string>>()
+  const withEngine = new Set<string>()
   for (const e of entries) {
     if (e.path.includes('__MACOSX/')) continue
+    const folders = e.path.split('/')
+    folders.pop()
+    const ri = folders.indexOf('renpy')
+    if (ri !== -1) withEngine.add(folders.slice(0, ri).join('/'))
     const idx = e.path.lastIndexOf('game/')
     const parts = e.path.split('/')
     const name = parts[parts.length - 1]!
@@ -44,8 +54,9 @@ export function detectLayout(entries: SourceEntry[]): Layout | null {
       return { kind: 'web', root: root ? root + '/' : '' }
     }
   }
+  const candidates = [...scores].filter(([root]) => withEngine.has(root))
   let best: [string, number] | null = null
-  for (const [root, n] of scores) {
+  for (const [root, n] of candidates.length ? candidates : scores) {
     if (!best || n > best[1] || (n === best[1] && root.length < best[0].length)) best = [root, n]
   }
   if (!best) return null

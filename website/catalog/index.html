@@ -269,6 +269,8 @@
   const stateLabel = (s) => cap(String(s).replace(/[-_]/g, ' '))
   /** The newest release that works, the one to recommend. */
   const working = (g) => (g.releases ?? []).find((r) => r.status === 'verified' || r.status === 'playable')
+  /** A game is listed when its newest release is not broken and one of its releases works. */
+  const offered = (g) => g.releases?.[0]?.status !== 'broken' && working(g)
   /** Tag ids to show: the vocabulary's labels, without the adult content group. */
   const shownTags = (g) => (g.tagIds ?? []).filter((t) => vocab[t] && vocab[t].group !== 'content')
   const label = (t) => vocab[t]?.label ?? t
@@ -395,12 +397,12 @@
   }
   const open = (g) => { opened = g; $('detail-body').innerHTML = detail(g); $('detail').showModal() }
 
-  // Only games that work are listed.
+  // Only games that work are listed: one whose newest release is broken stays in the index, not here.
   fetch(BASE + 'index.v4.json')
     .then((r) => r.json())
     .then((idx) => {
       vocab = idx.vocabulary ?? {}
-      games = (idx.games ?? []).filter(working).sort((a, b) => a.title.localeCompare(b.title))
+      games = (idx.games ?? []).filter(offered).sort((a, b) => a.title.localeCompare(b.title))
       render()
       const g = games.find((x) => x.id === location.hash.slice(1))
       if (g && listed().includes(g)) open(g)
