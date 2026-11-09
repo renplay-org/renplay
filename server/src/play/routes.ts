@@ -1,29 +1,26 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import express, { Router } from 'express'
+import express, { Router, type NextFunction, type Request, type Response } from 'express'
 import { viewer } from '../accounts/context.js'
-import { BUILD_RE, baseOf } from '../games/builds.js'
-import type { GameRow } from '../db.js'
+import { BUILD_RE, baseOf, modBuild } from '../games/builds.js'
+import { isWebGame, type GameRow } from '../db.js'
+import { ENGINE_FILES } from '../engines.js'
 import { PackReader } from '../pipeline/pack.js'
+import { isPresplash } from '../pipeline/project.js'
 import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
 import type { Services } from '../services.js'
 import type { OfflineManifest } from '../shared/api.js'
+import { parseGamePath, type GamePath } from './path.js'
 import { readRuntimes } from './runtime.js'
 
-/** A build's presplash, at its top level: /g/<game>/<build>/web-presplash.jpg. */
-export const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
-
-/** Where a web game's localStorage and IndexedDB are kept, in its save folder. */
 // Game pages play only inside Renplay's own player: another site cannot frame them to trick people
 // into clicks. Checked in Chromium and WebKit, sandboxed pages too. The library stays embeddable
 // (dashboards frame it).
 const FRAME_ANCESTORS = "frame-ancestors 'self'"
 
+/** Where a web game's localStorage and IndexedDB are kept, in its save folder. */
 const HTML_STORAGE = 'localStorage.json'
 const HTML_IDB = 'indexedDB.json'
-
-/** Games that are web pages of their own (HTML, Unity WebGL…): every family but Ren'Py. */
-const isWebGame = (g: GameRow) => !!g.family && g.family !== 'renpy' && !!g.entry
 
 /** The URL an installed game plays at. HTML games start at their own page. */
 export function playPath(g: GameRow): string {
@@ -35,9 +32,9 @@ export function playPath(g: GameRow): string {
  * Game pages: the engine's page template with Renplay's runtime wired in, the runtimes themselves,
  * and the files of a build and the engines. nginx serves the static files in production.
  */
-export function createPlayRouter(s: Services, runtimePath: string | undefined): Router {
+export function createPlayRouter(s: Services): Router {
   const { cfg, db, builds, engines, content, accounts } = s
-  const runtimes = readRuntimes(runtimePath)
+  const runtimes = readRuntimes()
   const runtimeVersion = runtimes.version
   const router = Router({ caseSensitive: true, strict: true })
 
@@ -62,7 +59,7 @@ export function createPlayRouter(s: Services, runtimePath: string | undefined): 
       saveDir: game.save_dir || null,
       screen: game.screen_w ? [game.screen_w, game.screen_h] : null,
       caches: await builds.caches(id, game.build),
-      presplash: presplash ?? `/engine/${game.engine}/web-presplash.jpg`,
+      presplash: presplash ?? `/engine/${game.engine}/${ENGINE_FILES.presplash}`,
       runtimeVersion,
       userId: accounts.current().id,
     })
@@ -94,10 +91,10 @@ export function createPlayRouter(s: Services, runtimePath: string | undefined): 
     const files: Array<{ url: string; bytes: number }> = [
       { url: page, bytes: 0 },
       { url: `/renplay/runtime.js?v=${runtimeVersion}`, bytes: 0 },
-      ...(await Promise.all(['renpy-pre.js', 'renpy.js', 'renpy.wasm.gz', 'renpy.data.gz'].map(async (n) => ({ url: `/engine/${game.engine}/${n}`, bytes: await size(join(engine, n)) })))),
+      ...(await Promise.all([ENGINE_FILES.pre, ENGINE_FILES.main, ENGINE_FILES.wasm, ENGINE_FILES.data].map(async (n) => ({ url: `/engine/${game.engine}/${n}`, bytes: await size(join(engine, n)) })))),
     ]
     const presplash = content.blurs(game) ? null : await findPresplash(builds.dir(id, base))
-    files.push(presplash ? { url: `${page}${presplash}`, bytes: await size(at(base, presplash)) } : { url: `/engine/${game.engine}/web-presplash.jpg`, bytes: await size(join(engine, 'web-presplash.jpg')) })
+    files.push(presplash ? { url: `${page}${presplash}`, bytes: await size(at(base, presplash)) } : { url: `/engine/${game.engine}/${ENGINE_FILES.presplash}`, bytes: await size(join(engine, ENGINE_FILES.presplash)) })
     files.push({ url: `${page}game.zip`, bytes: await size(at(game.build, 'game.zip'), at(base, 'game.zip')) })
     for (const c of await builds.caches(id, game.build)) {
       files.push({ url: `${page}cache/${c.name.split('/').map(encodeURIComponent).join('/')}?v=${encodeURIComponent(c.v)}`, bytes: await size(at(game.build, `cache/${c.name}`), at(base, `cache/${c.name}`)) })
@@ -112,9 +109,9 @@ export function createPlayRouter(s: Services, runtimePath: string | undefined): 
    * Streamed assets of a build, from its pack (mod builds use their base's).
    * Supports byte ranges: browsers seek in videos with them.
    */
-  router.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m[a-z0-9]+)?\/game\/(.+)$/, async (req, res) => {
-    const [id, base, raw] = [req.params[0], req.params[1], req.params[2]] as string[]
-    const name = safeName(raw)
+  const sendPackFile = async (where: GamePath, req: Request, res: Response): Promise<void> => {
+    const { game: id, base } = where
+    const name = safeName(decodePart(where.rest.slice(5)))
     const installed = db.getGame(id)
     if (accounts.enabled && installed && isWebGame(installed) && !res.locals.verifiedAsset) throw new HttpError(403, 'Open this game from the library')
     if (!name || !isSlug(id) || content.hides(db.getGame(id))) throw new HttpError(404, 'Not found')
@@ -172,7 +169,7 @@ export function createPlayRouter(s: Services, runtimePath: string | undefined): 
     s.on('error', () => res.destroy())
     req.on('close', () => s.destroy())
     s.pipe(res)
-  })
+  }
 
   /**
    * An HTML game's page with Renplay's runtime and the game's stored
@@ -206,19 +203,35 @@ export function createPlayRouter(s: Services, runtimePath: string | undefined): 
   // A static fallback for development: nginx serves the engines in production.
   router.use('/engine', express.static(cfg.enginesDir, { immutable: true, maxAge: '365d', setHeaders: gzipHeaders }))
   // game.zip, caches and presplash of a build (mod builds fall back to their base).
-  router.get(/^\/g\/([a-z0-9][a-z0-9._-]*)\/([a-z0-9]+)(?:\.m([a-z0-9]+))?\/(.+)$/, (req, res, next) => {
-    const [game, base, mod, asset] = [req.params[0], req.params[1], req.params[2], req.params[3]] as string[]
+  const sendBuildFile = (where: GamePath, res: Response, next: NextFunction): void => {
+    const { game, base, mod } = where
+    const asset = decodePart(where.rest)
     if (asset.includes('..')) return next()
     if (content.hides(db.getGame(game))) return next(new HttpError(404, 'Game not found'))
-    if (PRESPLASH.test(`/${asset}`) && content.blurs(db.getGame(game))) return next(new HttpError(404, 'Not found'))
-    const candidates = mod ? [join(cfg.gamesDir, game, `${base}.m${mod}`, asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
+    if (isPresplash(asset) && content.blurs(db.getGame(game))) return next(new HttpError(404, 'Not found'))
+    const candidates = mod ? [join(cfg.gamesDir, game, modBuild(base, mod), asset), join(cfg.gamesDir, game, base, asset)] : [join(cfg.gamesDir, game, base, asset)]
     const tryNext = (i: number): void => {
       if (i >= candidates.length) return next()
       res.sendFile(candidates[i]!, { cacheControl: false }, (err) => (err ? tryNext(i + 1) : undefined))
     }
     tryNext(0)
+  }
+  router.get(/^\/g\//, async (req, res, next) => {
+    const where = parseGamePath(req.path)
+    if (!where?.rest) return next()
+    if (where.rest.startsWith('game/') && where.rest.length > 5) return sendPackFile(where, req, res)
+    sendBuildFile(where, res, next)
   })
   return router
+}
+
+/** The part of an address after the build, decoded the way Express decodes a route parameter. */
+function decodePart(raw: string): string {
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    throw new HttpError(400, 'Failed to decode param')
+  }
 }
 
 /** Express has already decoded the route parameter. Validate without decoding or normalizing it again. */
@@ -280,7 +293,7 @@ function mimeOf(name: string): string {
 
 async function findPresplash(dir: string): Promise<string | null> {
   try {
-    return (await readdir(dir)).find((n) => /^web-presplash\.(png|jpe?g|webp)$/i.test(n)) ?? null
+    return (await readdir(dir)).find(isPresplash) ?? null
   } catch {
     return null
   }
@@ -301,6 +314,9 @@ export interface PageOptions {
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+/** The script tag of Ren'Py's page template that loads one of the engine's files. */
+const scriptTag = (file: string) => new RegExp(`<script[^>]*\\ssrc=["']${file.replaceAll('.', '\\.')}["'][^>]*></script>`)
+
 export function renderPage(template: string, o: PageOptions): string {
   const config = {
     id: o.id,
@@ -315,7 +331,7 @@ export function renderPage(template: string, o: PageOptions): string {
   const boot =
     `<script>window.__renplay=${JSON.stringify(config).replace(/</g, '\\u003c')};</script>` +
     `<script src="/renplay/runtime.js?v=${o.runtimeVersion}"></script>` +
-    `<script src="/engine/${o.engine}/renpy-pre.js"></script>` +
+    `<script src="/engine/${o.engine}/${ENGINE_FILES.pre}"></script>` +
     `<script>window.__renplayLate && window.__renplayLate()</script>`
 
   let out = template
@@ -324,9 +340,9 @@ export function renderPage(template: string, o: PageOptions): string {
   out = out.replace(/<link[^>]+rel="(manifest|icon|apple-touch-icon)"[^>]*>\s*/gi, '')
   out = out.replace(/navigator\.serviceWorker\.register\(/g, '(function () { return Promise.resolve() })(')
   out = out.replace(/(<img[^>]*id="presplash"[^>]*src=)"[^"]*"/i, `$1"${esc(o.presplash)}"`)
-  out = out.replace(/<script[^>]*\ssrc=["']renpy-pre\.js["'][^>]*><\/script>/, boot)
+  out = out.replace(scriptTag(ENGINE_FILES.pre), boot)
   // renpy.js is started by the runtime once the engine is downloaded.
-  out = out.replace(/<script[^>]*\ssrc=["']renpy\.js["'][^>]*><\/script>/, '')
+  out = out.replace(scriptTag(ENGINE_FILES.main), '')
   out = out.replace(/<meta name="viewport"[^>]*>/i, '<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">')
   // Ren'Py's own menu imports and exports browser-local saves, which renplay
   // replaces with saves on the server; the player has its own controls. The

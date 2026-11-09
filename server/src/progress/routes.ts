@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import type { GameRow } from '../db.js'
-import { toGame } from '../games/routes.js'
+import { toGame } from '../games/game.js'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
 import { PLAY_STATUSES, type GameWithProgress } from './store.js'

@@ -2,8 +2,8 @@ import { mkdir, rename } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 import { Router } from 'express'
-import { publicUser, validName, validUsername } from '../accounts/accounts.js'
-import { viewer, type User } from '../accounts/context.js'
+import { publicUser, validName, validUsername } from '../accounts/users.js'
+import { OWNER_ID, viewer, type User } from '../accounts/context.js'
 import { passwordHash, random } from '../accounts/passwords.js'
 import { parseAdultLevel } from '../shared/levels.js'
 import type { Services } from '../services.js'
@@ -33,7 +33,7 @@ export function createPeopleRouter(s: Services): Router {
       // Counts follow the admin's own level: an Off admin's counts leave hidden games' saves out.
       const store = saveStores.of(u.id), dirs = content.visibleSaveDirs(await store.listDirs())
       const files = await Promise.all(dirs.map((dir) => store.list(dir)))
-      return { ...publicUser(u), games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: u.id === 1 || u.id === cfg.authUser, ...accounts.managed(u.id) }
+      return { ...publicUser(u), games: files.filter((entries) => entries.length > 0).length, saves: files.reduce((n, entries) => n + entries.length, 0), protected: accounts.isProtected(u.id), ...accounts.managed(u.id) }
     }))
     res.json({ users, adultDefault: cfg.adultDefault } satisfies People)
   })
@@ -79,7 +79,7 @@ export function createPeopleRouter(s: Services): Router {
   })
   const remove = async (id: number) => {
     const u = accounts.user(id)
-    if (id === 1 || id === cfg.authUser) throw new HttpError(409, 'The no-sign-in account must stay')
+    if (accounts.isProtected(id)) throw new HttpError(409, 'The no-sign-in account must stay')
     if (removing.has(id)) throw new HttpError(409, 'This account is being archived')
     accounts.guardLastAdmin(u, {}, true)
     const store = saveStores.of(id), source = saveStores.folder(id)
@@ -117,7 +117,7 @@ export function createPeopleRouter(s: Services): Router {
     const u = accounts.current(), { session, bearer } = viewer()!
     if (u.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
     if (!accounts.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
-    if (u.id === 1) throw new HttpError(409, 'Use the setup code to choose the owner password')
+    if (u.id === OWNER_ID) throw new HttpError(409, 'Use the setup code to choose the owner password')
     if (u.id === cfg.authUser) throw new HttpError(409, 'Choose the owner as RENPLAY_AUTH_USER before claiming it')
     const reservation = random()
     db.raw.exec('BEGIN IMMEDIATE')
@@ -127,7 +127,7 @@ export function createPeopleRouter(s: Services): Router {
       db.raw.exec('COMMIT')
     } catch (error) { db.raw.exec('ROLLBACK'); throw error }
     try {
-      await saveStores.copy(u.id, 1)
+      await saveStores.copy(u.id, OWNER_ID)
       db.raw.exec('BEGIN IMMEDIATE')
       try {
         // The copy can take a while. Check again that the claimant is still signed in, enabled
@@ -136,17 +136,17 @@ export function createPeopleRouter(s: Services): Router {
         accounts.requireLiveLink(u.id, session, bearer)
         const now = db.raw.prepare('SELECT * FROM users WHERE id = ?').get(u.id) as unknown as User | undefined
         if (!now || now.disabled || now.role !== 'admin') throw new HttpError(403, 'Only an admin can claim the owner account')
-        mergeData(u.id, 1)
+        mergeData(u.id, OWNER_ID)
         db.raw.prepare('UPDATE users SET username = ? WHERE id = ?').run(`archived-${u.id}-${randomBytes(4).toString('hex')}`, u.id)
-        db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = 1").run(now.username, now.name, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject)
-        accounts.writeLevels(1, { ceiling: parseAdultLevel(now.adult_ceiling) ?? cfg.adultDefault, choice: parseAdultLevel(now.adult_choice) ?? cfg.adultDefault })
-        db.raw.prepare('UPDATE identities SET user_id = 1 WHERE user_id = ?').run(u.id)
-        db.raw.prepare('UPDATE sessions SET user_id = 1 WHERE hash = ?').run(session)
-        db.raw.prepare('UPDATE tokens SET user_id = 1 WHERE hash = ?').run(session)
+        db.raw.prepare("UPDATE users SET username = ?, name = ?, role = 'admin', avatar = ?, avatar_uploaded = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = ?").run(now.username, now.name, now.avatar, now.avatar_uploaded, now.admin_source, now.admin_provider, now.admin_subject, OWNER_ID)
+        accounts.writeLevels(OWNER_ID, { ceiling: content.ceilingOf(now), choice: content.choiceOf(now) })
+        db.raw.prepare('UPDATE identities SET user_id = ? WHERE user_id = ?').run(OWNER_ID, u.id)
+        db.raw.prepare('UPDATE sessions SET user_id = ? WHERE hash = ?').run(OWNER_ID, session)
+        db.raw.prepare('UPDATE tokens SET user_id = ? WHERE hash = ?').run(OWNER_ID, session)
         db.raw.exec('COMMIT')
       } catch (e) { db.raw.exec('ROLLBACK'); throw e }
       await remove(u.id)
-      await accounts.tag(accounts.user(1)); accounts.ownerClaimed(); accounts.invalidate()
+      await accounts.tag(accounts.user(OWNER_ID)); accounts.ownerClaimed(); accounts.invalidate()
       res.json({ ok: true })
     } finally {
       db.raw.prepare("DELETE FROM settings WHERE key = 'owner_claim' AND value = ?").run(JSON.stringify(reservation))
@@ -154,7 +154,7 @@ export function createPeopleRouter(s: Services): Router {
   })
   router.post('/users/:id/merge', async (req, res) => {
     const id = Number(req.params.id), target = Number(req.body?.target)
-    if (id === 1 || id === cfg.authUser) throw new HttpError(409, 'The no-sign-in account must stay')
+    if (accounts.isProtected(id)) throw new HttpError(409, 'The no-sign-in account must stay')
     accounts.guardLastAdmin(accounts.user(id), {}, true)
     const copied = await saveStores.copy(id, target)
     mergeData(id, target)

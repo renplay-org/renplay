@@ -1,13 +1,15 @@
 import { mkdir, rename, rm, stat, unlink } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
+import { viewer } from '../accounts/context.js'
 import { archiveIdentity, keepDownloads } from '../library/archives.js'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../games/builds.js'
 import type { Catalog } from '../catalog/catalog.js'
+import type { ContentMode } from '../content/mode.js'
 import type { BuildSettings, RecipeMatch } from '../shared/recipe.js'
 import type { Config } from '../config.js'
 import { parseJson, type BuildOptions, type Db, type GameRow, type GameSource } from '../db.js'
-import type { EngineStore } from '../engines.js'
-import type { JobContext } from '../jobs/manager.js'
+import { ENGINE_FILES, type EngineStore } from '../engines.js'
+import type { JobContext, JobManager } from '../jobs/manager.js'
 import type { Overlays } from '../games/mods.js'
 import { dirSize, exists } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
@@ -32,6 +34,13 @@ export interface ImportParams {
   /** Engine version to build with instead of the recipe's or the newest matching one. */
   engine?: string
   reapplyMods?: boolean
+  /** The person who started it: Choose artwork opens for them alone. */
+  by?: number
+}
+
+/** Queues an install for the signed-in person. */
+export function enqueueImport(jobs: JobManager, params: Omit<ImportParams, 'by'>): string {
+  return jobs.enqueue('import', params.game ?? '', { ...params, engine: params.engine || undefined, by: viewer()?.user.id } satisfies ImportParams)
 }
 
 export interface ImportDeps {
@@ -41,6 +50,7 @@ export interface ImportDeps {
   engines: EngineStore
   overlays: Overlays
   catalog: Catalog
+  content: ContentMode
 }
 
 /**
@@ -81,7 +91,7 @@ export async function deleteSource(ctx: JobContext<ImportParams>, deps: ImportDe
 }
 
 async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<unknown> {
-  const { cfg, db, builds, engines, catalog } = deps
+  const { cfg, db, builds, engines, catalog, content } = deps
   const p = ctx.params
   const work = join(cfg.workDir, ctx.id)
   await rm(work, { recursive: true, force: true })
@@ -110,7 +120,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
       match = catalog.match({ name: source.archive, size: source.size, sha256: source.sha256 })
     }
     // The route refuses adult games up front; this catches a switch to off while the job waited.
-    if (catalog.content.hidesRecipe(match?.recipe.nsfw) || (p.recipeId && catalog.isAdultId(p.recipeId) && catalog.content.hidesRecipe(true))) throw new Error('This is an adult game, and adult games are off on this Renplay.')
+    if (content.hidesRecipe(match?.recipe.nsfw) || (p.recipeId && catalog.isAdultId(p.recipeId) && content.hidesRecipe(true))) throw new Error('This is an adult game, and adult games are off on this Renplay.')
     if (match) ctx.log(`Recipe: ${match.recipe.id}${match.release ? ` (${match.release.version}, ${match.release.status})` : ' (unlisted version)'}`)
     const settings = match ? catalog.settings(match.recipe, match.release) : {}
 
@@ -208,7 +218,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     ctx.progress('Packing game.zip', 0)
     const asm = await assemble({
       dir: staging,
-      renpyZip: join(engineDir, 'renpy.zip'),
+      renpyZip: join(engineDir, ENGINE_FILES.zip),
       zipPack: { path: join(work, 'zip.pack'), index: zipPack.index },
       assets: assets.index,
       rules,
@@ -258,7 +268,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
       entry: '',
       recipe_id: recipeId,
       // Adult or not from the recipe now, not at the next catalog sync: the game is visible the moment it is installed.
-      adult: adultFlag(catalog, recipeId, existing),
+      adult: catalog.adultFlag(recipeId, existing?.adult ?? 0),
       version: meta.version ?? match?.release?.version ?? '',
       renpy_version: gameRenpy ?? '',
       engine,
@@ -278,7 +288,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     else db.insertGame({ id, title: meta.title || match?.recipe.title || id, ...row })
 
     await builds.prune(id, previous)
-    await engines.prune(new Set(db.allGames().map((g) => g.engine).filter(Boolean)))
+    await engines.prune()
     ctx.log(`Installed ${id} (build ${build}, engine ${engine}, ${(size.bytes / 1e9).toFixed(2)} GB)`)
     return { game: id, build, engine, size: size.bytes, zipBytes: asm.zipBytes, saveDir, title: meta.title, version: meta.version, images: info.images, recipe: match?.recipe.id ?? null }
   } finally {
@@ -380,7 +390,7 @@ async function installHtml(
   const row: Partial<GameRow> = {
     status: 'installed',
     recipe_id: recipeId,
-    adult: adultFlag(deps.catalog, recipeId, existing),
+    adult: deps.catalog.adultFlag(recipeId, existing?.adult ?? 0),
     version: version ?? '',
     renpy_version: engine.version ?? '',
     engine: '',
@@ -400,12 +410,6 @@ async function installHtml(
   await builds.prune(id, previous)
   ctx.log(`Installed ${id} (build ${build}, ${engine.label}, ${(size.bytes / 1e9).toFixed(2)} GB)`)
   return { game: id, build, family: engine.family, size: size.bytes, saveDir, title, version, images, recipe: match?.recipe.id ?? null }
-}
-
-/** A game is adult when its recipe is. Without a recipe it keeps what the library knew. */
-export function adultFlag(catalog: Pick<Catalog, 'isAdultId'>, recipeId: string, existing: GameRow | null | undefined): number {
-  if (recipeId) return catalog.isAdultId(recipeId) ? 1 : 0
-  return existing?.adult ?? 0
 }
 
 async function modsInfo(deps: ImportDeps, id: string): Promise<BuildInfo['mods']> {

@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { accessSync, constants, readFileSync, statSync } from 'node:fs'
 import { parseAdultGroups } from './content/levels.js'
 import { parseAdultLevel, type AdultLevel } from './shared/levels.js'
+import { SAVE_FILE_BYTES } from './saves/savefile.js'
 import { fallbackOf } from './envvars.js'
 
 /*
@@ -234,7 +235,7 @@ export function loadConfig(): Config {
       .filter(Boolean),
     adultGames: adultGames(),
     demo: bool('RENPLAY_DEMO'),
-    saveLimits: bool('RENPLAY_DEMO') ? { file: 2 << 20, total: 32 << 20, files: 1000 } : { file: 64 << 20, total: Infinity, files: Infinity },
+    saveLimits: bool('RENPLAY_DEMO') ? { file: 2 << 20, total: 32 << 20, files: 1000 } : { file: SAVE_FILE_BYTES, total: Infinity, files: Infinity },
     defaultEngine: text('RENPLAY_ENGINE'),
     keepaliveUrl: text('RENPLAY_KEEPALIVE_URL'),
     keepaliveHost: text('RENPLAY_KEEPALIVE_HOST'),

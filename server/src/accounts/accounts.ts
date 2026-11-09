@@ -4,36 +4,24 @@ import { join } from 'node:path'
 import express, { Router, type Request, type Response } from 'express'
 import type { Config } from '../config.js'
 import { type ContentMode } from '../content/mode.js'
+import { isTagIdList } from '../shared/defaults.js'
 import { lowestLevel, parseAdultLevel, type AdultLevel } from '../shared/levels.js'
 import type { Db, GameRow } from '../db.js'
 import { parseJson } from '../db.js'
-import { viewer, viewers, type User, type Viewer } from './context.js'
+import { OWNER_ID, viewer, viewers, type User, type Viewer } from './context.js'
 import type { SaveStores } from '../saves/stores.js'
 import { HttpError } from '../util/paths.js'
-import { SignInProviders, signInRandom, type ExternalIdentity } from './sign-in.js'
-import { fetchAvatar, storeAvatar } from './avatars.js'
+import { SignInProviders, type ExternalIdentity } from './sign-in.js'
+import { AVATAR_LIMIT, fetchAvatar, storeAvatar } from './avatars.js'
 import { always, log } from '../util/log.js'
 import { readDefaults } from '../defaults/defaults.js'
 import { PASSWORD_PREFIX, equal, hash, passwordHash, passwordMatches, random, secretHash } from './passwords.js'
+import { parseGamePath } from '../play/path.js'
 import { demoCheck, playerRoute } from './access.js'
+import { publicUser, validName, validUsername } from './users.js'
 import type { AdultState, Identities, Me, Providers, Session, Sessions, SwitchPeople, TagPrefs, Token, TokenCreated, Tokens } from '../shared/api.js'
 
 const DAYS30 = 30 * 86400_000
-
-/** An account as the API sends it: never its PIN's hash or lock. */
-export function publicUser<T extends Partial<User>>(u: T): Omit<T, 'pin_hash' | 'pin_failures' | 'pin_locked_until'> & { hasPin: boolean } {
-  const { pin_hash, pin_failures: _f, pin_locked_until: _l, ...rest } = u
-  return { ...rest, hasPin: !!pin_hash }
-}
-
-export function validUsername(value: unknown): string {
-  if (typeof value !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,63}$/.test(value)) throw new HttpError(400, 'Use 2 to 64 letters, numbers, dots, dashes or underscores for the username')
-  return value.toLowerCase()
-}
-export function validName(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > 100) throw new HttpError(400, 'Enter a name with at most 100 characters')
-  return value.trim()
-}
 
 export class Accounts {
   readonly enabled: boolean
@@ -51,7 +39,7 @@ export class Accounts {
     this.enabled = cfg.demo || (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
   }
-  get unclaimed(): boolean { return !this.db.raw.prepare('SELECT 1 FROM identities WHERE user_id = 1').get() && !this.db.raw.prepare("SELECT 1 FROM settings WHERE key = 'owner_claim'").get() }
+  get unclaimed(): boolean { return !this.db.raw.prepare('SELECT 1 FROM identities WHERE user_id = ?').get(OWNER_ID) && !this.db.raw.prepare("SELECT 1 FROM settings WHERE key = 'owner_claim'").get() }
   user(id: number): User {
     const u = this.db.raw.prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as User | undefined
     if (!u) throw new HttpError(404, 'User not found')
@@ -98,8 +86,8 @@ export class Accounts {
   /** Writes a person's ceiling and choice. */
   writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
     const u = this.user(id)
-    const ceiling = patch.ceiling ?? parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
-    const choice = patch.choice ?? parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
+    const ceiling = patch.ceiling ?? this.content.ceilingOf(u)
+    const choice = patch.choice ?? this.content.choiceOf(u)
     this.db.raw.prepare('UPDATE users SET adult_ceiling = ?, adult_choice = ? WHERE id = ?').run(ceiling, choice, id)
   }
   /** Forgets the cached sessions, after a change to people or their sessions. */
@@ -107,15 +95,15 @@ export class Accounts {
   private async claim(raw: unknown, display: unknown, password: unknown): Promise<void> {
     const login = validUsername(raw), displayName = validName(display), encoded = await passwordHash(password)
     if (!this.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
-    if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != 1').get(login)) throw new HttpError(409, 'That username is taken')
+    if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != ?').get(login, OWNER_ID)) throw new HttpError(409, 'That username is taken')
     this.db.raw.exec('BEGIN IMMEDIATE')
     try {
-      this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = 1').run(login, displayName)
-      this.writeLevels(1, { ceiling: 'shown', choice: 'shown' })
-      this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, 1, ?)").run(login, encoded)
+      this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = ?').run(login, displayName, OWNER_ID)
+      this.writeLevels(OWNER_ID, { ceiling: 'shown', choice: 'shown' })
+      this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, ?, ?)").run(login, OWNER_ID, encoded)
       this.db.raw.exec('COMMIT')
     } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
-    await this.tag(this.user(1))
+    await this.tag(this.user(OWNER_ID))
     this.ownerClaimed()
   }
   /** The owner account has its sign-in: the setup code is no use any more. */
@@ -208,12 +196,12 @@ export class Accounts {
     if (!req.path.startsWith('/api/') && !req.path.startsWith('/g/')) return next()
     res.setHeader('Cache-Control', 'private, no-store')
     // Sandboxed HTML assets have no cookies. Their capability resolves to a live session.
-    const signed = req.path.match(/^\/g\/([^/]+)\/([^/]+)\/s\/([^/]+)\/game\//)
+    const signed = parseGamePath(req.path)
     let v: Viewer | null
-    if (signed) {
-      v = this.verifyAsset(signed[3]!, signed[1]!, signed[2]!)
+    if (signed?.token) {
+      v = this.verifyAsset(signed.token, signed.game, signed.build)
       res.locals.verifiedAsset = !!v
-      req.url = req.url.replace(`/s/${signed[3]}/game/`, '/game/')
+      req.url = req.url.replace(`/s/${signed.token}/game/`, '/game/')
     } else v = this.authenticate(req, res)
     if (req.path.startsWith('/api/auth/') && req.path !== '/api/auth/check') {
       const proceed = () => { try { this.csrf(req); next() } catch (e) { next(e) } }
@@ -252,8 +240,19 @@ export class Accounts {
   }
   guardLastAdmin(target: User, patch: { role?: string; disabled?: boolean }, removing = false): void {
     if (target.role !== 'admin' || target.disabled || (!removing && patch.role !== 'player' && patch.disabled !== true)) return
-    const { n } = this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }
-    if (n <= 1) throw new HttpError(409, 'Keep at least one enabled admin')
+    if (this.enabledAdmins() <= 1) throw new HttpError(409, 'Keep at least one enabled admin')
+  }
+  /** How many admins can sign in. */
+  enabledAdmins(): number {
+    return (this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }).n
+  }
+  /** Whether an account must stay: the owner, and the one that runs Renplay with sign-in off. */
+  isProtected(id: number): boolean {
+    return id === OWNER_ID || id === this.cfg.authUser
+  }
+  /** Sets a person's PIN, or clears it with an empty one, and forgets their wrong tries. */
+  private setPin(id: number, hash: string): void {
+    this.db.raw.prepare('UPDATE users SET pin_hash = ?, pin_failures = 0, pin_locked_until = 0 WHERE id = ?').run(hash, id)
   }
   /**
    * Signs a person out everywhere but `except`. Their PIN goes too, and other browsers forget them,
@@ -261,7 +260,7 @@ export class Accounts {
    */
   revoke(id: number, except = '', keepDevice = ''): void {
     this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash != ?').run(id, except)
-    this.db.raw.prepare("UPDATE users SET pin_hash = '', pin_failures = 0, pin_locked_until = 0 WHERE id = ?").run(id)
+    this.setPin(id, '')
     this.db.raw.prepare('DELETE FROM device_people WHERE user_id = ? AND device != ?').run(id, keepDevice)
     this.invalidate()
   }
@@ -292,14 +291,14 @@ export class Accounts {
     this.db.raw.exec('BEGIN IMMEDIATE')
     try {
       if (newOwner) {
-        id = 1
-        const ownerLogin = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != 1').get(identity.username) ? `sso-${signInRandom().slice(0, 12)}` : identity.username.slice(0, 64)
-        this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = 1').run(ownerLogin, identity.name.slice(0, 100))
-        this.writeLevels(1, { ceiling: 'shown', choice: 'shown' })
+        id = OWNER_ID
+        const ownerLogin = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != ?').get(identity.username, OWNER_ID) ? `sso-${random().slice(0, 12)}` : identity.username.slice(0, 64)
+        this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = ?').run(ownerLogin, identity.name.slice(0, 100), OWNER_ID)
+        this.writeLevels(OWNER_ID, { ceiling: 'shown', choice: 'shown' })
       } else if (id === undefined) {
         // Display names and emails are never used to match or merge accounts.
         const login = identity.username.toLowerCase().replace(/[^a-z0-9._-]/g, '-').slice(0, 48) || 'player'
-        const unique = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login) ? `${login}-${signInRandom().slice(0, 8)}` : login
+        const unique = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login) ? `${login}-${random().slice(0, 8)}` : login
         id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, created_at) VALUES (?, ?, ?, ?)').run(unique, identity.name.slice(0, 100), identity.admin ? 'admin' : 'player', new Date().toISOString()).lastInsertRowid)
         // The sign-in group's level, or the starting level for new people (the first admin starts at shown).
         const ceiling = identity.ceiling ?? (identity.admin ? 'shown' : this.cfg.adultDefault)
@@ -313,8 +312,7 @@ export class Accounts {
       const sameGrant = u.admin_provider === identity.provider && u.admin_subject === identity.subject
       if (!manuallyAssigned && (identity.roleManaged || identity.admin || sameGrant)) {
         if (u.role === 'admin' && !identity.admin && !u.disabled) {
-          const { n } = this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }
-          if (n <= 1) console.warn(`sign-in: Last enabled admin ${id!} lost the sign-in provider admin grant. Restore provider group membership or configure RENPLAY_ADMINS without an admin group or filter to recover access.`)
+          if (this.enabledAdmins() <= 1) console.warn(`sign-in: Last enabled admin ${id!} lost the sign-in provider admin grant. Restore provider group membership or configure RENPLAY_ADMINS without an admin group or filter to recover access.`)
         }
         this.db.raw.prepare('UPDATE users SET role = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = ?').run(identity.admin ? 'admin' : 'player', identity.roleManaged ? 'provider' : 'allowlist', identity.provider, identity.subject, id!)
       }
@@ -338,7 +336,7 @@ export class Accounts {
     this.limit(`oidc:${req.ip}`)
     for (const [key, flow] of this.oidcFlows) if (flow.expires < Date.now()) this.oidcFlows.delete(key)
     if (this.oidcFlows.size >= 10000) throw new HttpError(429, 'Too many sign-in attempts')
-    const state = signInRandom(), nonce = signInRandom(), verifier = signInRandom()
+    const state = random(), nonce = random(), verifier = random()
     this.oidcFlows.set(hash(state), { nonce, verifier, expires: Date.now() + 600000, ...(linking ? { session: viewer()!.session, user: this.current().id, bearer: viewer()!.bearer } : {}) })
     res.cookie('renplay_oidc', state, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/api/auth/oidc', maxAge: 600000 })
     return this.providers.authorization(state, nonce, verifier)
@@ -403,7 +401,7 @@ export class Accounts {
       this.db.raw.prepare('DELETE FROM identity_metadata WHERE provider = ? AND subject = ?').run(provider, subject)
       this.revoke(id, viewer()!.session, this.device(req)); res.json({ ok: true })
     })
-    r.post('/me/avatar', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '2mb' }), async (req, res) => {
+    r.post('/me/avatar', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: AVATAR_LIMIT }), async (req, res) => {
       if (!Buffer.isBuffer(req.body)) throw new HttpError(400, 'Upload a JPEG, PNG or WebP picture')
       const avatar = await storeAvatar(this.cfg.dataDir, req.body)
       this.db.raw.prepare('UPDATE users SET avatar = ?, avatar_uploaded = 1 WHERE id = ?').run(avatar, this.current().id)
@@ -424,7 +422,7 @@ export class Accounts {
     r.post('/auth/setup', async (req, res) => {
       if (!this.enabled || !this.setupGrant || typeof req.body?.grant !== 'string' || !equal(this.setupGrant, req.body.grant)) throw new HttpError(403, 'Enter the setup code first')
       await this.claim(req.body.username, req.body.name || req.body.username, req.body.password)
-      this.newSession(req, res, 1)
+      this.newSession(req, res, OWNER_ID)
       res.json({ ok: true })
     })
     r.post('/auth/login', async (req, res) => {
@@ -466,14 +464,14 @@ export class Accounts {
       if (viewer()?.bearer) throw new HttpError(403, 'Set your PIN in the browser')
       const pin = req.body?.pin
       if (pin === '' || pin === null) {
-        this.db.raw.prepare("UPDATE users SET pin_hash = '', pin_failures = 0, pin_locked_until = 0 WHERE id = ?").run(u.id)
+        this.setPin(u.id, '')
         res.json({ hasPin: false })
         return
       }
       if (u.role === 'admin') throw new HttpError(409, 'Admins switch in with their full sign-in, so an admin account has no PIN')
       if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) throw new HttpError(400, 'A PIN has 4 to 8 digits')
       const encoded = await secretHash(pin)
-      this.db.raw.prepare('UPDATE users SET pin_hash = ?, pin_failures = 0, pin_locked_until = 0 WHERE id = ?').run(encoded, u.id)
+      this.setPin(u.id, encoded)
       res.json({ hasPin: true })
     })
 
@@ -553,8 +551,8 @@ export class Accounts {
     })
     r.put('/me/tags', (req, res) => {
       const list = (v: unknown): string[] => {
-        if (!Array.isArray(v) || v.length > 60 || v.some((t) => typeof t !== 'string' || !/^[a-z0-9-]{1,40}$/.test(t))) throw new HttpError(400, 'Tags are lists of tag ids')
-        return [...new Set(v as string[])]
+        if (!isTagIdList(v)) throw new HttpError(400, 'Tags are lists of tag ids')
+        return [...new Set(v)]
       }
       const include = list(req.body?.include ?? [])
       const exclude = list(req.body?.exclude ?? []).filter((t) => !include.includes(t))
@@ -565,8 +563,8 @@ export class Accounts {
     })
     r.get('/me/adult', (_req, res) => {
       const u = this.current()
-      const ceiling = parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
-      const choice = parseAdultLevel(u.adult_choice) ?? this.cfg.adultDefault
+      const ceiling = this.content.ceilingOf(u)
+      const choice = this.content.choiceOf(u)
       res.json({
         installation: { level: this.content.level, fixed: this.content.locked, chosen: this.content.chosen },
         ceiling: { level: ceiling, managed: this.managed(u.id).adultManaged ? 'group' : null },
@@ -578,7 +576,7 @@ export class Accounts {
       const level = parseAdultLevel(req.body?.level)
       if (!level) throw new HttpError(400, 'Choose Off, Blurred or Shown')
       const u = this.current()
-      const ceiling = parseAdultLevel(u.adult_ceiling) ?? this.cfg.adultDefault
+      const ceiling = this.content.ceilingOf(u)
       if (lowestLevel(level, ceiling) !== level) throw new HttpError(409, `Your account allows at most ${ceiling}`)
       this.writeLevels(u.id, { choice: level })
       res.json({ ok: true, choice: level })

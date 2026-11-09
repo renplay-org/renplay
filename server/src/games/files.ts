@@ -1,6 +1,7 @@
 import express, { Router, type Request } from 'express'
 import multer from 'multer'
-import type { GameRow } from '../db.js'
+import { isWebGame, type GameRow } from '../db.js'
+import { baseOf, isModBuild, isModBuildOf } from './builds.js'
 import { Overlays } from './mods.js'
 import { baseFiles, readBaseFile } from '../pipeline/applymods.js'
 import { isZip, readZipEntries, type ZipLimits } from '../util/zip.js'
@@ -26,12 +27,12 @@ export function createFilesRouter(s: Services): Router {
   const game = (req: Request): GameRow => {
     const g = content.game(req.params.id)
     if (g.status !== 'installed') throw new HttpError(409, 'Install the game to browse its files')
-    if (g.family && g.family !== 'renpy') throw new HttpError(409, 'Files and mods are for Ren’Py games')
+    if (isWebGame(g)) throw new HttpError(409, 'Files and mods are for Ren’Py games')
     return g
   }
 
   const base = async (g: GameRow): Promise<BaseIndex> => {
-    const key = g.build.split('.m')[0]!
+    const key = baseOf(g.build)
     const c = cache.get(g.id)
     if (c && c.key === key) return c.files
     const files = await baseFiles(builds, g.id, g.build)
@@ -72,7 +73,7 @@ export function createFilesRouter(s: Services): Router {
       dir,
       dirs: [...dirs].map(([name, d]): FileEntry => ({ name, path: `${prefix}${name}`, type: 'dir', count: d.count, changed: d.changed })).sort((a, b) => a.name.localeCompare(b.name)),
       files: entries.sort((a, b) => a.name.localeCompare(b.name)),
-      mods: { ...summary, applied: g.build.endsWith(`.m${summary.hash}`) || (!summary.hash && !g.build.includes('.m')), job: jobs.activeFor(g.id)?.type === 'apply-mods' },
+      mods: { ...summary, applied: isModBuildOf(g.build, summary.hash) || (!summary.hash && !isModBuild(g.build)), job: jobs.activeFor(g.id)?.type === 'apply-mods' },
     } satisfies FilesResponse)
   })
 

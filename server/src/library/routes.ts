@@ -5,11 +5,10 @@ import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
 import { KEEP_DOWNLOADS, archiveIdentity, publishUpload } from './archives.js'
 import { parseJson, type GameSource } from '../db.js'
-import { INSPECT_VERSION, inspectArchive } from '../pipeline/import.js'
+import { INSPECT_VERSION, enqueueImport, inspectArchive } from '../pipeline/import.js'
 import type { Archive, ArchiveInfo, ArchivesResponse, InspectResponse, UploadStarted } from '../shared/api.js'
 import { exists, newId } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
-import { viewer } from '../accounts/context.js'
 import type { Services } from '../services.js'
 
 const ARCHIVE_RE = /\.(zip|7z|rar|tar|tgz|tar\.(gz|bz2|xz|zst))$/i
@@ -45,8 +44,6 @@ export function createLibraryRouter(deps: Services): Router {
 
   // ---- archives -------------------------------------------------------------
 
-  const archiveHidden = (rel: string, size?: number) => catalog.archiveHidden(rel, size)
-
   router.get('/archives', async (_req, res) => {
     const files = await listArchiveFiles(cfg.archivesDir)
     const installedBy = new Map<string, string>()
@@ -55,7 +52,7 @@ export function createLibraryRouter(deps: Services): Router {
     for (const g of db.allGames()) {
       const s = parseJson<GameSource>(g.source, {})
       if (!s.archive) continue
-      if (catalog.content.hides(g)) hiddenSources.add(s.archive)
+      if (deps.content.hides(g)) hiddenSources.add(s.archive)
       else installedBy.set(s.archive, g.id)
     }
     const known = new Map(db.allArchives().map((a) => [a.path, a]))
@@ -70,7 +67,7 @@ export function createLibraryRouter(deps: Services): Router {
         const sha256 = fresh ? row.sha256 || null : null
         const match = catalog.match({ name: f.rel, size: f.size, sha256: sha256 ?? undefined })
         // Off: an adult game does not exist, so its download does not appear in Add games.
-        if (match && catalog.content.hidesRecipe(match.recipe.nsfw)) return null
+        if (match && deps.content.hidesRecipe(match.recipe.nsfw)) return null
         if (hiddenSources.has(f.rel) && !installedBy.has(f.rel)) return null
         return {
           path: f.rel,
@@ -91,7 +88,7 @@ export function createLibraryRouter(deps: Services): Router {
                 nsfw: match.recipe.nsfw ?? false,
               }
             : null,
-          existingGame: [match ? db.gameByRecipe(match.recipe.id) : null, info?.saveDir ? db.gameBySaveDir(info.saveDir) : null].find((g) => g && !catalog.content.hides(g))?.id ?? null,
+          existingGame: [match ? db.gameByRecipe(match.recipe.id) : null, info?.saveDir ? db.gameBySaveDir(info.saveDir) : null].find((g) => g && !deps.content.hides(g))?.id ?? null,
         }
       }).filter((a) => a !== null),
     } satisfies ArchivesResponse)
@@ -102,7 +99,7 @@ export function createLibraryRouter(deps: Services): Router {
     const full = safeJoin(cfg.archivesDir, rel)
     const st = await stat(full).catch(() => null)
     if (!st) throw new HttpError(404, 'Archive not found')
-    if (archiveHidden(rel, st.size)) throw new HttpError(404, 'Archive not found')
+    if (catalog.archiveHidden(rel, st.size)) throw new HttpError(404, 'Archive not found')
     const info = await inspectArchive(full)
     const prev = db.getArchive(rel)
     db.upsertArchive({
@@ -113,19 +110,19 @@ export function createLibraryRouter(deps: Services): Router {
       info: JSON.stringify(info),
     })
     const existing = info.saveDir ? db.gameBySaveDir(info.saveDir) : null
-    res.json({ info, existingGame: existing && !catalog.content.hides(existing) ? existing.id : null } satisfies InspectResponse)
+    res.json({ info, existingGame: existing && !deps.content.hides(existing) ? existing.id : null } satisfies InspectResponse)
   })
 
   router.post('/archives/hash', (req, res) => {
     const rel = cleanRelPath(req.body?.path)
-    if (archiveHidden(rel)) throw new HttpError(404, 'Archive not found')
+    if (catalog.archiveHidden(rel)) throw new HttpError(404, 'Archive not found')
     res.json({ jobId: jobs.enqueue('hash-archive', '', { path: rel }) })
   })
 
   router.delete('/archives', async (req, res) => {
     const rel = cleanRelPath(req.query['path'])
     const full = safeJoin(cfg.archivesDir, rel)
-    if (!(await exists(full)) || archiveHidden(rel)) throw new HttpError(404, 'Archive not found')
+    if (!(await exists(full)) || catalog.archiveHidden(rel)) throw new HttpError(404, 'Archive not found')
     await unlink(full)
     db.deleteArchive(rel)
     res.json({ ok: true })
@@ -143,23 +140,21 @@ export function createLibraryRouter(deps: Services): Router {
     if (b.game !== undefined && b.game !== null && !isSlug(b.game)) throw new HttpError(400, 'Invalid game id')
     // `game` reinstalls into a game already in the library. Check it now: the install only gets
     // to it after unpacking, which takes an hour for a big game.
-    if (b.game && (!db.getGame(b.game) || catalog.content.hides(db.getGame(b.game)))) throw new HttpError(404, `Game ${b.game} is not in the library`)
+    if (b.game && (!db.getGame(b.game) || deps.content.hides(db.getGame(b.game)))) throw new HttpError(404, `Game ${b.game} is not in the library`)
     if (b.game && jobs.activeFor(b.game)) throw new HttpError(409, 'A job is already running for this game')
     // Off: an adult game does not exist, so its download cannot be installed either.
     {
       const st = await stat(safeJoin(cfg.archivesDir, rel)).catch(() => null)
-      if ((st && archiveHidden(rel, st.size)) || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId) && catalog.content.hidesRecipe(true))) throw new HttpError(404, 'Game not found')
+      if ((st && catalog.archiveHidden(rel, st.size)) || (typeof b.recipeId === 'string' && catalog.isAdultId(b.recipeId) && deps.content.hidesRecipe(true))) throw new HttpError(404, 'Game not found')
     }
-    const id = jobs.enqueue('import', b.game ?? '', {
+    const jobId = enqueueImport(jobs, {
       source,
       game: b.game || undefined,
       recipeId: typeof b.recipeId === 'string' ? b.recipeId : undefined,
-      engine: typeof b.engine === 'string' && b.engine ? b.engine : undefined,
+      engine: typeof b.engine === 'string' ? b.engine : undefined,
       reapplyMods: !!b.reapplyMods,
-      // Who started it: Choose artwork opens for them alone.
-      by: viewer()?.user.id,
     })
-    res.json({ jobId: id })
+    res.json({ jobId })
   })
 
   // ---- chunked uploads into the archives folder -------------------------------

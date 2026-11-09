@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Config } from '../config.js'
-import type { Db } from '../db.js'
+import { isWebGame, type Db } from '../db.js'
 import { presence, walkFiles, writeFileAtomic } from '../util/fsx.js'
 import { isSlug, slugify } from '../util/paths.js'
 import type { Purger } from '../util/purge.js'
@@ -38,7 +38,8 @@ export interface BuildInfo {
   mods?: { hash: string; files: number } | null
 }
 
-export const BUILD_RE = /^[a-z0-9]+(\.m[a-z0-9]+)?$/
+/** A build's folder name: its base, then `.m<hash>` for the build with the mods applied. */
+export const BUILD_RE = /^([a-z0-9]+)(?:\.m([a-z0-9]+))?$/
 
 export function newBuildId(): string {
   return Date.now().toString(36)
@@ -46,6 +47,21 @@ export function newBuildId(): string {
 
 export function baseOf(build: string): string {
   return build.split('.m')[0]!
+}
+
+/** The folder name of a base build with the mods of this hash applied. */
+export function modBuild(base: string, hash: string): string {
+  return `${base}.m${hash}`
+}
+
+/** Whether a build has mods applied. */
+export function isModBuild(build: string): boolean {
+  return build !== baseOf(build)
+}
+
+/** Whether a build is the one with the mods of this hash applied. */
+export function isModBuildOf(build: string, hash: string): boolean {
+  return build === modBuild(baseOf(build), hash)
 }
 
 export class Builds {
@@ -88,7 +104,7 @@ export class Builds {
   /** Caches stored for a build (a mod build adds its own), with versions for cache-busting URLs. */
   async caches(id: string, build: string): Promise<Array<{ name: string; v: string }>> {
     const out = new Map<string, string>()
-    for (const b of build === baseOf(build) ? [build] : [build, baseOf(build)]) {
+    for (const b of isModBuild(build) ? [build, baseOf(build)] : [build]) {
       for (const f of await walkFiles(join(this.dir(id, b), 'cache'))) {
         if (out.has(f.rel)) continue
         if (/\.rpyb$/.test(f.rel) || (f.rel.startsWith('rpyc/') && f.rel.endsWith('.rpyc'))) {
@@ -143,7 +159,7 @@ export class Builds {
       // An uninstalled game has no build. One with a build was marked missing here before.
       if (!g.build || (g.status !== 'installed' && g.status !== 'not_installed')) continue
       // Web games of other engines (docs.renplay.org/engines) have no game.zip, only the pack and its index.
-      const marker = g.family && g.family !== 'renpy' ? 'assets.json' : 'game.zip'
+      const marker = isWebGame(g) ? 'assets.json' : 'game.zip'
       const there = await presence(join(this.dir(g.id, g.build), marker))
       if (g.status === 'installed' && there === false) {
         this.db.updateGame(g.id, { status: 'not_installed' })

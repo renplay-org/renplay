@@ -1,4 +1,4 @@
-import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
+import { createHash, scrypt, timingSafeEqual } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { readFileSync } from 'node:fs'
 import { Client } from 'ldapts'
@@ -128,7 +128,6 @@ export class SignInProviders {
     } finally { await client.unbind().catch(() => {}) }
   }
 }
-export const signInRandom = () => randomBytes(32).toString('base64url')
 
 /** The cn of every group DN in a memberOf attribute (string or list), unescaped. */
 export function groupCns(memberOf: unknown): string[] {

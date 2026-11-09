@@ -3,17 +3,16 @@ import { mkdir, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import yazl from 'yazl'
-import { baseOf, type Builds } from '../games/builds.js'
+import { baseOf, modBuild, type Builds } from '../games/builds.js'
 import type { Config } from '../config.js'
 import type { Db } from '../db.js'
 import type { JobContext } from '../jobs/manager.js'
 import type { Overlays } from '../games/mods.js'
 import { exists } from '../util/fsx.js'
 import { readAll, openZip } from './archive.js'
-import { copyZipEntries } from './assemble.js'
+import { STORED, copyZipEntries } from './assemble.js'
 import { PackReader } from './pack.js'
 
-const STORED = /\.(png|jpe?g|webp|avif|gif|ogg|opus|mp3|webm|mp4|ogv|zip|rpa|rpyc|rpymc|rpyb)$/i
 
 export interface ModDeps {
   cfg: Config
@@ -46,7 +45,7 @@ export async function applyMods(ctx: JobContext<{ game: string }>, deps: ModDeps
   }
 
   const hash = await overlays.hash(id)
-  const build = `${base}.m${hash}`
+  const build = modBuild(base, hash)
   if (game.build === build && (await exists(join(builds.dir(id, build), 'game.zip')))) return { build, mods: files.length + deleted.length, unchanged: true }
 
   const touched = new Set<string>(files.map((f) => f.path))

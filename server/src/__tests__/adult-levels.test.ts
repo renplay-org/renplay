@@ -9,7 +9,7 @@ import yazl from 'yazl'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
 import { groupCeiling, parseAdultGroups } from '../content/levels.js'
-import { adultFlag } from '../pipeline/import.js'
+import { Catalog } from '../catalog/catalog.js'
 import { Db } from '../db.js'
 import { SAVES_ZIP } from '../saves/savefile.js'
 import { readZipEntries } from '../util/zip.js'
@@ -266,8 +266,7 @@ describe('the levels on every route', () => {
     ['POST /users/:id/saves/copy', 'tool'], ['GET /users/:id/saves/export', 'tool'], ['POST /users/:id/saves/import', 'person'],
     ['POST /me/claim-owner', 'person'], ['POST /users/:id/merge', 'person'], ['DELETE /users/:id', 'person'], ['POST /games/:id/safe', 'game'],
     ['GET /api/auth/check', 'game'], ['GET /g/:id/:build/,/g/:id/:build/index.html', 'game'], ['GET /api/games/:id/offline', 'game'],
-    ['GET /^\\/g\\/([a-z0-9][a-z0-9._-]*)\\/([a-z0-9]+)(?:\\.m[a-z0-9]+)?\\/game\\/(.+)$/', 'game'],
-    ['GET /^\\/g\\/([a-z0-9][a-z0-9._-]*)\\/([a-z0-9]+)(?:\\.m([a-z0-9]+))?\\/(.+)$/', 'game'],
+    ['GET /^\\/g\\//', 'game'],
     // A save backup is the server's full copy of everyone's saves: never filtered, saves are sacred.
     ['GET /system/backups', 'tool'], ['POST /system/backups', 'tool'], ['GET /system/backups/:name', 'tool'], ['PUT /system/sync', 'none'], ['GET /system/storage', 'tool'], ['GET /defaults', 'none'], ['PUT /defaults', 'none'], ['POST /system/storage/refresh', 'none'],
     ['GET /health', 'none'], ['GET /keepalive', 'none'], ['GET /renplay/runtime.js', 'none'], ['GET /system', 'list'], ['PUT /system/downloads', 'none'], ['POST /system/prune', 'none'],
@@ -619,11 +618,14 @@ describe('the levels on every route', () => {
 
 describe('review fixes outside the routes', () => {
   it('marks an install adult from its recipe at once, and keeps a recipe-less game\'s mark', () => {
-    const catalog = { isAdultId: (id: string) => id === 'adult' }
-    expect(adultFlag(catalog, 'adult', null)).toBe(1)
-    expect(adultFlag(catalog, 'safe', { adult: 1 } as never)).toBe(0)
-    expect(adultFlag(catalog, '', { adult: 1 } as never)).toBe(1)
-    expect(adultFlag(catalog, '', null)).toBe(0)
+    const catalog = new Catalog({} as never, {} as never, {} as never, {} as never)
+    const recipes = (catalog as unknown as { recipes: Map<string, unknown> }).recipes
+    recipes.set('adult', { id: 'adult', nsfw: true })
+    recipes.set('safe', { id: 'safe' })
+    expect(catalog.adultFlag('adult', 0)).toBe(1)
+    expect(catalog.adultFlag('safe', 1)).toBe(0)
+    expect(catalog.adultFlag('', 1)).toBe(1)
+    expect(catalog.adultFlag('', 0)).toBe(0)
   })
 
   it('reads a group mapping without one valid entry as everyone at Off, never as no mapping', () => {

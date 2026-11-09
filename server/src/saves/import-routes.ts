@@ -77,13 +77,9 @@ export function createSavesImportRouter(s: Services): Router {
         report.skipped.push(rel)
         continue
       }
-      const before = await saves.stat(dir, name)
       // base 0: this computer never saw the server's copy, so the newer of the two stays.
       const written = await saves.write(dir, name, data, { mtimeMs: mtime, reason: 'import', base: 0, everyKind: true })
-      if (written.conflict === 'kept') report.kept++
-      else if (written.conflict === 'replaced') report.replaced++
-      else if (before) report.same++
-      else report.added++
+      report[written.outcome]++
     }
     res.json(report)
   }, { fields: 1 }))

@@ -1,5 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
+/** The first account, made at the first start. It owns what existed before there was sign-in. */
+export const OWNER_ID = 1
+
 export interface User {
   id: number
   username: string

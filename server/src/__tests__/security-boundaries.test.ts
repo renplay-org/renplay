@@ -6,9 +6,9 @@ import request from 'supertest'
 import express from 'express'
 import yazl from 'yazl'
 import yauzl from 'yauzl'
-import { SAVES_ZIP } from '../saves/savefile.js'
+import { SAVES_ZIP, SAVE_FILE_BYTES } from '../saves/savefile.js'
 import { readZipEntries } from '../util/zip.js'
-import { saveImport, IMPORT_MAX_BYTES, IMPORT_MAX_FILE_BYTES } from '../saves/import-upload.js'
+import { saveImport, IMPORT_MAX_BYTES } from '../saves/import-upload.js'
 import { signInReturnUrl } from '../../../selector/src/lib/sign-in-return.js'
 import { queueHtmlSave, replayHtmlSaves } from '../../../selector/src/lib/html-save-queue.js'
 
@@ -70,7 +70,7 @@ describe('security boundary regressions', () => {
     expect((await first).status).toBe(200); expect((await second).status).toBe(200)
     await vi.waitFor(() => paths.forEach((path) => expect(() => readFileSync(path)).toThrow()))
     await request(app).post('/import').set('Content-Length', String(IMPORT_MAX_BYTES + (2 << 20))).send('x').expect(413)
-    await request(app).post('/import').attach('files', Buffer.alloc(IMPORT_MAX_FILE_BYTES + 1), 'persistent').expect(400)
+    await request(app).post('/import').attach('files', Buffer.alloc(SAVE_FILE_BYTES + 1), 'persistent').expect(400)
     // Three individually valid files cross the aggregate limit, including chunked requests. Streams
     // are what makes them chunked, and supertest's types leave them out.
     const chunked = () => Readable.from([Buffer.alloc(48 << 20)]) as unknown as Buffer

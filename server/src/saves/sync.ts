@@ -176,12 +176,8 @@ export async function downloadSync(server: string, store: SaveStore, saveDir: st
     // is newer. A broken or empty file never takes a save's place.
     const meta = await readSaveMeta(data)
     if (!meta) continue
-    const before = await store.stat(saveDir, name)
     const written = await store.write(saveDir, name, data, { mtimeMs: meta.ctime ? meta.ctime * 1000 : mtime, reason: 'sync', base: 0 })
-    if (written.conflict === 'kept') report.kept++
-    else if (written.conflict === 'replaced') report.replaced++
-    else if (before) report.same++
-    else report.added++
+    report[written.outcome]++
   }
   return report
 }

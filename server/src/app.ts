@@ -4,7 +4,7 @@ import express, { type ErrorRequestHandler } from 'express'
 import multer from 'multer'
 import type { Accounts } from './accounts/accounts.js'
 import { playerRoute } from './accounts/access.js'
-import { viewer } from './accounts/context.js'
+import { OWNER_ID, viewer } from './accounts/context.js'
 import type { SaveBackups } from './saves/backups.js'
 import type { Builds } from './games/builds.js'
 import type { Catalog } from './catalog/catalog.js'
@@ -22,7 +22,9 @@ import { createPeopleRouter } from './people/routes.js'
 import { createProgressRouter } from './progress/routes.js'
 import { createContentRouter } from './content/routes.js'
 import { createLibraryRouter } from './library/routes.js'
-import { PRESPLASH, createPlayRouter } from './play/routes.js'
+import { isPresplash } from './pipeline/project.js'
+import { parseGamePath } from './play/path.js'
+import { createPlayRouter } from './play/routes.js'
 import { createSavesRouter } from './saves/routes.js'
 import { createMetricsRouter } from './system/metrics.js'
 import { createSystemRouter } from './system/routes.js'
@@ -48,7 +50,7 @@ export interface App {
   close(): void
 }
 
-export async function createApp(cfg: Config, opts: { runtimePath?: string; startJobs?: boolean } = {}): Promise<App> {
+export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {}): Promise<App> {
   const services = await createServices(cfg)
   const { db, content, accounts, art, catalog, jobs, builds, engines, purger, backups, version } = services
 
@@ -62,8 +64,9 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     const path = req.path
     // Only the filename tail of a canonical packed-asset route may contain encoded #, ? or %.
     // Route components retain the stricter rules; separators and double-encoded octets never pass.
-    const asset = path.match(/^\/g\/[a-z0-9][a-z0-9._-]*\/[a-z0-9]+(?:\.m[a-z0-9]+)?\/(?:s\/[a-zA-Z0-9_.-]+\/)?game\/(.+)$/)
-    const structure = asset ? path.slice(0, -asset[1]!.length) : path
+    const rest = parseGamePath(path)?.rest
+    const tail = rest?.startsWith('game/') ? rest.slice(5) : ''
+    const structure = tail ? path.slice(0, -tail.length) : path
     if (/^\/(?:api|g)(?:\/|%|$)/i.test(path) && (
       !/^\/(?:api|g)\//.test(path) || path.includes('//') || /%(?:2f|5c|00|25[0-9a-f]{2})/i.test(path) || /%(?:25|3f|23)/i.test(structure) || path.includes('\\') ||
       (path.startsWith('/api/') && path.endsWith('/'))
@@ -78,7 +81,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     const game = path.match(/^\/g\/([^/]+)\//)?.[1]
     if (game && (!db.getGame(game) || content.hides(db.getGame(game)))) throw new HttpError(404, 'Game not found')
     // The presplash is a picture of the game, not part of playing it: withheld below Shown.
-    if (game && PRESPLASH.test(path) && content.blurs(db.getGame(game))) throw new HttpError(404, 'Not found')
+    if (game && isPresplash(path) && content.blurs(db.getGame(game))) throw new HttpError(404, 'Not found')
     const picture = path.match(/^\/api\/art\/([^/]+)$/)?.[1]
     if (picture && !art.canRead(picture)) throw new HttpError(404, 'Not found')
     const walkthrough = path.match(/^\/api\/walkthroughs\/([^/]+)$/)?.[1]
@@ -96,7 +99,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
       path = req.get('x-original-uri') ?? ''
       if (!path.startsWith('/') || /[%?#]/.test(path) || path.includes('\\') || path.includes('//') || /(?:^|\/)\.{1,2}(?:\/|$)/.test(path)) throw new Error('Invalid path')
     } catch { throw new HttpError(403, 'Invalid static path') }
-    if (!/^\/g\/[a-z0-9][a-z0-9._-]*\/[a-z0-9]+(?:\.m[a-z0-9]+)?\/.+$/.test(path) && !/^\/api\/(?:art|walkthroughs)\/[^/]+$/.test(path)) throw new HttpError(403, 'Not a static game file')
+    if (!parseGamePath(path)?.rest && !/^\/api\/(?:art|walkthroughs)\/[^/]+$/.test(path)) throw new HttpError(403, 'Not a static game file')
     if (viewer()?.user.role !== 'admin' && !playerRoute('GET', path)) throw new HttpError(403, 'Only an admin can do this')
     // auth_request accepts only 2xx, 401 or 403; a hidden file must not become a 500.
     try { if (!checkStatic(path)) throw new HttpError(403, 'Not a recognized static resource') } catch (error) {
@@ -106,7 +109,7 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     res.sendStatus(204)
   })
   app.use((req, _res, next) => { try { checkStatic(req.path); next() } catch (e) { next(e) } })
-  app.use(createPlayRouter(services, opts.runtimePath))
+  app.use(createPlayRouter(services))
 
   if (opts.startJobs !== false) backups.start()
   app.use('/api', createSystemRouter(services))
@@ -167,5 +170,5 @@ export async function createApp(cfg: Config, opts: { runtimePath?: string; start
     ]
   }
 
-  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(1), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
+  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(OWNER_ID), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
 }

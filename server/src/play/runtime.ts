@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/** The repository's runtime/ folder, when RENPLAY_RUNTIME_PATH does not name another. */
-const IN_REPOSITORY = fileURLToPath(new URL('../../../runtime/renplay-runtime.js', import.meta.url))
+/** The runtime/ folder: next to server/ in the repository and in the image (/app/runtime). */
+const RUNTIME_DIR = fileURLToPath(new URL('../../../runtime/', import.meta.url))
 
 export interface Runtimes {
   /** Ren'Py's, served at /renplay/runtime.js. */
@@ -19,12 +19,12 @@ export interface Runtimes {
  * Builds the two in-game runtimes from runtime/: renplay-player.js, what both share, in front of
  * each one's own script. One function holds both, so nothing of the shared part is global.
  */
-export function readRuntimes(runtimePath = IN_REPOSITORY): Runtimes {
-  const read = (name: string) => readFileSync(join(dirname(runtimePath), name), 'utf-8')
+export function readRuntimes(): Runtimes {
+  const read = (name: string) => readFileSync(join(RUNTIME_DIR, name), 'utf-8')
   const player = read('renplay-player.js')
   const wrap = (own: string) =>
     `;(function () {\n'use strict'\n// A page that loads the runtime twice keeps the first.\nif (window.__renplayPlayer) return\nwindow.__renplayPlayer = true\n${player}\n${own}\n})()\n`
-  const renpy = wrap(readFileSync(runtimePath, 'utf-8'))
+  const renpy = wrap(read('renplay-runtime.js'))
   // Inside a script tag: a closing tag in the text would end it.
   const html = `${read('vendor/fake-indexeddb.js')}\n;\n${wrap(read('renplay-html.js'))}`.replace(/<\/script/gi, '<\\/script')
   return { renpy, html, version: createHash('sha1').update(renpy).digest('hex').slice(0, 10) }

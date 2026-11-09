@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
 import { DEFAULTS_KEY, readDefaults } from './defaults.js'
-import type { Defaults } from '../shared/defaults.js'
+import { TEXT_SIZES, isTagIdList, type Defaults } from '../shared/defaults.js'
 
 /** The defaults for everyone: anyone may read them, an admin sets them. */
 export function createDefaultsRouter(s: Services): Router {
@@ -20,9 +20,9 @@ export function createDefaultsRouter(s: Services): Router {
       if (typeof v !== 'boolean') throw new HttpError(400, `${name} is true, false or empty`)
       return v
     }
-    if (b.tagsExclude !== undefined && (!Array.isArray(b.tagsExclude) || b.tagsExclude.length > 60 || b.tagsExclude.some((t: unknown) => typeof t !== 'string' || !/^[a-z0-9-]{1,40}$/.test(t))))
+    if (b.tagsExclude !== undefined && !isTagIdList(b.tagsExclude))
       throw new HttpError(400, 'Tags are a list of tag ids')
-    if (b.textSize !== undefined && b.textSize !== null && ![1, 1.25, 1.5].includes(b.textSize)) throw new HttpError(400, 'Text size is 1, 1.25, 1.5 or empty')
+    if (b.textSize !== undefined && b.textSize !== null && !TEXT_SIZES.includes(b.textSize)) throw new HttpError(400, 'Text size is 1, 1.25, 1.5 or empty')
     const next: Defaults = {
       tagsExclude: [...new Set<string>(b.tagsExclude ?? [])],
       lighterBackground: bool(b.lighterBackground, 'Lighter background'),

@@ -1,6 +1,7 @@
 import express, { Router, type Request } from 'express'
 import type { GameRow } from '../db.js'
 import { ART_KINDS, type ArtKind } from '../shared/recipe.js'
+import { EVERYONE } from './store.js'
 import type { Services } from '../services.js'
 import { HttpError } from '../util/paths.js'
 import type { ArtCandidates, ArtUploaded } from '../shared/api.js'
@@ -25,7 +26,7 @@ export function createArtRouter(s: Services): Router {
     const me = accounts.current()
     if (value === 'everyone') {
       if (me.role !== 'admin') throw new HttpError(403, 'Only an admin can choose art for everyone')
-      return 0
+      return EVERYONE
     }
     if (value !== undefined && value !== 'me') throw new HttpError(400, 'Scope must be me or everyone')
     return me.id
@@ -51,7 +52,7 @@ export function createArtRouter(s: Services): Router {
     const picture = subject.pictures.find((p) => p.kind === kind && p.id === req.body?.candidate)
     if (!picture) throw new HttpError(404, 'That picture is not a choice for this game')
     // For everyone: a catalog picture or one uploaded for everyone. A personal upload is not on the others' lists.
-    if (scope === 0 && picture.upload && !art.isShared(picture.id, g.id))
+    if (scope === EVERYONE && picture.upload && !art.isShared(picture.id, g.id))
       throw new HttpError(409, 'Upload this picture for everyone first, then choose it for everyone.')
     art.choose(g.id, kind, req.body.candidate, scope)
     await art.ready(subject, scope)

@@ -12,3 +12,11 @@ export interface Defaults {
   rollback: boolean | null
   skip: boolean | null
 }
+
+/** The sizes a person or the admin can choose for Ren'Py text. */
+export const TEXT_SIZES: readonly number[] = [1, 1.25, 1.5]
+
+/** A list of tag ids, as the Catalog page keeps them: a few, each lowercase letters, digits and hyphens. */
+export function isTagIdList(v: unknown): v is string[] {
+  return Array.isArray(v) && v.length <= 60 && v.every((t) => typeof t === 'string' && /^[a-z0-9-]{1,40}$/.test(t))
+}

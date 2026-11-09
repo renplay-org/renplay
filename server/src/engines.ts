@@ -30,7 +30,16 @@ interface EngineIndex {
 }
 
 /** Files a pack must have; the rest (license) is kept when present. */
-const REQUIRED = ['renpy.wasm.gz', 'renpy.data.gz', 'renpy.js', 'renpy-pre.js', 'renpy.zip', 'index.html', 'web-presplash.jpg']
+export const ENGINE_FILES = {
+  pre: 'renpy-pre.js',
+  main: 'renpy.js',
+  wasm: 'renpy.wasm.gz',
+  data: 'renpy.data.gz',
+  zip: 'renpy.zip',
+  page: 'index.html',
+  presplash: 'web-presplash.jpg',
+}
+const REQUIRED = Object.values(ENGINE_FILES)
 const INDEX_KEY = 'engines_index'
 const INDEX_MAX_AGE = 6 * 3600_000
 const VERSION_RE = /^\d+\.\d+(\.\d+)*$/
@@ -180,8 +189,21 @@ export class EngineStore {
     return t
   }
 
-  /** Removes engine packs no installed game uses. */
-  async prune(used: Set<string>): Promise<string[]> {
+  /**
+   * The engines the library's builds run on, each with the titles of those games. The one rule for
+   * which packs to keep. A game whose folder is missing keeps its build and its engine, so it plays
+   * again when the folder comes back. A caller that may not show every game passes only the ones it
+   * may.
+   */
+  inUse(games = this.db.allGames()): Map<string, string[]> {
+    const used = new Map<string, string[]>()
+    for (const g of games) if (g.engine && g.build) used.set(g.engine, [...(used.get(g.engine) ?? []), g.title])
+    return used
+  }
+
+  /** Removes engine packs no build uses. */
+  async prune(): Promise<string[]> {
+    const used = this.inUse()
     const removed: string[] = []
     for (const e of await this.installed()) {
       if (used.has(e.version)) continue

@@ -27,7 +27,6 @@ export class JobManager {
   private pending: Partial<JobRow> & { id?: string } = {}
   private flushTimer: NodeJS.Timeout | null = null
   private keepalive: { stop: () => void } | null = null
-  listeners = new Set<() => void>()
 
   constructor(
     private readonly db: Db,
@@ -60,7 +59,6 @@ export class JobManager {
     if (!this.handlers.has(type)) throw new Error(`Unknown job type ${type}`)
     const id = newId('j')
     this.db.insertJob({ id, type, game, params: JSON.stringify(params ?? {}) })
-    this.notify()
     // Installs are shared work, not extensions of the enqueuing user's permissions.
     viewers.exit(() => void this.pump())
     return id
@@ -76,7 +74,6 @@ export class JobManager {
     if (!job) return false
     if (job.status === 'queued') {
       this.db.updateJob(id, { status: 'cancelled', finished_at: new Date().toISOString() })
-      this.notify()
       return true
     }
     if (job.status === 'running' && this.running?.id === id) {
@@ -108,10 +105,6 @@ export class JobManager {
     return this.running !== null
   }
 
-  private notify() {
-    for (const l of this.listeners) l()
-  }
-
   private async pump(): Promise<void> {
     if (this.running) return
     const next = this.db
@@ -130,7 +123,6 @@ export class JobManager {
     this.logWriteFailed = false
     this.keepalive ??= startKeepalive(this.cfg)
     this.db.updateJob(next.id, { status: 'running', started_at: new Date().toISOString(), stage: 'Starting', progress: 0 })
-    this.notify()
     const started = Date.now()
     const what = `${handler?.name ?? next.type}${next.game ? ` of ${next.game}` : ''}`
     log('job', `${what} started`)
@@ -191,7 +183,6 @@ export class JobManager {
     } finally {
       this.liveLog = ''
       this.running = null
-      this.notify()
       setImmediate(() => void this.pump())
     }
   }
@@ -206,9 +197,6 @@ export class JobManager {
     this.flushTimer = null
     const { id, ...rest } = this.pending
     this.pending = {}
-    if (id) {
-      this.db.updateJob(id, rest)
-      this.notify()
-    }
+    if (id) this.db.updateJob(id, rest)
   }
 }

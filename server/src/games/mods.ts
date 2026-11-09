@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rename, stat, unlink } from 'node:fs/promises'
+import { mkdir, readFile, rename, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { Config } from '../config.js'
 import { exists, walkFiles, writeFileAtomic } from '../util/fsx.js'
@@ -128,13 +128,5 @@ export class Overlays {
     const dest = join(this.cfg.overlaysDir, '.archived', `${slug}-${Date.now()}`)
     await mkdir(dirname(dest), { recursive: true })
     await rename(src, dest)
-  }
-
-  async sizeOf(slug: string, path: string): Promise<number | null> {
-    try {
-      return (await stat(safeJoin(this.filesDir(slug), Overlays.editablePath(path)))).size
-    } catch {
-      return null
-    }
   }
 }

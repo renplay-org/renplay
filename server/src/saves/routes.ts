@@ -1,7 +1,7 @@
 import express, { Router, type Request } from 'express'
 import { readFile } from 'node:fs/promises'
 import { saveImport } from './import-upload.js'
-import type { GameRow } from '../db.js'
+import { isRenpyGame, type GameRow } from '../db.js'
 import { SAVES_ZIP, readSaveScreenshot, slotInfo } from './savefile.js'
 import { readZipEntries } from '../util/zip.js'
 import { cachedSaveMeta, cachedSceneHash } from './cache.js'
@@ -69,13 +69,19 @@ function gameSaves(s: Services): Router {
     res.json({ saveDir: g.save_dir || null, files, lazy, serverTime: Date.now() })
   })
 
+  /** The version the device last saw, for the conflict rule. Older runtimes send none. */
+  const baseHeader = (req: Request): number | undefined => {
+    const raw = req.header('x-base')
+    return raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : undefined
+  }
+
   /**
    * Resolves a ~/.renpy-relative path to (folder, name). Any folder is allowed:
    * games read and write each other's folders like on desktop. The game's own
    * folder is only learned from config.save_directory (POST /save-dir), never
    * guessed from paths, since a write may belong to another game's folder.
    */
-  const resolvePath = (_g: GameRow, raw: unknown): { dir: string; name: string } => {
+  const resolvePath = (raw: unknown): { dir: string; name: string } => {
     const rel = cleanRelPath(raw)
     const slash = rel.indexOf('/')
     if (slash === -1) throw new HttpError(400, 'Path must be inside a save folder')
@@ -89,21 +95,18 @@ function gameSaves(s: Services): Router {
   /** Raw read of any file in the central tree (lazy files in the runtime). */
   router.get('/:id/raw', async (req, res) => {
     game(req)
-    const rel = cleanRelPath(req.query['path'])
-    const slash = rel.indexOf('/')
-    if (slash === -1) throw new HttpError(400, 'Invalid path')
-    if (!allowedDir(rel.slice(0, slash))) throw new HttpError(404, 'Save folder not found')
-    const data = await s.saves.read(rel.slice(0, slash), rel.slice(slash + 1))
+    const { dir, name } = resolvePath(req.query['path'])
+    const data = await s.saves.read(dir, name)
     res.setHeader('Cache-Control', 'no-store')
     // The version sent, so a device that loads it knows what it saw.
-    res.setHeader('X-Renplay-Mtime', String((await s.saves.stat(rel.slice(0, slash), rel.slice(slash + 1)))?.mtimeMs ?? 0))
+    res.setHeader('X-Renplay-Mtime', String((await s.saves.stat(dir, name))?.mtimeMs ?? 0))
     res.type('application/octet-stream').send(data)
   })
 
   // The body is refused while it arrives once it passes the limit, never held whole in memory.
   router.put('/:id/file', express.raw({ type: () => true, limit: limits.file }), async (req, res) => {
-    const g = game(req)
-    const { dir, name } = resolvePath(g, req.query['path'])
+    game(req)
+    const { dir, name } = resolvePath(req.query['path'])
     const body = req.body as Buffer
     if (!Buffer.isBuffer(body)) throw new HttpError(400, 'Expected a binary body')
     if (body.length > limits.file) throw new HttpError(413, `A save here can be at most ${Math.round(limits.file / (1 << 20))} MB`)
@@ -112,9 +115,7 @@ function gameSaves(s: Services): Router {
       if (size.bytes + body.length > limits.total || size.files >= limits.files) throw new HttpError(507, 'The saves here are full until the next fresh start')
     }
     const mtime = Number(req.header('x-mtime')) || undefined
-    // The version the device last saw, for the conflict rule. Older runtimes send none.
-    const rawBase = req.header('x-base')
-    const base = rawBase !== undefined && /^\d+$/.test(rawBase) ? Number(rawBase) : undefined
+    const base = baseHeader(req)
     const rawUnanswered = req.header('x-unanswered')
     const unanswered = rawUnanswered && /^[0-9a-f]{1,8}:\d{1,9}$/.test(rawUnanswered) ? rawUnanswered : undefined
     const f = await s.saves.write(dir, name, body, { mtimeMs: mtime, reason: 'game', base, unanswered })
@@ -122,11 +123,9 @@ function gameSaves(s: Services): Router {
   })
 
   router.delete('/:id/file', async (req, res) => {
-    const g = game(req)
-    const { dir, name } = resolvePath(g, req.query['path'])
-    const rawBase = req.header('x-base')
-    const base = rawBase !== undefined && /^\d+$/.test(rawBase) ? Number(rawBase) : undefined
-    const removed = await s.saves.remove(dir, name, 'game-delete', base)
+    game(req)
+    const { dir, name } = resolvePath(req.query['path'])
+    const removed = await s.saves.remove(dir, name, 'game-delete', baseHeader(req))
     // Another device saved it since this one last saw it: the save stays, and the device loads it.
     if (removed === 'changed') {
       res.status(409).json({ conflict: 'kept', mtime: (await s.saves.stat(dir, name))?.mtimeMs ?? 0 })
@@ -201,7 +200,7 @@ function gameSaves(s: Services): Router {
     slots.sort((a, b) => b.ctime - a.ctime)
     // Second versions the conflict rule kept in History during the last two weeks.
     const conflicts = await s.saves.conflicts(g.save_dir, Date.now() - 14 * 24 * 3600_000)
-    res.json({ saveDir: g.save_dir, slots, other, conflicts, sync: g.family === 'renpy' && syncCodesOn(db) } satisfies SavesResponse)
+    res.json({ saveDir: g.save_dir, slots, other, conflicts, sync: isRenpyGame(g) && syncCodesOn(db) } satisfies SavesResponse)
   })
 
   // ---- Ren'Py Sync codes ------------------------------------------------------
@@ -209,7 +208,7 @@ function gameSaves(s: Services): Router {
   const syncGame = (req: Request): string => {
     const g = game(req)
     if (!syncCodesOn(db)) throw new HttpError(409, 'Sync codes are off. An admin can turn them on in Settings.')
-    if (g.family !== 'renpy') throw new HttpError(409, 'Sync codes are for Ren’Py games.')
+    if (!isRenpyGame(g)) throw new HttpError(409, 'Sync codes are for Ren’Py games.')
     return requireSaveDir(g)
   }
 
