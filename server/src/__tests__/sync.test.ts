@@ -10,7 +10,8 @@ import { createApp, type App } from '../app.js'
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
 import { secretboxDecrypt, secretboxEncrypt } from '../saves/hydrogen.js'
-import { readZipEntries } from '../saves/savefile.js'
+import { SAVES_ZIP } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
 import { hashGame, keyAndHash, newSyncCode, normalizeSyncCode } from '../saves/sync.js'
 
 // Made by Ren'Py 8.5.3's own renpy.encryption.secretbox_encrypt and renpy.store._sync in the web
@@ -128,7 +129,7 @@ describe('Sync codes', () => {
     const { key, hash } = keyAndHash(code, 'Story-1')
     const box = kept.get(`/api/sync/v1/${hash}`)!
     expect(box).toBeTruthy()
-    const entries = await readZipEntries(secretboxDecrypt(box, key), () => true)
+    const entries = await readZipEntries(secretboxDecrypt(box, key), () => true, SAVES_ZIP)
     // The persistent data and the saves, without autosaves, quick saves after the first, or files starting with _.
     expect([...entries.keys()].sort()).toEqual(['1-1-LT1.save', 'persistent', 'quick-1-LT1.save', 'save_directory'])
     expect(entries.get('save_directory')!.toString()).toBe('Story-1')
@@ -138,7 +139,7 @@ describe('Sync codes', () => {
     const { code } = (await request(app.app).post('/api/saves/story/sync').send({ tz: 'Asia/Tokyo' }).expect(200)).body
     const { key, hash } = keyAndHash(code, 'Story-1')
     const times = new Map<string, number>()
-    await readZipEntries(secretboxDecrypt(kept.get(`/api/sync/v1/${hash}`)!, key), () => true, 64 << 20, times)
+    await readZipEntries(secretboxDecrypt(kept.get(`/api/sync/v1/${hash}`)!, key), () => true, { ...SAVES_ZIP, totalBytes: 64 << 20 }, times)
     const saved = (await app.saves.stat('Story-1', '1-1-LT1.save'))!.mtimeMs
     const tokyo = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(saved)
     const written = new Date(times.get('1-1-LT1.save')!)
@@ -162,7 +163,7 @@ describe('Sync codes', () => {
     kept.set(`/api/sync/v1/${hash}`, secretboxEncrypt(plain, key))
     const report = (await request(app.app).post('/api/saves/story/sync/download').send({ code: 'qwert67890' }).expect(200)).body
     expect(report).toEqual({ added: 1, replaced: 1, kept: 1, same: 0 })
-    expect((await readZipEntries(await app.saves.read('Story-1', '1-1-LT1.save'), (n) => n === 'json')).get('json')!.toString()).toContain('desktop newer')
+    expect((await readZipEntries(await app.saves.read('Story-1', '1-1-LT1.save'), (n) => n === 'json', SAVES_ZIP)).get('json')!.toString()).toContain('desktop newer')
     expect(await app.saves.stat('Story-1', '4-1-LT1.save')).toBeNull()
     expect((await app.saves.read('Story-1', 'quick-1-LT1.save')).toString()).toBe('web quick-1-LT1.save')
     expect((await app.saves.read('Story-1', 'persistent')).toString()).toBe('web persistent')

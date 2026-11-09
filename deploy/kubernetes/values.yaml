@@ -16,6 +16,12 @@ persistence:
 ingress:
   enabled: true
   className: nginx
+  # ingress-nginx takes 1 MB bodies and 60 s reads by default. Renplay takes mods, walkthroughs and
+  # zips of saves of up to 600 MB in one request, and games stream for minutes.
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 600m
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
   hosts:
     - host: renplay.example.com
       paths:

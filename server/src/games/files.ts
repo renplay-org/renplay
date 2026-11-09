@@ -3,12 +3,14 @@ import multer from 'multer'
 import type { GameRow } from '../db.js'
 import { Overlays } from './mods.js'
 import { baseFiles, readBaseFile } from '../pipeline/applymods.js'
-import { isZip, readZipEntries } from '../saves/savefile.js'
+import { isZip, readZipEntries, type ZipLimits } from '../util/zip.js'
 import { HttpError, cleanRelPath } from '../util/paths.js'
 import type { Services } from '../services.js'
 import type { FileEntry, FilesResponse } from '../shared/api.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 256 << 20, files: 500 } })
+/** A mod's zip: many files, each as large as one uploaded file, all of them read into memory. */
+const MOD_ZIP: ZipLimits = { files: 10_000, fileBytes: 256 << 20, totalBytes: 512 << 20 }
 const TEXT_EXT = /\.(rpy|rpym|txt|json|py|ini|cfg|md|csv|xml|ya?ml|log|tl|html|css|js)$/i
 
 type BaseIndex = Map<string, { size: number; where: 'zip' | 'pack' }>
@@ -133,7 +135,7 @@ export function createFilesRouter(s: Services): Router {
       const f = files[i]!
       const name = Buffer.from(f.originalname, 'latin1').toString('utf-8')
       if (req.body?.extract !== '0' && /\.zip$/i.test(name) && isZip(f.buffer)) {
-        const entries = await readZipEntries(f.buffer, () => true, 1 << 30)
+        const entries = await readZipEntries(f.buffer, () => true, MOD_ZIP)
         const names = [...entries.keys()].filter((n) => !n.endsWith('/') && !n.includes('__MACOSX'))
         // Mods are usually shipped as "game/..." or with a single wrapping folder.
         const gameRooted = names.every((n) => n.startsWith('game/'))

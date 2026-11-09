@@ -386,6 +386,14 @@ describe('HTTP API', () => {
     expect((await request(app.app).get('/api/games/short-name/recipe').expect(200)).body).toMatchObject({ sha256Pending: false, hashJob: null })
   })
 
+  it('takes a mod as a zip with a file larger than a save zip may hold', async () => {
+    const zip = await zipBuffer({ 'game/movies/intro.webm': Buffer.alloc(65 << 20) })
+    const res = await request(app.app).post('/api/games/fixture-game/files/upload').field('dir', 'game').attach('files', zip, 'movie-mod.zip').expect(200)
+    expect(res.body.written).toEqual(['game/movies/intro.webm'])
+    await request(app.app).post('/api/games/fixture-game/files/reset').expect(200)
+    await vi.waitFor(() => expect(app.jobs.isBusy()).toBe(false), { timeout: 10_000 })
+  })
+
   it('keeps saves when a game is uninstalled', async () => {
     await request(app.app).delete('/api/games/fixture-game').expect(200)
     const g = (await request(app.app).get('/api/games/fixture-game')).body.game

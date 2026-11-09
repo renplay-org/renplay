@@ -6,7 +6,8 @@ import request from 'supertest'
 import express from 'express'
 import yazl from 'yazl'
 import yauzl from 'yauzl'
-import { readZipEntries } from '../saves/savefile.js'
+import { SAVES_ZIP } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
 import { saveImport, IMPORT_MAX_BYTES, IMPORT_MAX_FILE_BYTES } from '../saves/import-upload.js'
 import { signInReturnUrl } from '../../../selector/src/lib/sign-in-return.js'
 import { queueHtmlSave, replayHtmlSaves } from '../../../selector/src/lib/html-save-queue.js'
@@ -29,11 +30,11 @@ describe('security boundary regressions', () => {
   })
   it('rejects an entry-count bomb, traversal and symlink entries before opening content streams', async () => {
     const open = vi.spyOn(yauzl.ZipFile.prototype, 'openReadStream')
-    await expect(readZipEntries(await zip(2049), () => true)).rejects.toThrow('Too many zip entries')
-    await expect(readZipEntries(await zip(1, 0o120777), () => true)).rejects.toThrow('Zip links')
+    await expect(readZipEntries(await zip(2049), () => true, SAVES_ZIP)).rejects.toThrow('Too many zip entries')
+    await expect(readZipEntries(await zip(1, 0o120777), () => true, SAVES_ZIP)).rejects.toThrow('Zip links')
     // Replace same-length names in the local and central headers; yazl itself disallows traversal.
     const traversal = Buffer.from((await zip(1)).toString('latin1').replaceAll('save/0', '../bad'), 'latin1')
-    await expect(readZipEntries(traversal, () => true)).rejects.toThrow(/invalid relative path|Invalid path/)
+    await expect(readZipEntries(traversal, () => true, SAVES_ZIP)).rejects.toThrow(/invalid relative path|Invalid path/)
     expect(open).not.toHaveBeenCalled()
     open.mockRestore()
   })
@@ -45,11 +46,11 @@ describe('security boundary regressions', () => {
     pos = bomb.indexOf(Buffer.from('PK\x01\x02'), pos + 4)
     bomb.writeUInt32LE(65 << 20, pos + 24)
     const open = vi.spyOn(yauzl.ZipFile.prototype, 'openReadStream')
-    await expect(readZipEntries(bomb, () => true, 512 << 20)).rejects.toThrow('Zip contents too large')
+    await expect(readZipEntries(bomb, () => true, SAVES_ZIP)).rejects.toThrow('Zip contents too large')
     expect(open).not.toHaveBeenCalled(); open.mockClear()
     const totalBomb = Buffer.from(await zip(3))
     for (let offset = totalBomb.indexOf(Buffer.from('PK\x01\x02')); offset !== -1; offset = totalBomb.indexOf(Buffer.from('PK\x01\x02'), offset + 4)) totalBomb.writeUInt32LE(48 << 20, offset + 24)
-    await expect(readZipEntries(totalBomb, () => true, 512 << 20)).rejects.toThrow('Zip contents too large')
+    await expect(readZipEntries(totalBomb, () => true, SAVES_ZIP)).rejects.toThrow('Zip contents too large')
     expect(open).not.toHaveBeenCalled(); open.mockRestore()
   })
   it('spools multipart bodies to disk, bounds file/aggregate bytes and holds a shared concurrency budget', async () => {

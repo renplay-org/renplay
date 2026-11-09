@@ -2,7 +2,8 @@ import express, { Router, type Request } from 'express'
 import { readFile } from 'node:fs/promises'
 import { saveImport } from './import-upload.js'
 import type { GameRow } from '../db.js'
-import { readSaveScreenshot, readZipEntries, slotInfo } from './savefile.js'
+import { SAVES_ZIP, readSaveScreenshot, slotInfo } from './savefile.js'
+import { readZipEntries } from '../util/zip.js'
 import { cachedSaveMeta, cachedSceneHash } from './cache.js'
 import { createSavesImportRouter } from './import-routes.js'
 import { SHARED_DIRS } from './store.js'
@@ -362,7 +363,7 @@ export function createSavesRouter(s: Services): Router {
   router.post('/users/:id/saves/import', saveImport('file', async (req, res) => {
     const target = saveStores.of(Number(req.params.id))
     if (!req.file) throw new HttpError(400, 'Upload a save folder zip')
-    const entries = await readZipEntries(req.file.path, () => true, 128 << 20)
+    const entries = await readZipEntries(req.file.path, () => true, SAVES_ZIP)
     const files = [...entries].map(([path, data]) => {
       const rel = cleanRelPath(path), slash = rel.indexOf('/'), dir = rel.slice(0, slash)
       if (slash < 1 || !isSaveDirName(dir)) throw new HttpError(400, 'Zip entries must be inside save folders')

@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it } from 'vitest'
 import yazl from 'yazl'
-import { readSaveMeta, readZipEntries, slotInfo } from '../saves/savefile.js'
+import { SAVES_ZIP,readSaveMeta, slotInfo } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
 import { SaveStore, fnv } from '../saves/store.js'
 import express from 'express'
 import request from 'supertest'
@@ -222,7 +223,7 @@ describe('SaveStore', () => {
     const chunks: Buffer[] = []
     out.on('data', (c) => chunks.push(c))
     await store.exportZip(['G'], out, { includeTokens: true })
-    const entries = await readZipEntries(Buffer.concat(chunks), () => true)
+    const entries = await readZipEntries(Buffer.concat(chunks), () => true, SAVES_ZIP)
     expect([...entries.keys()].sort()).toEqual(['G/1-1-LT1.save', 'tokens/security_keys.txt'])
   })
 })

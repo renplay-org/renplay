@@ -4,7 +4,8 @@ import type { Writable } from 'node:stream'
 import yazl from 'yazl'
 import { sha1, walkFiles, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
-import { isRenpySave, isZip, readZipEntries } from './savefile.js'
+import { SAVES_ZIP, isRenpySave } from './savefile.js'
+import { isZip, readZipEntries } from '../util/zip.js'
 
 const TOKENS_DIR = 'tokens'
 /** Top-level ~/.renpy folders shared by every game: save-signing keys and MultiPersistent data. */
@@ -378,7 +379,7 @@ export class SaveStore {
   }
 
   private async importBundle(saveDir: string, filename: string, data: Buffer, report: ImportReport): Promise<void> {
-    const entries = await readZipEntries(data, () => true, 512 << 20)
+    const entries = await readZipEntries(data, () => true, SAVES_ZIP)
     const names = [...entries.keys()]
     // A zipped-up *single* save (its members at the root) is itself a save file.
     if (names.includes('log') && names.includes('renpy_version') && !names.some((n) => n.endsWith('.save'))) {
