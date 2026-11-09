@@ -5,11 +5,12 @@ import { ArrowLeftRight, Copy, Download, FileArchive, History, MoreHorizontal, P
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, del, post } from '../lib/api'
-import { slotName } from '../lib/format'
+import { deviceHeaders } from '../lib/device'
 import type { Game, SaveSlot } from '@shared/api'
 import { ago, dateTime, duration, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
 import { useGames, useSaves } from '../lib/queries'
+import { playLink } from '../lib/links'
 import { Seg, Pill } from '../lantern/controls'
 import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveVersions, SyncDownloaded } from '@shared/api'
@@ -56,7 +57,7 @@ export default function SaveGallery({ game }: { game: Game }) {
     try {
       const fd = new FormData()
       for (const f of Array.from(files)) fd.append('files', f, f.name)
-      const res = await fetch(`/api/saves/${game.id}/import`, { method: 'POST', body: fd })
+      const res = await fetch(`/api/saves/${game.id}/import`, { method: 'POST', body: fd, headers: deviceHeaders() })
       const r = await res.json()
       if (!res.ok) throw new Error(r.error || 'Import failed')
       const parts = [`Imported ${r.imported.length} file${r.imported.length === 1 ? '' : 's'}`]
@@ -157,7 +158,7 @@ export default function SaveGallery({ game }: { game: Game }) {
             <div key={s.file} className={`save ${s.pinnedAt ? 'pinned' : ''}`.trim()}>
               <button
                 className="relative block w-full"
-                onClick={() => game.playUrl && navigate(`/play/${game.id}?resume=${encodeURIComponent(slotName(s.file))}`)}
+                onClick={() => game.playUrl && navigate(playLink(game.id, s.file))}
                 disabled={!game.playUrl}
                 title={game.playUrl ? 'Load this save' : 'Install the game to load saves'}
                 aria-label={game.playUrl ? `Load ${s.name || s.label}` : 'Install the game to load saves'}
@@ -185,7 +186,7 @@ export default function SaveGallery({ game }: { game: Game }) {
                 >
                   {(close) => (
                     <>
-                      <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); navigate(`/play/${game.id}?resume=${encodeURIComponent(slotName(s.file))}`) }}>Load</MenuItem>
+                      <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); navigate(playLink(game.id, s.file)) }}>Load</MenuItem>
                       <MenuItem icon={<Pin />} onClick={() => { close(); void saveMeta(s, { pinned: !s.pinnedAt }, s.pinnedAt ? 'Unpinned' : 'Pinned. Every previous version is kept.') }}>
                         {s.pinnedAt ? 'Unpin' : 'Pin'}
                       </MenuItem>

@@ -1,5 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, type RefObject } from 'react'
+import { userHeader } from '../../lib/api'
+import { deviceHeaders } from '../../lib/device'
 
 /**
  * Reports the time played, in bounded increments, while `on` (the game is ready and neither
@@ -15,7 +17,7 @@ export function usePlayTime(on: boolean, gameId: string, userId: number, sandbox
       const whole = Math.min(60, Math.floor(seconds))
       if (whole < 1) return
       seconds -= whole
-      void fetch(`/api/games/${gameId}/play-time`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-renplay-user': String(userId) }, body: JSON.stringify({ seconds: whole }), keepalive: true }).then((response) => { if (response.status === 401) onSignedOut() }).catch(() => {})
+      void fetch(`/api/games/${gameId}/play-time`, { method: 'POST', headers: { ...deviceHeaders(), ...userHeader(userId), 'content-type': 'application/json' }, body: JSON.stringify({ seconds: whole }), keepalive: true }).then((response) => { if (response.status === 401) onSignedOut() }).catch(() => {})
     }
     // A Ren'Py game left alone stops counting after 15 minutes without a tap, click or key, in the
     // game or on the player. A sandboxed game's input cannot be seen, so it counts while visible.

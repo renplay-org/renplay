@@ -1,4 +1,4 @@
-import { deviceLevel } from './device'
+import { deviceHeaders } from './device'
 
 export class ApiError extends Error {
   constructor(
@@ -9,13 +9,20 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The header that says which person this tab belongs to. A request that leaves it out is judged
+ * by the account that is signed in now, which may be another one.
+ */
+export function userHeader(userId: number): Record<string, string> {
+  return { 'x-renplay-user': String(userId) }
+}
+
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init
   // This device's adult games level: the server applies it to everything it answers. It can only narrow.
-  const device = deviceLevel()
   const res = await fetch(path, {
     ...rest,
-    headers: { ...(device ? { 'x-renplay-adult': device } : {}), ...(json !== undefined ? { 'content-type': 'application/json' } : {}), ...(rest.headers as Record<string, string> | undefined ?? {}) },
+    headers: { ...deviceHeaders(), ...(json !== undefined ? { 'content-type': 'application/json' } : {}), ...(rest.headers as Record<string, string> | undefined ?? {}) },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   })
   if (!res.ok) {

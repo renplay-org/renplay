@@ -3,6 +3,7 @@ import { Copy, FolderOpen, Laptop } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useRoom } from '../lantern/Room'
 import { api } from '../lib/api'
+import { deviceHeaders } from '../lib/device'
 import { readZip } from '../lib/zipread'
 import { Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveImportIndex } from '@shared/api'
@@ -149,7 +150,7 @@ export default function ImportSaves() {
         const form = new FormData()
         form.append('meta', JSON.stringify(batch.map((f) => ({ path: f.rel, mtime: f.mtime }))))
         for (const f of batch) form.append('files', await f.read(), f.rel.split('/').pop()!)
-        const res = await fetch('/api/saves-import', { method: 'POST', body: form })
+        const res = await fetch('/api/saves-import', { method: 'POST', body: form, headers: deviceHeaders() })
         const r = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(r.error || (res.status === 413 ? 'Those files are too large to send at once.' : 'The import failed. Try again.'))
         for (const k of Object.keys(total) as Array<keyof typeof total>) total[k] += r[k] ?? 0

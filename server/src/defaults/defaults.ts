@@ -8,7 +8,7 @@ export function readDefaults(db: Db): Defaults {
   return {
     tagsExclude: Array.isArray(d.tagsExclude) ? d.tagsExclude.filter((t) => typeof t === 'string') : [],
     lighterBackground: typeof d.lighterBackground === 'boolean' ? d.lighterBackground : null,
-    textSize: typeof d.textSize === 'number' && TEXT_SIZES.includes(d.textSize) ? d.textSize : null,
+    textSize: typeof d.textSize === 'number' && TEXT_SIZES.some((t) => t.value === d.textSize) ? d.textSize : null,
     rollback: typeof d.rollback === 'boolean' ? d.rollback : null,
     skip: typeof d.skip === 'boolean' ? d.skip : null,
   }

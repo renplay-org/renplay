@@ -22,7 +22,7 @@ export function createDefaultsRouter(s: Services): Router {
     }
     if (b.tagsExclude !== undefined && !isTagIdList(b.tagsExclude))
       throw new HttpError(400, 'Tags are a list of tag ids')
-    if (b.textSize !== undefined && b.textSize !== null && !TEXT_SIZES.includes(b.textSize)) throw new HttpError(400, 'Text size is 1, 1.25, 1.5 or empty')
+    if (b.textSize !== undefined && b.textSize !== null && !TEXT_SIZES.some((t) => t.value === b.textSize)) throw new HttpError(400, `Text size is ${TEXT_SIZES.map((t) => t.value).join(', ')} or empty`)
     const next: Defaults = {
       tagsExclude: [...new Set<string>(b.tagsExclude ?? [])],
       lighterBackground: bool(b.lighterBackground, 'Lighter background'),

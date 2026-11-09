@@ -1,12 +1,6 @@
 import { Seg, SourceLabel, Pill } from '../../lantern/controls'
 import { Switch } from '../../lantern/ui'
-
-/** Named text sizes: Ren'Py's own text size preference, kept with the game's persistent data. */
-const TEXT_SIZES = [
-  { value: 1, label: 'Normal' },
-  { value: 1.25, label: 'Large' },
-  { value: 1.5, label: 'Larger' },
-]
+import { TEXT_SIZES } from '@shared/defaults'
 
 /** A Ren'Py game's options for this person, as the game reports them. */
 export interface GameOptionsState {

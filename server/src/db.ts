@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
+import { isRenpy } from './shared/family.js'
 
 export type GameStatus = 'installed' | 'not_installed' | 'installing'
 
@@ -27,11 +28,8 @@ export interface WalkthroughRow {
   position: number
 }
 
-/** A Ren'Py game. A row with no family is one too, as the column's default says. */
-export const isRenpyGame = (g: Pick<GameRow, 'family'>): boolean => !g.family || g.family === 'renpy'
-
 /** A game that is a web page of its own (HTML, Unity WebGL and the like): every family but Ren'Py. */
-export const isWebGame = (g: Pick<GameRow, 'family'>): boolean => !isRenpyGame(g)
+export const isWebGame = (g: Pick<GameRow, 'family'>): boolean => !isRenpy(g)
 
 export interface GameRow {
   id: string

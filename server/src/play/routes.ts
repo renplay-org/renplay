@@ -8,6 +8,7 @@ import { ENGINE_FILES } from '../engines.js'
 import { PackReader } from '../pipeline/pack.js'
 import { isPresplash } from '../pipeline/project.js'
 import { HttpError, assertSlug, cleanRelPath, isSlug } from '../util/paths.js'
+import { HTML_STORAGE_FILES } from '../shared/html.js'
 import type { Services } from '../services.js'
 import type { OfflineManifest } from '../shared/api.js'
 import { parseGamePath, type GamePath } from './path.js'
@@ -17,10 +18,6 @@ import { readRuntimes } from './runtime.js'
 // into clicks. Checked in Chromium and WebKit, sandboxed pages too. The library stays embeddable
 // (dashboards frame it).
 const FRAME_ANCESTORS = "frame-ancestors 'self'"
-
-/** Where a web game's localStorage and IndexedDB are kept, in its save folder. */
-const HTML_STORAGE = 'localStorage.json'
-const HTML_IDB = 'indexedDB.json'
 
 /** The URL an installed game plays at. HTML games start at their own page. */
 export function playPath(g: GameRow): string {
@@ -185,8 +182,8 @@ export function createPlayRouter(s: Services): Router {
         return null
       }
     }
-    const storage = (await stored(HTML_STORAGE)) ?? {}
-    const idb = await stored(HTML_IDB)
+    const storage = (await stored(HTML_STORAGE_FILES.local)) ?? {}
+    const idb = await stored(HTML_STORAGE_FILES.idb)
     const cfg = JSON.stringify({ id: game.id, build: game.build, userId: viewer()?.user.id ?? 1, storage, idb }).replace(/</g, '\\u003c')
     const inject = `<script>window.__renplay=${cfg};</script><script>${runtimes.html}</script>`
     const head = page.match(/<head\b[^>]*>/i)

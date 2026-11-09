@@ -78,7 +78,7 @@ export default function FileBrowser({ game }: { game: Game }) {
       fd.append('extract', extract ? '1' : '0')
       fd.append('paths', JSON.stringify(Array.from(files).map((f) => (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name)))
       for (const f of Array.from(files)) fd.append('files', f, f.name)
-      const res = await fetch(`/api/games/${game.id}/files/upload`, { method: 'POST', body: fd })
+      const res = await fetch(`/api/games/${game.id}/files/upload`, { method: 'POST', body: fd, headers: deviceHeaders() })
       const r = await res.json()
       if (!res.ok) throw new Error(r.error)
       toast(`Added ${r.written.length} ${r.written.length === 1 ? 'file' : 'files'} to your mods. Apply changes to use them in the game.`, 'success')

@@ -17,13 +17,13 @@ import GameTags from '../components/GameTags'
 import SaveGallery from '../components/SaveGallery'
 import { BetaBadge, Confirm, Empty, Menu, MenuItem, Spinner, Switch, errorText, useToast } from '../lantern/ui'
 import { api, del, post } from '../lib/api'
-import { slotName } from '../lib/format'
 import type { Game } from '@shared/api'
 import type { ArtKind } from '@shared/recipe'
 import ArtPicker from '../components/ArtPicker'
 import { ago, capitalize, duration, pct, playedTime, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
-import { recipeLinks } from '../lib/links'
+import { recipeLinks, playLink } from '../lib/links'
+import { isRenpy } from '@shared/family'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
 import { useAuth } from '../lib/auth'
@@ -66,13 +66,13 @@ export default function GamePage() {
   if (error || !game) return <Empty title="Game not found">{error ? errorText(error) : null}</Empty>
 
   const installed = game.status === 'installed'
-  const renpy = game.family === 'renpy'
+  const renpy = isRenpy(game)
   const hidden = game.nsfw && view !== 'shown'
   const credits = hidden ? [] : (['grid', 'hero'] as const).map((kind) => ({ kind, credit: game.art[kind]?.credit, made: game.art[kind]?.made })).filter((c, i, all) => c.credit && all.findIndex((o) => JSON.stringify(o.credit) === JSON.stringify(c.credit)) === i)
-  const primary = () => navigate(`/play/${gameId}${latest ? `?resume=${encodeURIComponent(slotName(latest.file))}` : ''}`)
+  const primary = () => navigate(playLink(gameId, latest?.file))
   const resume = (menu: boolean) => {
     travelToDoor(game, hidden)
-    navigate(`/play/${gameId}${!menu && latest ? `?resume=${encodeURIComponent(slotName(latest.file))}` : ''}`)
+    navigate(menu ? playLink(gameId) : playLink(gameId, latest?.file))
   }
 
   // The parts the game has, with a separator between each two.
@@ -82,7 +82,7 @@ export default function GamePage() {
     game.version && <span key="m1">{game.version}</span>,
     game.free && <span key="m2">Free</span>,
     game.phone && <span key="m3">{phoneLabel[game.phone]}</span>,
-    game.family !== 'renpy' && <BetaBadge key="m4" engine={game.family} />,
+    !isRenpy(game) && <BetaBadge key="m4" engine={game.family} />,
   ].filter(Boolean)
   const meta = metaParts.flatMap((part, i) => (i ? [<span key={`sep${i}`} className="sep">·</span>, part] : [part]))
 
@@ -526,7 +526,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
             {game.engineLabel ? <Row label="Made with">{game.engineLabel}</Row> : game.renpyVersion && <Row label="Made with">{`Ren’Py ${game.renpyVersion}`}</Row>}
             {game.engine && <Row label="Plays on">{`Ren’Py ${game.engine} web`}</Row>}
             {game.phone && <Row label="Phones">{phoneLabel[game.phone]}</Row>}
-            {game.family === 'renpy' && game.saveDir && (
+            {isRenpy(game) && game.saveDir && (
               <Row label="Save folder">
                 <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13 }}>{game.saveDir}</span>
               </Row>

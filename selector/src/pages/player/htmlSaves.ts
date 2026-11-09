@@ -1,4 +1,5 @@
 import { queueHtmlSave, uploadHtmlSave } from '../../lib/html-save-queue'
+import { HTML_STORAGE_FILES } from '@shared/html'
 
 /** Who and where, read when a snapshot arrives: the player may move to another game. */
 export interface HtmlSaveContext {
@@ -26,7 +27,7 @@ export function htmlSaveKeeper(context: () => HtmlSaveContext): HtmlSaveKeeper {
   return {
     store(saveDir, kind, data) {
       const { userId, gameId, send, onSignedOut } = context()
-      const path = `${saveDir}/${kind === 'idb' ? 'indexedDB.json' : 'localStorage.json'}`
+      const path = `${saveDir}/${kind === 'idb' ? HTML_STORAGE_FILES.idb : HTML_STORAGE_FILES.local}`
       write = write
         .catch(() => {})
         .then(async () => {
