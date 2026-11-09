@@ -6,7 +6,7 @@ import { sha1, walkFiles, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
 import { isRenpySave, isZip, readZipEntries } from './savefile.js'
 
-export const TOKENS_DIR = 'tokens'
+const TOKENS_DIR = 'tokens'
 /** Top-level ~/.renpy folders shared by every game: save-signing keys and MultiPersistent data. */
 export const SHARED_DIRS = [TOKENS_DIR, 'persistent'] as const
 const MAX_FILE = 64 << 20

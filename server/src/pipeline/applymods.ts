@@ -111,7 +111,7 @@ export async function applyMods(ctx: JobContext<{ game: string }>, deps: ModDeps
 }
 
 /** The streamed assets of a build (mod builds use their base build's). */
-export function assetsOf(builds: Builds, id: string, build: string): PackReader {
+function assetsOf(builds: Builds, id: string, build: string): PackReader {
   const dir = builds.dir(id, baseOf(build))
   return new PackReader(join(dir, 'assets.pack'), join(dir, 'assets.json'))
 }

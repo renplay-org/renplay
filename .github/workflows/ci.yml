@@ -61,6 +61,7 @@ jobs:
 
       - run: mise run install
       - run: mise run check:server
+      - run: mise run check:structure
       - run: mise run check:runtime
       - run: mise run check:copy
       - run: mise run check:ui

@@ -121,7 +121,7 @@ export async function writeIndex(path: string, index: PackIndex): Promise<void> 
   await writeFileAtomic(path, JSON.stringify(obj))
 }
 
-export async function readIndex(path: string): Promise<PackIndex> {
+async function readIndex(path: string): Promise<PackIndex> {
   const obj = JSON.parse(await readFile(path, 'utf-8')) as Record<string, [number, number]>
   return new Map(Object.entries(obj))
 }

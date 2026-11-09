@@ -17,7 +17,7 @@ export interface Progress {
   not_now_at: string
 }
 
-export const NO_PROGRESS: Progress = { favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, play_status: '', rating: 0, not_now_at: '' }
+const NO_PROGRESS: Progress = { favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, play_status: '', rating: 0, not_now_at: '' }
 
 export type GameWithProgress = GameRow & Progress
 

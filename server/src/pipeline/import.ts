@@ -1,4 +1,4 @@
-import { mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises'
+import { mkdir, rename, rm, stat, unlink } from 'node:fs/promises'
 import { basename, join, relative } from 'node:path'
 import { archiveIdentity, keepDownloads } from '../library/archives.js'
 import { baseOf, newBuildId, type BuildInfo, type Builds } from '../games/builds.js'
@@ -470,13 +470,6 @@ export async function inspectArchive(path: string): Promise<ArchiveInfo> {
   } finally {
     src.close()
   }
-}
-
-/** Removes leftovers from interrupted jobs. */
-export async function cleanWorkDir(cfg: Config): Promise<void> {
-  try {
-    for (const n of await readdir(cfg.workDir)) await rm(join(cfg.workDir, n), { recursive: true, force: true })
-  } catch {}
 }
 
 /** The game's Ren'Py version from its renpy/ folder (see renpyVersionFromVc). */

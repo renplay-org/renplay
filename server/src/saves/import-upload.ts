@@ -10,7 +10,7 @@ import { HttpError } from '../util/paths.js'
 
 export const IMPORT_MAX_BYTES = 128 << 20
 export const IMPORT_MAX_FILE_BYTES = 64 << 20
-export const IMPORT_CONCURRENCY = 2
+const IMPORT_CONCURRENCY = 2
 let active = 0
 
 /** One global budget covers personal and admin imports, including disconnected handlers. */

@@ -14,8 +14,8 @@ zizmor = "1.32.0"
 # ---- setup and development --------------------------------------------------------------------
 
 [tasks.install]
-description = "Install the npm packages of the server, the library and the docs"
-run = ["npm ci --prefix server", "npm ci --prefix selector", "npm ci --prefix docs/site"]
+description = "Install the npm packages of the server, the library and the docs, and the pre-push hook"
+run = ["npm ci --prefix server", "npm ci --prefix selector", "npm ci --prefix docs/site", "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true"]
 
 [tasks.dev]
 description = "The server and the library together: open http://localhost:5199"
@@ -55,13 +55,25 @@ run = "npm run screenshots --"
 
 [tasks.check]
 description = "Everything CI checks, except the image"
-depends = ["check:server", "check:runtime", "check:copy", "check:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples"]
+depends = ["check:server", "check:structure", "check:runtime", "check:copy", "check:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples"]
 
 [tasks."check:server"]
 description = "Server type check, the tests' type check, and the tests"
 dir = "server"
 # Vitest runs the tests without checking their types: tsconfig.test.json does.
 run = ["npx tsc --noEmit", "npx tsc -p tsconfig.test.json", "npx vitest run"]
+
+[tasks."check:structure"]
+description = "No import cycles, layers in order, no unused exports, files within the size budget"
+run = "node scripts/check-structure.mjs"
+
+[tasks."check:types"]
+description = "Type checks of the server, its tests and the library"
+run = ["cd server && npx tsc --noEmit && npx tsc -p tsconfig.test.json", "cd selector && npx tsc -b --noEmit"]
+
+[tasks."check:fast"]
+description = "What the pre-push hook runs: types, structure, the runtimes and the writing rule"
+depends = ["check:types", "check:structure", "check:runtime", "check:copy"]
 
 [tasks."check:runtime"]
 description = "The game runtimes parse"

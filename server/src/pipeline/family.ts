@@ -10,7 +10,7 @@ import type { EngineInfo, Family } from '../shared/api.js'
  */
 
 /** Families this version of Renplay can install. */
-export const INSTALLABLE = new Set<Family>(['renpy', 'html'])
+const INSTALLABLE = new Set<Family>(['renpy', 'html'])
 
 const NOT_YET = 'Renplay recognizes it, but cannot install it yet.'
 

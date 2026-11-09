@@ -19,11 +19,11 @@ export const PRESPLASH = /\/web-presplash\.(?:png|jpe?g|webp)$/i
 // (dashboards frame it).
 const FRAME_ANCESTORS = "frame-ancestors 'self'"
 
-export const HTML_STORAGE = 'localStorage.json'
-export const HTML_IDB = 'indexedDB.json'
+const HTML_STORAGE = 'localStorage.json'
+const HTML_IDB = 'indexedDB.json'
 
 /** Games that are web pages of their own (HTML, Unity WebGL…): every family but Ren'Py. */
-export const isWebGame = (g: GameRow) => !!g.family && g.family !== 'renpy' && !!g.entry
+const isWebGame = (g: GameRow) => !!g.family && g.family !== 'renpy' && !!g.entry
 
 /** The URL an installed game plays at. HTML games start at their own page. */
 export function playPath(g: GameRow): string {
