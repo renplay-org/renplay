@@ -207,7 +207,7 @@ async function keepNow(game: Game, signal: AbortSignal, onProgress: (done: numbe
   await refreshShell(signal)
   // The answers the library and the player read.
   const answers = await caches.open(API)
-  for (const url of ['/api/me', '/api/auth/providers', '/api/defaults', '/api/content', '/api/games', `/api/games/${encodeURIComponent(game.id)}`]) {
+  for (const url of ['/api/me', '/api/me/adult', '/api/auth/providers', '/api/defaults', '/api/content', '/api/games', `/api/games/${encodeURIComponent(game.id)}`]) {
     const res = await fetch(url, { cache: 'no-store', signal }).catch(() => null)
     if (res?.ok) await answers.put(url, res)
   }

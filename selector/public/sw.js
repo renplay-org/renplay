@@ -20,8 +20,8 @@ const GAMEZIP = 'renplay-gamezip-v1'
 /** How long a page or an answer may take when a copy is there: Wi-Fi without internet waits much longer. */
 const WAIT = 6000
 
-/** Answers kept for offline: who is signed in, the library, a game, and the defaults. */
-const ANSWERS = /^\/api\/(me|auth\/providers|defaults|content|games|games\/[a-z0-9][a-z0-9._-]*)$/
+/** Answers kept for offline: who is signed in and their adult level, the library, a game, and the defaults. */
+const ANSWERS = /^\/api\/(me|me\/adult|auth\/providers|defaults|content|games|games\/[a-z0-9][a-z0-9._-]*)$/
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
@@ -199,7 +199,7 @@ async function fromKept(req, url, id) {
   }
   if (id && /^\/g\/[^/]+\/[^/]+\/(index\.html)?$/.test(url.pathname)) {
     const hit = await find()
-    const save = (res) => (res.redirected ? Promise.resolve() : caches.open(KEPT + id).then((c) => c.put(key, res)))
+    const save = (res) => (res.redirected ? Promise.resolve() : caches.open(KEPT + id).then((c) => c.put(key, res)).then(() => refreshKept(id, url)))
     try {
       return await network(req, save, !!hit)
     } catch (e) {
@@ -211,6 +211,25 @@ async function fromKept(req, url, id) {
   if (!hit) return fetch(req)
   const range = req.headers.get('range')
   return range ? part(hit, range) : hit
+}
+
+/**
+ * After a kept game's page came from the server, the files it names now come too. A new version of
+ * Renplay changes the runtime's address, and a game stores compiled caches as it plays. Its game.zip
+ * stays as it was kept: a new build is kept again from the library.
+ */
+async function refreshKept(id, page) {
+  const adult = page.searchParams.get('adult')
+  const res = await fetch(`/api/games/${encodeURIComponent(id)}/offline${adult ? `?adult=${encodeURIComponent(adult)}` : ''}`, { cache: 'no-store' })
+  if (!res.ok) return
+  const files = (await res.json()).files || []
+  const cache = await caches.open(KEPT + id)
+  for (const f of files) {
+    const url = new URL(f.url, self.location.origin)
+    if (/\/game\.zip$/.test(url.pathname) || (await cache.match(keyOf(url), { ignoreVary: true }))) continue
+    const file = await fetch(url.toString(), { cache: 'no-store' }).catch(() => null)
+    if (file && file.status === 200) await cache.put(keyOf(url), file)
+  }
 }
 
 /**
