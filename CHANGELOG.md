@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.6.1] - 2026-11-09
+
 ### Changed
 
 - On a computer, every icon button names itself when you point at it, as most already did.
@@ -646,7 +648,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.6.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.6.1...dev
+[4.6.1]: https://github.com/renplay-org/renplay/compare/v4.6.0...v4.6.1
 [4.6.0]: https://github.com/renplay-org/renplay/compare/v4.5.1...v4.6.0
 [4.5.1]: https://github.com/renplay-org/renplay/compare/v4.5.0...v4.5.1
 [4.5.0]: https://github.com/renplay-org/renplay/compare/v4.4.0...v4.5.0
