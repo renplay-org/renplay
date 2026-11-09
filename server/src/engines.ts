@@ -21,7 +21,7 @@ export interface EngineEntry {
   version: string
   renpy: string
   python: number
-  /** A public pre-release: picked only for a game made with a newer Ren'Py than every stable engine. Older indexes have no such field. */
+  /** A public pre-release: picked only for a game made with a newer Ren'Py than every stable engine. */
   prerelease?: boolean
   files: Record<string, EngineFile>
 }
@@ -29,6 +29,8 @@ export interface EngineEntry {
 interface EngineIndex {
   schema: number
   engines: EngineEntry[]
+  /** Listed apart, so Renplay 4.6.3 and older, which read only `engines`, never build with one. */
+  prereleases?: EngineEntry[]
 }
 
 /** Files a pack must have; the rest (license) is kept when present. */
@@ -84,7 +86,8 @@ export class EngineStore {
       const res = await fetch(this.cfg.enginesUrl, { signal: AbortSignal.timeout(15_000) })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const idx = (await res.json()) as EngineIndex
-      const engines = (idx.engines ?? []).filter((e) => VERSION_RE.test(e.version) && REQUIRED.every((f) => e.files?.[f]?.url))
+      const listed = [...(idx.engines ?? []), ...(idx.prereleases ?? []).map((e) => ({ ...e, prerelease: true }))]
+      const engines = listed.filter((e) => VERSION_RE.test(e.version) && REQUIRED.every((f) => e.files?.[f]?.url))
       this.index = { at: Date.now(), engines }
       this.db.setSetting(INDEX_KEY, this.index)
     } catch (e) {
