@@ -19,7 +19,7 @@ keywords:
   - self-hosted
 annotations:
   category: Entertainment
-  artifacthub.io/category: other
+  artifacthub.io/category: web-applications
   artifacthub.io/license: MIT
   artifacthub.io/links: |
     - name: Website
@@ -31,6 +31,3 @@ annotations:
   artifacthub.io/images: |
     - name: renplay
       image: ghcr.io/renplay-org/renplay:4.6.1
-  artifacthub.io/changes: |
-    - kind: added
-      description: Official Helm chart with persistent storage and optional downloads storage.

@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- The Helm chart is listed on Artifact Hub.
+
 ## [4.6.1] - 2026-11-09
 
 ### Changed
