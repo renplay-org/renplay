@@ -26,8 +26,9 @@ is Python 2 behaviour, such as `xrange`, `iteritems` or `unicode`, or sorting nu
 with text. If such a game stops with a Python error, check the [catalog](/catalog/) for a note, and
 see [Troubleshooting](/troubleshooting/#a-renpy-7-game-stops-with-a-python-error).
 
-Renplay picks the engine for a game from its recipe, then `RENPLAY_ENGINE`, then the newest engine
-of the game's major version. See [Configuration](/configuration/).
+Renplay picks the engine for a game from its recipe, then `RENPLAY_ENGINE`, then the newest stable engine
+of the game's major version. A pre-release engine, which the engine index marks, is picked only for a
+game made with a newer Ren'Py than every stable engine, so no other game moves onto it. See [Configuration](/configuration/).
 
 ## HTML games
 

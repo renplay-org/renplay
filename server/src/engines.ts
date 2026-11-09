@@ -21,6 +21,8 @@ export interface EngineEntry {
   version: string
   renpy: string
   python: number
+  /** A public pre-release: picked only for a game made with a newer Ren'Py than every stable engine. Older indexes have no such field. */
+  prerelease?: boolean
   files: Record<string, EngineFile>
 }
 
@@ -108,12 +110,16 @@ export class EngineStore {
 
   /**
    * Picks the engine for a game: an explicit version (recipe or user), the
-   * configured default, or the newest engine of the game's Ren'Py major.
+   * configured default, or the newest stable engine of the game's Ren'Py major.
+   * A pre-release engine is picked only for a game made with a newer Ren'Py
+   * than every stable engine, and then the lowest one that is new enough.
    */
   async pick(requested: string | undefined, gameRenpy: string | undefined): Promise<string> {
     const engines = await this.available().catch(() => [] as EngineEntry[])
     const installed = (await this.installed()).map((e) => e.version)
     const known = new Set([...engines.map((e) => e.version), ...installed])
+    // An installed engine the index does not list counts as stable.
+    const prereleases = new Set(engines.filter((e) => e.prerelease).map((e) => e.version))
     const want = requested || this.cfg.defaultEngine
     if (want) {
       if (!known.has(want)) throw new Error(`Engine ${want} is not available (have: ${[...known].join(', ') || 'none'})`)
@@ -122,8 +128,15 @@ export class EngineStore {
     // Games made with Ren'Py 7 or older run on the Ren'Py 8 engine: Ren'Py 8
     // loads their scripts, and most of their Python also runs on Python 3.
     const major = Math.max(8, Number((gameRenpy ?? '8').split('.')[0]) || 8)
-    const candidates = [...known].filter((v) => Number(v.split('.')[0]) === major).sort(cmp)
-    const best = candidates[candidates.length - 1]
+    const inMajor = [...known].filter((v) => Number(v.split('.')[0]) === major).sort(cmp)
+    const stable = inMajor.filter((v) => !prereleases.has(v))
+    const best = stable[stable.length - 1]
+    // The game's own version has a build number after the release (8.6.0.26110123).
+    const made = gameRenpy?.split('.').slice(0, 3).join('.')
+    if (made && (!best || cmp(made, best) > 0)) {
+      const needed = inMajor.find((v) => prereleases.has(v) && cmp(v, made) >= 0)
+      if (needed) return needed
+    }
     if (!best) throw new Error(`No Ren'Py ${major} engine is available`)
     return best
   }
