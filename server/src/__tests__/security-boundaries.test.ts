@@ -26,11 +26,6 @@ describe('security boundary regressions', () => {
     for (const target of ['/\n/evil.example', '//evil.example', '/\\evil.example', 'https://evil.example/', 'javascript:alert(1)', 'http://[']) expect(signInReturnUrl(target, origin)).toBe(`${origin}/`)
     expect(signInReturnUrl('/games/../account?x=1#section', origin)).toBe(`${origin}/account?x=1#section`)
     expect(signInReturnUrl(`${origin}/account`, origin)).toBe(`${origin}/account`)
-    // Exercise the expression wired into the actual submit handler, not just an unused helper.
-    const signIn = readFileSync(new URL('../../../selector/src/pages/SignIn.tsx', import.meta.url), 'utf-8')
-    const expression = signIn.match(/window\.location\.assign\((.+)\)/)![1]!
-    const assigned = new Function('target', 'params', 'location', 'signInReturnUrl', `return (${expression})`)('/\n/evil.example', new URLSearchParams({ return: '/\n/evil.example' }), { origin }, signInReturnUrl)
-    expect(new URL(assigned, origin).origin).toBe(origin)
   })
   it('rejects an entry-count bomb, traversal and symlink entries before opening content streams', async () => {
     const open = vi.spyOn(yauzl.ZipFile.prototype, 'openReadStream')

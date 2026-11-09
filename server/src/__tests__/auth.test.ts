@@ -2,7 +2,6 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSyn
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash, scryptSync } from 'node:crypto'
-import { runInNewContext } from 'node:vm'
 import request from 'supertest'
 import sharp from 'sharp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +12,7 @@ import { playerRoute } from '../accounts/access.js'
 import { keepaliveToken } from '../jobs/keepalive.js'
 import { viewer, viewers } from '../accounts/context.js'
 import yazl from 'yazl'
+import { renpyRuntime, sharedMirror } from './runtime-browser.js'
 
 function zipBuffer(entries: Record<string, string>): Promise<Buffer> {
   return new Promise((resolve) => {
@@ -379,38 +379,34 @@ describe('accounts authentication and security', () => {
 describe('personal data and save moves', () => {
   it('replays the real Ren’Py mirror and boot queue into A’s server folder after A → offline write → B → A', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password'); game(a)
-    const window: any = {}
-    const source = readFileSync(new URL('../../../runtime/renplay-runtime.js', import.meta.url), 'utf-8')
-    runInNewContext(readFileSync(new URL('../../../runtime/vendor/fake-indexeddb.js', import.meta.url), 'utf-8'), { window, structuredClone, setTimeout, clearTimeout, console, DOMException })
-    const indexedDB = new window.__renplayIDB.IDBFactory(); window.indexedDB = indexedDB
-    const section = (from: string, to: string) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)))
-    const runtime = (userId: number, cookie: string) => new Function('window', 'indexedDB', 'cfg', 'fetchJSON', 'fetch', 'setTimeout', `
-      var API = '/api/saves/safe', signedOut = false, HOME = '/home';
-      var state = { queue: new Map(), known: new Map(), lazy: new Map(), base: new Map(), unanswered: new Map(), online: true, inflight: false, failures: 0 };
-      function post() {} function status() {} function log() {} function writeLocal() {} function createLazy() {}
-      function hash(bytes) { return String(bytes) } function b64ToBytes(data) { return new Uint8Array() }
-      ${section('  var dbPromise = null', '  // ---------------------------------------------------------------- helpers')}
-      ${section('  function pump()', '  function flush(')}
-      ${section('  function boot()', '  // ---------------------------------------------------------------- Emscripten hooks')}
-      return { idbPut, idbAll, boot, state };
-    `)(window, indexedDB, { id: 'safe', userId }, async (url: string) => (await request(a.app).get(url).set('Cookie', cookie).expect(200)).body, async (url: string, init: any) => {
-      const response = await (request(a.app) as any)[init.method.toLowerCase()](url).set(site).set('Cookie', cookie).set('X-Renplay-User', String(userId)).set(init.headers ?? {}).send(init.body ? Buffer.from(init.body) : undefined)
-      return { ok: response.status < 300, status: response.status }
-    }, setTimeout)
+    const indexedDB = sharedMirror()
+    const serverFetch = (userId: number, cookie: string) => vi.fn(async (input: unknown, init: any = {}) => {
+      const method = String(init.method ?? 'GET').toLowerCase()
+      let call = (request(a.app) as any)[method](String(input)).set(site).set('Cookie', cookie).set('X-Renplay-User', String(userId))
+      for (const [name, value] of new Headers(init.headers ?? {})) call = call.set(name, value)
+      if (init.body) call = call.send(Buffer.from(init.body))
+      const response = await call
+      const json = String(response.headers['content-type']).includes('json')
+      return new Response(json ? response.text : response.body, { status: response.status, headers: response.headers })
+    })
     // Even a newer server copy must not cause an unsent browser write to be dropped: history keeps both.
     await a.saves.write('safe', 'persistent', Buffer.from('server copy'), { mtimeMs: Date.now() })
-    const owner = runtime(1, admin)
-    await owner.idbPut('safe/persistent', new Uint8Array(Buffer.from('offline A')), 10, false)
-    const other = runtime(id, player)
+    const owner = renpyRuntime({ userId: 1, game: 'safe', indexedDB, fetch: vi.fn(async () => { throw new TypeError('Offline') }) })
+    owner.write('safe/persistent', new Uint8Array(Buffer.from('offline A')), 10)
+    await owner.idle()
+    await vi.waitFor(async () => expect(await owner.entries()).toMatchObject([{ key: '1:safe/persistent', userId: 1, synced: 0 }]))
+    const other = renpyRuntime({ userId: id, game: 'safe', indexedDB, fetch: serverFetch(id, player) })
     await other.boot()
-    expect(await other.idbAll()).toEqual([])
-    await other.idbPut('safe/persistent', new Uint8Array(Buffer.from('online B')), 11, false)
+    expect(other.read('safe/persistent')).toBeNull()
+    expect((await other.entries()).filter((entry) => entry.userId === id)).toEqual([])
+    other.write('safe/persistent', new Uint8Array(Buffer.from('online B')), 11)
+    await other.idle()
+    await vi.waitFor(async () => expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('online B'))
     await other.boot()
-    await vi.waitFor(() => expect(other.state.inflight).toBe(false))
-    const returning = runtime(1, admin)
-    expect(await returning.idbAll()).toMatchObject([{ synced: 0 }])
+    const returning = renpyRuntime({ userId: 1, game: 'safe', indexedDB, fetch: serverFetch(1, admin) })
+    expect((await returning.entries()).filter((entry) => entry.userId === 1)).toMatchObject([{ synced: 0 }])
     await returning.boot()
-    await vi.waitFor(() => expect(returning.state.inflight).toBe(false))
+    await returning.idle()
     expect((await a.saves.read('safe', 'persistent')).toString()).toBe('offline A')
     expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('online B')
     expect(await a.saves.history('safe', 'persistent')).toHaveLength(1)
