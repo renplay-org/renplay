@@ -14,6 +14,8 @@
  *   loads urllib3.contrib.emscripten, which needs Pyodide's js module. A stand-in whose
  *   inject_into_urllib3() does nothing keeps the ordinary socket code, so `import requests`
  *   works and a request fails like being offline.
+ * - __builtin__: Python 2's name for the builtins module, which games made for Ren'Py 7
+ *   import. It is the same module under its old name.
  * - old import hooks: libraries games bundle (six in old requests) register
  *   finders with only find_module(), which Python 3.12 no longer calls.
  * - Python 2 syntax: games made for Ren'Py 7 (Python 2) can have print
@@ -72,6 +74,10 @@ python early:
         emscripten.inject_into_urllib3 = lambda: None
         emscripten.extract_from_urllib3 = lambda: None
         sys.modules["urllib3.contrib.emscripten"] = emscripten
+
+        # Python 2's name for builtins: games made for Ren'Py 7 import it.
+        import builtins
+        sys.modules.setdefault("__builtin__", builtins)
 
         start = threading.Thread.start
 

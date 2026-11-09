@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- Games made with Ren'Py 7 that import `__builtin__`, Python 2's name for the built-ins, start instead of failing at that import, as A House in the Rift did.
+
 ## [4.6.3] - 2026-11-09
 
 ### Changed
