@@ -341,6 +341,8 @@ describe('HTTP API', () => {
     try {
       expect((await app.builds.verify()).missing).toEqual(['fixture-game'])
       expect(app.db.getGame('fixture-game')).toMatchObject({ status: 'not_installed', build: 'b1' })
+      // Its engine stays while it is away, so the game plays again when the folder comes back.
+      expect((await request(app.app).post('/api/system/prune').expect(200)).body.removed).toEqual([])
       // Nothing changes on a second start while it is still away.
       expect((await app.builds.verify()).missing).toEqual([])
     } finally {
@@ -384,6 +386,16 @@ describe('HTTP API', () => {
       await vi.waitFor(() => expect(app.jobs.isBusy()).toBe(false))
     }
     expect((await request(app.app).get('/api/games/short-name/recipe').expect(200)).body).toMatchObject({ sha256Pending: false, hashJob: null })
+  })
+
+  it('removes no engine while a job runs, since an install names its engine only when it ends', async () => {
+    const busy = vi.spyOn(app.jobs, 'isBusy').mockReturnValue(true)
+    try {
+      await request(app.app).post('/api/system/prune').expect(409)
+    } finally {
+      busy.mockRestore()
+    }
+    expect(statSync(join(root, 'games', '_renplay', 'engines', '8.5.3', '.ready')).isFile()).toBe(true)
   })
 
   it('takes a mod as a zip with a file larger than a save zip may hold', async () => {

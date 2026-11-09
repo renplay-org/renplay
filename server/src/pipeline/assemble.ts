@@ -11,7 +11,7 @@ import { classify, type Placeholder, type ProgressiveRule } from './progressive.
 import { WEB_COMPAT, WEB_COMPAT_PATH } from './webcompat.js'
 
 /** Already-compressed formats are stored; the rest is deflated. */
-const STORED = /\.(png|jpe?g|webp|avif|gif|ogg|opus|mp3|webm|mp4|ogv|zip|rpa|rpyc|rpymc|rpyb|woff2?)$/i
+export const STORED = /\.(png|jpe?g|webp|avif|gif|ogg|opus|mp3|webm|mp4|ogv|zip|rpa|rpyc|rpymc|rpyb|woff2?)$/i
 
 export interface AssembleOptions {
   /** Build folder: game.zip is written here. */

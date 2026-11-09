@@ -1,8 +1,9 @@
 import { createWriteStream } from 'node:fs'
 import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import yazl from 'yazl'
-import { log } from '../util/log.js'
+import { walkFiles } from '../util/fsx.js'
+import { log, stamp } from '../util/log.js'
 import { bytes } from '../shared/format.js'
 import type { Config } from '../config.js'
 import type { Db } from '../db.js'
@@ -12,19 +13,6 @@ import type { BackupInfo } from '../shared/api.js'
 const DAY = 24 * 3600_000
 /** saves-YYYY-MM-DD-HHMMSS.zip, or HHMM as the first backups were named. */
 const NAME = /^saves-(\d{4}-\d{2}-\d{2}-\d{4}(?:\d{2})?)\.zip$/
-
-/** Every file under a folder, as paths relative to it. */
-async function walk(root: string, dir = root): Promise<string[]> {
-  const out: string[] = []
-  for (const entry of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    const path = join(dir, entry.name)
-    if (entry.isDirectory()) out.push(...(await walk(root, path)))
-    else if (entry.isFile()) out.push(relative(root, path))
-  }
-  return out
-}
-
-const stamp = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`
 
 /**
  * Save backups: once a day, a zip of everyone's saves (not their history, which stays in the data
@@ -88,7 +76,7 @@ export class SaveBackups {
 
   private async write(): Promise<string> {
     const dir = this.dir!
-    const name = `saves-${stamp(new Date())}.zip`
+    const name = `saves-${stamp().replace(' ', '-').replaceAll(':', '')}.zip`
     const temp = join(dir, `.${name}.part`)
     let out: ReturnType<typeof createWriteStream> | null = null
     try {
@@ -108,10 +96,8 @@ export class SaveBackups {
       let count = 0
       for (const u of users) {
         const root = join(this.saveStores.folder(u.id), 'saves')
-        for (const rel of await walk(root)) {
-          const st = await stat(join(root, rel)).catch(() => null)
-          if (!st) continue
-          zip.addFile(join(root, rel), `${u.id}-${u.username}/${rel.split('\\').join('/')}`, { mtime: st.mtime })
+        for (const f of await walkFiles(root)) {
+          zip.addFile(f.full, `${u.id}-${u.username}/${f.rel}`, { mtime: new Date(f.mtimeMs) })
           count++
         }
       }

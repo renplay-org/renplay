@@ -21,7 +21,6 @@ fi
 export GAMES_DIR="${GAMES_DIR:-/games}"
 export DATA_DIR="${DATA_DIR:-/data}"
 export RENPLAY_DIR="${RENPLAY_DIR:-$GAMES_DIR/_renplay}"
-export RENPLAY_RUNTIME_PATH=/app/runtime/renplay-runtime.js
 # The server's port inside the container, which nginx forwards to.
 export PORT="${PORT:-3000}"
 export HOME="${HOME:-/tmp/home}"

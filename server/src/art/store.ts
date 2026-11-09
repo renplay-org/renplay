@@ -13,7 +13,7 @@ import { HttpError } from '../util/paths.js'
 import { catalogHosts, fetchPublic } from '../util/net.js'
 import { readLocalFile } from '../recipes/local.js'
 import { ART_KINDS, type ArtKind, type CatalogImage } from '../shared/recipe.js'
-import type { ArtCredit, ArtFormat, ArtMade, ArtSet } from '../shared/art.js'
+import type { ArtCredit, ArtFormat, ArtMade, ArtProblem, ArtSet } from '../shared/art.js'
 import type { ArtCandidate } from '../shared/api.js'
 
 /**
@@ -385,7 +385,7 @@ export interface ArtSubject {
   pictures: Picture[]
 }
 
-const EVERYONE = 0
+export const EVERYONE = 0
 
 export class ArtStore {
   private readonly dir: string
@@ -753,15 +753,15 @@ export class ArtStore {
    * Makes every format of every subject for everyone, and for each person who chose something, so
    * pages open with their pictures. Then forgets what nothing uses. Errors are returned, not thrown.
    */
-  async sync(subjects: ArtSubject[]): Promise<string[]> {
+  async sync(subjects: ArtSubject[]): Promise<ArtProblem[]> {
     const started = Date.now()
-    const errors = new Set<string>()
+    const errors = new Map<string, ArtProblem>()
     const used = new Map<string, boolean>()
     const sources = new Set<string>()
-    const name = (subject: ArtSubject) => subject.recipe ?? subject.game ?? 'a catalog game'
+    const fail = (subject: ArtSubject, kind: string, url: string | null | undefined, e: unknown) => { const recipe = subject.recipe ?? subject.game ?? undefined, text = `${kind} of ${recipe ?? 'a catalog game'} (${url ?? 'an upload'}): ${(e as Error).message}`; errors.set(text, { text, recipe }) }
     for (const given of subjects) {
       let subject = given
-      const scopes = [EVERYONE, ...(subject.game ? (this.db.raw.prepare('SELECT DISTINCT scope FROM art_choices WHERE game = ? AND scope != 0').all(subject.game) as Array<{ scope: number }>).map((r) => r.scope) : [])]
+      const scopes = [EVERYONE, ...(subject.game ? (this.db.raw.prepare('SELECT DISTINCT scope FROM art_choices WHERE game = ? AND scope != ?').all(subject.game, EVERYONE) as Array<{ scope: number }>).map((r) => r.scope) : [])]
       // Chosen pictures the index gives no size for are measured first, so they can be placed.
       for (const scope of scopes) {
         for (const p of Object.values(this.chosen(subject, scope))) {
@@ -770,7 +770,7 @@ export class ArtStore {
           try {
             await this.measure(p, subject.adult)
           } catch (e) {
-            errors.add(`${p.kind} of ${name(subject)} (${p.url ?? 'an upload'}): ${(e as Error).message}`)
+            fail(subject, p.kind, p.url, e)
           }
         }
       }
@@ -783,14 +783,14 @@ export class ArtStore {
           try {
             await this.ensure(plan, subject.adult)
           } catch (e) {
-            errors.add(`${plan.kind} of ${name(subject)} (${plan.source.url ?? 'an upload'}): ${(e as Error).message}`)
+            fail(subject, plan.kind, plan.source.url, e)
           }
         }
       }
     }
     for (const row of this.db.raw.prepare('SELECT id FROM art_uploads').all() as Array<{ id: string }>) sources.add(row.id)
     await this.prune(used, sources, started)
-    return [...errors]
+    return [...errors.values()]
   }
 
   /** Forgets made pictures and originals nothing uses. Anything made since `since` stays: a request may be about to send it. */

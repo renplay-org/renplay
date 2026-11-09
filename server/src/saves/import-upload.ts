@@ -7,9 +7,9 @@ import { pipeline } from 'node:stream/promises'
 import type { Request, Response, RequestHandler } from 'express'
 import multer from 'multer'
 import { HttpError } from '../util/paths.js'
+import { SAVE_FILE_BYTES } from './savefile.js'
 
 export const IMPORT_MAX_BYTES = 128 << 20
-export const IMPORT_MAX_FILE_BYTES = 64 << 20
 const IMPORT_CONCURRENCY = 2
 let active = 0
 
@@ -35,7 +35,7 @@ export function saveImport(field: 'file' | 'files', handler: (req: Request, res:
         },
         _removeFile(_req, file, done) { rm(file.path, { force: true }).then(() => done(null), done) },
       }
-      const upload = multer({ storage, limits: { fileSize: IMPORT_MAX_FILE_BYTES, files: field === 'file' ? 1 : 200, fields: opts.fields ?? 0, parts: 201 + (opts.fields ?? 0), fieldNameSize: 100, headerPairs: 100 } })
+      const upload = multer({ storage, limits: { fileSize: SAVE_FILE_BYTES, files: field === 'file' ? 1 : 200, fields: opts.fields ?? 0, parts: 201 + (opts.fields ?? 0), fieldNameSize: 100, headerPairs: 100 } })
       await new Promise<void>((resolve, reject) => (field === 'file' ? upload.single(field) : upload.array(field))(req, res, (error) => error ? reject(error) : resolve()))
       await handler(req, res)
     } catch (error) { next(error) }

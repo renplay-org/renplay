@@ -26,3 +26,9 @@ export interface ArtFormat {
 
 /** A game's five formats. */
 export type ArtSet = Partial<Record<ArtKind, ArtFormat>>
+
+/** Something that went wrong making a picture. `recipe` names the recipe or library game it was for, so it can be kept from people who may not see that game. */
+export interface ArtProblem {
+  text: string
+  recipe?: string
+}

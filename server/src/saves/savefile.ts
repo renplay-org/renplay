@@ -1,9 +1,11 @@
 import { isZip, readZipEntries, type ZipLimits } from '../util/zip.js'
 
+/** The most a single save file may hold. */
+export const SAVE_FILE_BYTES = 64 << 20
 /** A Ren'Py save file is a small zip. */
-const SAVE_FILE: ZipLimits = { files: 2048, fileBytes: 64 << 20, totalBytes: 64 << 20 }
+const SAVE_FILE: ZipLimits = { files: 2048, fileBytes: SAVE_FILE_BYTES, totalBytes: SAVE_FILE_BYTES }
 /** A zip of save folders, imported or copied between people. */
-export const SAVES_ZIP: ZipLimits = { files: 2048, fileBytes: 64 << 20, totalBytes: 128 << 20 }
+export const SAVES_ZIP: ZipLimits = { files: 2048, fileBytes: SAVE_FILE_BYTES, totalBytes: 128 << 20 }
 
 export interface SaveMeta {
   /** Name given by the player (extra_info). */

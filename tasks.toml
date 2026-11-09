@@ -13,7 +13,7 @@ depends = ["dev:server", "dev:ui"]
 ["dev:server"]
 description = "The server on port 3999, with its games and data in /tmp/rp"
 dir = "server"
-env = { DATA_DIR = "/tmp/rp/data", GAMES_DIR = "/tmp/rp/games", PORT = "3999", RENPLAY_RUNTIME_PATH = "{{config_root}}/runtime/renplay-runtime.js" }
+env = { DATA_DIR = "/tmp/rp/data", GAMES_DIR = "/tmp/rp/games", PORT = "3999" }
 run = ["npx tsc -p .", "node dist/index.js"]
 
 ["dev:ui"]

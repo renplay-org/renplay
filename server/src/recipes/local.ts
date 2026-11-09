@@ -3,7 +3,7 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, extname, sep } from 'node:path'
 import sharp from 'sharp'
 import YAML from 'yaml'
-import { normalizeRecipe, type CatalogImage, type Recipe, type Vocabulary } from '../shared/recipe.js'
+import { ART_KINDS, normalizeRecipe, type CatalogImage, type Recipe, type Vocabulary } from '../shared/recipe.js'
 import { MAX_IMAGE_PIXELS } from '../pipeline/image-memory.js'
 import { cleanRelPath, safeJoin } from '../util/paths.js'
 
@@ -23,7 +23,6 @@ export interface LocalRecipes {
 
 /** Groups whose tags show as chips in Renplay 2.9 and older (the index's `tags`). */
 const CHIP_GROUPS = new Set(['play', 'story'])
-const KINDS = new Set(['grid', 'wide', 'hero', 'logo', 'icon'])
 const MB = 1024 * 1024
 
 /** Reads a file in the folder, refusing links that lead out of it and files over `max` bytes. */
@@ -93,7 +92,7 @@ export async function readLocalRecipes(dir: string, vocabulary: Vocabulary): Pro
     if (Array.isArray(r.art)) {
       const art: CatalogImage[] = []
       for (const a of r.art) {
-        if (!a || typeof a !== 'object' || !KINDS.has(a.kind)) {
+        if (!a || typeof a !== 'object' || !ART_KINDS.includes(a.kind)) {
           problem('a picture without a known kind (grid, wide, hero, logo or icon) was left out')
           continue
         }

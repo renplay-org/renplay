@@ -66,7 +66,9 @@ export async function walkFiles(root: string, opts: { skipHidden?: boolean } = {
       const rel = prefix ? `${prefix}/${e.name}` : e.name
       if (e.isDirectory()) await walk(full, rel)
       else if (e.isFile()) {
-        const st = await stat(full)
+        // A file can go between the listing and here: a save written through a temporary file.
+        const st = await stat(full).catch(() => null)
+        if (!st) continue
         out.push({ rel, full, size: st.size, mtimeMs: st.mtimeMs })
       }
     }

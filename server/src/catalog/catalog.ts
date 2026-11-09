@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { viewer } from '../accounts/context.js'
 import { catalogPictures, type ArtStore, type ArtSubject } from '../art/store.js'
-import type { ArtSet } from '../shared/art.js'
+import type { ArtProblem, ArtSet } from '../shared/art.js'
 import type { Config } from '../config.js'
 import { ContentMode } from '../content/mode.js'
 import { parseAdultLevel } from '../shared/levels.js'
@@ -21,6 +21,11 @@ const CACHE_KEY = 'catalog_cache'
 const failed = (e: unknown) => log('catalog', `Could not update: ${(e as Error).message}`, 'error')
 /** What blocking needs to know about adult recipes: ids, archives and save folders, never titles, tags or covers. */
 const STUBS_KEY = 'catalog_adult_stubs'
+
+/** A problem of the last refresh. `source` is the catalog address or the recipes folder it came from. */
+interface Problem extends ArtProblem {
+  source?: string
+}
 /** How often the catalog is fetched while Renplay runs (cheap: pictures are fetched only once). */
 const REFRESH_EVERY = 3600_000
 
@@ -94,13 +99,13 @@ export class Catalog {
   vocabulary: Vocabulary = {}
   private fetchedAt = 0
   /** Problems of the last refresh. An error about one recipe names it, so a person who may not see that game does not see the error either. */
-  private errors: Array<{ text: string; recipe?: string }> = []
+  private errors: Problem[] = []
   private timer: NodeJS.Timeout | null = null
 
   constructor(
     private readonly cfg: Config,
     private readonly db: Db,
-    readonly content: ContentMode,
+    private readonly content: ContentMode,
     readonly art: ArtStore,
   ) {}
 
@@ -186,9 +191,16 @@ export class Catalog {
   syncAdult(): void {
     for (const g of this.db.allGames()) {
       if (!g.recipe_id) continue
-      const adult = this.recipes.has(g.recipe_id) ? (this.recipes.get(g.recipe_id)!.nsfw === true ? 1 : 0) : this.adult.has(g.recipe_id) ? 1 : g.adult
+      const adult = this.adultFlag(g.recipe_id, g.adult)
       if (adult !== g.adult) this.db.updateGame(g.id, { adult })
     }
+  }
+
+  /** A game is adult when its recipe is. Without a recipe, or with one the catalog does not have, it keeps what the library knew. */
+  adultFlag(recipeId: string, current: number): number {
+    const recipe = this.recipes.get(recipeId)
+    if (recipe) return recipe.nsfw === true ? 1 : 0
+    return this.adult.has(recipeId) ? 1 : current
   }
 
   /** True when this recipe id belongs to an adult game that a blocked install does not show. */
@@ -203,7 +215,7 @@ export class Catalog {
 
   async refresh(): Promise<{ games: number; errors: string[] }> {
     await this.refreshAll()
-    return { games: this.visibleCount(), errors: this.visibleErrors() }
+    return { games: this.visibleCount(), errors: this.visibleErrors().map((e) => e.text) }
   }
 
   private async refreshAll(): Promise<void> {
@@ -223,7 +235,7 @@ export class Catalog {
           from = sfw
         } catch (e) {
           console.warn(`catalog: No safe-for-work index at ${sfw} (${(e as Error).message}). Adult games from ${url} are left out.`)
-          this.errors.push({ text: `${sfw}: ${(e as Error).message}` })
+          this.errors.push({ text: `${sfw}: ${(e as Error).message}`, source: url })
         }
       } else if (off) {
         console.warn(`catalog: ${url} has no safe-for-work index. Its adult games are left out.`)
@@ -243,12 +255,12 @@ export class Catalog {
         }
         all.push(...games)
       } catch (e) {
-        this.errors.push({ text: `${url}: ${(e as Error).message}` })
+        this.errors.push({ text: `${url}: ${(e as Error).message}`, source: url })
       }
     }
     // Your recipes: read like one more catalog, and a recipe there takes the place of the catalog's.
     const local = await readLocalRecipes(this.cfg.recipesDir, vocabulary)
-    for (const p of local.problems) this.errors.push({ text: `Your recipes, ${p.file}: ${p.message}`, recipe: p.recipe })
+    for (const p of local.problems) this.errors.push({ text: `Your recipes, ${p.file}: ${p.message}`, recipe: p.recipe, source: this.cfg.recipesDir })
     let mine = local.games
     if (off) {
       const kept = withoutAdult(mine, {})
@@ -288,7 +300,7 @@ export class Catalog {
         this.adult.get(g.id) ??
         (source.archive ? this.match({ name: source.archive, size: source.size, sha256: source.sha256 })?.recipe : undefined) ??
         (g.save_dir ? [...this.recipes.values(), ...this.adult.values()].find((r) => r.saveDir === g.save_dir) : undefined)
-      if (recipe) this.db.updateGame(g.id, { recipe_id: recipe.id, adult: recipe.nsfw === true ? 1 : g.adult })
+      if (recipe) this.db.updateGame(g.id, { recipe_id: recipe.id, adult: this.adultFlag(recipe.id, g.adult) })
     }
   }
 
@@ -333,7 +345,7 @@ export class Catalog {
 
   /** Makes the pictures every page needs, and forgets the ones nothing uses. */
   async syncArt(): Promise<void> {
-    for (const text of await this.art.sync(this.artSubjects())) this.errors.push({ text, recipe: text.match(/^[a-z]+ of ([a-z0-9][a-z0-9._-]*) \(/)?.[1] })
+    this.errors.push(...(await this.art.sync(this.artSubjects())))
   }
 
 
@@ -356,7 +368,7 @@ export class Catalog {
 
 
   status(): { fetchedAt: number; urls: string[]; errors: string[]; count: number } {
-    return { fetchedAt: this.fetchedAt, urls: this.cfg.catalogUrls, errors: this.visibleErrors(), count: this.visibleCount() }
+    return { fetchedAt: this.fetchedAt, urls: this.cfg.catalogUrls, errors: this.visibleErrors().map((e) => e.text), count: this.visibleCount() }
   }
 
   /**
@@ -369,23 +381,22 @@ export class Catalog {
     const of = (origin: string) => visible.filter((r) => r._origin === origin)
     const count = (rs: Recipe[]) => ({ recipes: rs.length, pictures: rs.reduce((n, r) => n + (r.art?.length ?? 0), 0) })
     return [
-      ...this.cfg.catalogUrls.map((url) => ({ kind: 'catalog' as const, location: url, ...count(of(url)), problems: problems.filter((p) => p.startsWith(url) || p.startsWith(sfwIndexUrl(url) ?? '\0')) })),
-      { kind: 'folder' as const, location: this.cfg.recipesDir, ...count(of('local')), problems: problems.filter((p) => p.startsWith('Your recipes')) },
+      ...this.cfg.catalogUrls.map((url) => ({ kind: 'catalog' as const, location: url, ...count(of(url)), problems: problems.filter((p) => p.source === url).map((p) => p.text) })),
+      { kind: 'folder' as const, location: this.cfg.recipesDir, ...count(of('local')), problems: problems.filter((p) => p.source === this.cfg.recipesDir).map((p) => p.text) },
     ]
   }
 
   /** Errors about an adult recipe name it and its art, so only a person at Shown sees them. */
-  private visibleErrors(): string[] {
+  private visibleErrors(): Problem[] {
     const shown = this.content.viewerLevel() === 'shown'
     // The name can be a recipe, or a library game without one (then its own adult flag counts).
-    return this.errors.filter((e) => shown || !e.recipe || !(this.isAdultId(e.recipe) || this.db.getGame(e.recipe)?.adult === 1)).map((e) => e.text)
+    return this.errors.filter((e) => shown || !e.recipe || !(this.isAdultId(e.recipe) || this.db.getGame(e.recipe)?.adult === 1))
   }
 
   private visibleCount(): number {
     return [...this.recipes.values()].filter((r) => !this.content.hidesRecipe(r.nsfw)).length
   }
 
-  /** Finds the recipe (and release) an archive belongs to. */
   /**
    * Off: an adult game does not exist, so neither does its download: one a recipe for an adult
    * game names, or one a hidden game was installed from (also a game without a recipe).

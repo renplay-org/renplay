@@ -14,8 +14,7 @@ COPY --chown=1000:1000 recipes/ /data/recipes/
 COPY --chown=1000:1000 games/ /games/_archives/
 COPY seed.mjs /tmp/seed.mjs
 ENV RENPLAY_ADULT_GAMES=blurred \
-    RENPLAY_BACKUP_DIR=off \
-    RENPLAY_RUNTIME_PATH=/app/runtime/renplay-runtime.js
+    RENPLAY_BACKUP_DIR=off
 RUN cd /games/_archives && node /tmp/seed.mjs *.zip
 
 FROM ${IMAGE}

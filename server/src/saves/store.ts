@@ -1,16 +1,18 @@
-import { mkdir, readFile, readdir, rename, rm, stat, unlink, utimes } from 'node:fs/promises'
+import { mkdir, readFile, readdir, stat, unlink, utimes } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { Writable } from 'node:stream'
 import yazl from 'yazl'
 import { sha1, walkFiles, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
-import { SAVES_ZIP, isRenpySave } from './savefile.js'
+import { SAVES_ZIP, SAVE_FILE_BYTES, isRenpySave } from './savefile.js'
 import { isZip, readZipEntries } from '../util/zip.js'
 
 const TOKENS_DIR = 'tokens'
 /** Top-level ~/.renpy folders shared by every game: save-signing keys and MultiPersistent data. */
 export const SHARED_DIRS = [TOKENS_DIR, 'persistent'] as const
-const MAX_FILE = 64 << 20
+
+/** What a write did to the slot. */
+export type WriteOutcome = 'added' | 'replaced' | 'kept' | 'same'
 
 export interface SaveFile {
   /** Path relative to the save directory. */
@@ -114,12 +116,14 @@ export class SaveStore {
    * Writes a file, keeping the copy it replaces in History. `base` is the server's version (mtime)
    * the writer last saw, 0 for none. When a save has changed since (another device saved it), the
    * conflict rule applies: the copy saved later stays in the slot and the other goes to History as
-   * a conflict. `conflict` says which: `kept` (the server's copy stayed) or `replaced`.
+   * a conflict. `conflict` says which: `kept` (the server's copy stayed) or `replaced`. `outcome`
+   * says what happened to the slot: a file `added`, one `replaced`, the server's copy `kept`, or
+   * the same file `same` as was there.
    */
-  async write(saveDir: string, name: string, data: Buffer, opts: { mtimeMs?: number; reason?: SaveReason; base?: number; everyKind?: boolean; unanswered?: string } = {}): Promise<SaveFile & { conflict?: 'kept' | 'replaced' }> {
+  async write(saveDir: string, name: string, data: Buffer, opts: { mtimeMs?: number; reason?: SaveReason; base?: number; everyKind?: boolean; unanswered?: string } = {}): Promise<SaveFile & { outcome: WriteOutcome; conflict?: 'kept' | 'replaced' }> {
     const rel = cleanRelPath(name)
     if (isJunk(rel)) throw new HttpError(400, 'Refusing temporary file')
-    if (data.length > MAX_FILE) throw new HttpError(413, 'Save file too large')
+    if (data.length > SAVE_FILE_BYTES) throw new HttpError(413, 'Save file too large')
     const full = safeJoin(this.dir(saveDir), rel)
     return this.locked(full, async () => {
       let old: Buffer | null = null
@@ -131,9 +135,9 @@ export class SaveStore {
       if (old && old.equals(data)) {
         // The same bytes from a writer that tracks versions (a device, an import) never move the
         // server's time back: an older copy of the same save is still the same save.
-        if (opts.base !== undefined && opts.mtimeMs && opts.mtimeMs < oldMtime) return { name: rel, size: data.length, mtimeMs: oldMtime }
+        if (opts.base !== undefined && opts.mtimeMs && opts.mtimeMs < oldMtime) return { name: rel, size: data.length, mtimeMs: oldMtime, outcome: 'same' }
         if (opts.mtimeMs) await utimes(full, new Date(), new Date(clampMtime(opts.mtimeMs))).catch(() => {})
-        return { name: rel, size: data.length, mtimeMs: opts.mtimeMs ? clampMtime(opts.mtimeMs) : Date.now() }
+        return { name: rel, size: data.length, mtimeMs: opts.mtimeMs ? clampMtime(opts.mtimeMs) : Date.now(), outcome: 'same' }
       }
       const mtime = clampMtime(opts.mtimeMs)
       // Only saves, unless asked (an import): Ren'Py merges its persistent data itself while it runs.
@@ -144,15 +148,15 @@ export class SaveStore {
       if (old && !own && opts.base !== undefined && (opts.everyKind || rel.endsWith('.save')) && Math.abs(oldMtime - opts.base) > 1) {
         if (mtime < oldMtime) {
           await this.snapshot(saveDir, rel, data, 'conflict')
-          return { name: rel, size: old.length, mtimeMs: oldMtime, conflict: 'kept' as const }
+          return { name: rel, size: old.length, mtimeMs: oldMtime, outcome: 'kept', conflict: 'kept' }
         }
         await this.snapshot(saveDir, rel, old, 'conflict')
         await writeFileAtomic(full, data, new Date(mtime))
-        return { name: rel, size: data.length, mtimeMs: mtime, conflict: 'replaced' as const }
+        return { name: rel, size: data.length, mtimeMs: mtime, outcome: 'replaced', conflict: 'replaced' }
       }
       if (old) await this.snapshot(saveDir, rel, old, opts.reason ?? 'overwrite')
       await writeFileAtomic(full, data, new Date(mtime))
-      return { name: rel, size: data.length, mtimeMs: mtime }
+      return { name: rel, size: data.length, mtimeMs: mtime, outcome: old ? 'replaced' : 'added' }
     })
   }
 
@@ -419,16 +423,6 @@ export class SaveStore {
       return
     }
     for (const [n, buf] of chosen) await this.importOne(saveDir, n, buf, report)
-  }
-
-  /** Moves a whole save directory aside (used when a game is forgotten with its saves). */
-  async archiveDir(saveDir: string): Promise<void> {
-    const src = this.dir(saveDir)
-    const dest = safeJoin(this.historyRoot, `.deleted/${saveDir}.${Date.now()}`)
-    await mkdir(dirname(dest), { recursive: true })
-    await rename(src, dest).catch(async () => {
-      await rm(src, { recursive: true, force: true })
-    })
   }
 }
 

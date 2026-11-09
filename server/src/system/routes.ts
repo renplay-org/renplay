@@ -4,7 +4,7 @@ import { readdir, stat, statfs } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
 import { parseJson } from '../db.js'
-import { cleanRelPath, safeJoin } from '../util/paths.js'
+import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
 import { dirSize } from '../util/fsx.js'
 import type { Services } from '../services.js'
 import type { Health, StorageReport, SystemInfo } from '../shared/api.js'
@@ -29,11 +29,6 @@ export function createSystemRouter(s: Services): Router {
     res.json({ ok: true, uptime: process.uptime(), version } satisfies Health)
   })
 
-  /**
-   * Held open by the job runner (through the scale-to-zero proxy) to keep the
-   * pod alive. Headers go out immediately: proxies give up on responses whose
-   * headers take longer than their header timeout, but stream bodies fine.
-   */
   // ---- storage -----------------------------------------------------------------
 
   /**
@@ -81,7 +76,7 @@ export function createSystemRouter(s: Services): Router {
     }
     games.sort((a, b) => b.bytes - a.bytes)
     const installed = await engines.installed()
-    const used = new Set(db.allGames().filter((g) => g.status === 'installed' && g.engine).map((g) => g.engine))
+    const used = engines.inUse()
     const { orphans } = await builds.verify()
     const orphanSizes = []
     for (const name of orphans) orphanSizes.push({ name, bytes: (await dirSize(join(cfg.gamesDir, name))).bytes })
@@ -113,8 +108,7 @@ export function createSystemRouter(s: Services): Router {
 
   router.get('/system', async (_req, res) => {
     const games = db.allGames().filter((g) => !content.hides(g))
-    const used = new Map<string, string[]>()
-    for (const g of games) if (g.engine && g.status === 'installed') used.set(g.engine, [...(used.get(g.engine) ?? []), g.title])
+    const used = engines.inUse(games)
     const installed = await engines.installed()
     const available = await engines.available().catch(() => [])
     const { orphans } = await builds.verify()
@@ -144,10 +138,10 @@ export function createSystemRouter(s: Services): Router {
     } satisfies SystemInfo)
   })
 
-  /** Removes engines no installed game uses. */
+  /** Removes engines no build uses. A running job may be building with one its game does not name yet. */
   router.post('/system/prune', async (_req, res) => {
-    const used = new Set(db.allGames().filter((g) => g.status === 'installed' && g.engine).map((g) => g.engine))
-    res.json({ removed: await engines.prune(used) })
+    if (jobs.isBusy()) throw new HttpError(409, 'Wait for the running job to finish, then remove unused engines.')
+    res.json({ removed: await engines.prune() })
   })
 
   router.post('/system/engines/refresh', async (_req, res) => {
