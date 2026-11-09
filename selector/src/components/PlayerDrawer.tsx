@@ -2,6 +2,7 @@ import { BookOpen, Expand, ExternalLink, Maximize2, Shrink, Volume2, VolumeX, X 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Frame } from '../lantern/art'
 import { Pill, Seg } from '../lantern/controls'
+import { useModal } from '../lantern/modal'
 import type { Game } from '@shared/api'
 import { isAppleTouch } from '../lib/platform'
 
@@ -61,40 +62,8 @@ export function PlayerDrawer({
   options: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  // The newest onClose, without running the effect below again: the player re-renders often (each
-  // sync report), and focus must stay where the person is.
-  const close = useRef(onClose)
-  close.current = onClose
-  useEffect(() => {
-    const opener = document.activeElement
-    ref.current?.querySelector<HTMLElement>('[data-initial]')?.focus({ preventScroll: true })
-    const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        close.current()
-        return
-      }
-      // Tab stays in the drawer while it is open.
-      if (e.key !== 'Tab' || !ref.current) return
-      const items = [...ref.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => el.offsetParent !== null)
-      if (!items.length) return
-      const first = items[0]!
-      const last = items[items.length - 1]!
-      const inside = ref.current.contains(document.activeElement)
-      if (e.shiftKey && (document.activeElement === first || !inside)) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', key)
-    return () => {
-      document.removeEventListener('keydown', key)
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true })
-    }
-  }, [])
+  // Not inert: the drawer is part of the player's page, and a sheet over it sets the page inert itself.
+  useModal(ref, true, onClose)
   const tabs = [
     ...(renpy ? [{ value: 'saves' as const, label: 'Saves' }] : []),
     { value: 'guide' as const, label: 'Guide' },

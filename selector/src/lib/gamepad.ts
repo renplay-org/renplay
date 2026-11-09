@@ -5,7 +5,8 @@
  * player's drawer. With the drawer open, Menu here closes it (the 'renplay:pad-menu' event).
  */
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+import { FOCUSABLE } from '../lantern/modal'
+
 const REPEAT_AFTER = 400
 const REPEAT_EVERY = 120
 

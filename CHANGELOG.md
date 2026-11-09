@@ -24,6 +24,7 @@ release notes say what).
 - A mod uploaded as a zip may hold files of up to 256 MB and up to 10,000 files. It was held to the limits of a zip of saves (64 MB a file, 128 MB in all), whatever the upload allowed.
 - The nginx and Kubernetes examples allow the 600 MB bodies Renplay takes. Behind them, uploads of mods, walkthroughs and zips of saves over 40 MB failed, and behind the Kubernetes example any upload over 1 MB did.
 - On a phone, tapping a text field no longer zooms the page in, and Renplay does not zoom with a double tap or a pinch.
+- In the player, Escape on the question about saves that have not reached the server closes only the question, not the player menu behind it. The notice that you were signed out takes the keyboard's focus, and Tab stays in it.
 - A game's sheet in the catalog has a close button. On a phone it covered the page with no way to close it but the strip above it.
 - A game without a developer no longer shows a dot before its version on its page.
 - The footer on a phone no longer ends a line with a dot.
