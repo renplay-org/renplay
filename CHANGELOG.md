@@ -12,6 +12,10 @@ release notes say what).
 - On a computer, every icon button names itself when you point at it, as most already did.
 - The Library button on an empty Play history looks like the other buttons.
 
+### Fixed
+
+- A game kept offline opens with a network without checking every one of its files first. Since 4.6.0 it did each time, which slowed the start of a game with many files. Now it does only when the game's page changed, as after an upgrade.
+
 ## [4.6.0] - 2026-11-09
 
 ### Changed

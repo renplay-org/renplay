@@ -196,11 +196,10 @@ export class Catalog {
     }
   }
 
-  /** A game is adult when its recipe is. Without a recipe, or with one the catalog does not have, it keeps what the library knew. */
+  /** A game is adult when the catalog knows it, by its recipe or its adult list. Without either, it keeps what the library knew. */
   adultFlag(recipeId: string, current: number): number {
-    const recipe = this.recipes.get(recipeId)
-    if (recipe) return recipe.nsfw === true ? 1 : 0
-    return this.adult.has(recipeId) ? 1 : current
+    if (this.recipes.has(recipeId) || this.adult.has(recipeId)) return this.isAdultId(recipeId) ? 1 : 0
+    return current
   }
 
   /** True when this recipe id belongs to an adult game that a blocked install does not show. */
