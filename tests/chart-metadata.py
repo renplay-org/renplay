@@ -21,14 +21,16 @@ class PackageChartTest(unittest.TestCase):
             (root / 'CHANGELOG.md').write_text(
                 '## [Unreleased]\n- Not released.\n\n## [3.2.0] - 2026-11-06\n'
                 '### Added\n- Downloads can use a separate mount.\n'
-                '  Existing files stay where they are.\n\n## [3.1.0] - 2026-11-05\n- Old entry.\n')
+                '  Existing files stay where they are.\n\n### Fixed\n- Uploads resume.\n\n'
+                '## [3.1.0] - 2026-11-05\n- Old entry.\n')
             digest = 'sha256:' + 'a' * 64
             subprocess.run([sys.executable, SCRIPT, '3.2.0', digest], cwd=root, check=True)
             metadata = yaml.safe_load((chart / 'Chart.yaml').read_text())
             self.assertEqual(metadata['version'], '3.2.0')
             self.assertEqual(metadata['appVersion'], '3.2.0')
             self.assertEqual(yaml.safe_load(metadata['annotations']['artifacthub.io/changes']), [
-                {'kind': 'changed', 'description': 'Downloads can use a separate mount. Existing files stay where they are.'}
+                {'kind': 'added', 'description': 'Downloads can use a separate mount. Existing files stay where they are.'},
+                {'kind': 'fixed', 'description': 'Uploads resume.'},
             ])
             images = yaml.safe_load(metadata['annotations']['artifacthub.io/images'])
             self.assertEqual(images[0]['image'], 'ghcr.io/renplay-org/renplay@' + digest)
