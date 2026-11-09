@@ -101,14 +101,13 @@ export default function Sheet({
         className={`sheet ${wide === 'xl' ? 'xwide' : wide ? 'wide' : ''} ${fullPhone ? 'full-ph' : ''}`.replace(/\s+/g, ' ').trim()}
       >
         <div className="grip" aria-hidden="true" />
-        {title && (
-          <div className="sheet-h">
-            <h2 className="h2">{title}</h2>
-            <button type="button" className="ib sheet-close" aria-label="Close" onClick={onClose}>
-              <X />
-            </button>
-          </div>
-        )}
+        {/* Every sheet can be closed with a tap, titled or not: a phone has no other way. */}
+        <div className="sheet-h">
+          {title && <h2 className="h2">{title}</h2>}
+          <button type="button" className="ib sheet-close" aria-label="Close" onClick={onClose}>
+            <X />
+          </button>
+        </div>
         <div className="sheet-b">{children}</div>
         {footer && <div className="sheet-f">{footer}</div>}
       </div>
