@@ -140,10 +140,13 @@ describe('SaveStore', () => {
   it('keeps the only copy of something for 30 days, however many versions follow', async () => {
     await store.write('G', 'auto-1-LT1.save', Buffer.from('desktop'), { mtimeMs: Date.now() - 60_000, base: 0 })
     await store.write('G', 'auto-1-LT1.save', Buffer.from('phone'), { mtimeMs: Date.now() - 30_000, base: 0 })
+    // An admin's import over the save: what it replaced is the only copy too.
+    await store.write('G', 'auto-1-LT1.save', Buffer.from('imported'), { reason: 'user-import' })
     for (let i = 0; i < 10; i++) await store.write('G', 'auto-1-LT1.save', Buffer.from(`turn ${i}`))
     const reasons = (await store.history('G', 'auto-1-LT1.save')).map((v) => v.reason)
     expect(reasons.filter((r) => r === 'conflict')).toHaveLength(1)
-    expect(reasons.filter((r) => r === 'game' || r === 'overwrite')).toHaveLength(2)
+    expect(reasons.filter((r) => r === 'user-import')).toHaveLength(1)
+    expect(reasons.filter((r) => r === 'game' || r === 'overwrite')).toHaveLength(1)
   })
 
   it('never moves a save’s time into the future, and leaves a save another device changed when deleting', async () => {

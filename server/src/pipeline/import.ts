@@ -252,6 +252,10 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     const recipeId = match?.recipe.id ?? existing?.recipe_id ?? ''
     const row: Partial<GameRow> = {
       status: 'installed',
+      // Over an HTML game of the same id, the row becomes a Ren'Py game's again.
+      family: 'renpy',
+      engine_label: '',
+      entry: '',
       recipe_id: recipeId,
       // Adult or not from the recipe now, not at the next catalog sync: the game is visible the moment it is installed.
       adult: adultFlag(catalog, recipeId, existing),
