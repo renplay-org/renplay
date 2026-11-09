@@ -13,11 +13,12 @@ import Shelf from '../components/Shelf'
 import SortMenu from '../components/SortMenu'
 import { Empty, errorText, useToast } from '../lantern/ui'
 import { del, post } from '../lib/api'
-import { slotName } from '../lib/format'
 import type { Game } from '@shared/api'
 import { ago, capitalize, pct, playedTime } from '../lib/format'
+import { playLink } from '../lib/links'
 import { useCatalog, useGames, useJobs } from '../lib/queries'
 import { gameTags, matchesSearch, tagChips } from '../lib/tags'
+import { isRenpy } from '@shared/family'
 
 /** The one meta line under a tile: heart, Beta, when it was played. */
 function tileMeta(g: Game) {
@@ -26,7 +27,7 @@ function tileMeta(g: Game) {
   return (
     <>
       {g.favoriteAt && <Heart fill="currentColor" className="pink" />}
-      {g.family !== 'renpy' && <span className="vio">Beta</span>}
+      {!isRenpy(g) && <span className="vio">Beta</span>}
       <span className="truncate">{g.lastPlayedAt ? capitalize(ago(g.lastPlayedAt)) : 'Not played yet'}</span>
     </>
   )
@@ -56,10 +57,6 @@ function tileExtra(g: Game) {
 function GameTile({ game, kind = 'grid', on, onFocus, onMouseEnter }: { game: Game; kind?: 'grid' | 'wide'; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
   const installed = game.status === 'installed'
   return <Card game={game} kind={kind} href={`/game/${game.id}`} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} onFocus={onFocus} onMouseEnter={onMouseEnter} />
-}
-
-function resumeUrl(g: Game): string {
-  return `/play/${g.id}${g.latestSave ? `?resume=${encodeURIComponent(slotName(g.latestSave.file))}` : ''}`
 }
 
 /** The stage's line about where you are: one line on a wide screen, two short lines on a phone. */
@@ -105,7 +102,7 @@ function StageActions({ g }: { g: Game }) {
   }
   return (
     <>
-      <Pill variant="p" size="lg" icon={<Play />} to={resumeUrl(g)} onClick={() => travelToDoor(g, hidden)}>
+      <Pill variant="p" size="lg" icon={<Play />} to={playLink(g.id, g.latestSave?.file)} onClick={() => travelToDoor(g, hidden)}>
         {g.latestSave ? 'Resume' : 'Play'}
       </Pill>
       <Pill variant="s" size="lg" to={`/game/${g.id}`}>

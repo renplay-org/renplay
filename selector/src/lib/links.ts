@@ -1,3 +1,5 @@
+import { slotName } from './format'
+
 /** Labels for recipe links, in display order. */
 const LINK_LABELS: Record<string, string> = {
   website: 'Website',
@@ -14,4 +16,9 @@ export function recipeLinks(links: Record<string, string> | undefined): Array<[s
   return Object.keys(LINK_LABELS)
     .filter((k) => links?.[k])
     .map((k) => [k, LINK_LABELS[k]!, links![k]!])
+}
+
+/** The address a game plays at, with the save to resume, if there is one. */
+export function playLink(gameId: string, saveFile?: string | null): string {
+  return saveFile ? `/play/${gameId}?resume=${encodeURIComponent(slotName(saveFile))}` : `/play/${gameId}`
 }

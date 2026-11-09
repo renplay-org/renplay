@@ -47,7 +47,7 @@ export interface Game {
   build: string | null
   playUrl: string | null
   /** What made the game: renpy, or another engine (docs.renplay.org/engines). */
-  family: string
+  family: Family
   /** What made it, for other engines: "HTML (SugarCube 2.36.1)". */
   engineLabel: string | null
   version: string | null

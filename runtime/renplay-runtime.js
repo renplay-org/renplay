@@ -1462,18 +1462,6 @@
           console.warn('[renplay] load failed', er)
         })
         break
-      case 'renplay:reload-saves':
-        fetchJSON(API + '/boot', { cache: 'no-store' }).then(function (b) {
-          b.files.forEach(function (f) {
-            var bytes = b64ToBytes(f.data)
-            var k = state.known.get(f.path)
-            if (k && k.hash === hash(bytes)) return
-            writeLocal(f.path, bytes, f.mtime)
-            state.known.set(f.path, { mtime: f.mtime, size: bytes.length, hash: hash(bytes) })
-          })
-          return exec('import renpy.loadsave as _rl\n_rl.location.scan()\nrenpy.restart_interaction()\nresult = True')
-        })
-        break
       case 'renplay:mute':
         setAudioMuted(d.value)
         break

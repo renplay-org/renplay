@@ -1,7 +1,8 @@
 import express, { Router, type Request } from 'express'
 import { readFile } from 'node:fs/promises'
 import { saveImport } from './import-upload.js'
-import { isRenpyGame, type GameRow } from '../db.js'
+import type { GameRow } from '../db.js'
+import { isRenpy } from '../shared/family.js'
 import { SAVES_ZIP, readSaveScreenshot, slotInfo } from './savefile.js'
 import { readZipEntries } from '../util/zip.js'
 import { cachedSaveMeta, cachedSceneHash } from './cache.js'
@@ -200,7 +201,7 @@ function gameSaves(s: Services): Router {
     slots.sort((a, b) => b.ctime - a.ctime)
     // Second versions the conflict rule kept in History during the last two weeks.
     const conflicts = await s.saves.conflicts(g.save_dir, Date.now() - 14 * 24 * 3600_000)
-    res.json({ saveDir: g.save_dir, slots, other, conflicts, sync: isRenpyGame(g) && syncCodesOn(db) } satisfies SavesResponse)
+    res.json({ saveDir: g.save_dir, slots, other, conflicts, sync: isRenpy(g) && syncCodesOn(db) } satisfies SavesResponse)
   })
 
   // ---- Ren'Py Sync codes ------------------------------------------------------
@@ -208,7 +209,7 @@ function gameSaves(s: Services): Router {
   const syncGame = (req: Request): string => {
     const g = game(req)
     if (!syncCodesOn(db)) throw new HttpError(409, 'Sync codes are off. An admin can turn them on in Settings.')
-    if (!isRenpyGame(g)) throw new HttpError(409, 'Sync codes are for Ren’Py games.')
+    if (!isRenpy(g)) throw new HttpError(409, 'Sync codes are for Ren’Py games.')
     return requireSaveDir(g)
   }
 

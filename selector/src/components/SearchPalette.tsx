@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useCatalog, useGames } from '../lib/queries'
 import { matchesSearch } from '../lib/tags'
-import { slotName } from '../lib/format'
+import { playLink } from '../lib/links'
 import type { CatalogGame } from '@shared/api'
 import RecipeCard from './RecipeCard'
 import { Frame } from '../lantern/art'
@@ -64,7 +64,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
   ]
   const next = games?.filter((g) => g.status === 'installed' && g.lastPlayedAt && !g.finishedAt).sort((a, b) => (b.lastPlayedAt || '').localeCompare(a.lastPlayedAt || ''))[0]
   const results: { id: string; title: string; subtitle: string; action: () => void; cover?: Parameters<typeof Frame>[0]['game'] }[] = [
-    ...(next ? [{ id: 'resume', title: `Resume ${next.title}`, subtitle: 'Action · Up next', action: () => go(`/play/${next.id}${next.latestSave ? `?resume=${encodeURIComponent(slotName(next.latestSave.file))}` : ''}`) }] : []),
+    ...(next ? [{ id: 'resume', title: `Resume ${next.title}`, subtitle: 'Action · Up next', action: () => go(playLink(next.id, next.latestSave?.file)) }] : []),
     ...pages.map((p) => ({ id: p.url, title: p.title, subtitle: p.url === '/add' ? 'Page · Add a game' : 'Page', action: () => go(p.url) })),
   ].filter((r) => `${r.title} ${r.subtitle}`.toLowerCase().includes(query.toLowerCase()))
   results.push(...(games ?? []).filter((g) => matchesSearch(g, query, vocabulary)).slice(0, 30).map((g) => ({ id: `game:${g.id}`, title: g.title, subtitle: `Library${g.developer ? ` · ${g.developer}` : ''}`, cover: g, action: () => go(`/game/${g.id}`) })))

@@ -13,8 +13,12 @@ export interface Defaults {
   skip: boolean | null
 }
 
-/** The sizes a person or the admin can choose for Ren'Py text. */
-export const TEXT_SIZES: readonly number[] = [1, 1.25, 1.5]
+/** The sizes a person or the admin can choose for Ren'Py text, with the names people see. */
+export const TEXT_SIZES = [
+  { value: 1, label: 'Normal' },
+  { value: 1.25, label: 'Large' },
+  { value: 1.5, label: 'Larger' },
+] as const
 
 /** A list of tag ids, as the Catalog page keeps them: a few, each lowercase letters, digits and hyphens. */
 export function isTagIdList(v: unknown): v is string[] {

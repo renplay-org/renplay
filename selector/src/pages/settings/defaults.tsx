@@ -5,6 +5,7 @@ import CatalogTags from '../../components/CatalogTags'
 import { put } from '../../lib/api'
 import { useCatalog, useDefaults } from '../../lib/queries'
 import type { Defaults } from '@shared/defaults'
+import { TEXT_SIZES } from '@shared/defaults'
 import { Setting } from './common'
 
 /** What everyone starts with until they choose: tags left out, Lighter background, text size, Rollback and Skip. */
@@ -61,8 +62,7 @@ export function DefaultsForEveryone() {
           onChange={(v) => void save({ textSize: v === 'unset' ? null : Number(v) })}
           options={[
             { value: 'unset', label: 'As the game has it' },
-            { value: '1.25', label: 'Large' },
-            { value: '1.5', label: 'Larger' },
+            ...TEXT_SIZES.filter((t) => t.value !== 1).map((t) => ({ value: String(t.value), label: t.label })),
           ]}
         />
       </Setting>

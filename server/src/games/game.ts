@@ -5,6 +5,7 @@ import { playPath } from '../play/routes.js'
 import { cachedSaveMeta, cachedSceneHash } from '../saves/cache.js'
 import { slotInfo } from '../saves/savefile.js'
 import { installedRelease } from '../shared/recipe.js'
+import { toFamily } from '../shared/family.js'
 import { exists } from '../util/fsx.js'
 import { cleanRelPath } from '../util/paths.js'
 import type { Accounts } from '../accounts/accounts.js'
@@ -92,7 +93,7 @@ export async function toGame(game: GameRow, deps: GameParts): Promise<Game> {
     build: row.build || null,
     // The game page is an iframe, which sends no header: this device's level rides along as a query.
     playUrl: row.status === 'installed' && row.build ? (isWebGame(row) ? deps.accounts.assetUrl(row) : playPath(row) + (viewer()?.device ? `?adult=${viewer()!.device}` : '')) : null,
-    family: row.family || 'renpy',
+    family: toFamily(row.family),
     /** What made the game, for other engines ("HTML (SugarCube 2.36.1)"). */
     engineLabel: row.engine_label || null,
     version: release?.version || row.version || null,

@@ -15,7 +15,7 @@ const SHARED = join(SERVER, 'shared')
 const MAX_LINES = 600
 const LARGER = {
   'selector/src/index.css': 3412,
-  'runtime/renplay-runtime.js': 1650,
+  'runtime/renplay-runtime.js': 1638,
   'server/src/art/store.ts': 839,
   'selector/src/pages/GamePage.tsx': 628,
 }

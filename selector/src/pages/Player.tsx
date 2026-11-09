@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Confirm, Spinner, Switch, cx, useToast } from '../lantern/ui'
 import { useAuth } from '../lib/auth'
-import { api } from '../lib/api'
+import { api, userHeader } from '../lib/api'
 import {
   frameRect,
   fullscreenMode,
@@ -27,6 +27,7 @@ import type { Defaults } from '@shared/defaults'
 import { keptGame, useOnline } from '../lib/offline'
 import { setGameHasPad } from '../lib/gamepad'
 import type { Me } from '@shared/api'
+import { isRenpy } from '@shared/family'
 import Door from './player/Door'
 import EscapeHint from './player/EscapeHint'
 import { SLOW_SYNC, useSlow } from './player/useSlow'
@@ -102,7 +103,10 @@ export default function Player() {
   const resumed = useRef(false)
   // Other engines run their own JavaScript, so they play in a sandboxed frame
   // (opaque origin, no access to Renplay) and their storage comes through here.
-  const sandboxed = !!game && game.family !== 'renpy'
+  const sandboxed = !!game && !isRenpy(game)
+  // The drawer's first tab. Other engines' games have no saves of their own.
+  const firstTab: DrawerTab = sandboxed ? 'options' : 'saves'
+  const openDrawer = () => setDrawer(firstTab)
 
   const setPrefs = (p: DisplayPrefs) => {
     setPrefsState(p)
@@ -148,7 +152,7 @@ export default function Player() {
           break
         case 'renplay:ready':
           setReady(true)
-          void api(`/api/games/${gameId}/played`, { method: 'POST', headers: { 'x-renplay-user': String(userId) } }).then(() => qc.invalidateQueries({ queryKey: ['games'] })).catch(() => {})
+          void api(`/api/games/${gameId}/played`, { method: 'POST', headers: userHeader(userId) }).then(() => qc.invalidateQueries({ queryKey: ['games'] })).catch(() => {})
           if (resume && !resumed.current) {
             resumed.current = true
             send({ type: 'renplay:load', slot: resume })
@@ -213,7 +217,7 @@ export default function Player() {
           break
         case 'renplay:menu':
           // The controller's Menu button in the game.
-          setDrawer((tab) => tab ?? (sandboxed ? 'options' : 'saves'))
+          setDrawer((tab) => tab ?? firstTab)
           break
       }
     }
@@ -300,7 +304,7 @@ export default function Player() {
     const key = (e: KeyboardEvent) => {
       // A key the drawer already used (to close itself) does not open it again.
       if (e.key !== 'Escape' || e.repeat || e.defaultPrevented || escLocked || drawer || guide) return
-      setDrawer(sandboxed ? 'options' : 'saves')
+      openDrawer()
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
@@ -400,7 +404,7 @@ export default function Player() {
           // HTML games often put their own menu in the top left (SugarCube's sidebar toggle).
           style={sandboxed ? { top: 10 + Math.max(insets.top, pad.top), right: 10 + insets.right } : { top: 10 + Math.max(insets.top, pad.top), left: 10 + insets.left }}
         >
-          <button type="button" className="rp-pill" onClick={() => setDrawer(sandboxed ? 'options' : 'saves')} aria-label="Open the player menu">
+          <button type="button" className="rp-pill" onClick={openDrawer} aria-label="Open the player menu">
             <span className="mark" aria-hidden="true" />
             Renplay
           </button>
@@ -434,7 +438,7 @@ export default function Player() {
               const t = ev.changedTouches[0]
               const dx = (t?.clientX ?? x0) - x0
               const dy = Math.abs((t?.clientY ?? y0) - y0)
-              if (dx > 40 && dx > dy * 2) setDrawer(sandboxed ? 'options' : 'saves')
+              if (dx > 40 && dx > dy * 2) openDrawer()
               done()
             }
             window.addEventListener('touchend', end)

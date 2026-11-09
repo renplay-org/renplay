@@ -13,6 +13,7 @@ release notes say what).
 
 ### Fixed
 
+- On a browser set to hide adult games, Import saves leaves out those games' saves, as its list of what it will import already did. Before, it imported them.
 - `PORT` works in the image: nginx forwards to the port it names. Before, the server moved and every request failed.
 - `RENPLAY_LOG_LEVEL` is read the same way for the server and for the requests nginx logs, in any case and with spaces around it.
 - When Renplay starts and a game's files are missing, as when a network share is mounted late, the game shows as not installed and comes back by itself on a later start once the files are there. Before, it stayed not installed until it was installed again, and a share that could not be read at all made every game look missing.
