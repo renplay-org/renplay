@@ -17,7 +17,7 @@ Thanks for helping with Renplay. Pick what fits:
 ## Development setup
 
 You need [mise](https://mise.jdx.dev) and, for the image, Docker. mise installs the pinned tools
-(Node 24, Python, Helm and the linters) and runs the tasks in `mise.toml`, the same ones CI runs.
+(Node 24, Python, Helm and the linters) and runs the tasks in `tasks.toml`, the same ones CI runs.
 
 ```sh
 mise install          # the tools
@@ -28,7 +28,7 @@ mise tasks            # every task: test, docs, image, contract, screenshots, re
 ```
 
 `RENPLAY_BACKEND=https://renplay.example mise run dev:ui` runs the library against a deployed
-Renplay. Without mise, each task is a plain npm or node command you can read in `mise.toml`.
+Renplay. Without mise, each task is a plain npm or node command you can read in `tasks.toml`.
 
 Put a game’s PC zip into `/tmp/rp/games/_archives/` and install it from the library.
 

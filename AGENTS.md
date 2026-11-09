@@ -123,7 +123,8 @@ website/           renplay.org: plain HTML and CSS (home, catalog browser), _red
                      addresses (/docs, /github, /demo...), www/ the www.renplay.org redirect
 tests/             The image's install contract, the chart's tests, the deploy/ examples
 scripts/           Repo checks (writing rule, built library, website links), release.mjs, package-chart.py
-mise.toml          Pinned tools and every task, locally and in CI
+mise.toml          Pinned tools, locally and in CI (CI caches them by this file)
+tasks.toml         Every task, locally and in CI
 ```
 
 ## Structure rules
@@ -222,7 +223,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
 
 ## Commands
 
-`mise.toml` pins the tools and holds every task. CI runs the same tasks.
+`mise.toml` pins the tools and `tasks.toml` holds every task. CI runs the same tasks.
 
 ```sh
 mise install && mise run install    # tools and npm packages
