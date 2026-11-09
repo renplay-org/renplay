@@ -360,6 +360,14 @@ export class Catalog {
     return [...this.recipes.values()].filter((r) => !this.content.hidesRecipe(r.nsfw)).sort((a, b) => a.title.localeCompare(b.title))
   }
 
+  /**
+   * What the catalog lists: a recipe whose newest release is broken stays in the index, so a
+   * download of it is still recognized and warned about, but nobody is offered it.
+   */
+  listed(): Recipe[] {
+    return this.list().filter((r) => r.releases[0]?.status !== 'broken')
+  }
+
   recipe(id: string): Recipe | null {
     const recipe = this.recipes.get(id)
     return recipe && !this.content.hidesRecipe(recipe.nsfw) ? recipe : null

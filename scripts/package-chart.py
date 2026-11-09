@@ -17,8 +17,11 @@ annotations = chart['annotations']
 annotations['artifacthub.io/images'] = yaml.safe_dump([
     {'name': 'renplay', 'image': 'ghcr.io/renplay-org/renplay@' + digest}
 ])
+# The changelog's headings, as Artifact Hub's kinds of change.
+KINDS = {'Added': 'added', 'Changed': 'changed', 'Deprecated': 'deprecated', 'Removed': 'removed', 'Fixed': 'fixed', 'Security': 'security'}
 lines = Path('CHANGELOG.md').read_text().splitlines()
 collecting = False
+kind = 'changed'
 changes = []
 for line in lines:
     if line.startswith('## [' + version + '] - '):
@@ -26,8 +29,10 @@ for line in lines:
         continue
     if collecting and line.startswith('## ['):
         break
-    if collecting and line.startswith('- '):
-        changes.append({'kind': 'changed', 'description': line[2:]})
+    if collecting and line.startswith('### '):
+        kind = KINDS.get(line[4:].strip(), 'changed')
+    elif collecting and line.startswith('- '):
+        changes.append({'kind': kind, 'description': line[2:]})
     elif collecting and changes and line.startswith('  '):
         changes[-1]['description'] += ' ' + line.strip()
 if not changes:

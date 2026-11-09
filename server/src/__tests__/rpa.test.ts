@@ -159,6 +159,26 @@ describe('RPA streaming split', () => {
     src.close()
   })
 
+  it('takes the game with Ren\'Py beside it over a developer\'s launcher project with more scripts', async () => {
+    const root = 'Innocent_Witches-0-11-7-pc/'
+    const launcher: Record<string, Buffer> = {}
+    for (let i = 0; i < 40; i++) launcher[`${root}launcher/game/screen${i}.rpy`] = Buffer.from('screen s:')
+    const zip = await zipOf(
+      {
+        [`${root}game/scripts.rpa`]: Buffer.from('RPA-3.0 x'),
+        [`${root}game/images.rpa`]: Buffer.from('RPA-3.0 y'),
+        [`${root}game/options.rpy`]: Buffer.from('define x = 1'),
+        [`${root}renpy/__init__.py`]: Buffer.from('version = 8'),
+        [`${root}renpy/common/00start.rpy`]: Buffer.from('init: pass'),
+        ...launcher,
+      },
+      true,
+    )
+    const src = await openZip(zip)
+    expect(detectLayout(src.entries)).toEqual({ kind: 'project', root })
+    src.close()
+  })
+
   it('ignores archives without a Ren\'Py game', async () => {
     const zip = await zipOf({ 'readme.txt': Buffer.from('hi') }, true)
     const src = await openZip(zip)

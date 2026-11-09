@@ -32,8 +32,7 @@ git checkout -b release-X.Y.Z origin/dev
 # taking anything from it, or the release PR conflicts:
 git merge -s ours origin/main -m "Merge main (PREVIOUS) into release-X.Y.Z"
 # The versions (server, selector, lockfiles, Chart.yaml, deploy/), the dated changelog section
-# and its compare links, and the chart's Artifact Hub changes from that section. It refuses when
-# something is not where it expects it.
+# and its compare links. It refuses when something is not where it expects it.
 mise run release X.Y.Z
 git diff                       # read the X.Y.Z section of CHANGELOG.md: it is the release notes
 git commit -am "chore: release X.Y.Z"
