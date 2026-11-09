@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Renplay can use a public Ren'Py pre-release engine, but only for a game made with a newer Ren'Py than every stable engine, such as Innocent Witches 0.11.7 (Ren'Py 8.6.0). Every other game keeps the newest stable engine, and an engine named in a recipe or setting is used as it is.
+
 ### Fixed
 
 - Games made with Ren'Py 7 that import `__builtin__`, Python 2's name for the built-ins, start instead of failing at that import, as A House in the Rift did.
