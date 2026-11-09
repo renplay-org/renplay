@@ -28,9 +28,6 @@ annotations:
       url: https://docs.renplay.org
     - name: Source
       url: https://github.com/renplay-org/renplay
-  artifacthub.io/changes: |
-    - kind: added
-      description: "The Helm chart is listed on Artifact Hub."
   artifacthub.io/images: |
     - name: renplay
       image: ghcr.io/renplay-org/renplay:4.6.2
