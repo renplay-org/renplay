@@ -89,6 +89,21 @@ describe('HTTP API', () => {
     app.db.deleteGame('legacy-game')
   })
 
+  it('lists no recipe whose newest release is broken, and still knows it', async () => {
+    const recipe = (id: string, ...statuses: string[]) => ({ id, title: id, engine: 'renpy', releases: statuses.map((status, i) => ({ version: `1.${statuses.length - i}`, status, archives: [{ name: `${id}-1.${statuses.length - i}-pc.zip` }] })) })
+    app.catalog.stop()
+    app.db.setSetting('catalog_cache', { at: Date.now(), vocabulary: {}, games: [recipe('works-now', 'playable', 'broken'), recipe('broken-now', 'broken', 'verified'), recipe('only-broken', 'broken')] })
+    await app.catalog.init()
+    const catalog = (await request(app.app).get('/api/catalog').expect(200)).body
+    expect(catalog.games.map((g: { id: string }) => g.id)).toEqual(['works-now'])
+    expect(catalog.status.count).toBe(1)
+    // The index keeps them: a download of one is still recognized and warned about.
+    expect(app.catalog.recipe('broken-now')?.releases[0]?.status).toBe('broken')
+    app.db.insertGame({ id: 'broken-now', title: 'Broken', status: 'installed', recipe_id: 'broken-now', version: '1.2', source: JSON.stringify({ archive: 'broken-now-1.2-pc.zip' }) })
+    expect((await request(app.app).get('/api/games/broken-now').expect(200)).body.game.recipe).toMatchObject({ status: 'broken' })
+    app.db.deleteGame('broken-now')
+  })
+
   it('sets and clears favourites, preserving them on uninstall but not forget', async () => {
     app.db.insertGame({ id: 'favorite-game', title: 'Favorite', status: 'installed' })
     const path = '/api/games/favorite-game'

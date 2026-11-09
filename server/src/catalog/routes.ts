@@ -20,9 +20,9 @@ export function createCatalogRouter(s: Services): Router {
     const games = db.allGames().filter((g) => !content.hides(g))
     res.json({
       // Where Your recipes live on the server is for admins.
-      status: { ...catalog.status(), count: catalog.list().length, sources: catalog.sources().map((s) => (s.kind === 'folder' && viewer()?.user.role !== 'admin' ? { ...s, location: '' } : s)) },
+      status: { ...catalog.status(), count: catalog.listed().length, sources: catalog.sources().map((s) => (s.kind === 'folder' && viewer()?.user.role !== 'admin' ? { ...s, location: '' } : s)) },
       vocabulary: content.hidesRecipe(true) ? Object.fromEntries(Object.entries(catalog.vocabulary).filter(([, v]) => v.group !== 'content')) : catalog.vocabulary,
-      games: catalog.list().map((r): CatalogGame => {
+      games: catalog.listed().map((r): CatalogGame => {
         const local = games.find((g) => g.recipe_id === r.id) ?? (r.saveDir ? games.find((g) => g.save_dir === r.saveDir) : undefined)
         // The source as the interface says it: Your recipes, or the catalog (its address stays here).
         const { _base, _origin, ...recipe } = r
