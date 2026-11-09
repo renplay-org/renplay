@@ -14,6 +14,7 @@ release notes say what).
 ### Fixed
 
 - On a phone, tapping a text field no longer zooms the page in, and Renplay does not zoom with a double tap or a pinch.
+- A game's sheet in the catalog has a close button. On a phone it covered the page with no way to close it but the strip above it.
 - A game without a developer no longer shows a dot before its version on its page.
 - The footer on a phone no longer ends a line with a dot.
 - The Users page names each person's username instead of starting a line with it.

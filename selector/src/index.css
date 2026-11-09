@@ -2180,6 +2180,9 @@ select.input option {
   margin-bottom: 12px;
   flex: none;
 }
+.sheet .sheet-h .sheet-close {
+  margin-left: auto;
+}
 .sheet .sheet-b {
   min-height: 0;
   overflow-y: auto;
