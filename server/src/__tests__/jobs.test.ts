@@ -6,9 +6,9 @@ import request from 'supertest'
 import { describe, expect, it } from 'vitest'
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
-import { JOB_LOG_LIMIT, JobLogs } from '../joblogs.js'
-import { JobManager } from '../jobs.js'
-import { createSystemRouter } from '../routes/system.js'
+import { JOB_LOG_LIMIT, JobLogs } from '../jobs/logs.js'
+import { JobManager } from '../jobs/manager.js'
+import { createJobsRouter } from '../jobs/routes.js'
 
 describe('job logs', () => {
   it('caps and rotates logs by bytes, including a single huge line, and removes orphan files', () => {
@@ -40,7 +40,7 @@ describe('job logs', () => {
     const gate = new Promise<void>((resolve) => { finish = resolve })
     const original = new JobManager(db, cfg)
     try {
-      original.register('test', async (ctx) => {
+      original.register('test', 'Test', async (ctx) => {
         ctx.log('Source: game with spaces.zip')
         ctx.log('Unpacking: 74%')
         await gate
@@ -52,12 +52,14 @@ describe('job logs', () => {
       restarted.start()
       expect(db.getJob(id)?.status).toBe('interrupted')
       const app = express()
-      app.use('/api', createSystemRouter(cfg, db, restarted, null as never, null as never, null as never, 'test', { hides: () => false, viewerLevel: () => 'shown' } as never, { jobHidden: () => false } as never))
+      app.use('/api', createJobsRouter({ db, jobs: restarted, content: { hides: () => false, viewerLevel: () => 'shown' } } as never))
       const response = await request(app).get(`/api/jobs/${id}/log`).expect(200)
       expect(response.text).toContain('Source: game with spaces.zip')
       expect(response.text).toContain('Unpacking: 74%')
       finish()
       await expect.poll(() => original.isBusy()).toBe(false)
+      // A finished job's log is still there, from its file.
+      expect(restarted.getLog(id)).toContain('Unpacking: 74%')
       // Old jobs still read their database log; clearing the UI removes files too.
       db.insertJob({ id: 'legacy', type: 'test', game: '', params: '{}' })
       db.updateJob('legacy', { status: 'done', log: 'Legacy log' })

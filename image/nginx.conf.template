@@ -96,7 +96,7 @@ http {
   proxy_cache_path /tmp/nginx/auth levels=1:2 keys_zone=auth:10m max_size=20m inactive=2m;
 
   upstream renplay {
-    server 127.0.0.1:3000;
+    server 127.0.0.1:${PORT};
     keepalive 32;
   }
 
@@ -140,11 +140,12 @@ http {
       try_files $uri /index.html;
     }
 
-    # In-game runtime (versioned by query string).
+    # In-game runtime, built by the server from runtime/ (versioned by query string).
     location = /renplay/runtime.js {
       auth_request off;
-      alias /app/runtime/renplay-runtime.js;
-      add_header Cache-Control "public, max-age=31536000, immutable" always;
+      proxy_pass http://renplay;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
     }
 
     # Shared Ren'Py web engines, precompressed. Always send the .gz: the
@@ -161,7 +162,7 @@ http {
     # Game pages are rendered by the server (engine template + runtime).
     location ~ ^/g/[a-z0-9][a-z0-9._-]*/[a-z0-9]+(\.m[a-z0-9]+)?/(index\.html)?$ {
       auth_request off;
-      proxy_pass http://127.0.0.1:3000;
+      proxy_pass http://127.0.0.1:${PORT};
       proxy_http_version 1.1;
       proxy_set_header Host $http_host;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -219,7 +220,7 @@ http {
     # trailing slash: "/api/uploads" itself must not get nginx's redirect.)
     location ^~ /api/uploads {
       auth_request off;
-      proxy_pass http://127.0.0.1:3000;
+      proxy_pass http://127.0.0.1:${PORT};
       proxy_http_version 1.1;
       proxy_set_header Host $http_host;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -233,7 +234,7 @@ http {
     # Prometheus' usual address. Node asks for an admin's session or access token.
     location = /metrics {
       auth_request off;
-      proxy_pass http://127.0.0.1:3000/api/metrics;
+      proxy_pass http://127.0.0.1:${PORT}/api/metrics;
       proxy_http_version 1.1;
       proxy_set_header Host $http_host;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -243,7 +244,7 @@ http {
     location /api/ {
       # Includes the public /api/health and /api/auth/; node protects all other routes.
       auth_request off;
-      proxy_pass http://127.0.0.1:3000;
+      proxy_pass http://127.0.0.1:${PORT};
       proxy_http_version 1.1;
       proxy_set_header Host $http_host;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

@@ -1,5 +1,9 @@
 import { useSyncExternalStore } from 'react'
-import { api, type Game } from './api'
+import { api } from './api'
+import type { Game } from '@shared/api'
+import type { OfflineManifest } from '@shared/api'
+import { isAppleTouch, isStandalone } from './platform'
+import { bytes } from '@shared/format'
 
 /*
  * Keeping a game offline: its files go into this browser's Cache Storage, where the service worker
@@ -13,16 +17,8 @@ const SHELL = 'renplay-shell-v1'
 const API = 'renplay-api-v1'
 const STATE = 'renplay:offline'
 
-export interface OfflineManifest {
-  id: string
-  build: string
-  page: string
-  bytes: number
-  files: Array<{ url: string; bytes: number }>
-}
-
 /** A game kept in this browser: its build, size, and when it was kept. */
-export interface KeptGame {
+interface KeptGame {
   build: string
   bytes: number
   at: string
@@ -66,14 +62,13 @@ export function useOnline(): boolean {
   )
 }
 
-/** iPhone and iPad keep site data only for Home Screen apps: a Safari tab loses it after a week. */
-const apple = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-const standalone = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
-
-/** Whether this browser can keep games: 'home-screen' means only from Renplay on the Home Screen. */
+/**
+ * Whether this browser can keep games: 'home-screen' means only from Renplay on the Home Screen.
+ * iPhone and iPad keep site data only for Home Screen apps: a Safari tab loses it after a week.
+ */
 export function offlineSupport(): 'ok' | 'browser' | 'home-screen' {
   if (!('caches' in window) || !('serviceWorker' in navigator) || !window.isSecureContext) return 'browser'
-  if (apple() && !standalone()) return 'home-screen'
+  if (isAppleTouch() && !isStandalone()) return 'home-screen'
   return 'ok'
 }
 
@@ -102,16 +97,6 @@ function keyOf(url: string): string {
 /** The worker reads the kept games again (also when this page is not controlled, after a hard reload). */
 function tellWorker(): void {
   navigator.serviceWorker?.ready.then((r) => r.active?.postMessage({ type: 'renplay:kept-changed' })).catch(() => {})
-}
-
-const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
-function size(n: number): string {
-  let i = 0
-  while (n >= 1000 && i < SIZE_UNITS.length - 1) {
-    n /= 1000
-    i++
-  }
-  return `${n >= 10 || i === 0 ? Math.round(n) : n.toFixed(1)} ${SIZE_UNITS[i]}`
 }
 
 /**
@@ -215,14 +200,14 @@ async function keepNow(game: Game, signal: AbortSignal, onProgress: (done: numbe
   const est = await navigator.storage?.estimate?.().catch(() => null)
   const need = total - done
   if (est?.quota && est.quota - (est.usage ?? 0) < need * 1.05) {
-    throw new Error(`This browser has room for ${size(est.quota - (est.usage ?? 0))} more, and the game needs ${size(need)}.`)
+    throw new Error(`This browser has room for ${bytes(est.quota - (est.usage ?? 0))} more, and the game needs ${bytes(need)}.`)
   }
 
   // The library's own files, so Renplay opens with no network.
   await refreshShell(signal)
   // The answers the library and the player read.
   const answers = await caches.open(API)
-  for (const url of ['/api/me', '/api/auth/providers', '/api/defaults', '/api/content', '/api/games', `/api/games/${encodeURIComponent(game.id)}`]) {
+  for (const url of ['/api/me', '/api/me/adult', '/api/auth/providers', '/api/defaults', '/api/content', '/api/games', `/api/games/${encodeURIComponent(game.id)}`]) {
     const res = await fetch(url, { cache: 'no-store', signal }).catch(() => null)
     if (res?.ok) await answers.put(url, res)
   }

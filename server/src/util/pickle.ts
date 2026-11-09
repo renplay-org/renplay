@@ -29,9 +29,7 @@ export class PyObject {
   }
 }
 
-const MARK = Symbol('mark')
-
-export class UnpicklingError extends Error {}
+class UnpicklingError extends Error {}
 
 export interface UnpickleOptions {
   /** Hard limit on decoded container elements, guards against pickle bombs. */

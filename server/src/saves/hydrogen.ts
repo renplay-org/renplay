@@ -18,7 +18,7 @@ const DOMAIN_AEAD = 0x0
 const DOMAIN_XOF = 0xf
 const IV_BYTES = 20
 const MAC_BYTES = 16
-export const HEADER_BYTES = IV_BYTES + MAC_BYTES
+const HEADER_BYTES = IV_BYTES + MAC_BYTES
 const PREFIX = [6, 0x73, 0x62, 0x78, 0x32, 0x35, 0x36, 8] // 6 "sbx256" 8
 const RENPY_CONTEXT = Buffer.from('shirocat')
 

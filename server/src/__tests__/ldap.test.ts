@@ -3,7 +3,7 @@ import request from 'supertest'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Client } from 'ldapts'
-import { escapeLdapFilter } from '../sign-in-providers.js'
+import { escapeLdapFilter } from '../accounts/sign-in.js'
 import { signInFixture, site } from './sign-in-fixture.js'
 
 it('escapes every LDAP filter metacharacter', () => { expect(escapeLdapFilter('a*)(uid=*)\\\0')).toBe('a\\2a\\29\\28uid=\\2a\\29\\5c\\00') })

@@ -13,8 +13,9 @@ You can also put Renplay behind a VPN or your proxy's authentication.
   the API from one origin.
 - **Pass `Range` requests through, and do not cache or rewrite bodies.** The browser resumes the
   game download with Range requests, and games stream assets that way.
-- **Allow long requests and large downloads.** Game files are large. Uploads are sent in chunks of 32 MB,
-  so a body limit of 40 MB is enough, but do not set a short read timeout.
+- **Allow long requests and large bodies.** Game files are large. A download you add is sent in
+  chunks of 32 MB, but a mod, a walkthrough or a zip of saves comes in one request, so allow bodies of
+  600 MB, as Renplay's own nginx does. Do not set a short read timeout.
 - **Set `RENPLAY_PUBLIC_URL`** to your public HTTPS address when the proxy terminates HTTPS.
   Cookies are marked `Secure` over HTTPS; plain HTTP remains usable on a local NAS. Set
   `RENPLAY_TRUSTED_HOPS` to the trusted proxy hop count for client-address rate limits (the

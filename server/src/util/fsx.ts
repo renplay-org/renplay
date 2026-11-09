@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { mkdir, open, readdir, rename, rm, stat, lstat, unlink } from 'node:fs/promises'
+import { mkdir, open, readdir, rename, stat, lstat, unlink } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 /** Writes a file atomically: temp file in the same directory, fsync, rename. */
@@ -23,18 +23,21 @@ export async function writeFileAtomic(path: string, data: Uint8Array | string, m
   }
 }
 
+/** Whether a file is there: false only when it is missing, null when it could not be told (a share that stalls). */
+export async function presence(path: string): Promise<boolean | null> {
+  try {
+    await lstat(path)
+    return true
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code
+    return code === 'ENOENT' || code === 'ENOTDIR' ? false : null
+  }
+}
+
 export async function exists(path: string): Promise<boolean> {
   try {
     await lstat(path)
     return true
-  } catch {
-    return false
-  }
-}
-
-export async function isDir(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory()
   } catch {
     return false
   }
@@ -63,7 +66,9 @@ export async function walkFiles(root: string, opts: { skipHidden?: boolean } = {
       const rel = prefix ? `${prefix}/${e.name}` : e.name
       if (e.isDirectory()) await walk(full, rel)
       else if (e.isFile()) {
-        const st = await stat(full)
+        // A file can go between the listing and here: a save written through a temporary file.
+        const st = await stat(full).catch(() => null)
+        if (!st) continue
         out.push({ rel, full, size: st.size, mtimeMs: st.mtimeMs })
       }
     }
@@ -118,33 +123,6 @@ export function sha256File(path: string, onProgress?: (bytes: number) => void): 
 
 export function sha1(data: Uint8Array | string): string {
   return createHash('sha1').update(data).digest('hex')
-}
-
-/**
- * Moves a directory into the trash (same filesystem, so this is a cheap rename)
- * and deletes it in the background.
- */
-export async function trashDir(path: string, trashRoot: string): Promise<void> {
-  if (!(await exists(path))) return
-  await mkdir(trashRoot, { recursive: true })
-  const dest = join(trashRoot, `${basename(path)}.${Date.now()}.${randomBytes(3).toString('hex')}`)
-  try {
-    await rename(path, dest)
-  } catch {
-    await rm(path, { recursive: true, force: true })
-    return
-  }
-  void rm(dest, { recursive: true, force: true }).catch((e) => console.warn(`Could not clean up ${dest}: ${(e as Error).message}`))
-}
-
-export async function emptyTrash(trashRoot: string): Promise<void> {
-  let entries: string[] = []
-  try {
-    entries = await readdir(trashRoot)
-  } catch {
-    return
-  }
-  for (const e of entries) void rm(join(trashRoot, e), { recursive: true, force: true }).catch(() => {})
 }
 
 export function newId(prefix = ''): string {

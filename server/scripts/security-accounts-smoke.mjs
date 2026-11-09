@@ -18,7 +18,7 @@ const cfg = { ...loadConfig(), dataDir, gamesDir, internalDir, savesDir: join(da
 const db = Db.open(dataDir)
 db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'safe', title: 'Safe', releases: [] }, { id: 'adult', title: 'Adult', nsfw: true, releases: [] }] })
 db.setSetting('catalog_covers', { safe: { file: 'safe.webp' }, adult: { file: 'adult.webp' } }); db.close()
-const a = await createApp(cfg, { startJobs: false, runtimePath: resolve('../runtime/renplay-runtime.js') })
+const a = await createApp(cfg, { startJobs: false })
 const server = a.app.listen(3994, '0.0.0.0')
 const container = `renplay-security-${process.pid}`, base = 'http://127.0.0.1:8094'
 const shots = process.argv[2] || join(root, 'shots')

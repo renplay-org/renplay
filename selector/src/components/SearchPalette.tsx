@@ -4,18 +4,19 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useCatalog, useGames } from '../lib/queries'
 import { matchesSearch } from '../lib/tags'
-import { slotName, type Recipe } from '../lib/api'
+import { playLink } from '../lib/links'
+import type { CatalogGame } from '@shared/api'
 import RecipeCard from './RecipeCard'
 import { Frame } from '../lantern/art'
-import { Modal, cx } from './ui'
-
-export const applePlatform = () => /Mac|iPhone|iPad|iPod/.test(navigator.platform) || /iPhone|iPad/.test(navigator.userAgent)
+import { cx } from '../lantern/ui'
+import { isApple } from '../lib/platform'
+import Sheet from '../lantern/Sheet'
 
 export default function SearchPalette() {
   const [open, setOpen] = useState(false)
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'k' && (applePlatform() ? e.metaKey : e.ctrlKey)) {
+      if (e.key.toLowerCase() === 'k' && (isApple() ? e.metaKey : e.ctrlKey)) {
         e.preventDefault()
         setOpen((o) => !o)
       }
@@ -28,7 +29,7 @@ export default function SearchPalette() {
       <button aria-label="Search" onClick={() => setOpen(true)} className="search">
         <Search />
         <span className="lbl">Search</span>
-        <kbd>{applePlatform() ? '⌘K' : 'Ctrl K'}</kbd>
+        <kbd>{isApple() ? '⌘K' : 'Ctrl K'}</kbd>
       </button>
       <button aria-label="Search" onClick={() => setOpen(true)} className="ib hide-desk">
         <Search />
@@ -45,7 +46,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
     navigate = useNavigate()
   const [query, setQuery] = useState(''),
     [active, setActive] = useState(0),
-    [recipe, setRecipe] = useState<Recipe | null>(null)
+    [recipe, setRecipe] = useState<CatalogGame | null>(null)
   const list = useRef<HTMLDivElement>(null),
     input = useRef<HTMLInputElement>(null)
   const go = (url: string) => {
@@ -63,7 +64,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
   ]
   const next = games?.filter((g) => g.status === 'installed' && g.lastPlayedAt && !g.finishedAt).sort((a, b) => (b.lastPlayedAt || '').localeCompare(a.lastPlayedAt || ''))[0]
   const results: { id: string; title: string; subtitle: string; action: () => void; cover?: Parameters<typeof Frame>[0]['game'] }[] = [
-    ...(next ? [{ id: 'resume', title: `Resume ${next.title}`, subtitle: 'Action · Up next', action: () => go(`/play/${next.id}${next.latestSave ? `?resume=${encodeURIComponent(slotName(next.latestSave.file))}` : ''}`) }] : []),
+    ...(next ? [{ id: 'resume', title: `Resume ${next.title}`, subtitle: 'Action · Up next', action: () => go(playLink(next.id, next.latestSave?.file)) }] : []),
     ...pages.map((p) => ({ id: p.url, title: p.title, subtitle: p.url === '/add' ? 'Page · Add a game' : 'Page', action: () => go(p.url) })),
   ].filter((r) => `${r.title} ${r.subtitle}`.toLowerCase().includes(query.toLowerCase()))
   results.push(...(games ?? []).filter((g) => matchesSearch(g, query, vocabulary)).slice(0, 30).map((g) => ({ id: `game:${g.id}`, title: g.title, subtitle: `Library${g.developer ? ` · ${g.developer}` : ''}`, cover: g, action: () => go(`/game/${g.id}`) })))
@@ -81,7 +82,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
     list.current?.querySelector(`[data-index="${index}"]`)?.scrollIntoView({ block: 'nearest' })
   }, [index])
   return (
-    <Modal open onClose={onClose} title="Search Renplay">
+    <Sheet open onClose={onClose} title="Search Renplay">
       <div className="stack">
         {recipe ? (
           <>
@@ -147,6 +148,6 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
           </>
         )}
       </div>
-    </Modal>
+    </Sheet>
   )
 }

@@ -10,7 +10,7 @@ async function main() {
   routeConsole()
   if (process.env['RENPLAY_LOG_LEVEL'] && !parseLogLevel(process.env['RENPLAY_LOG_LEVEL'])) console.warn(`config: RENPLAY_LOG_LEVEL=${process.env['RENPLAY_LOG_LEVEL']} is not error, warn, info or debug. Using info.`)
   const cfg = loadConfig()
-  const { app, close, summary } = await createApp(cfg, { runtimePath: process.env['RENPLAY_RUNTIME_PATH'] })
+  const { app, close, summary } = await createApp(cfg)
   const server = app.listen(cfg.port, '127.0.0.1', () => {
     for (const item of summary()) log('server', item)
     log('server', `Ready, logging at ${logLevel()}`)

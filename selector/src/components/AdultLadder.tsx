@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { adultLabels, adultLevels, lowestLevel, useAdultState, useDeviceLevel, useSetAdultChoice, type AdultLevel } from '../lib/adult'
+import { adultLabels, useAdultState, useDeviceLevel, useSetAdultChoice } from '../lib/adult'
+import { ADULT_LEVELS, lowestLevel, type AdultLevel } from '@shared/levels'
 import { Seg, SourceLabel } from '../lantern/controls'
 import { useAuth } from '../lib/auth'
-import { errorText, Spinner, useToast } from './ui'
+import { errorText, Spinner, useToast } from '../lantern/ui'
 
 /**
  * Three pills, Off, Blurred and Shown. A pill above `max` (the row above) is
@@ -17,11 +18,11 @@ export function LevelSeg({ label, value, max = 'shown', onChange, busy }: { labe
       value={value}
       onChange={onChange}
       disabled={busy}
-      options={adultLevels.map((level) => ({
+      options={ADULT_LEVELS.map((level) => ({
         value: level,
         label: adultLabels[level],
-        na: adultLevels.indexOf(level) > adultLevels.indexOf(max),
-        disabled: !onChange || adultLevels.indexOf(level) > adultLevels.indexOf(max),
+        na: ADULT_LEVELS.indexOf(level) > ADULT_LEVELS.indexOf(max),
+        disabled: !onChange || ADULT_LEVELS.indexOf(level) > ADULT_LEVELS.indexOf(max),
       }))}
     />
   )

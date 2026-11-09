@@ -1,10 +1,11 @@
 import { CloudOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Pill } from '../lantern/controls'
-import type { Game } from '../lib/api'
-import { bytes } from '../lib/format'
+import { Pill, Bar } from '../lantern/controls'
+import type { Game } from '@shared/api'
+import { bytes } from '@shared/format'
 import { keep, keptGame, offlineSupport, removeKept } from '../lib/offline'
-import { Confirm, Progress, errorText, useToast } from './ui'
+import { isRenpy } from '@shared/family'
+import { Confirm, errorText, useToast } from '../lantern/ui'
 
 /** The game's copy in this browser, for playing with no network. Ren'Py games only. */
 export default function OfflineCard({ game }: { game: Game }) {
@@ -21,7 +22,7 @@ export default function OfflineCard({ game }: { game: Game }) {
       stop.current?.abort()
     }
   }, [game.id])
-  if (game.status !== 'installed' || game.family !== 'renpy') return null
+  if (game.status !== 'installed' || !isRenpy(game)) return null
   const support = offlineSupport()
   const outdated = !!kept && kept.build !== game.build
   const start = async () => {
@@ -53,7 +54,7 @@ export default function OfflineCard({ game }: { game: Game }) {
           <p className="small muted">
             Keeping it in this browser{progress.total ? `: ${bytes(progress.done)} of ${bytes(progress.total)}` : ''}. Keep this page open.
           </p>
-          <Progress value={progress.total ? progress.done / progress.total : 0} indeterminate={!progress.total} />
+          <Bar value={progress.total ? progress.done / progress.total : 0} indeterminate={!progress.total} />
           <div className="actions">
             <Pill variant="q" size="sm" onClick={() => stop.current?.abort()}>
               Stop

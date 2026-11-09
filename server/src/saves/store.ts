@@ -1,15 +1,18 @@
-import { mkdir, readFile, readdir, rename, rm, stat, unlink, utimes } from 'node:fs/promises'
+import { mkdir, readFile, readdir, stat, unlink, utimes } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { Writable } from 'node:stream'
 import yazl from 'yazl'
 import { sha1, walkFiles, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
-import { isRenpySave, isZip, readZipEntries } from './savefile.js'
+import { SAVES_ZIP, SAVE_FILE_BYTES, isRenpySave } from './savefile.js'
+import { isZip, readZipEntries } from '../util/zip.js'
 
-export const TOKENS_DIR = 'tokens'
+const TOKENS_DIR = 'tokens'
 /** Top-level ~/.renpy folders shared by every game: save-signing keys and MultiPersistent data. */
 export const SHARED_DIRS = [TOKENS_DIR, 'persistent'] as const
-const MAX_FILE = 64 << 20
+
+/** What a write did to the slot. */
+export type WriteOutcome = 'added' | 'replaced' | 'kept' | 'same'
 
 export interface SaveFile {
   /** Path relative to the save directory. */
@@ -41,13 +44,12 @@ export class SaveStore {
   private static locks = new Map<string, Promise<unknown>>()
   private acceptingWrites = true
 
-  /** Whether a save is pinned: its history keeps every version. Set by the owner of the store. */
-  pinned: (saveDir: string, rel: string) => boolean = () => false
-
+  /** `pinned` says whether a save is pinned: its history keeps every version. */
   constructor(
     readonly root: string,
     readonly historyRoot: string,
     private readonly keepVersions = 20,
+    private readonly pinned: (saveDir: string, rel: string) => boolean = () => false,
   ) {}
 
   private dir(saveDir: string): string {
@@ -114,12 +116,14 @@ export class SaveStore {
    * Writes a file, keeping the copy it replaces in History. `base` is the server's version (mtime)
    * the writer last saw, 0 for none. When a save has changed since (another device saved it), the
    * conflict rule applies: the copy saved later stays in the slot and the other goes to History as
-   * a conflict. `conflict` says which: `kept` (the server's copy stayed) or `replaced`.
+   * a conflict. `conflict` says which: `kept` (the server's copy stayed) or `replaced`. `outcome`
+   * says what happened to the slot: a file `added`, one `replaced`, the server's copy `kept`, or
+   * the same file `same` as was there.
    */
-  async write(saveDir: string, name: string, data: Buffer, opts: { mtimeMs?: number; reason?: string; base?: number; everyKind?: boolean; unanswered?: string } = {}): Promise<SaveFile & { conflict?: 'kept' | 'replaced' }> {
+  async write(saveDir: string, name: string, data: Buffer, opts: { mtimeMs?: number; reason?: SaveReason; base?: number; everyKind?: boolean; unanswered?: string } = {}): Promise<SaveFile & { outcome: WriteOutcome; conflict?: 'kept' | 'replaced' }> {
     const rel = cleanRelPath(name)
     if (isJunk(rel)) throw new HttpError(400, 'Refusing temporary file')
-    if (data.length > MAX_FILE) throw new HttpError(413, 'Save file too large')
+    if (data.length > SAVE_FILE_BYTES) throw new HttpError(413, 'Save file too large')
     const full = safeJoin(this.dir(saveDir), rel)
     return this.locked(full, async () => {
       let old: Buffer | null = null
@@ -131,9 +135,9 @@ export class SaveStore {
       if (old && old.equals(data)) {
         // The same bytes from a writer that tracks versions (a device, an import) never move the
         // server's time back: an older copy of the same save is still the same save.
-        if (opts.base !== undefined && opts.mtimeMs && opts.mtimeMs < oldMtime) return { name: rel, size: data.length, mtimeMs: oldMtime }
+        if (opts.base !== undefined && opts.mtimeMs && opts.mtimeMs < oldMtime) return { name: rel, size: data.length, mtimeMs: oldMtime, outcome: 'same' }
         if (opts.mtimeMs) await utimes(full, new Date(), new Date(clampMtime(opts.mtimeMs))).catch(() => {})
-        return { name: rel, size: data.length, mtimeMs: opts.mtimeMs ? clampMtime(opts.mtimeMs) : Date.now() }
+        return { name: rel, size: data.length, mtimeMs: opts.mtimeMs ? clampMtime(opts.mtimeMs) : Date.now(), outcome: 'same' }
       }
       const mtime = clampMtime(opts.mtimeMs)
       // Only saves, unless asked (an import): Ren'Py merges its persistent data itself while it runs.
@@ -144,15 +148,15 @@ export class SaveStore {
       if (old && !own && opts.base !== undefined && (opts.everyKind || rel.endsWith('.save')) && Math.abs(oldMtime - opts.base) > 1) {
         if (mtime < oldMtime) {
           await this.snapshot(saveDir, rel, data, 'conflict')
-          return { name: rel, size: old.length, mtimeMs: oldMtime, conflict: 'kept' as const }
+          return { name: rel, size: old.length, mtimeMs: oldMtime, outcome: 'kept', conflict: 'kept' }
         }
         await this.snapshot(saveDir, rel, old, 'conflict')
         await writeFileAtomic(full, data, new Date(mtime))
-        return { name: rel, size: data.length, mtimeMs: mtime, conflict: 'replaced' as const }
+        return { name: rel, size: data.length, mtimeMs: mtime, outcome: 'replaced', conflict: 'replaced' }
       }
       if (old) await this.snapshot(saveDir, rel, old, opts.reason ?? 'overwrite')
       await writeFileAtomic(full, data, new Date(mtime))
-      return { name: rel, size: data.length, mtimeMs: mtime }
+      return { name: rel, size: data.length, mtimeMs: mtime, outcome: old ? 'replaced' : 'added' }
     })
   }
 
@@ -160,7 +164,7 @@ export class SaveStore {
    * Deletes a file, keeping it in History. With `base` (the version the deleting device last saw),
    * a save another device has changed since is left alone: the answer is `changed`.
    */
-  async remove(saveDir: string, name: string, reason = 'delete', base?: number): Promise<boolean | 'changed'> {
+  async remove(saveDir: string, name: string, reason: SaveReason = 'delete', base?: number): Promise<boolean | 'changed'> {
     const rel = cleanRelPath(name)
     const full = safeJoin(this.dir(saveDir), rel)
     return this.locked(full, async () => {
@@ -181,7 +185,7 @@ export class SaveStore {
     return safeJoin(safeJoin(this.historyRoot, saveDir), rel.replace(/\//g, '__'))
   }
 
-  private async snapshot(saveDir: string, rel: string, data: Buffer, reason: string): Promise<void> {
+  private async snapshot(saveDir: string, rel: string, data: Buffer, reason: SaveReason): Promise<void> {
     if (!isSaveDirName(saveDir)) return
     const dir = this.historyDir(saveDir, rel)
     await mkdir(dir, { recursive: true })
@@ -379,7 +383,7 @@ export class SaveStore {
   }
 
   private async importBundle(saveDir: string, filename: string, data: Buffer, report: ImportReport): Promise<void> {
-    const entries = await readZipEntries(data, () => true, 512 << 20)
+    const entries = await readZipEntries(data, () => true, SAVES_ZIP)
     const names = [...entries.keys()]
     // A zipped-up *single* save (its members at the root) is itself a save file.
     if (names.includes('log') && names.includes('renpy_version') && !names.some((n) => n.endsWith('.save'))) {
@@ -420,16 +424,6 @@ export class SaveStore {
     }
     for (const [n, buf] of chosen) await this.importOne(saveDir, n, buf, report)
   }
-
-  /** Moves a whole save directory aside (used when a game is forgotten with its saves). */
-  async archiveDir(saveDir: string): Promise<void> {
-    const src = this.dir(saveDir)
-    const dest = safeJoin(this.historyRoot, `.deleted/${saveDir}.${Date.now()}`)
-    await mkdir(dirname(dest), { recursive: true })
-    await rename(src, dest).catch(async () => {
-      await rm(src, { recursive: true, force: true })
-    })
-  }
 }
 
 export interface ImportReport {
@@ -438,8 +432,32 @@ export interface ImportReport {
   trustedKeys: number
 }
 
-/** History reasons whose version is the only copy of something. */
-const ONLY_COPIES = new Set(['conflict', 'delete', 'game-delete', 'user-delete', 'import', 'restore', 'sync', 'copy', 'user-copy'])
+/**
+ * Why a version went to History, and whether that version is the only copy of something. The
+ * table names every reason, so a new one has to decide: an only copy stays at least 30 days however
+ * many versions follow it.
+ */
+const ONLY_COPY = {
+  // The game's own saving and a plain overwrite: the person's earlier save, kept by the version limit.
+  game: false,
+  overwrite: false,
+  // The older of two saves from two devices.
+  conflict: true,
+  delete: true,
+  'game-delete': true,
+  'user-delete': true,
+  // What an import, a restore, a sync code or a copy replaced.
+  import: true,
+  'user-import': true,
+  restore: true,
+  sync: true,
+  copy: true,
+  'user-copy': true,
+  // A merge of save keys keeps every earlier key, so the old file is no only copy.
+  'merge-keys': false,
+} as const satisfies Record<string, boolean>
+export type SaveReason = keyof typeof ONLY_COPY
+const ONLY_COPIES = new Set(Object.keys(ONLY_COPY).filter((r) => ONLY_COPY[r as SaveReason]))
 const KEEP_ONLY_COPIES = 30 * 24 * 3600_000
 
 /** The runtime's FNV-1a hash of a file, as it names an upload: "<hex>:<length>". */

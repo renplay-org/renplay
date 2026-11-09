@@ -2,13 +2,15 @@ import { BookOpen, Expand, ExternalLink, Maximize2, Shrink, Volume2, VolumeX, X 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Frame } from '../lantern/art'
 import { Pill, Seg } from '../lantern/controls'
-import type { Game } from '../lib/api'
+import { useModal } from '../lantern/modal'
+import type { Game } from '@shared/api'
+import { isAppleTouch } from '../lib/platform'
 
 export type DrawerTab = 'saves' | 'guide' | 'options'
 type Walkthrough = Game['walkthroughs'][number]
 
 /**
- * The player's one drawer (DESIGN 2.4): from the left, a sheet from the bottom on a portrait
+ * The player's one drawer: from the left, a sheet from the bottom on a portrait
  * phone. The icon and title, three tabs, and a footer with Save now as a plate, Save and exit as
  * the one primary, a line on what happens to saves that have not synced, and the other ways out.
  * Rendered only while open, so nothing in it can take focus while it is closed.
@@ -60,40 +62,8 @@ export function PlayerDrawer({
   options: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  // The newest onClose, without running the effect below again: the player re-renders often (each
-  // sync report), and focus must stay where the person is.
-  const close = useRef(onClose)
-  close.current = onClose
-  useEffect(() => {
-    const opener = document.activeElement
-    ref.current?.querySelector<HTMLElement>('[data-initial]')?.focus({ preventScroll: true })
-    const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        close.current()
-        return
-      }
-      // Tab stays in the drawer while it is open.
-      if (e.key !== 'Tab' || !ref.current) return
-      const items = [...ref.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((el) => el.offsetParent !== null)
-      if (!items.length) return
-      const first = items[0]!
-      const last = items[items.length - 1]!
-      const inside = ref.current.contains(document.activeElement)
-      if (e.shiftKey && (document.activeElement === first || !inside)) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', key)
-    return () => {
-      document.removeEventListener('keydown', key)
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true })
-    }
-  }, [])
+  // Not inert: the drawer is part of the player's page, and a sheet over it sets the page inert itself.
+  useModal(ref, true, onClose)
   const tabs = [
     ...(renpy ? [{ value: 'saves' as const, label: 'Saves' }] : []),
     { value: 'guide' as const, label: 'Guide' },
@@ -204,7 +174,7 @@ function Reader({ w }: { w: Walkthrough }) {
       </div>
     )
   // iPhone and iPad Safari draw only a PDF's first page in a frame: there it opens in its own tab.
-  if (w.kind === 'pdf' && /iPhone|iPad|iPod/.test(navigator.userAgent + (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent) ? ' iPad' : '')))
+  if (w.kind === 'pdf' && isAppleTouch())
     return (
       <div className="gw-img stack" style={{ gap: 12, alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
         <p className="small muted">This browser shows only the first page of a PDF here.</p>

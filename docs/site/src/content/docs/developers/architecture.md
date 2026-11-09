@@ -16,6 +16,14 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
                         └─ /api/…                  node server on 127.0.0.1:3000
 ```
 
+## The server
+
+`services.ts` makes the server's parts once at start: the database, the adult level rules
+(`content/mode.ts`), accounts, the catalog with its art cache, jobs, builds, engines and save backups.
+Every router and job gets that one object. The person a request is for comes from the request
+itself (`accounts/context.ts`), so `services.saves` is always the saves of whoever is asking.
+Modules below the routes, like the install pipeline, take only the parts they use.
+
 ## Storage
 
 | Path | Contents |
@@ -31,7 +39,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (React, s
 | `/data/saves/`, `/data/save-history/` | Compatibility symlinks to owner 1's folders |
 | `/data/users-removed/` | Archived removed accounts. Never automatically purged |
 | `/data/overlays/<id>/` | Mods: the user's files layered over a game |
-| `/data/art/` | The art cache: made pictures by content hash, originals in `src/` (`art.ts`) |
+| `/data/art/` | The art cache: made pictures by content hash, originals in `src/` (`art/store.ts`) |
 | `/data/walkthroughs/` | Walkthrough PDFs |
 
 `/data` is what to back up. Everything in `/games` except `_archives` can be rebuilt (from the
@@ -44,7 +52,7 @@ archives, while they are kept).
 1. **Read the archive in place** (`archive.ts`): zip, 7z, rar or tar, without unpacking it to disk.
    Find the game folder and the Ren'Py version (`renpy/vc_version.py`). Other engines' games are
    recognized (`family.ts`) and refused with the reason. See [Engines](/engines/).
-2. **Match the catalog** (`catalog.ts`): by sha256, name and size, or a `match` pattern. The recipe
+2. **Match the catalog** (`catalog/catalog.ts`): by sha256, name and size, or a `match` pattern. The recipe
    can choose the engine, files to keep or exclude, and small patches.
 3. **Pick the engine** (`engines.ts`): the recipe's, `RENPLAY_ENGINE`, or the newest published
    engine of the game's major version. Games made with Ren'Py 7 or older get the newest Ren'Py 8
@@ -86,9 +94,9 @@ its current entry has been consumed. RPA indexes are capped at 32 MiB compressed
 uncompressed. Archives with unreadable or oversized indexes are kept intact. File indexes and
 small image placeholders still scale with the number of files, but file bodies are not queued.
 
-Job logs (`joblogs.ts`) use synchronous appends under `/data/job-logs/`, with two files of at most
+Job logs (`jobs/logs.ts`) use synchronous appends under `/data/job-logs/`, with two files of at most
 96 KiB per job. The log API returns the latest 96 KiB after a restart, even if the job never finished.
-Finished jobs also retain their database log for compatibility. Clearing finished activity deletes
+Jobs from before 2.11 have their log only in the database, and the log API still reads it. Clearing finished activity deletes
 its log files. Startup removes any orphan files left by an interrupted cleanup.
 
 ### Why packs
@@ -101,7 +109,8 @@ no-store HTTP responses. The runtime separately caches shared build data in Cach
 ## Playing
 
 The game page is the engine's own `index.html` with Renplay's runtime
-(`runtime/renplay-runtime.js`) injected. The runtime:
+(`runtime/renplay-runtime.js`, after `runtime/renplay-player.js`, which the HTML games' runtime
+shares) injected. The server builds it at start and serves it at `/renplay/runtime.js`. The runtime:
 
 - **Paces frames** to the display with `requestAnimationFrame`. Without it, Ren'Py's web build
   drew about 8 frames a second in tested games.
@@ -150,14 +159,15 @@ unreachable.
 ## Saves
 
 `server/src/saves/store.ts` has one instance per account, under `/data/users/<id>/saves/`, laid out
-like desktop Ren'Py. Every overwrite and delete snapshots the previous version in that account's
-`save-history/`. Locks are shared across store instances. Metadata keys include the store root.
+like desktop Ren'Py. `saves/stores.ts` makes them and owns where they live, and the names, notes and
+pins people give their saves. Every overwrite and delete snapshots the previous version in that
+account's `save-history/`. Locks are shared across store instances. Metadata keys include the store root.
 Renplay never deletes saves on uninstall or reinstall. See [Accounts API](/developers/accounts-api/)
 for schema 7, migration, sessions, nginx protection and the request-local permission boundary.
 
 ## The catalog
 
-`catalog.ts` fetches the index (`index.v4.json`, catalog schema 4; `normalizeRecipe` also reads
+`catalog/catalog.ts` fetches the index (`index.v4.json`, catalog schema 4; `normalizeRecipe` also reads
 schemas 2 and 3, turning a schema 3 cover into a grid) every hour (or from Settings). It links
 installed games to recipes (by id, archive or save folder) and reports newer working releases as
 updates. Library metadata (title, developer, tags, links, summary and game state) comes only from
@@ -180,9 +190,9 @@ library entry's `createdAt`, not the installation date. Library pages reveal 60 
 then 48 at a time. Catalog pages reveal 30 at a time. Tag chips count games, include only play
 and story tags shared by at least two games, and use the catalog vocabulary for labels.
 
-Favourites first lived in `games.favorite_at` (schema 4). Schema 7 copies owner progress into
-`user_games` and all account-facing progress reads and writes use that table, independently of builds.
-The shared `games.last_played_at` remains the latest across accounts for downgrade compatibility.
+Each person's progress (favourite, status, rating, play time, last played) lives in `user_games`,
+independently of builds, and their play sessions in `play_sessions`. Both belong to
+`progress/store.ts`, and their routes to `progress/routes.ts`.
 `PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
 Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
 its timestamp. Uninstall keeps it. Forgetting the library entry removes it.
@@ -207,7 +217,7 @@ non-finished game and invalidates on player exit.
 The empty library's starter is the first Ren'Py recipe with `free: true` that is not `nsfw` and
 has a working release. Without one it shows no starter.
 
-**Adult levels** (`content.ts`). A request's level is the lowest of the installation's, the
+**Adult levels** (`content/mode.ts`). A request's level is the lowest of the installation's, the
 person's ceiling, the person's choice and this device's. The interface shows a person one choice
 (`AdultChoice` on the account page) with the levels above their limit struck through. The browser keeps the device level in
 `localStorage` (`renplay:adult-device`, for everyone using that browser) and sends it as the
@@ -221,16 +231,14 @@ a download or a recipe), downloads, the Users tools, counts and catalog problems
 is listed and plays, with its walkthrough and the person's own save files, but no picture of it is
 sent: no art URL in JSON (each format is its ThumbHash and tint), 404 for art, save screenshots and the build's presplash, directly and
 through nginx's `/api/auth/check`. `adult-levels.test.ts` lists every registered route with what
-the levels do on it, so a new route fails until it is classified. The 3.x columns (`adult_access`,
-the `adultPictures` preference, the `adult_games` setting) are kept in step, the installation level
-included, so a downgrade to 3.2 never shows more.
+the levels do on it, so a new route fails until it is classified.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1 to 200) and `offset` (default 0). Invalid or unsafe integers use the defaults.
 Jobs sort active first, then newest first, with the id breaking timestamp ties. Offset pages
 reflect the current queue. Running jobs can move between pages as their status changes.
 
-**Art** (`art.ts`). A game has five formats: grid 600x900, wide 920x430, hero 1920x620, a logo and
+**Art** (`art/store.ts`). A game has five formats: grid 600x900, wide 920x430, hero 1920x620, a logo and
 a square icon. For each, the chosen picture is a person's choice, else the admin's for everyone
 (`art_choices`, scope 0), else the catalog's default. `planFormat` decides how a format is made:
 real art in the shape is resized. Another shape is cropped around its focal point when the recipe
@@ -252,13 +260,13 @@ instance's cache.
 
 ## Mods
 
-`mods.ts` keeps the user's files in `/data/overlays/<id>/`. Applying mods (`applymods.ts`) builds a
+`games/mods.ts` keeps the user's files in `/data/overlays/<id>/`. Applying mods (`applymods.ts`) builds a
 new `game.zip` from the base build plus the overlay into `<build>.m<hash>/`; streamed files still
 come from the base build's pack. Updating a game can re-apply mods or move them aside.
 
 ## Adult games
 
-`content.ts` holds the three levels, Off, Blurred and Shown. The installation's level is
+`content/levels.ts` holds the three levels, Off, Blurred and Shown, and `content/mode.ts` applies them. The installation's level is
 `RENPLAY_ADULT_GAMES=off|blurred|shown` when set (it locks it, and `allow` and `block` still mean
 Shown and Off), else the `adult_level` setting, else Shown until the owner answers the one question
 in the empty library (`GET`/`PUT /api/content`). Each person has a ceiling, set by an admin, by a
@@ -288,7 +296,7 @@ At Off adult games are left out where the data enters and where it leaves:
 
 ## People on a shared browser
 
-**PINs** (`auth.ts`). A person's PIN is hashed with scrypt like a password (`users.pin_hash`). Each
+**PINs** (`accounts/accounts.ts`). A person's PIN is hashed with scrypt like a password (`users.pin_hash`). Each
 browser has a `renplay_device` cookie of its own, stored hashed, that outlives sign-out, and every
 sign-in records the person against it (`device_people`). **Who is playing?** lists and switches to
 only those people. A switch counts its try before the PIN is checked, so tries sent at once cannot

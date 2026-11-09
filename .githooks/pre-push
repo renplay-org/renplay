@@ -1,0 +1,8 @@
+#!/bin/sh
+# The quick checks, before code leaves this machine: types, structure, the runtimes and the writing
+# rule (mise run check:fast). CI runs everything again. To push once without them: git push --no-verify
+if ! command -v mise >/dev/null 2>&1; then
+  echo "pre-push: mise is not installed, so the checks did not run" >&2
+  exit 0
+fi
+exec mise run check:fast

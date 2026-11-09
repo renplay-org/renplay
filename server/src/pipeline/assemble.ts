@@ -5,13 +5,13 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import yauzl from 'yauzl'
 import yazl from 'yazl'
-import type { JobContext } from '../jobs.js'
+import type { JobContext } from '../jobs/manager.js'
 import type { PackIndex } from './pack.js'
 import { classify, type Placeholder, type ProgressiveRule } from './progressive.js'
 import { WEB_COMPAT, WEB_COMPAT_PATH } from './webcompat.js'
 
 /** Already-compressed formats are stored; the rest is deflated. */
-const STORED = /\.(png|jpe?g|webp|avif|gif|ogg|opus|mp3|webm|mp4|ogv|zip|rpa|rpyc|rpymc|rpyb|woff2?)$/i
+export const STORED = /\.(png|jpe?g|webp|avif|gif|ogg|opus|mp3|webm|mp4|ogv|zip|rpa|rpyc|rpymc|rpyb|woff2?)$/i
 
 export interface AssembleOptions {
   /** Build folder: game.zip is written here. */

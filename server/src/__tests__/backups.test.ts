@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp, type App } from '../app.js'
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
-import { readZipEntries } from '../saves/savefile.js'
+import { SAVES_ZIP } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
 
 describe('save backups', () => {
   let root = ''
@@ -28,7 +29,7 @@ describe('save backups', () => {
     app = await createApp(cfg, { startJobs: false })
     await app.saves.write('Story-1', '1-1-LT1.save', Buffer.from('owner save'))
     await request(app.app).post('/api/users').send({ username: 'second', name: 'Second', password: 'second-password-1' }).expect(201)
-    await app.accounts.store(2).write('Other-1', 'auto-1-LT1.save', Buffer.from('second save'))
+    await app.services.saveStores.of(2).write('Other-1', 'auto-1-LT1.save', Buffer.from('second save'))
   })
   afterAll(() => {
     app?.close()
@@ -51,7 +52,7 @@ describe('save backups', () => {
       res.on('data', (c: Buffer) => chunks.push(c))
       res.on('end', () => cb(null, Buffer.concat(chunks)))
     }).expect(200)).body
-    const entries = await readZipEntries(zip, () => true, 64 << 20)
+    const entries = await readZipEntries(zip, () => true, { ...SAVES_ZIP, totalBytes: 64 << 20 })
     expect([...entries.keys()].sort()).toEqual(['1-owner/Story-1/1-1-LT1.save', '2-second/Other-1/auto-1-LT1.save', 'README.txt'])
     expect(entries.get('1-owner/Story-1/1-1-LT1.save')!.toString()).toBe('owner save')
   })

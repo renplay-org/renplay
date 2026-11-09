@@ -1,7 +1,7 @@
 import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { signInFixture, site } from './sign-in-fixture.js'
-import type { ExternalIdentity } from '../sign-in-providers.js'
+import type { ExternalIdentity } from '../accounts/sign-in.js'
 
 let app: Awaited<ReturnType<typeof signInFixture>>
 afterEach(() => { vi.restoreAllMocks(); app?.cleanup() })
@@ -118,11 +118,11 @@ describe('atomic owner claiming', () => {
       const id = Number(app.db.raw.prepare("INSERT INTO users (username, name, role, created_at) VALUES (?, ?, 'admin', '')").run(login, login).lastInsertRowid)
       app.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, ?, '')").run(login, id)
       app.db.raw.prepare('INSERT INTO tokens VALUES (?, ?, ?, ?, ?)').run((await import('node:crypto')).createHash('sha256').update(login).digest('hex'), login, id, login, Date.now())
-      await app.accounts.store(id).write('test', `${login}.save`, Buffer.from(login))
+      await app.services.saveStores.of(id).write('test', `${login}.save`, Buffer.from(login))
     }
-    const entered = deferred(), finish = deferred(), source = app.accounts.store(2), list = source.listDirs.bind(source)
+    const entered = deferred(), finish = deferred(), source = app.services.saveStores.of(2), list = source.listDirs.bind(source)
     vi.spyOn(source, 'listDirs').mockImplementation(async () => { entered.release(); await finish.promise; return list() })
-    const loserCopy = vi.spyOn(app.accounts.store(3), 'listDirs')
+    const loserCopy = vi.spyOn(app.services.saveStores.of(3), 'listDirs')
     const first = request(app.app).post('/api/me/claim-owner').auth('first', { type: 'bearer' }).send({}).then(r => r)
     await entered.promise
     const second = await request(app.app).post('/api/me/claim-owner').auth('second', { type: 'bearer' }).send({})
@@ -130,7 +130,7 @@ describe('atomic owner claiming', () => {
     expect((await first).status).toBe(200)
     expect(second.status).toBe(409)
     expect(loserCopy).not.toHaveBeenCalled()
-    expect((await app.accounts.store(1).list('test')).map(f => f.name)).toEqual(['first.save'])
+    expect((await app.services.saveStores.of(1).list('test')).map(f => f.name)).toEqual(['first.save'])
     expect(app.db.raw.prepare('SELECT user_id FROM identities WHERE subject = ?').get('second')!.user_id).toBe(3)
   })
   it('does not restore admin rights removed while the claim was copying saves', async () => {
@@ -138,8 +138,8 @@ describe('atomic owner claiming', () => {
     const id = Number(app.db.raw.prepare("INSERT INTO users (username, name, role, created_at) VALUES ('claimant', 'Claimant', 'admin', '')").run().lastInsertRowid)
     app.db.raw.prepare("INSERT INTO identities VALUES ('local', 'claimant', ?, '')").run(id)
     app.db.raw.prepare('INSERT INTO tokens VALUES (?, ?, ?, ?, ?)').run((await import('node:crypto')).createHash('sha256').update('claimant').digest('hex'), 'claimant', id, 'claimant', Date.now())
-    await app.accounts.store(id).write('test', 'claimant.save', Buffer.from('claimant'))
-    const entered = deferred(), finish = deferred(), source = app.accounts.store(id), list = source.listDirs.bind(source)
+    await app.services.saveStores.of(id).write('test', 'claimant.save', Buffer.from('claimant'))
+    const entered = deferred(), finish = deferred(), source = app.services.saveStores.of(id), list = source.listDirs.bind(source)
     vi.spyOn(source, 'listDirs').mockImplementation(async () => { entered.release(); await finish.promise; return list() })
     const claim = request(app.app).post('/api/me/claim-owner').auth('claimant', { type: 'bearer' }).send({}).then(r => r)
     await entered.promise
@@ -162,7 +162,7 @@ describe('atomic owner claiming', () => {
     const owner = await start(), agent = await player(owner, 'claimant', 'admin')
     app.db.raw.exec('DELETE FROM identities WHERE user_id = 1')
     const id = (await agent.get('/api/me')).body.user.id
-    const target = app.accounts.store(1), source = app.accounts.store(id)
+    const target = app.services.saveStores.of(1), source = app.services.saveStores.of(id)
     for (const file of ['one.save', 'two.save']) {
       await source.write('test', file, Buffer.from('personal save'))
       await target.write('test', file, Buffer.from('owner save'))

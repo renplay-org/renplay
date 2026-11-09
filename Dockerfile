@@ -8,6 +8,8 @@ COPY server/package.json server/package-lock.json server/
 RUN cd server && npm ci --no-audit --no-fund
 
 COPY selector/ selector/
+# The library builds with the types and rules it shares with the server.
+COPY server/src/shared/ server/src/shared/
 RUN cd selector && npm run build
 COPY server/ server/
 RUN cd server && npm run build && npm prune --omit=dev

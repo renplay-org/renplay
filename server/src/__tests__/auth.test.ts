@@ -1,18 +1,18 @@
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, lstatSync, readdirSync, realpathSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { createHash, scryptSync } from 'node:crypto'
-import { runInNewContext } from 'node:vm'
 import request from 'supertest'
 import sharp from 'sharp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
 import { Db, type GameRow } from '../db.js'
-import { keepaliveToken, playerRoute } from '../auth.js'
-import { viewer, viewers } from '../accounts-context.js'
+import { playerRoute } from '../accounts/access.js'
+import { keepaliveToken } from '../jobs/keepalive.js'
+import { viewer, viewers } from '../accounts/context.js'
 import yazl from 'yazl'
+import { renpyRuntime, sharedMirror } from './runtime-browser.js'
 
 function zipBuffer(entries: Record<string, string>): Promise<Buffer> {
   return new Promise((resolve) => {
@@ -30,7 +30,7 @@ function config(): Config {
   const root = mkdtempSync(join(tmpdir(), 'renplay-auth-')); roots.push(root)
   const cfg = loadConfig()
   const dataDir = join(root, 'data'), gamesDir = join(root, 'games'), internalDir = join(gamesDir, '_renplay')
-  return { ...cfg, dataDir, gamesDir, internalDir, savesDir: join(dataDir, 'saves'), saveHistoryDir: join(dataDir, 'save-history'), coversDir: join(dataDir, 'covers'), walkthroughsDir: join(dataDir, 'walkthroughs'), overlaysDir: join(dataDir, 'overlays'), workDir: join(internalDir, 'work'), purgeDir: join(internalDir, 'purge'), archivesDir: join(gamesDir, '_archives'), uploadsDir: join(internalDir, 'uploads'), enginesDir: join(internalDir, 'engines'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', auth: 'on', authLocal: true, authUser: 1, adultGames: 'shown', adminUsername: '', adminPassword: '', adultDefault: 'off' }
+  return { ...cfg, dataDir, gamesDir, internalDir, walkthroughsDir: join(dataDir, 'walkthroughs'), overlaysDir: join(dataDir, 'overlays'), workDir: join(internalDir, 'work'), purgeDir: join(internalDir, 'purge'), archivesDir: join(gamesDir, '_archives'), uploadsDir: join(internalDir, 'uploads'), enginesDir: join(internalDir, 'engines'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', auth: 'on', authLocal: true, authUser: 1, adultGames: 'shown', adminUsername: '', adminPassword: '', adultDefault: 'off' }
 }
 async function start(cfg = config(), seeded = true) {
   if (seeded) { cfg.adminUsername = 'admin'; cfg.adminPassword = 'correct password' }
@@ -45,9 +45,10 @@ async function login(a: App, username = 'admin', password = 'correct password') 
 async function add(a: App, cookie: string, username = 'player') {
   return (await request(a.app).post('/api/users').set(site).set('Cookie', cookie).send({ username, password: 'player password' }).expect(201)).body.user.id as number
 }
-function game(a: App, id = 'safe', extras: Partial<GameRow> = {}) {
+/** A library game, with a walkthrough file when one is named. */
+function game(a: App, id = 'safe', { walkthroughFile, ...extras }: Partial<GameRow> & { walkthroughFile?: string } = {}) {
   a.db.insertGame({ id, title: id, recipe_id: `recipe-${id}`, status: 'installed', build: 'b1', save_dir: id, ...extras })
-  if (extras.walkthrough) a.db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at) VALUES (?, ?, 'Walkthrough', 'pdf', '2026-01-01')").run(extras.walkthrough, id)
+  if (walkthroughFile) a.db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at) VALUES (?, ?, 'Walkthrough', 'pdf', '2026-01-01')").run(walkthroughFile, id)
 }
 
 describe('accounts authentication and security', () => {
@@ -61,7 +62,7 @@ describe('accounts authentication and security', () => {
     game(a, 'download-game', { source: JSON.stringify({ archive: 'download.zip' }) })
     mkdirSync(join(cfg.gamesDir, 'download-game/b1'), { recursive: true })
     writeFileSync(join(cfg.gamesDir, 'download-game/b1/game.zip'), 'installed')
-    await a.accounts.store(1).write('download-game', '1.save', Buffer.from('sacred'))
+    await a.services.saveStores.of(1).write('download-game', '1.save', Buffer.from('sacred'))
     expect((await request(a.app).get('/api/games/download-game').set('Cookie', admin)).body.game.canReinstall).toBe(true)
     await request(a.app).put('/api/system/downloads').set(site).set('Cookie', player).send({ keepDownloads: false }).expect(403)
     await request(a.app).delete('/api/games/download-game/download').set(site).set('Cookie', player).expect(403)
@@ -86,9 +87,9 @@ describe('accounts authentication and security', () => {
   it('supplies Account password state and Users save counts and protected accounts', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin)
     expect((await request(a.app).get('/api/me').set('Cookie', admin).expect(200)).body.hasPassword).toBe(true)
-    await a.accounts.store(id).write('one-game', '1-1.save', Buffer.from('save'))
-    await a.accounts.store(id).write('one-game', 'persistent', Buffer.from('persistent'))
-    await a.accounts.store(id).write('tokens', 'security_keys.txt', Buffer.from('keys'))
+    await a.services.saveStores.of(id).write('one-game', '1-1.save', Buffer.from('save'))
+    await a.services.saveStores.of(id).write('one-game', 'persistent', Buffer.from('persistent'))
+    await a.services.saveStores.of(id).write('tokens', 'security_keys.txt', Buffer.from('keys'))
     const response = await request(a.app).get('/api/users').set('Cookie', admin).expect(200)
     expect(response.body.adultDefault).toBe('off')
     expect(response.body.users.find((u: { id: number }) => u.id === id)).toMatchObject({ games: 1, saves: 2, protected: false })
@@ -304,8 +305,9 @@ describe('accounts authentication and security', () => {
     const plain = await start()
     expect((await request(plain.app).get('/api/auth/providers').expect(200)).body.demo).toBe(false)
     await request(plain.app).post('/api/auth/demo').set(site).expect(404)
+    process.env['RENPLAY_DEMO'] = 'on'
     const cfg = config()
-    cfg.demo = true
+    delete process.env['RENPLAY_DEMO']
     cfg.auth = 'off'
     const a = await start(cfg)
     game(a)
@@ -377,46 +379,42 @@ describe('accounts authentication and security', () => {
 describe('personal data and save moves', () => {
   it('replays the real Ren’Py mirror and boot queue into A’s server folder after A → offline write → B → A', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password'); game(a)
-    const window: any = {}
-    const source = readFileSync(new URL('../../../runtime/renplay-runtime.js', import.meta.url), 'utf-8')
-    runInNewContext(readFileSync(new URL('../../../runtime/vendor/fake-indexeddb.js', import.meta.url), 'utf-8'), { window, structuredClone, setTimeout, clearTimeout, console, DOMException })
-    const indexedDB = new window.__renplayIDB.IDBFactory(); window.indexedDB = indexedDB
-    const section = (from: string, to: string) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)))
-    const runtime = (userId: number, cookie: string) => new Function('window', 'indexedDB', 'cfg', 'fetchJSON', 'fetch', 'setTimeout', `
-      var API = '/api/saves/safe', signedOut = false, HOME = '/home';
-      var state = { queue: new Map(), known: new Map(), lazy: new Map(), base: new Map(), unanswered: new Map(), online: true, inflight: false, failures: 0 };
-      function post() {} function status() {} function log() {} function writeLocal() {} function createLazy() {}
-      function hash(bytes) { return String(bytes) } function b64ToBytes(data) { return new Uint8Array() }
-      ${section('  var dbPromise = null', '  // ---------------------------------------------------------------- helpers')}
-      ${section('  function pump()', '  function flush(')}
-      ${section('  function boot()', '  // ---------------------------------------------------------------- Emscripten hooks')}
-      return { idbPut, idbAll, boot, state };
-    `)(window, indexedDB, { id: 'safe', userId }, async (url: string) => (await request(a.app).get(url).set('Cookie', cookie).expect(200)).body, async (url: string, init: any) => {
-      const response = await (request(a.app) as any)[init.method.toLowerCase()](url).set(site).set('Cookie', cookie).set('X-Renplay-User', String(userId)).set(init.headers ?? {}).send(init.body ? Buffer.from(init.body) : undefined)
-      return { ok: response.status < 300, status: response.status }
-    }, setTimeout)
+    const indexedDB = sharedMirror()
+    const serverFetch = (userId: number, cookie: string) => vi.fn(async (input: unknown, init: any = {}) => {
+      const method = String(init.method ?? 'GET').toLowerCase()
+      let call = (request(a.app) as any)[method](String(input)).set(site).set('Cookie', cookie).set('X-Renplay-User', String(userId))
+      for (const [name, value] of new Headers(init.headers ?? {})) call = call.set(name, value)
+      if (init.body) call = call.send(Buffer.from(init.body))
+      const response = await call
+      const json = String(response.headers['content-type']).includes('json')
+      return new Response(json ? response.text : response.body, { status: response.status, headers: response.headers })
+    })
     // Even a newer server copy must not cause an unsent browser write to be dropped: history keeps both.
     await a.saves.write('safe', 'persistent', Buffer.from('server copy'), { mtimeMs: Date.now() })
-    const owner = runtime(1, admin)
-    await owner.idbPut('safe/persistent', new Uint8Array(Buffer.from('offline A')), 10, false)
-    const other = runtime(id, player)
+    const owner = renpyRuntime({ userId: 1, game: 'safe', indexedDB, fetch: vi.fn(async () => { throw new TypeError('Offline') }) })
+    owner.write('safe/persistent', new Uint8Array(Buffer.from('offline A')), 10)
+    await owner.idle()
+    await vi.waitFor(async () => expect(await owner.entries()).toMatchObject([{ key: '1:safe/persistent', userId: 1, synced: 0 }]))
+    const other = renpyRuntime({ userId: id, game: 'safe', indexedDB, fetch: serverFetch(id, player) })
     await other.boot()
-    expect(await other.idbAll()).toEqual([])
-    await other.idbPut('safe/persistent', new Uint8Array(Buffer.from('online B')), 11, false)
+    expect(other.read('safe/persistent')).toBeNull()
+    expect((await other.entries()).filter((entry) => entry.userId === id)).toEqual([])
+    other.write('safe/persistent', new Uint8Array(Buffer.from('online B')), 11)
+    await other.idle()
+    await vi.waitFor(async () => expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('online B'))
     await other.boot()
-    await vi.waitFor(() => expect(other.state.inflight).toBe(false))
-    const returning = runtime(1, admin)
-    expect(await returning.idbAll()).toMatchObject([{ synced: 0 }])
+    const returning = renpyRuntime({ userId: 1, game: 'safe', indexedDB, fetch: serverFetch(1, admin) })
+    expect((await returning.entries()).filter((entry) => entry.userId === 1)).toMatchObject([{ synced: 0 }])
     await returning.boot()
-    await vi.waitFor(() => expect(returning.state.inflight).toBe(false))
+    await returning.idle()
     expect((await a.saves.read('safe', 'persistent')).toString()).toBe('offline A')
-    expect((await a.accounts.store(id).read('safe', 'persistent')).toString()).toBe('online B')
+    expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('online B')
     expect(await a.saves.history('safe', 'persistent')).toHaveLength(1)
   })
   it('runs shared background jobs outside the enqueuing account context', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin)
     let seen: unknown = 'not run'
-    a.jobs.register('account-context', async () => { await Promise.resolve(); seen = viewer() })
+    a.jobs.register('account-context', 'Test', async () => { await Promise.resolve(); seen = viewer() })
     viewers.run({ user: a.accounts.user(id), session: 'fixture', bearer: false }, () => a.jobs.enqueue('account-context', '', {}))
     await vi.waitFor(() => expect(a.db.listJobs()[0]!.status).toBe('done'))
     expect(seen).toBeUndefined()
@@ -430,18 +428,17 @@ describe('personal data and save moves', () => {
       await request(a.app).post('/api/games/safe/played').set(site).set('Cookie', cookie!).send({}).expect(200)
     }
     await request(a.app).put('/api/games/safe/favorite').set(site).set('Cookie', player).send({ on: true }).expect(200)
-    await request(a.app).put('/api/games/safe/finished').set(site).set('Cookie', player).send({ on: true }).expect(200)
+    await request(a.app).put('/api/games/safe/status').set(site).set('Cookie', player).send({ status: 'finished' }).expect(200)
     await request(a.app).post('/api/games/safe/play-time').set(site).set('Cookie', player).send({ seconds: 23 }).expect(200)
     const personal = (await request(a.app).get('/api/games/safe').set('Cookie', player)).body.game
     expect(personal).toMatchObject({ playTime: 23, saves: { count: 0 } }); expect(personal.favoriteAt).toBeTruthy(); expect(personal.finishedAt).toBeTruthy()
     const owner = (await request(a.app).get('/api/games/safe').set('Cookie', admin)).body.game
     expect(owner).toMatchObject({ playTime: 0, favoriteAt: null, finishedAt: null })
-    expect(a.db.getGame('safe')!.last_played_at).toBe(personal.lastPlayedAt)
-    expect((await a.accounts.store(id).read('safe', 'persistent')).toString()).toBe('player')
+    expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('player')
     expect((await a.saves.read('safe', 'persistent')).toString()).toBe('owner')
     await request(a.app).put('/api/saves/safe/file?path=safe/persistent').set(site).set('Cookie', player).set('X-Renplay-User', '1').send('wrong account').expect(401)
     await request(a.app).get('/api/saves/safe/screenshot?user=1&file=a.save').set('Cookie', player).expect(404)
-    for (const [store, label] of [[a.saves, 'owner'], [a.accounts.store(id), 'other']] as const) {
+    for (const [store, label] of [[a.saves, 'owner'], [a.services.saveStores.of(id), 'other']] as const) {
       await store.write('safe', '1-1-LT1.save', await zipBuffer({ log: 'x', json: JSON.stringify({ _save_name: label, _ctime: 10 }), 'screenshot.png': label }), { mtimeMs: 10000 })
     }
     const library = async (cookie: string) => (await request(a.app).get('/api/games/safe').set('Cookie', cookie)).body.game
@@ -452,7 +449,7 @@ describe('personal data and save moves', () => {
     expect(ownerScreenshot).not.toBe(playerScreenshot)
     expect((await request(a.app).get(playerScreenshot).set('Cookie', player)).body.toString()).toBe('other')
     await request(a.app).get(ownerScreenshot).set('Cookie', player).expect(404)
-    const tag = JSON.parse(readFileSync(join(a.accounts.store(id).root, '..', 'user.json'), 'utf-8'))
+    const tag = JSON.parse(readFileSync(join(a.services.saveStores.of(id).root, '..', 'user.json'), 'utf-8'))
     expect(tag).toMatchObject({ id, name: 'player' })
   })
   it('lets an existing admin claim the unclaimed owner, keeping both accounts’ saves and archiving the old folder', async () => {
@@ -460,7 +457,7 @@ describe('personal data and save moves', () => {
     let a = await start(cfg, false); game(a)
     const id = (await request(a.app).post('/api/users').send({ username: 'another', role: 'admin', password: 'another password' }).expect(201)).body.user.id
     await a.saves.write('safe', 'persistent', Buffer.from('owner'))
-    await a.accounts.store(id).write('safe', 'persistent', Buffer.from('another'))
+    await a.services.saveStores.of(id).write('safe', 'persistent', Buffer.from('another'))
     a.close(); apps.pop(); cfg.auth = 'on'; a = await start(cfg, false)
     const cookie = await login(a, 'another', 'another password')
     await request(a.app).post('/api/me/claim-owner').set(site).set('Cookie', cookie).expect(200)
@@ -478,14 +475,14 @@ describe('personal data and save moves', () => {
       cookies.push(await login(a, username, 'admin password'))
     }
     await request(a.app).put('/api/users/1').set(site).set('Cookie', owner).send({ role: 'player' }).expect(200)
-    const stores = ids.map((id) => a.accounts.store(id))
+    const stores = ids.map((id) => a.services.saveStores.of(id))
     await Promise.all(stores.map((store) => store.write('safe', 'persistent', Buffer.from('kept'))))
     const results = await Promise.all(ids.map((id, i) => request(a.app).delete(`/api/users/${id}`).set(site).set('Cookie', cookies[i]!)))
     expect(results.map((r) => r.status).sort()).toEqual([200, 409])
     expect(a.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get()!.n).toBe(1)
     const removed = results.findIndex((response) => response.status === 200)
     await expect(stores[removed]!.write('safe', 'persistent', Buffer.from('late write'))).rejects.toThrow('being archived')
-    expect(() => a.accounts.store(ids[removed])).toThrow('User not found')
+    expect(() => a.services.saveStores.of(ids[removed])).toThrow('User not found')
     const archived = readdirSync(join(a.accounts.cfg.dataDir, 'users-removed'))[0]!
     expect(readFileSync(join(a.accounts.cfg.dataDir, 'users-removed', archived, 'saves', 'safe', 'persistent'), 'utf-8')).toBe('kept')
   })
@@ -495,19 +492,19 @@ describe('personal data and save moves', () => {
     await a.saves.write('safe', 'localStorage.json', Buffer.from('{"owner":1}'))
     await a.saves.write('safe', 'indexedDB.json', Buffer.from('{"owner":2}'))
     await a.saves.write('tokens', 'security_keys.txt', Buffer.from('signing-key AAA BBB\n'))
-    await a.accounts.store(id).write('tokens', 'security_keys.txt', Buffer.from('signing-key CCC DDD\n'))
-    await a.accounts.store(id).write('safe', 'persistent', Buffer.from('target'))
+    await a.services.saveStores.of(id).write('tokens', 'security_keys.txt', Buffer.from('signing-key CCC DDD\n'))
+    await a.services.saveStores.of(id).write('safe', 'persistent', Buffer.from('target'))
     await request(a.app).post('/api/users/1/saves/copy').set(site).set('Cookie', admin).send({ target: id, game: 'safe' }).expect(200)
-    expect((await a.accounts.store(id).history('safe', 'persistent'))[0]!.reason).toBe('user-copy')
-    expect((await a.accounts.store(id).read('tokens', 'security_keys.txt')).toString()).toContain('verifying-key BBB')
-    const history = (await a.accounts.store(id).history('safe', 'persistent'))[0]!
-    expect(readFileSync(join(a.accounts.store(id).historyRoot, 'safe', history.id), 'utf-8')).toBe('target')
+    expect((await a.services.saveStores.of(id).history('safe', 'persistent'))[0]!.reason).toBe('user-copy')
+    expect((await a.services.saveStores.of(id).read('tokens', 'security_keys.txt')).toString()).toContain('verifying-key BBB')
+    const history = (await a.services.saveStores.of(id).history('safe', 'persistent'))[0]!
+    expect(readFileSync(join(a.services.saveStores.of(id).historyRoot, 'safe', history.id), 'utf-8')).toBe('target')
     await request(a.app).post('/api/users/1/saves/copy').set(site).set('Cookie', admin).send({ target: id }).expect(200)
-    expect((await a.accounts.store(id).read('tokens', 'security_keys.txt')).toString()).toContain('signing-key CCC DDD')
-    expect((await a.accounts.store(id).read('tokens', 'security_keys.txt')).toString()).toContain('verifying-key BBB')
+    expect((await a.services.saveStores.of(id).read('tokens', 'security_keys.txt')).toString()).toContain('signing-key CCC DDD')
+    expect((await a.services.saveStores.of(id).read('tokens', 'security_keys.txt')).toString()).toContain('verifying-key BBB')
     const exported = await request(a.app).get('/api/users/1/saves/export').set('Cookie', admin).responseType('blob').expect(200)
     await request(a.app).post(`/api/users/${id}/saves/import`).set(site).set('Cookie', admin).attach('file', exported.body, 'saves.zip').expect(200)
-    expect((await a.accounts.store(id).read('safe', 'indexedDB.json')).toString()).toBe('{"owner":2}')
+    expect((await a.services.saveStores.of(id).read('safe', 'indexedDB.json')).toString()).toBe('{"owner":2}')
     await request(a.app).post(`/api/users/${id}/saves/import`).set(site).set('Cookie', admin).attach('file', await zipBuffer({ 'root.txt': 'no folder' }), 'bad.zip').expect(400)
     await request(a.app).post(`/api/users/${id}/merge`).set(site).set('Cookie', admin).send({ target: 1 }).expect(200)
     expect(() => a.accounts.user(id)).toThrow('User not found')
@@ -519,13 +516,13 @@ describe('personal data and save moves', () => {
     await request(a.app).put('/api/saves/safe/file?path=safe/persistent').set('Content-Type', 'application/octet-stream').send(Buffer.from('off')).expect(200)
     a.close(); apps.pop(); cfg.auth = 'on'
     a = await start(cfg); let admin = await login(a); const id = await add(a, admin)
-    await a.accounts.store(id).write('safe', 'persistent', Buffer.from('personal'))
+    await a.services.saveStores.of(id).write('safe', 'persistent', Buffer.from('personal'))
     await a.saves.write('safe', 'persistent', Buffer.from('on-owner'))
     a.close(); apps.pop(); cfg.auth = 'off'
     a = await start(cfg)
     expect((await request(a.app).get('/api/saves/safe/raw?path=safe/persistent')).body.toString()).toBe('on-owner')
     await a.saves.write('safe', 'persistent', Buffer.from('off-again'))
-    expect((await a.accounts.store(id).read('safe', 'persistent')).toString()).toBe('personal')
+    expect((await a.services.saveStores.of(id).read('safe', 'persistent')).toString()).toBe('personal')
     a.close(); apps.pop(); cfg.authUser = id
     a = await start(cfg)
     expect((await request(a.app).get('/api/saves/safe/raw?path=safe/persistent')).body.toString()).toBe('personal')
@@ -542,12 +539,12 @@ describe('adult access and signed game URLs', () => {
   it('enforces adult and unknown game access on saves, raw paths, library, static files and play, with an admin safe flag', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password')
     game(a); game(a, 'adult', { adult: 1 }); game(a, 'unknown', { recipe_id: '' })
-    await a.accounts.store(id).write('adult', 'persistent', Buffer.from('adult'))
+    await a.services.saveStores.of(id).write('adult', 'persistent', Buffer.from('adult'))
     expect((await request(a.app).get('/api/games').set('Cookie', player)).body.games.map((g: any) => g.id)).toEqual(['safe'])
     for (const path of ['/api/games/adult', '/api/saves/adult', '/api/saves/adult/boot', '/api/saves/adult/export', '/g/adult/b1/', '/g/adult/b1/game.zip', '/api/saves/safe/raw?path=adult/persistent']) await request(a.app).get(path).set('Cookie', player).expect(404)
     expect((await request(a.app).get('/api/saves/safe/boot').set('Cookie', player)).body.lazy).toEqual([])
     await request(a.app).post('/api/saves/safe/save-dir').set(site).set('Cookie', player).send({ saveDir: 'adult' }).expect(404)
-    await a.accounts.store(id).write('orphan', 'persistent', Buffer.from('unclassified'))
+    await a.services.saveStores.of(id).write('orphan', 'persistent', Buffer.from('unclassified'))
     await request(a.app).post('/api/saves/safe/save-dir').set(site).set('Cookie', player).send({ saveDir: 'orphan' }).expect(404)
     await request(a.app).post('/api/saves/safe/save-dir').set(site).set('Cookie', player).send({ saveDir: 'tokens' }).expect(400)
     expect(a.db.getGame('safe')!.save_dir).toBe('safe')
@@ -579,7 +576,7 @@ describe('adult access and signed game URLs', () => {
     db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'safe', title: 'Safe', art: await art('safe'), releases: [] }, { id: 'adult', title: 'Adult', nsfw: true, art: await art('adult'), releases: [] }] })
     db.close()
     const a = await start(cfg), admin = await login(a); await add(a, admin); const player = await login(a, 'player', 'player password')
-    for (const id of ['safe', 'adult']) { game(a, id, { recipe_id: id, adult: id === 'adult' ? 1 : 0, walkthrough: `${id}.pdf` }); writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), 'pdf') }
+    for (const id of ['safe', 'adult']) { game(a, id, { recipe_id: id, adult: id === 'adult' ? 1 : 0, walkthroughFile: `${id}.pdf` }); writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), 'pdf') }
     await a.catalog.syncArt()
     const picture = (id: string) => (a.catalog.recipeArt(a.catalog.recipe(id)!) as Record<string, { url1x: string }>)['grid']!.url1x
     const adultPic = picture('adult'), safePic = picture('safe')
@@ -622,7 +619,7 @@ describe('adult access and signed game URLs', () => {
     const page = '<html><head></head><body>Fixture</body></html>'
     writeFileSync(join(root, 'assets.pack'), page + page); writeFileSync(join(root, 'assets.json'), JSON.stringify({ 'index.html': [0, Buffer.byteLength(page)], 'secondary.html': [Buffer.byteLength(page), Buffer.byteLength(page)] }))
     await a.saves.write('html', 'localStorage.json', Buffer.from('{"owner":"state"}'))
-    await a.accounts.store(id).write('html', 'localStorage.json', Buffer.from('{"player":"state"}'))
+    await a.services.saveStores.of(id).write('html', 'localStorage.json', Buffer.from('{"player":"state"}'))
     const url = (await request(a.app).get('/api/games/html').set('Cookie', player).expect(200)).body.game.playUrl
     expect(url).toMatch(/^\/g\/html\/b1\/s\/.+\/game\/index.html$/)
     const response = await request(a.app).get(url).expect(200)
@@ -641,42 +638,3 @@ describe('adult access and signed game URLs', () => {
   })
 })
 
-describe('account migration', () => {
-  it('backs up v6 saves, history and database, preserves progress and opens through the 2.10 layout after downgrade', () => {
-    const cfg = config(); let db = Db.open(cfg.dataDir)
-    db.insertGame({ id: 'safe', title: 'Safe', favorite_at: 'favorite', finished_at: 'finished', play_time: 12, last_played_at: 'played' })
-    db.raw.exec('DROP TABLE sessions; DROP TABLE tokens; DROP TABLE identities; DROP TABLE user_games; DROP TABLE users; DROP TABLE safe_games; DELETE FROM settings WHERE key = \'auth_default\'; PRAGMA user_version = 6'); db.close()
-    mkdirSync(join(cfg.savesDir, 'Safe'), { recursive: true }); writeFileSync(join(cfg.savesDir, 'Safe', 'persistent'), 'original')
-    mkdirSync(join(cfg.saveHistoryDir, 'Safe', 'persistent'), { recursive: true }); writeFileSync(join(cfg.saveHistoryDir, 'Safe', 'persistent', '1__game__abc'), 'previous')
-    db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir })
-    expect(db.getSetting('auth_default', '')).toBe('off')
-    expect(db.raw.prepare('SELECT * FROM user_games').get()).toMatchObject({ user_id: 1, favorite_at: 'favorite', play_time: 12, last_played_at: 'played', finished_at: 'finished' })
-    expect(lstatSync(cfg.savesDir).isSymbolicLink()).toBe(true); expect(lstatSync(cfg.saveHistoryDir).isSymbolicLink()).toBe(true)
-    expect(readFileSync(join(cfg.dataDir, 'backups', 'pre-3.0', 'saves', 'Safe', 'persistent'), 'utf-8')).toBe('original')
-    const backup = new DatabaseSync(join(cfg.dataDir, 'backups', 'pre-3.0', 'library.db'))
-    expect(backup.prepare('PRAGMA user_version').get()!.user_version).toBe(6); backup.close(); db.close()
-    // 2.10 accepts a newer user_version and uses these unchanged paths and columns.
-    const oldDb = new DatabaseSync(join(cfg.dataDir, 'library.db'))
-    expect(oldDb.prepare('SELECT last_played_at, favorite_at FROM games').get()).toMatchObject({ last_played_at: 'played', favorite_at: 'favorite' })
-    expect(readFileSync(join(cfg.savesDir, 'Safe', 'persistent'), 'utf-8')).toBe('original')
-    expect(readFileSync(join(cfg.saveHistoryDir, 'Safe', 'persistent', '1__game__abc'), 'utf-8')).toBe('previous')
-    writeFileSync(join(cfg.savesDir, 'Safe', 'from-2.10'), 'downgrade write')
-    expect(readFileSync(join(cfg.dataDir, 'users', '1', 'saves', 'Safe', 'from-2.10'), 'utf-8')).toBe('downgrade write')
-    oldDb.close()
-  })
-  it('resumes after a folder moved but history did not, merges partial copies and leaves both originals recoverable', () => {
-    const cfg = config(); let db = Db.open(cfg.dataDir)
-    db.raw.exec('PRAGMA user_version = 6'); db.close()
-    const owner = join(cfg.dataDir, 'users', '1')
-    mkdirSync(join(owner, 'saves', 'Safe'), { recursive: true }); writeFileSync(join(owner, 'saves', 'Safe', 'persistent'), 'moved')
-    symlinkSync(join(owner, 'saves'), cfg.savesDir)
-    mkdirSync(join(cfg.saveHistoryDir, 'Safe', 'persistent'), { recursive: true }); writeFileSync(join(cfg.saveHistoryDir, 'Safe', 'persistent', '1__game__abc'), 'source')
-    mkdirSync(join(owner, 'save-history', 'Safe', 'persistent'), { recursive: true }); writeFileSync(join(owner, 'save-history', 'Safe', 'persistent', '1__game__abc'), 'target')
-    db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir }); db.close()
-    expect(realpathSync(cfg.savesDir)).toBe(realpathSync(join(owner, 'saves'))); expect(realpathSync(cfg.saveHistoryDir)).toBe(realpathSync(join(owner, 'save-history')))
-    expect(readFileSync(join(cfg.saveHistoryDir, 'Safe', 'persistent', '1__game__abc'), 'utf-8')).toBe('target')
-    expect(readdirSync(join(owner, 'migration-conflicts', 'save-history', 'Safe', 'persistent', '1__game__abc'))).toHaveLength(1)
-    db = Db.open(cfg.dataDir, { saves: cfg.savesDir, history: cfg.saveHistoryDir }); db.close()
-    expect(readFileSync(join(cfg.savesDir, 'Safe', 'persistent'), 'utf-8')).toBe('moved')
-  })
-})

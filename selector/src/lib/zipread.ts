@@ -1,5 +1,5 @@
 /** One file in a zip, read only when asked. */
-export interface ZipEntry {
+interface ZipEntry {
   name: string
   size: number
   /** Modified time in milliseconds, from the zip's local date and time (two-second steps). */

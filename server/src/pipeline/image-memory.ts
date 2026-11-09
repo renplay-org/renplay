@@ -9,7 +9,7 @@ export const MAX_IMAGE_PIXELS = 16 * 1024 * 1024
  * default concurrency of 4 keeps all encoders busy on 4K games. With jemalloc (Dockerfile) a
  * 4K-heavy install peaked well under 1 GB at this level of parallelism.
  */
-export const IMAGE_PIXEL_BUDGET = 36 * 1024 * 1024
+const IMAGE_PIXEL_BUDGET = 36 * 1024 * 1024
 
 /** FIFO budget. Callers are themselves limited to the configured number of image tasks. */
 export class PixelBudget {

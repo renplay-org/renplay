@@ -1,3 +1,6 @@
+import { userHeader } from './api'
+import { deviceHeaders } from './device'
+
 interface PendingHtmlSave {
   key: string
   userId: number
@@ -32,7 +35,7 @@ export async function queueHtmlSave(userId: number, game: string, path: string, 
 export async function uploadHtmlSave(entry: PendingHtmlSave): Promise<void> {
   const response = await fetch(`/api/saves/${entry.game}/file?path=${encodeURIComponent(entry.path)}`, {
     method: 'PUT', body: entry.data,
-    headers: { 'content-type': 'application/octet-stream', 'x-mtime': String(entry.mtime), 'x-renplay-user': String(entry.userId) },
+    headers: { ...deviceHeaders(), ...userHeader(entry.userId), 'content-type': 'application/octet-stream', 'x-mtime': String(entry.mtime) },
   })
   if (!response.ok) throw new Error(response.status === 401 ? 'You were signed out. Your saves are kept on this device.' : 'Your saves are kept on this device. Try syncing again.')
   await transaction('readwrite', (store) => {

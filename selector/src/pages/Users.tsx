@@ -1,35 +1,37 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react'
+import { MoreHorizontal, Plus } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Avatar from '../components/Avatar'
-import { Button, Modal, Spinner, accountInput, errorText, useToast } from '../components/ui'
+import { Spinner, errorText, useToast } from '../lantern/ui'
 import { Pill, TagPill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
-import { adultLabels, adultLevels, isLevel, type AdultLevel } from '../lib/adult'
+import { adultLabels } from '../lib/adult'
+import { ADULT_LEVELS, parseAdultLevel, type AdultLevel } from '@shared/levels'
 import { api, del, post, put } from '../lib/api'
-import { useAuth, type Account } from '../lib/auth'
+import { useAuth, useProviders } from '../lib/auth'
 import { useGames } from '../lib/queries'
 import { AccountSection } from './Account'
+import type { People, PersonListed } from '@shared/api'
+import Sheet from '../lantern/Sheet'
+import BackLink from '../components/BackLink'
 
-interface User extends Account { disabled: number; games: number; saves: number; protected: boolean }
 type Action = 'add' | 'edit' | 'password' | 'copy' | 'merge' | 'import' | 'remove'
 const historyNotice = 'Nothing is overwritten without a copy in the destination’s save history.'
 
 export default function Users() {
   const { data: me } = useAuth(), qc = useQueryClient(), toast = useToast()
-  const users = useQuery({ queryKey: ['users'], queryFn: () => api<{ users: User[]; adultDefault: AdultLevel }>('/api/users') })
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ enabled: boolean; local: boolean; oidc: string | null; ldap: boolean }>('/api/auth/providers') })
+  const users = useQuery({ queryKey: ['users'], queryFn: () => api<People>('/api/users') })
+  const providers = useProviders()
   const { data: games } = useGames()
-  const [dialog, setDialog] = useState<{ action: Action; user?: User } | null>(null)
-  const [menu, setMenu] = useState<User | null>(null)
+  const [dialog, setDialog] = useState<{ action: Action; user?: PersonListed } | null>(null)
+  const [menu, setMenu] = useState<PersonListed | null>(null)
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   useRoom({ game: null, quiet: true })
   const all = users.data?.users ?? []
-  const ceilingOf = (user: User): AdultLevel => isLevel(user.adult_ceiling) ? user.adult_ceiling : users.data?.adultDefault ?? 'off'
-  const choiceOf = (user: User): AdultLevel => isLevel(user.adult_choice) ? user.adult_choice : ceilingOf(user)
-  const lastAdmin = (user: User) => user.role === 'admin' && !user.disabled && all.filter((u) => u.role === 'admin' && !u.disabled).length === 1
-  const open = (action: Action, user?: User) => { setMenu(null); setError(''); setDialog({ action, user }) }
+  const ceilingOf = (user: PersonListed): AdultLevel => parseAdultLevel(user.adult_ceiling) ?? users.data?.adultDefault ?? 'off'
+  const choiceOf = (user: PersonListed): AdultLevel => parseAdultLevel(user.adult_choice) ?? ceilingOf(user)
+  const lastAdmin = (user: PersonListed) => user.role === 'admin' && !user.disabled && all.filter((u) => u.role === 'admin' && !u.disabled).length === 1
+  const open = (action: Action, user?: PersonListed) => { setMenu(null); setError(''); setDialog({ action, user }) }
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true); setError('')
     try { await fn(); await qc.invalidateQueries(); setDialog(null); toast('Changes saved', 'success') }
@@ -40,9 +42,7 @@ export default function Users() {
   const destinations = all.filter((u) => u.id !== dialog?.user?.id)
   return (
     <div>
-      <Link to="/settings" className="crumb row small muted hide-desk" style={{ gap: 6 }}>
-        <ArrowLeft style={{ width: 16, height: 16 }} /> Settings
-      </Link>
+      <BackLink to="/settings" label="Settings" />
       <header className="row between wrap" style={{ gap: 12, marginTop: 8 }}>
         <div>
           <h1 className="h1">Users</h1>
@@ -67,7 +67,7 @@ export default function Users() {
                   {!!user.disabled && <TagPill tone="amber">Disabled</TagPill>}
                 </div>
                 <div className="m">
-                  {user.username} · {user.games} {user.games === 1 ? 'game' : 'games'} · {user.saves} save {user.saves === 1 ? 'file' : 'files'} · Adult games at most {adultLabels[ceilingOf(user)]}
+                  Username {user.username} · {user.games} {user.games === 1 ? 'game' : 'games'} · {user.saves} save {user.saves === 1 ? 'file' : 'files'} · Adult games at most {adultLabels[ceilingOf(user)]}
                   {choiceOf(user) !== ceilingOf(user) && `, chose ${adultLabels[choiceOf(user)]}`}
                 </div>
                 {user.role === 'admin' && <div className="m">{user.admin_source === 'provider' ? 'Admin access set by the sign-in provider.' : user.admin_source === 'allowlist' ? 'Admin access granted by RENPLAY_ADMINS.' : 'Admin access set in Renplay.'}</div>}
@@ -88,8 +88,8 @@ export default function Users() {
         <AccountSection title="Moving saves">
           <p className="small muted">Copy one game or all save folders between users. {historyNotice} Merging also combines progress and archives the source account.</p>
           <div className="actions">
-            <Button size="sm" disabled={all.length < 2} onClick={() => open('copy')}>Copy saves</Button>
-            <Button size="sm" disabled={!all.length} onClick={() => open('import')}>Import a save folder</Button>
+            <Pill size="sm" disabled={all.length < 2} onClick={() => open('copy')}>Copy saves</Pill>
+            <Pill size="sm" disabled={!all.length} onClick={() => open('import')}>Import a save folder</Pill>
           </div>
         </AccountSection>
         <AccountSection title="Sign-in">
@@ -98,24 +98,24 @@ export default function Users() {
           <a className="link small" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }} href="https://renplay.org/docs/accounts/" target="_blank" rel="noreferrer">About accounts and sign-in ↗</a>
         </AccountSection>
       </div>
-      <Modal open={!!menu} onClose={() => setMenu(null)} title={menu ? `Actions for ${menu.name}` : 'User actions'}>
+      <Sheet open={!!menu} onClose={() => setMenu(null)} title={menu ? `Actions for ${menu.name}` : 'PersonListed actions'}>
         {menu && (
           <div className="stack">
             <div className="stack" style={{ gap: 8 }}>
-              <Button onClick={() => open('edit', menu)}>Edit role and access</Button>
-              <Button onClick={() => open('password', menu)}>Reset password</Button>
-              <Button onClick={() => open('copy', menu)} disabled={all.length < 2}>Copy saves</Button>
-              <Button href={`/api/users/${menu.id}/saves/export`}>Export save folder</Button>
-              <Button onClick={() => open('import', menu)}>Import a save folder</Button>
-              <Button disabled={menu.protected || lastAdmin(menu)} onClick={() => open('merge', menu)}>Merge into another user</Button>
-              <Button variant="danger" disabled={menu.protected || lastAdmin(menu)} onClick={() => open('remove', menu)}>Remove user</Button>
+              <Pill onClick={() => open('edit', menu)}>Edit role and access</Pill>
+              <Pill onClick={() => open('password', menu)}>Reset password</Pill>
+              <Pill onClick={() => open('copy', menu)} disabled={all.length < 2}>Copy saves</Pill>
+              <Pill href={`/api/users/${menu.id}/saves/export`}>Export save folder</Pill>
+              <Pill onClick={() => open('import', menu)}>Import a save folder</Pill>
+              <Pill disabled={menu.protected || lastAdmin(menu)} onClick={() => open('merge', menu)}>Merge into another user</Pill>
+              <Pill variant="d" disabled={menu.protected || lastAdmin(menu)} onClick={() => open('remove', menu)}>Remove user</Pill>
             </div>
             {menu.protected && <p className="small muted">The owner and the account used with sign-in off must stay. Their saves can still be copied.</p>}
             {lastAdmin(menu) && <p className="small muted">Keep at least one enabled admin. Users cannot demote, disable or remove this account. Provider sign-in can still revoke its grant.</p>}
           </div>
         )}
-      </Modal>
-      <Modal open={!!dialog} onClose={() => !busy && setDialog(null)} title={dialog ? titles[dialog.action] : ''}>
+      </Sheet>
+      <Sheet open={!!dialog} onClose={() => !busy && setDialog(null)} title={dialog ? titles[dialog.action] : ''}>
         {dialog && (
           <form className="stack" onSubmit={(e) => {
             e.preventDefault(); const form = new FormData(e.currentTarget), action = dialog.action, id = dialog.user?.id ?? Number(form.get('source'))
@@ -133,20 +133,20 @@ export default function Users() {
             {dialog.user && <p className="small muted-2" style={{ overflowWrap: 'anywhere' }}>{dialog.user.name} ({dialog.user.username})</p>}
             {dialog.action === 'add' && (
               <>
-                <label className="field"><span>Username</span><input name="username" required minLength={2} maxLength={64} pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{1,63}" autoCapitalize="none" autoComplete="off" className={accountInput} /></label>
-                <label className="field"><span>Display name</span><input name="name" required maxLength={100} className={accountInput} /></label>
+                <label className="field"><span>Username</span><input name="username" required minLength={2} maxLength={64} pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{1,63}" autoCapitalize="none" autoComplete="off" className="input" /></label>
+                <label className="field"><span>Display name</span><input name="name" required maxLength={100} className="input" /></label>
               </>
             )}
             {(dialog.action === 'add' || dialog.action === 'password') && (
               <>
-                <label className="field"><span>{dialog.action === 'password' ? 'New password' : 'Password'}</span><input name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={1024} className={accountInput} /></label>
+                <label className="field"><span>{dialog.action === 'password' ? 'New password' : 'Password'}</span><input name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={1024} className="input" /></label>
                 {dialog.action === 'password' && <p className="small muted">All of this user’s sessions will end. Saves are kept.</p>}
               </>
             )}
             {(dialog.action === 'add' || dialog.action === 'edit') && (
               <>
-                <label className="field"><span>Role</span><select aria-label="Role" name="role" defaultValue={dialog.user?.role || 'player'} disabled={!!dialog.user && (lastAdmin(dialog.user) || dialog.user.roleManaged)} className={accountInput}><option value="player">Player</option><option value="admin">Admin</option></select></label>
-                <label className="field"><span>Adult games, at most</span><select aria-label="Adult games, at most" name="adultCeiling" disabled={dialog.user?.adultManaged} defaultValue={dialog.user ? ceilingOf(dialog.user) : users.data?.adultDefault ?? 'off'} className={accountInput}>{adultLevels.map((level) => <option key={level} value={level}>{adultLabels[level]}</option>)}</select></label>
+                <label className="field"><span>Role</span><select aria-label="Role" name="role" defaultValue={dialog.user?.role || 'player'} disabled={!!dialog.user && (lastAdmin(dialog.user) || dialog.user.roleManaged)} className="input"><option value="player">Player</option><option value="admin">Admin</option></select></label>
+                <label className="field"><span>Adult games, at most</span><select aria-label="Adult games, at most" name="adultCeiling" disabled={dialog.user?.adultManaged} defaultValue={dialog.user ? ceilingOf(dialog.user) : users.data?.adultDefault ?? 'off'} className="input">{ADULT_LEVELS.map((level) => <option key={level} value={level}>{adultLabels[level]}</option>)}</select></label>
                 {dialog.action === 'edit' && <label className="row" style={{ minHeight: 44 }}><input name="disabled" type="checkbox" defaultChecked={!!dialog.user?.disabled} disabled={!!dialog.user && lastAdmin(dialog.user)} style={{ width: 20, height: 20 }} />Disabled</label>}
                 {dialog.user && lastAdmin(dialog.user) && <p className="small muted">Users cannot demote or disable the last enabled admin. Provider sign-in can still revoke its grant.</p>}
                 {(dialog.user?.roleManaged || dialog.user?.adultManaged) && <p className="small muted">Locked permissions are set by the sign-in provider at every sign-in.</p>}
@@ -155,20 +155,20 @@ export default function Users() {
               </>
             )}
             {['copy', 'import'].includes(dialog.action) && !dialog.user && (
-              <label className="field"><span>{dialog.action === 'import' ? 'Import into' : 'From'}</span><select aria-label={dialog.action === 'import' ? 'Import into' : 'From'} name="source" required className={accountInput}>{all.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.username})</option>)}</select></label>
+              <label className="field"><span>{dialog.action === 'import' ? 'Import into' : 'From'}</span><select aria-label={dialog.action === 'import' ? 'Import into' : 'From'} name="source" required className="input">{all.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.username})</option>)}</select></label>
             )}
             {(dialog.action === 'copy' || dialog.action === 'merge') && (
               <>
-                <label className="field"><span>To</span><select aria-label="To" name="target" required defaultValue={destinations.find((u) => u.id !== (dialog.user?.id ?? all[0]?.id))?.id} className={accountInput}>{destinations.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.username})</option>)}</select></label>
+                <label className="field"><span>To</span><select aria-label="To" name="target" required defaultValue={destinations.find((u) => u.id !== (dialog.user?.id ?? all[0]?.id))?.id} className="input">{destinations.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.username})</option>)}</select></label>
                 {dialog.action === 'copy' && (
-                  <label className="field"><span>Game</span><select aria-label="Game" name="game" className={accountInput}><option value="">All save folders</option>{games?.filter((g) => g.saveDir).map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
+                  <label className="field"><span>Game</span><select aria-label="Game" name="game" className="input"><option value="">All save folders</option>{games?.filter((g) => g.saveDir).map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
                 )}
                 <p className="small muted-2">{historyNotice}</p>
               </>
             )}
             {dialog.action === 'import' && (
               <>
-                <label className="field"><span>Save folder zip</span><input name="file" type="file" accept=".zip" required className={accountInput} style={{ paddingTop: 12 }} /></label>
+                <label className="field"><span>Save folder zip</span><input name="file" type="file" accept=".zip" required className="input" style={{ paddingTop: 12 }} /></label>
                 <p className="small muted">Choose a whole save-folder export. {historyNotice}</p>
               </>
             )}
@@ -178,11 +178,11 @@ export default function Users() {
             {dialog.action === 'edit' && dialog.user?.id === me?.user.id && <p className="small amber">You are editing your own account. Disabling it or changing its role changes your access immediately.</p>}
             {error && <p role="alert" className="small red">{error}</p>}
             <div>
-              <Button type="submit" loading={busy} variant={dialog.action === 'remove' || dialog.action === 'merge' ? 'danger' : 'primary'}>{dialog.action === 'edit' ? 'Save changes' : titles[dialog.action]}</Button>
+              <Pill type="submit" loading={busy} variant={dialog.action === 'remove' || dialog.action === 'merge' ? 'd' : 'p'}>{dialog.action === 'edit' ? 'Save changes' : titles[dialog.action]}</Pill>
             </div>
           </form>
         )}
-      </Modal>
+      </Sheet>
     </div>
   )
 }

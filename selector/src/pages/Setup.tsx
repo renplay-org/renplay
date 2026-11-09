@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate } from 'react-router-dom'
-import AuthLayout, { authInput } from '../components/AuthLayout'
+import AuthLayout from '../components/AuthLayout'
 import { Pill } from '../lantern/controls'
-import { errorText } from '../components/ui'
-import { api, post } from '../lib/api'
+import { errorText } from '../lantern/ui'
+import { post } from '../lib/api'
+import { useProviders } from '../lib/auth'
 
 export default function Setup() {
   const [grant, setGrant] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const providers = useQuery({ queryKey: ['providers'], queryFn: () => api<{ setup: boolean }>('/api/auth/providers') })
+  const providers = useProviders()
   if (providers.data && !providers.data.setup) return <Navigate to="/" replace />
   return (
     <AuthLayout wide>
@@ -54,7 +54,7 @@ export default function Setup() {
             <>
               <label className="field">
                 <span>Setup code</span>
-                <input key="code" name="code" autoCapitalize="none" autoComplete="off" spellCheck={false} required className={`${authInput} mono`} style={{ height: 56, fontSize: 20, letterSpacing: '0.2em', textAlign: 'center' }} />
+                <input key="code" name="code" autoCapitalize="none" autoComplete="off" spellCheck={false} required className="input mono" style={{ height: 56, fontSize: 20, letterSpacing: '0.2em', textAlign: 'center' }} />
               </label>
               <p className="hint">
                 Find it with <code>docker logs renplay | grep "Setup code"</code>, or in the app’s log on your NAS. Skipped when the admin is set by environment variables.
@@ -64,15 +64,15 @@ export default function Setup() {
             <>
               <label className="field">
                 <span>Name</span>
-                <input name="name" autoComplete="name" required className={authInput} />
+                <input name="name" autoComplete="name" required className="input" />
               </label>
               <label className="field">
                 <span>Username</span>
-                <input name="username" autoComplete="username" autoCapitalize="none" required className={authInput} />
+                <input name="username" autoComplete="username" autoCapitalize="none" required className="input" />
               </label>
               <label className="field">
                 <span>Password</span>
-                <input name="password" type="password" autoComplete="new-password" aria-describedby="password-hint" minLength={10} required className={authInput} />
+                <input name="password" type="password" autoComplete="new-password" aria-describedby="password-hint" minLength={10} required className="input" />
               </label>
               <p id="password-hint" className="hint">
                 Use at least 10 characters.

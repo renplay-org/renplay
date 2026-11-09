@@ -1,19 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
 import { Copy, Download } from 'lucide-react'
-import { api, type Game } from '../lib/api'
-import { Button, Modal, Spinner, useToast } from './ui'
+import { api } from '../lib/api'
+import type { Game } from '@shared/api'
+import { Spinner, useToast } from '../lantern/ui'
+import type { DraftRecipe } from '@shared/api'
+import { Pill } from '../lantern/controls'
+import Sheet from '../lantern/Sheet'
 
 /** A recipe for an installed game, filled in from the installation, to contribute to the catalog. */
 export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' | 'recipe'>; onClose: () => void }) {
   const toast = useToast()
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['recipe', game.id],
-    queryFn: () => api<{ yaml: string; sha256Pending: boolean; hashJob: string | null }>(`/api/games/${game.id}/recipe`),
+    queryFn: () => api<DraftRecipe>(`/api/games/${game.id}/recipe`),
     refetchInterval: (q) => (q.state.data?.sha256Pending ? 4000 : false),
   })
   const file = `${game.recipe?.id ?? game.id}.yaml`
   return (
-    <Modal
+    <Sheet
       open
       onClose={onClose}
       wide
@@ -21,8 +25,8 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
       footer={
         <>
           <span className="mr-auto text-xs text-zinc-500">{data?.sha256Pending ? 'Computing the archive checksum' : `Save as recipes/${file}`}</span>
-          <Button
-            variant="ghost"
+          <Pill
+            variant="q"
             icon={<Download className="size-4" />}
             disabled={!data}
             onClick={() => {
@@ -34,9 +38,9 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
             }}
           >
             Download
-          </Button>
-          <Button
-            variant="primary"
+          </Pill>
+          <Pill
+            variant="p"
             icon={<Copy className="size-4" />}
             disabled={!data}
             onClick={async () => {
@@ -45,7 +49,7 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
             }}
           >
             Copy
-          </Button>
+          </Pill>
         </>
       }
     >
@@ -66,6 +70,6 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
           Refresh
         </button>
       )}
-    </Modal>
+    </Sheet>
   )
 }

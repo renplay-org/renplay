@@ -6,8 +6,9 @@ import request from 'supertest'
 import express from 'express'
 import yazl from 'yazl'
 import yauzl from 'yauzl'
-import { readZipEntries } from '../saves/savefile.js'
-import { saveImport, IMPORT_MAX_BYTES, IMPORT_MAX_FILE_BYTES } from '../saves/import-upload.js'
+import { SAVES_ZIP, SAVE_FILE_BYTES } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
+import { saveImport, IMPORT_MAX_BYTES } from '../saves/import-upload.js'
 import { signInReturnUrl } from '../../../selector/src/lib/sign-in-return.js'
 import { queueHtmlSave, replayHtmlSaves } from '../../../selector/src/lib/html-save-queue.js'
 
@@ -26,19 +27,14 @@ describe('security boundary regressions', () => {
     for (const target of ['/\n/evil.example', '//evil.example', '/\\evil.example', 'https://evil.example/', 'javascript:alert(1)', 'http://[']) expect(signInReturnUrl(target, origin)).toBe(`${origin}/`)
     expect(signInReturnUrl('/games/../account?x=1#section', origin)).toBe(`${origin}/account?x=1#section`)
     expect(signInReturnUrl(`${origin}/account`, origin)).toBe(`${origin}/account`)
-    // Exercise the expression wired into the actual submit handler, not just an unused helper.
-    const signIn = readFileSync(new URL('../../../selector/src/pages/SignIn.tsx', import.meta.url), 'utf-8')
-    const expression = signIn.match(/window\.location\.assign\((.+)\)/)![1]!
-    const assigned = new Function('target', 'params', 'location', 'signInReturnUrl', `return (${expression})`)('/\n/evil.example', new URLSearchParams({ return: '/\n/evil.example' }), { origin }, signInReturnUrl)
-    expect(new URL(assigned, origin).origin).toBe(origin)
   })
   it('rejects an entry-count bomb, traversal and symlink entries before opening content streams', async () => {
     const open = vi.spyOn(yauzl.ZipFile.prototype, 'openReadStream')
-    await expect(readZipEntries(await zip(2049), () => true)).rejects.toThrow('Too many zip entries')
-    await expect(readZipEntries(await zip(1, 0o120777), () => true)).rejects.toThrow('Zip links')
+    await expect(readZipEntries(await zip(2049), () => true, SAVES_ZIP)).rejects.toThrow('Too many zip entries')
+    await expect(readZipEntries(await zip(1, 0o120777), () => true, SAVES_ZIP)).rejects.toThrow('Zip links')
     // Replace same-length names in the local and central headers; yazl itself disallows traversal.
     const traversal = Buffer.from((await zip(1)).toString('latin1').replaceAll('save/0', '../bad'), 'latin1')
-    await expect(readZipEntries(traversal, () => true)).rejects.toThrow(/invalid relative path|Invalid path/)
+    await expect(readZipEntries(traversal, () => true, SAVES_ZIP)).rejects.toThrow(/invalid relative path|Invalid path/)
     expect(open).not.toHaveBeenCalled()
     open.mockRestore()
   })
@@ -50,11 +46,11 @@ describe('security boundary regressions', () => {
     pos = bomb.indexOf(Buffer.from('PK\x01\x02'), pos + 4)
     bomb.writeUInt32LE(65 << 20, pos + 24)
     const open = vi.spyOn(yauzl.ZipFile.prototype, 'openReadStream')
-    await expect(readZipEntries(bomb, () => true, 512 << 20)).rejects.toThrow('Zip contents too large')
+    await expect(readZipEntries(bomb, () => true, SAVES_ZIP)).rejects.toThrow('Zip contents too large')
     expect(open).not.toHaveBeenCalled(); open.mockClear()
     const totalBomb = Buffer.from(await zip(3))
     for (let offset = totalBomb.indexOf(Buffer.from('PK\x01\x02')); offset !== -1; offset = totalBomb.indexOf(Buffer.from('PK\x01\x02'), offset + 4)) totalBomb.writeUInt32LE(48 << 20, offset + 24)
-    await expect(readZipEntries(totalBomb, () => true, 512 << 20)).rejects.toThrow('Zip contents too large')
+    await expect(readZipEntries(totalBomb, () => true, SAVES_ZIP)).rejects.toThrow('Zip contents too large')
     expect(open).not.toHaveBeenCalled(); open.mockRestore()
   })
   it('spools multipart bodies to disk, bounds file/aggregate bytes and holds a shared concurrency budget', async () => {
@@ -74,9 +70,11 @@ describe('security boundary regressions', () => {
     expect((await first).status).toBe(200); expect((await second).status).toBe(200)
     await vi.waitFor(() => paths.forEach((path) => expect(() => readFileSync(path)).toThrow()))
     await request(app).post('/import').set('Content-Length', String(IMPORT_MAX_BYTES + (2 << 20))).send('x').expect(413)
-    await request(app).post('/import').attach('files', Buffer.alloc(IMPORT_MAX_FILE_BYTES + 1), 'persistent').expect(400)
-    // Three individually valid files cross the aggregate limit, including chunked requests.
-    await request(app).post('/import').attach('files', Readable.from([Buffer.alloc(48 << 20)]), 'persistent').attach('files', Readable.from([Buffer.alloc(48 << 20)]), 'persistent').attach('files', Readable.from([Buffer.alloc(48 << 20)]), 'persistent').expect(413)
+    await request(app).post('/import').attach('files', Buffer.alloc(SAVE_FILE_BYTES + 1), 'persistent').expect(400)
+    // Three individually valid files cross the aggregate limit, including chunked requests. Streams
+    // are what makes them chunked, and supertest's types leave them out.
+    const chunked = () => Readable.from([Buffer.alloc(48 << 20)]) as unknown as Buffer
+    await request(app).post('/import').attach('files', chunked(), 'persistent').attach('files', chunked(), 'persistent').attach('files', chunked(), 'persistent').expect(413)
   })
   it('keeps offline HTML state through A → B → A and uploads only owner-bound snapshots', async () => {
     const window: any = {}

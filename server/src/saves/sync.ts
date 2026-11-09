@@ -2,8 +2,14 @@ import { createHash, randomInt } from 'node:crypto'
 import yazl from 'yazl'
 import { HttpError } from '../util/paths.js'
 import { secretboxDecrypt, secretboxEncrypt } from './hydrogen.js'
-import { readSaveMeta, readZipEntries } from './savefile.js'
+import { readSaveMeta } from './savefile.js'
+import { readZipEntries } from '../util/zip.js'
 import type { SaveStore } from './store.js'
+import type { Db } from '../db.js'
+
+/** Sync codes are off until an admin turns them on: saves leave the server only then, and only when someone asks. */
+export const syncCodesOn = (db: Db): boolean => db.getSetting<boolean>(SYNC_SETTING, false) === true
+export const SYNC_SETTING = 'renpy_sync'
 
 /*
  * Ren'Py Sync, as renpy/common/00sync.rpy does it (Ren'Py 8.1 and newer): a code like ABCDE-12345,
@@ -14,7 +20,7 @@ import type { SaveStore } from './store.js'
 
 const DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const SIZE_LIMIT = 10 << 20
-export const SYNC_LIFETIME = 3600_000
+const SYNC_LIFETIME = 3600_000
 
 function sha256Rounds(data: Buffer, rounds: number): Buffer {
   let hashed = data
@@ -156,7 +162,7 @@ export async function downloadSync(server: string, store: SaveStore, saveDir: st
     throw new HttpError(409, 'That code did not work for this game.')
   }
   const times = new Map<string, number>()
-  const entries = await readZipEntries(plain, (n) => n === 'save_directory' || n === 'persistent' || syncable(n), SIZE_LIMIT * 2, times)
+  const entries = await readZipEntries(plain, (n) => n === 'save_directory' || n === 'persistent' || syncable(n), { files: 2048, fileBytes: SIZE_LIMIT * 2, totalBytes: SIZE_LIMIT * 2 }, times)
   if (entries.get('save_directory')?.toString('utf8') !== saveDir) throw new HttpError(409, 'The sync belongs to a different game.')
   const report = { added: 0, replaced: 0, kept: 0, same: 0 }
   for (const [name, data] of entries) {
@@ -170,12 +176,8 @@ export async function downloadSync(server: string, store: SaveStore, saveDir: st
     // is newer. A broken or empty file never takes a save's place.
     const meta = await readSaveMeta(data)
     if (!meta) continue
-    const before = await store.stat(saveDir, name)
     const written = await store.write(saveDir, name, data, { mtimeMs: meta.ctime ? meta.ctime * 1000 : mtime, reason: 'sync', base: 0 })
-    if (written.conflict === 'kept') report.kept++
-    else if (written.conflict === 'replaced') report.replaced++
-    else if (before) report.same++
-    else report.added++
+    report[written.outcome]++
   }
   return report
 }

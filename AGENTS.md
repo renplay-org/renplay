@@ -51,7 +51,7 @@ These decide most review comments. Follow them without being asked.
 - **Adult games have three levels.** Off (they do not exist for that person), Blurred (they show,
   but no picture of them is ever sent) and Shown, set by the installation, the person's account (an
   admin or a sign-in group), the person and the device. Each layer only narrows the one above. The
-  server enforces the person's level and the device's on every route (`content.ts`). Every route is
+  server enforces the person's level and the device's on every route (`content/mode.ts`). Every route is
   listed in `adult-levels.test.ts` with what the levels do on it, so a new route fails the tests
   until it is classified. At Blurred the game plays (with its walkthrough and the person's save
   files) but no picture of it is sent. Safe-for-work games
@@ -65,30 +65,53 @@ These decide most review comments. Follow them without being asked.
 
 ```
 server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). Tests: vitest.
-  src/app.ts         HTTP app; src/index.ts starts it
-  src/config.ts      Environment variables (all documented in README.md)
+  src/app.ts         The HTTP app, mounting each part's routes. src/index.ts starts it
+  src/services.ts    The server's parts, made once at start and given to every router and job
+  src/config.ts      Environment variables, read from the table in envvars.ts
   src/db.ts          SQLite schema and migrations (PRAGMA user_version)
-  src/catalog.ts     Catalog index: recipe matching, linking games to recipes, updates
-  src/art.ts         The art cache: five formats per game, the making order, choices, uploads
+  src/shared/        What the server and the library both use: the adult levels, the recipe format,
+                     the art types, the defaults, sizes for people (format.ts), and every answer of
+                     the API (api.ts), which the server builds with `satisfies`. The library
+                     imports it as @shared. It imports nothing outside itself (shared.test.ts),
+                     since the library builds from it
+                     Each folder below is one part of the server, with its routes in routes.ts:
+  src/accounts/      Sign-in: sessions, passwords and PINs, OIDC and LDAP, tokens, who may call what
+                     (access.ts), a person's own settings
+  src/people/        An admin's work with people: adding, changing, removing, merging, the owner
+  src/content/       The adult levels (levels.ts) and what each person may see (mode.ts)
+  src/defaults/      The defaults for everyone
+  src/library/       Adding games: the archives folder, uploads, installs, keeping downloads
+  src/games/         The library's games, their build folders (builds.ts), the mod overlay (mods.ts)
+                     with its file browser (files.ts), and walkthroughs
+  src/play/          Game pages, the runtimes and the files a game streams
+  src/progress/      Each person's progress with each game and their play history
+  src/saves/         Everyone's saves: the store with history (store.ts), each person's store, notes
+                     and pins (stores.ts), import, sync codes, backups. savefile.ts reads Ren'Py
+                     save metadata
+  src/recipes/       Your recipes (local.ts), read from the recipes folder
+  src/catalog/       Catalog index: recipe matching, linking games to recipes, updates
+  src/art/           The art cache (store.ts): five formats per game, the making order, choices,
+                     uploads
+  src/jobs/          Background job queue (installs, mod builds, hashing), its logs and keepalive
+  src/system/        Health, storage, the system page, metrics and the dashboard widget
   src/engines.ts     Engine packs: index, download on demand, checksum, pruning
-  src/builds.ts      Build folders /games/<id>/<build>/, build.json, caches
-  src/jobs.ts        Background job queue (installs, mod builds, hashing) with logs
-  src/mods.ts        The mod overlay (user files layered over a build)
   src/pipeline/      Install pipeline: archive.ts (zip/7z/rar reading), rpa.ts (RPA split, data-only
                      pickle in util/pickle.ts), project.ts (extraction), optimize.ts (WebP),
                      progressive.ts (what streams), pack.ts (asset packs), assemble.ts (game.zip),
                      import.ts (the whole install), applymods.ts (mod builds), detect.ts
-  src/routes/        REST API: games, library (imports, uploads, archives, catalog), saves, files
-                     (mod file browser), play (game pages and streamed assets), system
-  src/saves/         Save store with history; savefile.ts reads Ren'Py save metadata
   scripts/           screenshots.mjs (Playwright, phone and desktop)
 selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. No tests; type-checked.
   src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
-  src/lantern/       The 4.0 design system: Tile, Stage, the room, Sheet, controls, focus, travel
-                     (tokens and styles in src/index.css, the reference prototype in renplay-plans)
-  src/components/    AppShell (header, tab bar, footer), SaveGallery, FileBrowser, ui.tsx
-  src/lib/           api.ts (types and fetch), queries.ts, display.ts (screen geometry), format.ts
-runtime/           renplay-runtime.js: plain ES5-style script injected into every game page
+  src/lantern/       The design system, the only UI kit: Tile, Stage, the room, Sheet, controls (Pill,
+                     IconBtn, Bar, Seg, switches), ui.tsx (Spinner, Empty, Confirm, Menu, toasts),
+                     focus, travel
+                     (tokens and styles in src/index.css)
+  src/components/    AppShell (header, tab bar, footer), AuthGuard, SaveGallery, FileBrowser, ActionMenu
+  src/lib/           api.ts (fetching), queries.ts, display.ts (screen geometry), platform.ts (what
+                     device and browser this is), format.ts
+runtime/           Plain ES5-style scripts for the game pages: renplay-runtime.js (Ren'Py) and
+                     renplay-html.js (HTML games), each with renplay-player.js, what they share, in
+                     front. The server builds them (server/src/play/runtime.ts)
 image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it)
 charts/renplay/    The Helm chart
 deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
@@ -100,8 +123,34 @@ website/           renplay.org: plain HTML and CSS (home, catalog browser), _red
                      addresses (/docs, /github, /demo...), www/ the www.renplay.org redirect
 tests/             The image's install contract, the chart's tests, the deploy/ examples
 scripts/           Repo checks (writing rule, built library, website links), release.mjs, package-chart.py
-mise.toml          Pinned tools and every task, locally and in CI
+mise.toml          Pinned tools, locally and in CI (CI caches them by this file)
+tasks.toml         Every task, locally and in CI
 ```
+
+## Structure rules
+
+The code was untangled so that a change lands in one place. `scripts/check-structure.mjs`
+(`mise run check:structure`) enforces the parts a script can see, and CI runs it. Keep to all of them.
+
+- **One part, one folder.** Each part of the server (accounts, saves, art, catalog and the rest in
+  Layout) holds its storage, its logic and its routes. A new feature goes into the part it belongs
+  to, not into a folder for its layer.
+- **One wiring.** `services.ts` makes every part once. Only `app.ts` and routers (a
+  `create…Router`) get the `Services`. Lower modules take the few parts they use as parameters.
+- **One contract.** What the server and the library share is in `server/src/shared/`, which imports
+  nothing outside itself. The library imports it as `@shared`, and reaches the server only that way.
+  Every API answer has its type in `shared/api.ts`, and the server builds it with `satisfies`.
+- **Layers point down.** `util/` imports only `util/` and `shared/`. `pipeline/` and `util/` never
+  import routes, `services.ts` or `app.ts`. In the library, `lantern/` (the one UI kit) and `lib/`
+  never import `components/` or `pages/`. No import cycles anywhere.
+- **No dead code.** Unused locals fail the type check. A function or constant is exported only when
+  another file uses it.
+- **Small files.** At most 600 lines. A few older files are larger, listed in
+  `scripts/check-structure.mjs` at their size: they may only shrink.
+- **Tests test behaviour.** Tests are type-checked (`server/tsconfig.test.json`). Drive the code the
+  way it is used (requests, messages, the built runtime), never by cutting its source text apart.
+- **Write things once.** A device check goes in `selector/src/lib/platform.ts`, a size for people is
+  `bytes` in `shared/format.ts`, a control comes from `lantern/`. Look for the existing one first.
 
 ## How it fits together
 
@@ -127,7 +176,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   restores compiled caches (bytecode and recompiled `.rpyc`), and talks to the player UI through
   `postMessage` (`renplay:*` messages).
 - **Catalog:** fetched every 6 hours or on demand. Games link to recipes by id, archive or save
-  folder (`Catalog.link`). The art cache (`art.ts`) downloads each picture once and makes every
+  folder (`Catalog.link`). The art cache (`art/store.ts`) downloads each picture once and makes every
   format into `/data/art` under content-hashed names.
 
 ## Lessons that shaped the code
@@ -174,7 +223,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
 
 ## Commands
 
-`mise.toml` pins the tools and holds every task. CI runs the same tasks.
+`mise.toml` pins the tools and `tasks.toml` holds every task. CI runs the same tasks.
 
 ```sh
 mise install && mise run install    # tools and npm packages
@@ -188,12 +237,13 @@ mise run screenshots http://localhost:5199 /tmp/shots --sfw   # phone and deskto
 mise run release 4.4.0              # a release branch's versions and changelog (release skill)
 ```
 
-Inside `server/`: `npx tsc -p .` builds to `dist/`, `npx vitest run src/__tests__/x.test.ts` runs one
-test file. Screenshots need `npx playwright install chromium webkit` once.
+Inside `server/`: `npx tsc -p .` builds to `dist/`, `npx tsc -p tsconfig.test.json` type-checks the
+tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs one test file. Screenshots need `npx playwright install chromium webkit` once.
 
 ## Definition of done
 
-1. Server type check and tests pass; new behavior has a test (`server/src/__tests__`).
+1. `mise run check` passes: type checks (the tests' too), tests, the structure rules and the writing
+   rule. New behavior has a test (`server/src/__tests__`).
 2. The UI type-checks and builds.
 3. UI changes are looked at on a phone size (WebKit, iPhone) and a desktop size, using
    `npm run screenshots` or Playwright directly. No page errors.
@@ -207,6 +257,9 @@ test file. Screenshots need `npx playwright install chromium webkit` once.
   branch from `dev` (`feat-…`, `fix-…`), open a pull request against `dev`, squash-merge.
 - **Commits and PR titles:** Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`, `chore:`).
   The body says why, and what was tested.
+- **The pre-push hook** (`.githooks/pre-push`, set up by `mise run install`) runs
+  `mise run check:fast` before a push: types, structure, the runtimes and the writing rule, in a few
+  seconds. Fix what it reports rather than pushing with `--no-verify`. CI runs it all again.
 - **CI** (`.github/workflows/ci.yml`) runs on pull requests into `dev` and `main`, and the
   rulesets require it: `check` (type checks, tests, the interface, docs, chart, workflow and
   deploy/ examples lint), `Install contract` (on amd64 and arm64: the image from a build cache, users

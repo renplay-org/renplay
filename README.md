@@ -125,8 +125,7 @@ code. Passwords must have at least 10 characters. The account menu shows your na
 
 `RENPLAY_AUTH=off` lets everyone play as the owner, or the account id in `RENPLAY_AUTH_USER`.
 Changing modes never moves or deletes other people's saves. All saves and history live under
-`/data/users/<id>/`. Old owner paths remain symlinks for rollback to 2.10. The upgrade first backs
-up saves, save history and the database under `/data/backups/pre-3.0/`. Back up `/data` yourself too.
+`/data/users/<id>/`. Back up `/data` yourself too.
 
 Cookies work on plain HTTP for a local NAS and are marked `Secure` over HTTPS. Behind HTTPS
 termination, set `RENPLAY_PUBLIC_URL` to the public HTTPS address. Keep proxy hop counts correct

@@ -1,14 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useAuth } from './auth'
-import type { AdultLevel } from './adult'
-import { api, put, type CatalogResponse, type ContentState, type Archive, type FilesResponse, type Game, type Job, type SavesResponse, type SystemInfo } from './api'
+import type { Defaults } from '@shared/defaults'
+import type { AdultLevel } from '@shared/levels'
+import { api, put } from './api'
+import type { ArchivesResponse, CatalogResponse, ContentState, FilesResponse, Game, GameResponse, GamesResponse, JobsResponse, SavesResponse, SystemInfo } from '@shared/api'
 
 export function useGames() {
   // The server leaves out what the person's level and this device's hide.
   return useQuery({
     queryKey: ['games'],
-    queryFn: () => api<{ games: Game[] }>('/api/games').then((r) => r.games),
+    queryFn: () => api<GamesResponse>('/api/games').then((r) => r.games),
     refetchInterval: (q) => (q.state.data?.some((g) => g.job) ? 2000 : false),
   })
 }
@@ -17,7 +19,7 @@ export function useGame(id: string | undefined) {
   const qc = useQueryClient()
   return useQuery({
     queryKey: ['game', id],
-    queryFn: () => api<{ game: Game }>(`/api/games/${id}`).then((r) => r.game),
+    queryFn: () => api<GameResponse>(`/api/games/${id}`).then((r) => r.game),
     enabled: !!id,
     // The library's list has the same game: its page shows at once while the full answer comes.
     placeholderData: () => qc.getQueryData<Game[]>(['games'])?.find((g) => g.id === id),
@@ -39,7 +41,7 @@ export function useJobs() {
   const q = useQuery({
     queryKey: ['jobs'],
     enabled: admin,
-    queryFn: () => api<{ jobs: Job[]; busy: boolean }>('/api/jobs?limit=40'),
+    queryFn: () => api<JobsResponse>('/api/jobs?limit=40'),
     refetchInterval: (q) => (q.state.data?.jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 1500 : 15000),
   })
   // Refresh game data when a job finishes.
@@ -63,7 +65,7 @@ export function useJobs() {
 export function useArchives() {
   return useQuery({
     queryKey: ['archives'],
-    queryFn: () => api<{ dir: string; archives: Archive[] }>('/api/archives'),
+    queryFn: () => api<ArchivesResponse>('/api/archives'),
   })
 }
 
@@ -99,14 +101,6 @@ export function useFiles(id: string, dir: string) {
   })
 }
 
-/** Defaults for everyone, set by an admin: what a person starts with until they choose. */
-export interface Defaults {
-  tagsExclude: string[]
-  lighterBackground: boolean | null
-  textSize: number | null
-  rollback: boolean | null
-  skip: boolean | null
-}
 export function useDefaults() {
   return useQuery({ queryKey: ['defaults'], queryFn: () => api<Defaults>('/api/defaults'), staleTime: 5 * 60_000, retry: false })
 }

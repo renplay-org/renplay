@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import type { JobContext } from '../jobs.js'
+import type { JobContext } from '../jobs/manager.js'
 import { Limiter } from '../util/limit.js'
 import { readAll, type ArchiveSource, type SourceEntry } from './archive.js'
 import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit, type GameMeta } from './detect.js'
@@ -79,7 +79,12 @@ export interface ExtractTargets {
 }
 
 const SKIP_GAME = [/^cache\//i, /^saves\//i, /\.rpyb$/i, /(^|\/)\.ds_store$/i, /(^|\/)thumbs\.db$/i, /\.bak$/i]
-const KEEP_ROOT = /^(progressive_download\.txt|web-presplash\.(png|jpe?g|webp)|web-icon\.png)$/i
+const KEEP_ROOT = /^(progressive_download\.txt|web-icon\.png)$/i
+
+/** A build's presplash picture, by its file name or the end of its path. */
+export function isPresplash(path: string): boolean {
+  return /(^|\/)web-presplash\.(png|jpe?g|webp)$/i.test(path)
+}
 
 /**
  * Extracts the parts of a Ren'Py game a web build needs. Files under game/
@@ -134,7 +139,7 @@ export async function extractProject(
       continue
     }
     if (!rel.startsWith('game/')) {
-      if (KEEP_ROOT.test(rel)) {
+      if (KEEP_ROOT.test(rel) || (!rel.includes('/') && isPresplash(rel))) {
         await pipeline(await e.open(), createWriteStream(join(dest, rel)))
       }
       continue

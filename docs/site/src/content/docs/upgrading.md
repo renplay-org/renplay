@@ -7,9 +7,9 @@ description: Versions, database migrations, backups and rollback.
 
 Renplay follows [Semantic Versioning](https://semver.org/):
 
-- a **patch** version (2.9.1 to 2.9.2) fixes things,
-- a **minor** version (2.9 to 2.10) adds features,
-- a **major** version (2.x to 3.0) needs something from you when you upgrade. The release notes say
+- a **patch** version (4.5.0 to 4.5.1) fixes things,
+- a **minor** version (4.5 to 4.6) adds features,
+- a **major** version (4.x to 5.0) needs something from you when you upgrade. The release notes say
   what.
 
 The [releases](https://renplay.org/releases) page lists what changed in each
@@ -36,22 +36,6 @@ older version understands a newer schema. In general:
   older image. Without a backup you cannot roll back.
 - Migrations never rewrite save contents.
 
-### The 3.0 accounts migration
-
-Sign-in stays off on an upgraded data folder. The first admin claims the owner when you turn it on.
-All existing saves, history and library progress belong to owner 1. The migration backs up the
-checkpointed database and both save trees under `/data/backups/pre-3.0/` before moving either tree.
-It resumes after an interruption and verifies copies across volumes before removing the source.
-
-Saves and history move under `/data/users/1/`, with symlinks at their old paths (including custom
-`SAVES_DIR` and `SAVE_HISTORY_DIR`). The filesystem must support symlinks. Conflicts from a partial
-copy stay in `users/1/migration-conflicts/`; they are not discarded.
-
-For this migration, **2.10 can still use the owner layout** through those symlinks. Other accounts
-stay untouched but are not visible to 2.10. Stop the newer server before starting an older one;
-never run them against the same folders together. Keep your own complete backup as the safest
-rollback. See [Accounts](/accounts/) for switching sign-in off and on without moving saves.
-
 ## Backups
 
 `/data` is what to back up: saves and their history, the library database, mods, covers and
@@ -72,15 +56,13 @@ off. A server that sleeps when idle makes the backup the next time it runs. **Se
 backups with a download link and has **Back up now**. To restore a game's saves, import its folder
 from the zip on the game's page, under **Saves**.
 
-## Upgrading to 4.x
+## Upgrading within 4.x
 
-No action is needed: the database updates itself on the first start.
+No action is needed: the database updates itself on the first start. Going back to the release
+before works too (see [Stability](/stability/#upgrades-and-going-back)).
 
-- **4.0** turns the 3.x adult games settings into the three levels (see
-  [Adult games](/start-here/adult-games/#upgrading-from-3x)) and makes every game's art again in
-  the new formats. 3.2 still runs on a database 4.0 migrated.
-- **4.1** to **4.3** add a PIN for each person, the list of who signed in on each browser, and make
-  every game's art once more after the upgrade, in the background.
+A library from before 4.0 opens in Renplay 4.5.1 first: start 4.5.1 on it once, then the newest
+version.
 
 ## An important change in an earlier release line
 

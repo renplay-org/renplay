@@ -1,14 +1,23 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, symlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ArtStore } from '../art.js'
-import { Catalog, installedRelease, normalizeRecipe } from '../catalog.js'
-import { loadConfig } from '../config.js'
+import { ArtStore } from '../art/store.js'
+import { Catalog } from '../catalog/catalog.js'
+import { installedRelease, normalizeRecipe } from '../shared/recipe.js'
+import { loadConfig, type Config } from '../config.js'
+import { ContentMode } from '../content/mode.js'
 import { Db } from '../db.js'
+
+/** A catalog with its content mode and art cache, as the server makes it (services.ts). */
+function catalogOf(cfg: Config, db: Db): Catalog {
+  const content: ContentMode = new ContentMode(cfg, db, () => catalog.adultSaveDirs())
+  const catalog = new Catalog(cfg, db, content, new ArtStore(cfg, db, content))
+  return catalog
+}
 
 describe('catalog', () => {
   let server: Server
@@ -70,24 +79,17 @@ describe('catalog', () => {
     process.env['RENPLAY_ADULT_GAMES'] = 'allow'
     const cfg = loadConfig()
     const db = Db.open(cfg.dataDir)
-    return { cfg, db, catalog: new Catalog(cfg, db) }
+    return { cfg, db, catalog: catalogOf(cfg, db) }
   }
 
   it('links installed games to their recipe and makes their art from a schema 3 cover', async () => {
     const { cfg, db, catalog } = setup()
-    catalog.art = new ArtStore(cfg, db, catalog.content)
     db.insertGame({ id: 'ripples', title: 'ripples', status: 'installed', version: '0.9.23' })
     db.insertGame({ id: 'some-save', title: 'Some', status: 'installed', save_dir: 'BySave-1' })
     db.insertGame({ id: 'some-archive', title: 'Other', status: 'installed', source: JSON.stringify({ archive: 'Pattern-2.0-pc.zip' }) })
     db.insertGame({ id: 'unknown', title: 'Unknown', status: 'installed' })
-    // Renplay 3.x covers are forgotten: 4.0 makes its pictures in the art cache.
-    mkdirSync(cfg.coversDir, { recursive: true })
-    writeFileSync(join(cfg.coversDir, 'ripples.0123456789ab.webp'), 'old')
-    db.setSetting('catalog_covers', { ripples: { url: 'x', sha256: '', file: 'ripples.0123456789ab.webp', etag: '' } })
     await catalog.init()
     catalog.stop()
-    expect(existsSync(cfg.coversDir)).toBe(false)
-    expect(db.getSetting('catalog_covers', null)).toBeNull()
 
     const res = await catalog.refresh()
     expect(res.games).toBe(3)
@@ -123,24 +125,6 @@ describe('catalog', () => {
     expect(catalog.update(recipe, '0.9.24')).toBeNull()
     // A version the catalog does not list (newer, matched by pattern) gets no offer.
     expect(catalog.update(recipe, '0.9.30')).toBeNull()
-    db.close()
-  })
-
-  it('upgrades a 2.1 database: drops the hand-edited columns, adds the engine family', () => {
-    const root = mkdtempSync(join(tmpdir(), 'renplay-db-'))
-    let db = Db.open(root)
-    // As 2.1 left it: without the 2.6 columns, with the hand-edited ones.
-    db.raw.exec('ALTER TABLE games DROP COLUMN adult; ALTER TABLE games DROP COLUMN finished_at; ALTER TABLE games DROP COLUMN play_time; ALTER TABLE games DROP COLUMN favorite_at; ALTER TABLE games DROP COLUMN family; ALTER TABLE games DROP COLUMN engine_label; ALTER TABLE games DROP COLUMN entry')
-    db.raw.exec("ALTER TABLE games ADD COLUMN save_dir_locked INTEGER NOT NULL DEFAULT 0; ALTER TABLE games ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'; ALTER TABLE games ADD COLUMN cover TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 1")
-    db.insertGame({ id: 'kept', title: 'Kept', status: 'installed' })
-    db.close()
-    db = Db.open(root)
-    const cols = (db.raw.prepare('PRAGMA table_info(games)').all() as Array<{ name: string }>).map((c) => c.name)
-    expect(cols).not.toContain('tags')
-    expect(cols).not.toContain('cover')
-    expect(cols).not.toContain('save_dir_locked')
-    expect(db.getGame('kept')).toMatchObject({ title: 'Kept', family: 'renpy', engine_label: '', entry: '' })
-    expect((db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
     db.close()
   })
 
@@ -196,7 +180,7 @@ describe('catalog', () => {
     await catalog.refresh()
     expect(catalog.vocabulary).toEqual({ 'sci-fi': { label: 'Sci-fi', group: 'story' }, adventure: { label: 'Adventure', group: 'play' } })
     expect(catalog.recipe('ripples')).toMatchObject({ tagIds: ['sci-fi'], content: ['violence'], state: 'ongoing', summary: 'A journey through time.' })
-    const restarted = new Catalog({ ...cfg, catalogUrls: ['http://127.0.0.1:9/offline'] }, db)
+    const restarted = catalogOf({ ...cfg, catalogUrls: ['http://127.0.0.1:9/offline'] }, db)
     await restarted.init()
     expect(restarted.vocabulary).toEqual(catalog.vocabulary)
     expect(restarted.recipe('ripples')).toEqual(catalog.recipe('ripples'))
@@ -204,10 +188,20 @@ describe('catalog', () => {
     db.close()
   })
 
+  it('starts from the catalog in the image when it has no cache and no network', async () => {
+    const { cfg, db } = setup()
+    const bundled = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'catalog.json'), 'utf-8')) as { games: Array<{ id: string }> }
+    const catalog = catalogOf({ ...cfg, catalogUrls: ['http://127.0.0.1:9/offline'] }, db)
+    await catalog.init()
+    catalog.stop()
+    expect(catalog.list().map((r) => r.id)).toEqual(bundled.games.map((g) => g.id))
+    db.close()
+  })
+
   it('reads older caches without vocabulary and preserves label-only tags', async () => {
     const { cfg, db } = setup()
     db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'old', title: 'Old', tags: ['romance'], releases: [] }] })
-    const catalog = new Catalog(cfg, db)
+    const catalog = catalogOf(cfg, db)
     await catalog.init()
     expect(catalog.vocabulary).toEqual({})
     expect(catalog.recipe('old')?.tags).toEqual(['romance'])
@@ -228,22 +222,6 @@ describe('catalog', () => {
     expect(catalog.update(recipe, 'Ch4Up7Public', 'Example-Ch4Up7Public-pc.zip')?.version).toBe('0.9.24')
     expect(installedRelease(recipe, '0.9.23', 'unknown.zip')?.version).toBe('0.9.23')
     expect(installedRelease(recipe, 'v0.20_Pre-Alpha', 'unknown.zip')).toBeNull()
-    db.close()
-  })
-
-  it('upgrades v3 in place and reopens v5 without changing favourites', () => {
-    const root = mkdtempSync(join(tmpdir(), 'renplay-db-v3-'))
-    let db = Db.open(root)
-    db.raw.exec('ALTER TABLE games DROP COLUMN adult; ALTER TABLE games DROP COLUMN finished_at; ALTER TABLE games DROP COLUMN play_time; ALTER TABLE games DROP COLUMN favorite_at; PRAGMA user_version = 3')
-    db.insertGame({ id: 'kept', title: 'Kept', source: '{"archive":"game.zip"}' })
-    db.close()
-    db = Db.open(root)
-    expect(db.getGame('kept')).toMatchObject({ title: 'Kept', favorite_at: '', source: '{"archive":"game.zip"}' })
-    expect(db.raw.prepare('PRAGMA user_version').get()).toMatchObject({ user_version: 18 })
-    db.updateGame('kept', { favorite_at: '2026-11-04T12:00:00.000Z' })
-    db.close()
-    db = Db.open(root)
-    expect(db.getGame('kept')?.favorite_at).toBe('2026-11-04T12:00:00.000Z')
     db.close()
   })
 

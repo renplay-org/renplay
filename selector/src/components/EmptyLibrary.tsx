@@ -2,12 +2,12 @@ import { useAuth } from '../lib/auth'
 import { useState } from 'react'
 import DocsLink from './DocsLink'
 import { Link } from 'react-router-dom'
-import type { Recipe } from '../lib/api'
+import type { CatalogGame } from '@shared/api'
 import { useContent, useSetInstallationLevel, useSystem } from '../lib/queries'
-import type { AdultLevel } from '../lib/adult'
+import type { AdultLevel } from '@shared/levels'
 import { Frame } from '../lantern/art'
 import { Pill, TagPill } from '../lantern/controls'
-import { Button, errorText, useToast } from './ui'
+import { errorText, useToast } from '../lantern/ui'
 
 /** A fresh install asks once which games it shows. Until then it uses the default, Shown. */
 function ContentChoice() {
@@ -49,7 +49,7 @@ function ContentChoice() {
   )
 }
 
-export default function EmptyLibrary({ recipes }: { recipes: Recipe[] }) {
+export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
   const { data: system } = useSystem()
   const { data: content } = useContent()
   const starter = recipes.find((game) => game.free === true && !game.nsfw && game.engine === 'renpy' && ['verified', 'playable'].includes(game.releases[0]?.status ?? ''))

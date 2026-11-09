@@ -23,8 +23,8 @@ Each person chooses their level on their **Account** page, under **Adult games**
 one line says who sets that limit:
 
 - **The installation.** An admin sets **Highest level for everyone** in **Settings**, or fixes it
-  with `RENPLAY_ADULT_GAMES=off|blurred|shown`. A new install asks once, in the empty library. The
-  3.x values still work: `allow` means Shown and `block` means Off.
+  with `RENPLAY_ADULT_GAMES=off|blurred|shown`. A new install asks once, in the empty library.
+  `allow` (Shown) and `block` (Off) work too.
 - **An admin, for one person.** **Settings → Users** sets the highest level each person can have.
   New people start at `RENPLAY_ADULT_DEFAULT` (Off unless you set it). The first admin starts at
   Shown.
@@ -63,19 +63,6 @@ take that long to reach them.
 
 A game Renplay cannot match to the catalog counts as adult for a person whose own levels are at
 Off, until an admin marks it safe.
-
-## Upgrading from 3.x
-
-Renplay 4.0 turns the 3.x settings into levels:
-
-- The install switch: allow becomes Shown, block becomes Off.
-- A person with adult access gets Shown as their account's level, a person without gets Off.
-- Their own level follows their 3.x picture preference: Show becomes Shown, Hide adult games
-  becomes Off, and Hide pictures, the 3.x default, becomes Blurred.
-- A browser that hid pictures keeps doing so, as this browser's level.
-
-The 3.x settings are kept in step, so going back to 3.2 shows the same games. Blurred has no 3.2
-equivalent and reads as hidden pictures there.
 
 ## In these docs
 

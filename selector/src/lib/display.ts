@@ -1,4 +1,5 @@
-export type FitMode = 'fit' | 'fill'
+import { isAppleTouch, isMacComputer, isStandalone } from './platform'
+type FitMode = 'fit' | 'fill'
 
 export interface DisplayPrefs {
   fit: FitMode
@@ -27,9 +28,7 @@ export function savePrefs(p: DisplayPrefs) {
  * pixels, or 0 when this does not look like such a display.
  */
 export function notchHeight(): number {
-  const ua = navigator.userAgent
-  const isMac = /Macintosh|Mac OS X/.test(ua) && navigator.maxTouchPoints <= 1
-  if (!isMac || window.devicePixelRatio < 2) return 0
+  if (!isMacComputer() || window.devicePixelRatio < 2) return 0
   const w = screen.width
   const h = screen.height
   const aspect = w / h
@@ -64,24 +63,6 @@ export function safeInsets(): Insets {
   return out
 }
 
-/** Phones and tablets: no hover, coarse pointer. */
-export function isTouchDevice(): boolean {
-  return matchMedia('(hover: none) and (pointer: coarse)').matches
-}
-
-export function isIOS(): boolean {
-  return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-}
-
-/** Opened from the home screen (no browser bars). */
-export function isStandalone(): boolean {
-  return (
-    matchMedia('(display-mode: standalone)').matches ||
-    matchMedia('(display-mode: fullscreen)').matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  )
-}
-
 /**
  * How this device gets a game to fill the screen: the Fullscreen API
  * (desktops, Android, iPad), adding Renplay to the home screen (iPhone, where
@@ -91,7 +72,7 @@ export function isStandalone(): boolean {
 export function fullscreenMode(): 'api' | 'home-screen' | 'none' {
   if (document.fullscreenEnabled) return 'api'
   if (isStandalone()) return 'none'
-  return isIOS() ? 'home-screen' : 'none'
+  return isAppleTouch() ? 'home-screen' : 'none'
 }
 
 /**

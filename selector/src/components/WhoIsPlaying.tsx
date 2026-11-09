@@ -4,7 +4,8 @@ import { Pill } from '../lantern/controls'
 import Sheet from '../lantern/Sheet'
 import { api, post } from '../lib/api'
 import Avatar from './Avatar'
-import { errorText } from './ui'
+import { errorText } from '../lantern/ui'
+import type { SwitchPeople } from '@shared/api'
 
 /*
  * Who is playing? On a device that is already signed in, switch to another person who has signed in
@@ -16,7 +17,7 @@ export default function WhoIsPlaying({ open, onClose }: { open: boolean; onClose
   const people = useQuery({
     queryKey: ['switch'],
     enabled: open,
-    queryFn: () => api<{ people: Array<{ id: number; name: string; avatar: string }> }>('/api/auth/switch').then((r) => r.people),
+    queryFn: () => api<SwitchPeople>('/api/auth/switch').then((r) => r.people),
   })
   const [chosen, setChosen] = useState<{ id: number; name: string } | null>(null)
   const [pin, setPin] = useState('')

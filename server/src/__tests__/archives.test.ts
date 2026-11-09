@@ -2,10 +2,10 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeF
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { archiveIdentity } from '../archive-origin.js'
+import { archiveIdentity } from '../library/archives.js'
 import { downloadsDirectory, loadConfig } from '../config.js'
 import { Db } from '../db.js'
-import type { JobContext } from '../jobs.js'
+import type { JobContext } from '../jobs/manager.js'
 import { deleteSource, type ImportDeps, type ImportParams } from '../pipeline/import.js'
 
 describe('archives after install', () => {

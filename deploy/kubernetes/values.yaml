@@ -1,7 +1,7 @@
 # Values for the Renplay chart: its own disk for data, games on NFS, and an ingress with HTTPS.
 # https://docs.renplay.org/install/kubernetes/
 #
-#   helm install renplay oci://ghcr.io/renplay-org/charts/renplay --version 4.5.1 \
+#   helm install renplay oci://ghcr.io/renplay-org/charts/renplay --version 4.6.0 \
 #     --namespace renplay --create-namespace -f values.yaml
 #
 # Every value: https://github.com/renplay-org/renplay/tree/dev/charts/renplay
@@ -16,6 +16,12 @@ persistence:
 ingress:
   enabled: true
   className: nginx
+  # ingress-nginx takes 1 MB bodies and 60 s reads by default. Renplay takes mods, walkthroughs and
+  # zips of saves of up to 600 MB in one request, and games stream for minutes.
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 600m
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
   hosts:
     - host: renplay.example.com
       paths:

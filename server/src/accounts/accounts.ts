@@ -1,0 +1,596 @@
+import { createHmac, randomBytes } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import express, { Router, type Request, type Response } from 'express'
+import type { Config } from '../config.js'
+import { type ContentMode } from '../content/mode.js'
+import { isTagIdList } from '../shared/defaults.js'
+import { lowestLevel, parseAdultLevel, type AdultLevel } from '../shared/levels.js'
+import type { Db, GameRow } from '../db.js'
+import { parseJson } from '../db.js'
+import { OWNER_ID, viewer, viewers, type User, type Viewer } from './context.js'
+import type { SaveStores } from '../saves/stores.js'
+import { HttpError } from '../util/paths.js'
+import { SignInProviders, type ExternalIdentity } from './sign-in.js'
+import { AVATAR_LIMIT, fetchAvatar, storeAvatar } from './avatars.js'
+import { always, log } from '../util/log.js'
+import { readDefaults } from '../defaults/defaults.js'
+import { PASSWORD_PREFIX, equal, hash, passwordHash, passwordMatches, random, secretHash } from './passwords.js'
+import { parseGamePath } from '../play/path.js'
+import { demoCheck, playerRoute } from './access.js'
+import { publicUser, validName, validUsername } from './users.js'
+import type { AdultState, Identities, Me, Providers, Session, Sessions, SwitchPeople, TagPrefs, Token, TokenCreated, Tokens } from '../shared/api.js'
+
+const DAYS30 = 30 * 86400_000
+
+export class Accounts {
+  readonly enabled: boolean
+  readonly providers: SignInProviders
+  private readonly oidcFlows = new Map<string, { nonce: string; verifier: string; expires: number; session?: string; user?: number; bearer?: boolean }>()
+  private setupCode = randomBytes(9).toString('hex').toUpperCase()
+  private attempts = 10
+  private setupGrant = ''
+  private readonly signingKey = random()
+  private readonly limits = new Map<string, { count: number; until: number }>()
+  private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
+  private dummyPassword = ''
+  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly saveStores: SaveStores) {
+    // A demo needs its guest, so sign-in is always on there.
+    this.enabled = cfg.demo || (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
+    this.providers = new SignInProviders(cfg)
+  }
+  get unclaimed(): boolean { return !this.db.raw.prepare('SELECT 1 FROM identities WHERE user_id = ?').get(OWNER_ID) && !this.db.raw.prepare("SELECT 1 FROM settings WHERE key = 'owner_claim'").get() }
+  user(id: number): User {
+    const u = this.db.raw.prepare('SELECT * FROM users WHERE id = ?').get(id) as unknown as User | undefined
+    if (!u) throw new HttpError(404, 'User not found')
+    return u
+  }
+  current(): User {
+    const user = viewer()?.user
+    if (!user) throw new HttpError(401, 'Sign in to Renplay')
+    return user
+  }
+  async tag(u: User): Promise<void> {
+    const root = this.saveStores.folder(u.id)
+    await mkdir(root, { recursive: true })
+    await writeFile(join(root, 'user.json'), JSON.stringify({ id: u.id, name: u.name, created: u.created_at }) + '\n')
+  }
+  async init(): Promise<void> {
+    // A process interrupted during copying keeps all saves and can retry after restart.
+    this.db.raw.prepare("DELETE FROM settings WHERE key = 'owner_claim'").run()
+    this.dummyPassword = await passwordHash(random())
+    await this.providers.init()
+    if (this.enabled && !this.cfg.authLocal && !this.cfg.oidcIssuer && !this.cfg.ldapUrl) throw new Error('No sign-in provider is enabled. Enable RENPLAY_AUTH_LOCAL or configure OIDC or LDAP.')
+    if (this.enabled && !this.cfg.authLocal && !this.cfg.admins.length && !this.cfg.oidcAdminGroup && !this.cfg.ldapAdminFilter) throw new Error('SSO-only sign-in needs RENPLAY_ADMINS or an admin group or filter.')
+    if (!!this.cfg.adminUsername !== !!this.cfg.adminPassword) throw new Error('Set both RENPLAY_ADMIN_USERNAME and RENPLAY_ADMIN_PASSWORD (or its _FILE variant)')
+    if (this.unclaimed && this.cfg.adminUsername) await this.claim(this.cfg.adminUsername, this.cfg.adminUsername, this.cfg.adminPassword)
+    if (this.enabled && this.cfg.authLocal && this.unclaimed) always('sign-in', `Setup code: ${this.setupCode}`)
+    if (!this.enabled && this.user(this.cfg.authUser).disabled) throw new Error('RENPLAY_AUTH_USER is disabled')
+    if (this.cfg.demo) this.ensureGuest()
+    for (const u of this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]) await this.tag(u)
+  }
+  /**
+   * The demo's guest: a player everyone signs in as with Try the demo. It has no password, and its
+   * level for adult games is Blurred, so the catalog shows adult games without a picture of them.
+   */
+  private ensureGuest(): void {
+    if (this.demoGuest()) return
+    const id = Number(this.db.raw.prepare("INSERT INTO users (username, name, role, created_at) VALUES ('demo', 'Guest', 'player', ?)").run(new Date().toISOString()).lastInsertRowid)
+    this.writeLevels(id, { ceiling: 'blurred', choice: 'blurred' })
+  }
+  demoGuest(): number | null {
+    if (!this.cfg.demo) return null
+    const row = this.db.raw.prepare("SELECT id FROM users WHERE username = 'demo'").get() as { id: number } | undefined
+    return row?.id ?? null
+  }
+  /** Writes a person's ceiling and choice. */
+  writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
+    const u = this.user(id)
+    const ceiling = patch.ceiling ?? this.content.ceilingOf(u)
+    const choice = patch.choice ?? this.content.choiceOf(u)
+    this.db.raw.prepare('UPDATE users SET adult_ceiling = ?, adult_choice = ? WHERE id = ?').run(ceiling, choice, id)
+  }
+  /** Forgets the cached sessions, after a change to people or their sessions. */
+  invalidate(): void { this.sessionCache.clear() }
+  private async claim(raw: unknown, display: unknown, password: unknown): Promise<void> {
+    const login = validUsername(raw), displayName = validName(display), encoded = await passwordHash(password)
+    if (!this.unclaimed) throw new HttpError(409, 'The owner account is already claimed')
+    if (this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != ?').get(login, OWNER_ID)) throw new HttpError(409, 'That username is taken')
+    this.db.raw.exec('BEGIN IMMEDIATE')
+    try {
+      this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = ?').run(login, displayName, OWNER_ID)
+      this.writeLevels(OWNER_ID, { ceiling: 'shown', choice: 'shown' })
+      this.db.raw.prepare("INSERT INTO identities VALUES ('local', ?, ?, ?)").run(login, OWNER_ID, encoded)
+      this.db.raw.exec('COMMIT')
+    } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
+    await this.tag(this.user(OWNER_ID))
+    this.ownerClaimed()
+  }
+  /** The owner account has its sign-in: the setup code is no use any more. */
+  ownerClaimed(): void {
+    this.setupGrant = ''; this.setupCode = ''
+  }
+  private limit(key: string): void {
+    const now = Date.now()
+    for (const [k, value] of this.limits) if (value.until <= now) this.limits.delete(k)
+    const bucket = this.limits.get(key) ?? { count: 0, until: now + 60_000 }
+    if (++bucket.count > 10) throw new HttpError(429, 'Too many tries. Wait a minute.')
+    this.limits.set(key, bucket)
+  }
+  private secure(req: Request): boolean { return req.secure || this.cfg.publicUrl.startsWith('https://') }
+  private cookie(req: Request, res: Response, value: string): void {
+    res.cookie('renplay_session', value, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/', maxAge: value ? DAYS30 : 0 })
+  }
+  private newSession(req: Request, res: Response, id: number): void {
+    log('sign-in', `Signed in: ${this.user(id).username}`)
+    const token = random(), now = Date.now()
+    this.db.raw.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?)').run(hash(token), id, now, now, now + DAYS30, (req.get('user-agent') ?? '').slice(0, 200))
+    this.cookie(req, res, token)
+    this.db.raw.prepare('INSERT OR REPLACE INTO device_people VALUES (?, ?, ?)').run(this.device(req, res), id, now)
+  }
+  /**
+   * This browser, for Who is playing: a cookie of its own that outlives sign-out, stored hashed.
+   * Given a response, a browser without one gets one. Without, it is '' then.
+   */
+  private device(req: Request, res?: Response): string {
+    let token = req.get('cookie')?.match(/(?:^|;\s*)renplay_device=([A-Za-z0-9_-]{40,64})(?:;|$)/)?.[1]
+    if (!token) {
+      if (!res) return ''
+      token = random()
+      res.cookie('renplay_device', token, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/', maxAge: 400 * 86400_000 })
+    }
+    return hash(token)
+  }
+  private session(key: string): Viewer | null {
+    const now = Date.now()
+    let cached = this.sessionCache.get(key)
+    if (!cached || now - cached.checked > 5000) {
+      const s = this.db.raw.prepare('SELECT * FROM sessions WHERE hash = ?').get(key) as { user_id: number; expires_at: number; touched_at: number } | undefined
+      if (!s || s.expires_at <= now) { this.sessionCache.delete(key); return null }
+      cached = { id: s.user_id, expires: s.expires_at, touched: s.touched_at, checked: now }
+      if (this.sessionCache.size > 10000) this.sessionCache.clear()
+      this.sessionCache.set(key, cached)
+    }
+    if (cached.expires <= now) return null
+    const u = this.user(cached.id)
+    if (u.disabled) return null
+    if (now - cached.touched >= 300_000) {
+      this.db.raw.prepare('UPDATE sessions SET touched_at = ?, expires_at = ? WHERE hash = ?').run(now, now + DAYS30, key)
+      cached.touched = now; cached.expires = now + DAYS30
+    }
+    return { user: u, session: key, bearer: false }
+  }
+  requireLiveLink(user: number, session: string, bearer = false): void {
+    const row = bearer
+      ? this.db.raw.prepare('SELECT user_id FROM tokens WHERE hash = ?').get(session)
+      : this.db.raw.prepare('SELECT user_id FROM sessions WHERE hash = ? AND expires_at > ?').get(session, Date.now())
+    const liveUser = this.db.raw.prepare('SELECT disabled FROM users WHERE id = ?').get(user)
+    if (!this.enabled || !row || row.user_id !== user || !liveUser || liveUser.disabled) throw new HttpError(401, 'Sign in to the same account before linking')
+  }
+  private authenticate(req: Request, res: Response): Viewer | null {
+    if (!this.enabled) return { user: this.user(this.cfg.authUser), session: `off-${this.cfg.authUser}`, bearer: false }
+    const bearer = req.get('authorization')?.match(/^Bearer (.+)$/i)?.[1]
+    if (bearer) {
+      const row = this.db.raw.prepare('SELECT user_id FROM tokens WHERE hash = ?').get(hash(bearer)) as { user_id: number } | undefined
+      if (!row) return null
+      const u = this.user(row.user_id)
+      return u.disabled ? null : { user: u, session: hash(bearer), bearer: true }
+    }
+    const token = req.get('cookie')?.match(/(?:^|;\s*)renplay_session=([^;]+)/)?.[1]
+    if (!token) return null
+    const found = this.session(hash(token))
+    if (found) this.cookie(req, res, token)
+    return found
+  }
+  /** Cookie authentication does not constrain body type: raw, multipart and empty deletes work. */
+  csrf(req: Request): void {
+    if (!this.enabled || ['GET', 'HEAD', 'OPTIONS'].includes(req.method) || viewer()?.bearer) return
+    const site = req.get('sec-fetch-site')
+    if (site === 'same-origin' || site === 'none') return
+    const origin = req.get('origin')
+    if (site !== 'cross-site' && origin && [this.cfg.publicUrl && new URL(this.cfg.publicUrl).origin, `${req.protocol}://${req.get('host')}`].includes(origin)) return
+    throw new HttpError(403, 'This request must come from this Renplay')
+  }
+  readonly middleware: express.RequestHandler = (req, res, next) => {
+    if (req.path === '/api/health' || req.path === '/api/keepalive' || req.path.startsWith('/engine/') || req.path === '/renplay/runtime.js') return next()
+    if (!req.path.startsWith('/api/') && !req.path.startsWith('/g/')) return next()
+    res.setHeader('Cache-Control', 'private, no-store')
+    // Sandboxed HTML assets have no cookies. Their capability resolves to a live session.
+    const signed = parseGamePath(req.path)
+    let v: Viewer | null
+    if (signed?.token) {
+      v = this.verifyAsset(signed.token, signed.game, signed.build)
+      res.locals.verifiedAsset = !!v
+      req.url = req.url.replace(`/s/${signed.token}/game/`, '/game/')
+    } else v = this.authenticate(req, res)
+    if (req.path.startsWith('/api/auth/') && req.path !== '/api/auth/check') {
+      const proceed = () => { try { this.csrf(req); next() } catch (e) { next(e) } }
+      return v ? viewers.run(v, proceed) : proceed()
+    }
+    if (!v) return next(new HttpError(401, 'Sign in to Renplay'))
+    // This device's level: a header on API calls, a query on the game page. It can only narrow.
+    const device = parseAdultLevel(req.get('x-renplay-adult')) ?? parseAdultLevel(typeof req.query['adult'] === 'string' ? req.query['adult'] : undefined)
+    if (device === 'off' || device === 'blurred') v = { ...v, device }
+    viewers.run(v, () => {
+      try {
+        this.csrf(req)
+        const runtimeUser = req.get('x-renplay-user')
+        if (runtimeUser !== undefined && runtimeUser !== String(v.user.id)) throw new HttpError(401, 'You were signed out')
+        if (req.path !== '/api/auth/check' && v.user.role !== 'admin' && !playerRoute(req.method, req.path)) throw new HttpError(403, 'Only an admin can do this')
+        if (this.cfg.demo && v.user.id === this.demoGuest()) demoCheck(req)
+        next()
+      } catch (e) { next(e) }
+    })
+  }
+  assetUrl(game: GameRow): string {
+    const v = viewer()
+    if (!v) throw new HttpError(401, 'Sign in to Renplay')
+    const signature = createHmac('sha256', this.signingKey).update(`${v.session}\n${game.id}\n${game.build}`).digest('base64url')
+    return `/g/${game.id}/${game.build}/s/${v.session}.${signature}/game/${game.entry.split('/').map(encodeURIComponent).join('/')}`
+  }
+  private verifyAsset(token: string, game: string, build: string): Viewer | null {
+    const [session, signature] = token.split('.')
+    if (!session || !signature) return null
+    const expected = createHmac('sha256', this.signingKey).update(`${session}\n${game}\n${build}`).digest('base64url')
+    if (!equal(expected, signature)) return null
+    if (!this.enabled) return session === `off-${this.cfg.authUser}` ? { user: this.user(this.cfg.authUser), session, bearer: false } : null
+    const tokenUser = this.db.raw.prepare('SELECT user_id FROM tokens WHERE hash = ?').get(session) as { user_id: number } | undefined
+    if (tokenUser) { const user = this.user(tokenUser.user_id); return user.disabled ? null : { user, session, bearer: true } }
+    return this.session(session)
+  }
+  guardLastAdmin(target: User, patch: { role?: string; disabled?: boolean }, removing = false): void {
+    if (target.role !== 'admin' || target.disabled || (!removing && patch.role !== 'player' && patch.disabled !== true)) return
+    if (this.enabledAdmins() <= 1) throw new HttpError(409, 'Keep at least one enabled admin')
+  }
+  /** How many admins can sign in. */
+  enabledAdmins(): number {
+    return (this.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin' AND disabled = 0").get() as { n: number }).n
+  }
+  /** Whether an account must stay: the owner, and the one that runs Renplay with sign-in off. */
+  isProtected(id: number): boolean {
+    return id === OWNER_ID || id === this.cfg.authUser
+  }
+  /** Sets a person's PIN, or clears it with an empty one, and forgets their wrong tries. */
+  private setPin(id: number, hash: string): void {
+    this.db.raw.prepare('UPDATE users SET pin_hash = ?, pin_failures = 0, pin_locked_until = 0 WHERE id = ?').run(hash, id)
+  }
+  /**
+   * Signs a person out everywhere but `except`. Their PIN goes too, and other browsers forget them,
+   * so whoever held a session or a token cannot come back with a PIN they set.
+   */
+  revoke(id: number, except = '', keepDevice = ''): void {
+    this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash != ?').run(id, except)
+    this.setPin(id, '')
+    this.db.raw.prepare('DELETE FROM device_people WHERE user_id = ? AND device != ?').run(id, keepDevice)
+    this.invalidate()
+  }
+  /** Whether a sign-in provider sets this person's role or adult ceiling. */
+  managed(id: number) {
+    const identities = this.db.raw.prepare('SELECT provider FROM identities WHERE user_id = ?').all(id)
+    const oidc = identities.some(i => i.provider === this.providers.oidcProvider), ldap = identities.some(i => i.provider === this.providers.ldapProvider)
+    const u = this.user(id)
+    return { roleManaged: !(u.role === 'admin' && u.admin_source === 'manual') && !!(oidc && this.cfg.oidcAdminGroup || ldap && this.cfg.ldapAdminFilter), adultManaged: !!(oidc && this.cfg.oidcAdultGroups || ldap && (this.cfg.ldapAdultGroups || this.cfg.ldapAdultFilter)) }
+  }
+  private methodAvailable(id: number, provider: string, subject: string, removingLocal = ''): boolean {
+    if (provider === 'local') return this.cfg.authLocal
+    if (provider === this.providers.oidcProvider) return !!this.cfg.oidcIssuer
+    if (provider !== this.providers.ldapProvider || !this.cfg.ldapUrl) return false
+    const metadata = this.db.raw.prepare('SELECT username FROM identity_metadata WHERE provider = ? AND subject = ?').get(provider, subject)
+    if (!metadata) return false
+    const login = String(metadata.username).toLowerCase().slice(0, 64)
+    const local = this.db.raw.prepare("SELECT user_id FROM identities WHERE provider = 'local' AND subject = ?").get(login)
+    return login === removingLocal || !local || !this.cfg.authLocal && local.user_id === id
+  }
+  private async external(identity: ExternalIdentity, linking?: { user: number; session: string; bearer?: boolean }): Promise<number> {
+    const existing = this.db.raw.prepare('SELECT user_id FROM identities WHERE provider = ? AND subject = ?').get(identity.provider, identity.subject) as { user_id: number } | undefined
+    if (linking && existing && existing.user_id !== linking.user) throw new HttpError(409, 'That sign-in belongs to another account. Accounts are never merged automatically.')
+    if (existing && this.user(existing.user_id).disabled) throw new HttpError(403, 'This account is disabled')
+    if (!existing && !linking && identity.provider === this.providers.oidcProvider && !this.cfg.oidcAutoCreate) throw new HttpError(403, 'Ask an admin to link this sign-in to an account first')
+    let id = linking?.user ?? existing?.user_id
+    const newOwner = id === undefined && identity.admin && this.unclaimed
+    this.db.raw.exec('BEGIN IMMEDIATE')
+    try {
+      if (newOwner) {
+        id = OWNER_ID
+        const ownerLogin = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ? AND id != ?').get(identity.username, OWNER_ID) ? `sso-${random().slice(0, 12)}` : identity.username.slice(0, 64)
+        this.db.raw.prepare('UPDATE users SET username = ?, name = ? WHERE id = ?').run(ownerLogin, identity.name.slice(0, 100), OWNER_ID)
+        this.writeLevels(OWNER_ID, { ceiling: 'shown', choice: 'shown' })
+      } else if (id === undefined) {
+        // Display names and emails are never used to match or merge accounts.
+        const login = identity.username.toLowerCase().replace(/[^a-z0-9._-]/g, '-').slice(0, 48) || 'player'
+        const unique = this.db.raw.prepare('SELECT 1 FROM users WHERE username = ?').get(login) ? `${login}-${random().slice(0, 8)}` : login
+        id = Number(this.db.raw.prepare('INSERT INTO users (username, name, role, created_at) VALUES (?, ?, ?, ?)').run(unique, identity.name.slice(0, 100), identity.admin ? 'admin' : 'player', new Date().toISOString()).lastInsertRowid)
+        // The sign-in group's level, or the starting level for new people (the first admin starts at shown).
+        const ceiling = identity.ceiling ?? (identity.admin ? 'shown' : this.cfg.adultDefault)
+        this.writeLevels(id, { ceiling, choice: ceiling })
+      }
+      if (linking) this.requireLiveLink(linking.user, linking.session, linking.bearer)
+      if (!existing) this.db.raw.prepare('INSERT INTO identities (provider, subject, user_id) VALUES (?, ?, ?)').run(identity.provider, identity.subject, id!)
+      this.db.raw.prepare('INSERT INTO identity_metadata VALUES (?, ?, ?) ON CONFLICT(provider, subject) DO UPDATE SET username = excluded.username').run(identity.provider, identity.subject, identity.username)
+      const u = this.user(id!)
+      const manuallyAssigned = !newOwner && (linking !== undefined || existing !== undefined) && u.role === 'admin' && u.admin_source === 'manual'
+      const sameGrant = u.admin_provider === identity.provider && u.admin_subject === identity.subject
+      if (!manuallyAssigned && (identity.roleManaged || identity.admin || sameGrant)) {
+        if (u.role === 'admin' && !identity.admin && !u.disabled) {
+          if (this.enabledAdmins() <= 1) console.warn(`sign-in: Last enabled admin ${id!} lost the sign-in provider admin grant. Restore provider group membership or configure RENPLAY_ADMINS without an admin group or filter to recover access.`)
+        }
+        this.db.raw.prepare('UPDATE users SET role = ?, admin_source = ?, admin_provider = ?, admin_subject = ? WHERE id = ?').run(identity.admin ? 'admin' : 'player', identity.roleManaged ? 'provider' : 'allowlist', identity.provider, identity.subject, id!)
+      }
+      // A configured sign-in group replaces the hand setting and is recomputed at each sign-in.
+      if (identity.adultManaged) this.writeLevels(id!, { ceiling: identity.ceiling! })
+      if (u.disabled) throw new HttpError(403, 'This account is disabled')
+      this.db.raw.exec('COMMIT')
+    } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
+    if (identity.picture && !this.user(id!).avatar_uploaded) {
+      try {
+        const picture = typeof identity.picture === 'string' ? await fetchAvatar(identity.picture) : identity.picture
+        const avatar = await storeAvatar(this.cfg.dataDir, picture)
+        this.db.raw.prepare('UPDATE users SET avatar = ? WHERE id = ? AND avatar_uploaded = 0').run(avatar, id!)
+      } catch { /* An unavailable provider picture must not prevent sign-in. */ }
+    }
+    this.invalidate(); await this.tag(this.user(id!))
+    return id!
+  }
+  private beginOidc(req: Request, res: Response, linking = false): string {
+    if (!this.enabled || !this.cfg.oidcIssuer) throw new HttpError(403, 'Single sign-on is off')
+    this.limit(`oidc:${req.ip}`)
+    for (const [key, flow] of this.oidcFlows) if (flow.expires < Date.now()) this.oidcFlows.delete(key)
+    if (this.oidcFlows.size >= 10000) throw new HttpError(429, 'Too many sign-in attempts')
+    const state = random(), nonce = random(), verifier = random()
+    this.oidcFlows.set(hash(state), { nonce, verifier, expires: Date.now() + 600000, ...(linking ? { session: viewer()!.session, user: this.current().id, bearer: viewer()!.bearer } : {}) })
+    res.cookie('renplay_oidc', state, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/api/auth/oidc', maxAge: 600000 })
+    return this.providers.authorization(state, nonce, verifier)
+  }
+  router(): Router {
+    const r = Router({ caseSensitive: true, strict: true })
+    r.get('/auth/providers', (_req, res) => res.json({ enabled: this.enabled, setup: this.enabled && this.cfg.authLocal && this.unclaimed && !this.cfg.demo, local: this.cfg.authLocal || !!this.cfg.ldapUrl, oidc: this.cfg.oidcIssuer ? this.cfg.oidcName : null, ldap: !!this.cfg.ldapUrl, demo: this.cfg.demo } satisfies Providers))
+    // In a demo the guest is the only way in: no password, setup code, single sign-on or directory.
+    if (this.cfg.demo) {
+      r.use((req, _res, next) => next(/^\/auth\/(login|setup(\/verify)?|oidc\/(start|callback))$/.test(req.path) ? new HttpError(403, 'The demo signs you in with Try the demo') : undefined))
+    }
+    /** Try the demo: a session as the shared guest, no password. Only in a demo. */
+    r.post('/auth/demo', (req, res) => {
+      const guest = this.demoGuest()
+      if (!guest) throw new HttpError(404, 'This is not a demo')
+      this.limit(`ip:${req.ip}`)
+      this.newSession(req, res, guest)
+      res.json({ ok: true })
+    })
+    r.get('/auth/oidc/start', (req, res) => res.redirect(this.beginOidc(req, res)))
+    r.get('/auth/oidc/callback', async (req, res) => {
+      if (!this.enabled || !this.cfg.oidcIssuer) throw new HttpError(403, 'Single sign-on is off')
+      const state = typeof req.query.state === 'string' ? req.query.state : ''
+      const cookie = req.get('cookie')?.match(/(?:^|;\s*)renplay_oidc=([^;]+)/)?.[1]
+      const flow = this.oidcFlows.get(hash(state))
+      this.oidcFlows.delete(hash(state))
+      res.clearCookie('renplay_oidc', { path: '/api/auth/oidc' })
+      if (!state || cookie !== state || !flow || flow.expires < Date.now() || typeof req.query.code !== 'string') throw new HttpError(401, 'This sign-in request expired or does not match. Try again.')
+      if (flow.user && (viewer()?.session !== flow.session || this.current().id !== flow.user)) throw new HttpError(401, 'Sign in to the same account before linking')
+      let identity: ExternalIdentity
+      try { identity = await this.providers.oidc(req.query.code, flow.nonce, flow.verifier) } catch { throw new HttpError(401, 'Single sign-on failed. Try again.') }
+      const id = await this.external(identity, flow.user ? { user: flow.user, session: flow.session!, bearer: flow.bearer } : undefined)
+      if (!flow.user) this.newSession(req, res, id)
+      res.redirect(flow.user ? '/account' : '/')
+    })
+    r.post('/me/identities/oidc', (req, res) => res.json({ url: this.beginOidc(req, res, true) }))
+    r.post('/me/identities/ldap', async (req, res) => {
+      if (!this.cfg.ldapUrl) throw new HttpError(403, 'LDAP is off')
+      this.limit(`ip:${req.ip}`)
+      this.limit(`ldap:${String(req.body?.username).toLowerCase()}`)
+      const initiating = viewer()!
+      const identity = await this.providers.ldap(req.body?.username, req.body?.password)
+      await this.external(identity, { user: initiating.user.id, session: initiating.session, bearer: initiating.bearer })
+      res.json({ ok: true })
+    })
+    r.get('/me/identities', (_req, res) => {
+      const id = this.current().id, methods = this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(id) as Array<{ provider: string; subject: string }>
+      res.json({ identities: methods.map((i): Identities['identities'][number] => ({ ...i, name: i.provider === 'local' ? 'Password' : String(i.provider).startsWith('oidc:') ? this.cfg.oidcName : 'LDAP', available: this.methodAvailable(id, String(i.provider), String(i.subject)), removable: methods.some(other => (other.provider !== i.provider || other.subject !== i.subject) && this.methodAvailable(id, String(other.provider), String(other.subject), i.provider === 'local' ? String(i.subject) : '')) })) } satisfies Identities)
+    })
+    r.delete('/me/identities', (req, res) => {
+      const id = this.current().id, provider = req.body?.provider, subject = req.body?.subject
+      const methods = this.db.raw.prepare('SELECT provider, subject FROM identities WHERE user_id = ?').all(id)
+      if (typeof provider !== 'string' || typeof subject !== 'string' || !methods.some(i => i.provider === provider && i.subject === subject)) throw new HttpError(404, 'Linked sign-in not found')
+      const remaining = methods.filter(i => i.provider !== provider || i.subject !== subject).filter(i => this.methodAvailable(id, String(i.provider), String(i.subject), provider === 'local' ? subject : ''))
+      if (!remaining.length) throw new HttpError(409, 'Keep at least one enabled way to sign in')
+      const u = this.user(id)
+      const roleManaged = u.admin_source !== 'manual' && u.admin_provider === provider && u.admin_subject === subject
+      const adultManaged = provider === this.providers.oidcProvider && !!this.cfg.oidcAdultGroups || provider === this.providers.ldapProvider && !!(this.cfg.ldapAdultGroups || this.cfg.ldapAdultFilter)
+      if (roleManaged) { this.guardLastAdmin(u, { role: 'player' }); this.db.raw.prepare("UPDATE users SET role = 'player', admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(id) }
+      if (adultManaged) this.writeLevels(id, { ceiling: 'off' })
+      this.db.raw.prepare('DELETE FROM identities WHERE user_id = ? AND provider = ? AND subject = ?').run(id, provider, subject)
+      this.db.raw.prepare('DELETE FROM identity_metadata WHERE provider = ? AND subject = ?').run(provider, subject)
+      this.revoke(id, viewer()!.session, this.device(req)); res.json({ ok: true })
+    })
+    r.post('/me/avatar', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: AVATAR_LIMIT }), async (req, res) => {
+      if (!Buffer.isBuffer(req.body)) throw new HttpError(400, 'Upload a JPEG, PNG or WebP picture')
+      const avatar = await storeAvatar(this.cfg.dataDir, req.body)
+      this.db.raw.prepare('UPDATE users SET avatar = ?, avatar_uploaded = 1 WHERE id = ?').run(avatar, this.current().id)
+      res.json({ avatar })
+    })
+    r.get('/avatars/:file', (req, res) => {
+      if (!/^[a-f0-9]{64}\.webp$/.test(req.params.file)) throw new HttpError(404, 'Picture not found')
+      res.sendFile(join(this.cfg.dataDir, 'avatars', req.params.file))
+    })
+    r.post('/auth/setup/verify', (req, res) => {
+      if (!this.enabled || !this.cfg.authLocal || !this.unclaimed) throw new HttpError(409, 'Setup is complete')
+      if (this.attempts <= 0) throw new HttpError(429, 'Restart Renplay to get a new setup code')
+      this.attempts--
+      if (typeof req.body?.code !== 'string' || !equal(req.body.code, this.setupCode)) throw new HttpError(403, 'That setup code is wrong')
+      this.setupGrant ||= random()
+      res.json({ grant: this.setupGrant })
+    })
+    r.post('/auth/setup', async (req, res) => {
+      if (!this.enabled || !this.setupGrant || typeof req.body?.grant !== 'string' || !equal(this.setupGrant, req.body.grant)) throw new HttpError(403, 'Enter the setup code first')
+      await this.claim(req.body.username, req.body.name || req.body.username, req.body.password)
+      this.newSession(req, res, OWNER_ID)
+      res.json({ ok: true })
+    })
+    r.post('/auth/login', async (req, res) => {
+      if (!this.enabled || !this.cfg.authLocal && !this.cfg.ldapUrl) throw new HttpError(403, 'Password sign-in is off')
+      this.limit(`ip:${req.ip}`)
+      const login = typeof req.body?.username === 'string' ? req.body.username.toLowerCase().slice(0, 64) : ''
+      this.limit(`user:${login}`)
+      const row = this.db.raw.prepare("SELECT user_id, password FROM identities WHERE provider = 'local' AND subject = ?").get(login) as { user_id: number; password: string } | undefined
+      // With local sign-in off, a reserved name can use only its explicitly linked LDAP identity.
+      if ((!row || !this.cfg.authLocal) && this.cfg.ldapUrl) {
+        const identity = await this.providers.ldap(req.body?.username, req.body?.password)
+        if (row) {
+          const linked = this.db.raw.prepare('SELECT user_id FROM identities WHERE provider = ? AND subject = ?').get(identity.provider, identity.subject)
+          if (linked?.user_id !== row.user_id) throw new HttpError(401, 'The username or password is wrong')
+        }
+        const id = await this.external(identity)
+        this.newSession(req, res, id); res.json({ ok: true }); return
+      }
+      const valid = this.cfg.authLocal && await passwordMatches(req.body?.password, row?.password ?? this.dummyPassword)
+      if (!valid || !row || this.user(row.user_id).disabled) throw new HttpError(401, 'The username or password is wrong')
+      if (!row.password.startsWith(PASSWORD_PREFIX)) {
+        const upgraded = await passwordHash(req.body.password)
+        // A concurrent password reset must not be undone by this upgrade.
+        const result = this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND subject = ? AND password = ?").run(upgraded, login, row.password)
+        if (!result.changes) throw new HttpError(401, 'The username or password is wrong')
+      } else if (this.db.raw.prepare("SELECT password FROM identities WHERE provider = 'local' AND subject = ?").get(login)?.password !== row.password) {
+        throw new HttpError(401, 'The username or password is wrong')
+      }
+      if (this.user(row.user_id).disabled) throw new HttpError(401, 'The username or password is wrong')
+      this.newSession(req, res, row.user_id)
+      res.json({ ok: true })
+    })
+    // ---- PINs: switching to a person on a device that is already signed in ------------------
+
+    /** Sets (4 to 8 digits) or clears this person's PIN. Admins always use their full sign-in. */
+    r.put('/me/pin', async (req, res) => {
+      const u = this.current()
+      if (!this.enabled) throw new HttpError(409, 'Sign-in is off, so there is no one to switch between')
+      if (viewer()?.bearer) throw new HttpError(403, 'Set your PIN in the browser')
+      const pin = req.body?.pin
+      if (pin === '' || pin === null) {
+        this.setPin(u.id, '')
+        res.json({ hasPin: false })
+        return
+      }
+      if (u.role === 'admin') throw new HttpError(409, 'Admins switch in with their full sign-in, so an admin account has no PIN')
+      if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) throw new HttpError(400, 'A PIN has 4 to 8 digits')
+      const encoded = await secretHash(pin)
+      this.setPin(u.id, encoded)
+      res.json({ hasPin: true })
+    })
+
+    /** The people this browser may switch to: those who signed in on it before and have a PIN. */
+    r.get('/auth/switch', (req, res) => {
+      const me = this.current()
+      const device = this.enabled && !viewer()?.bearer ? this.device(req) : ''
+      const people = device
+        ? this.db.raw.prepare("SELECT u.id, u.name, u.avatar FROM device_people d JOIN users u ON u.id = d.user_id WHERE d.device = ? AND u.id != ? AND u.disabled = 0 AND u.role != 'admin' AND u.pin_hash != '' ORDER BY d.seen_at DESC LIMIT 20").all(device, me.id) as unknown as SwitchPeople['people']
+        : []
+      res.json({ people } satisfies SwitchPeople)
+    })
+
+    /**
+     * Switches this device to another person by their PIN, ending the current session. Five wrong
+     * PINs lock switching to that person for 15 minutes.
+     */
+    r.post('/auth/switch', async (req, res) => {
+      this.current()
+      if (!this.enabled) throw new HttpError(409, 'Sign-in is off, so there is no one to switch between')
+      if (viewer()?.bearer) throw new HttpError(403, 'Switch people in the browser')
+      this.limit(`ip:${req.ip}`)
+      const id = Number(req.body?.user), pin = String(req.body?.pin ?? ''), device = this.device(req)
+      const target = Number.isInteger(id) && device
+        ? (this.db.raw.prepare('SELECT u.* FROM users u JOIN device_people d ON d.user_id = u.id WHERE u.id = ? AND d.device = ?').get(id, device) as unknown as User | undefined)
+        : undefined
+      // Anyone who cannot be switched to here gets the same answer after the same wait, so it says
+      // nothing about who exists or has a PIN.
+      if (!target || target.disabled || target.role === 'admin' || !target.pin_hash) {
+        await passwordMatches(pin, this.dummyPassword)
+        throw new HttpError(403, 'That PIN is not right')
+      }
+      const now = Date.now()
+      if (target.pin_locked_until > now) throw new HttpError(429, `Too many wrong PINs. Try again in ${Math.ceil((target.pin_locked_until - now) / 60_000)} minutes.`)
+      // Each try counts before its PIN is checked (nothing runs in between), so tries sent at the
+      // same time cannot get past the limit. The right PIN clears the count.
+      const failures = target.pin_failures + 1, locked = failures >= 5
+      this.db.raw.prepare('UPDATE users SET pin_failures = ?, pin_locked_until = ? WHERE id = ?').run(locked ? 0 : failures, locked ? now + 15 * 60_000 : 0, target.id)
+      if (!(await passwordMatches(pin, target.pin_hash))) throw new HttpError(locked ? 429 : 403, locked ? 'Too many wrong PINs. Try again in 15 minutes.' : 'That PIN is not right')
+      this.db.raw.prepare('UPDATE users SET pin_failures = 0, pin_locked_until = 0 WHERE id = ?').run(target.id)
+      // The person who was here is signed out on this device: back again takes their PIN or sign-in.
+      if (viewer()?.session) this.db.raw.prepare('DELETE FROM sessions WHERE hash = ?').run(viewer()!.session)
+      this.invalidate()
+      this.newSession(req, res, target.id)
+      res.json({ ok: true, user: publicUser(this.user(target.id)) })
+    })
+
+    r.post('/auth/logout', (req, res) => {
+      if (viewer()?.session) this.db.raw.prepare('DELETE FROM sessions WHERE hash = ?').run(viewer()!.session)
+      this.invalidate(); this.cookie(req, res, '')
+      res.json({ ok: true })
+    })
+    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: this.cfg.demo && this.current().id === this.demoGuest(), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) } satisfies Me))
+    r.put('/me', async (req, res) => {
+      this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(validName(req.body?.name), this.current().id)
+      await this.tag(this.user(this.current().id)); res.json({ ok: true })
+    })
+    r.post('/me/password', async (req, res) => {
+      const u = this.current()
+      const identity = this.db.raw.prepare("SELECT password FROM identities WHERE provider = 'local' AND user_id = ?").get(u.id) as { password: string } | undefined
+      if (!identity || !await passwordMatches(req.body?.current, identity.password)) throw new HttpError(403, 'The current password is wrong')
+      const encoded = await passwordHash(req.body?.password)
+      this.db.raw.prepare("UPDATE identities SET password = ? WHERE provider = 'local' AND user_id = ?").run(encoded, u.id)
+      this.revoke(u.id, viewer()!.session, this.device(req)); res.json({ ok: true })
+    })
+    // Tag preferences: the tags this person includes and leaves out on the Catalog page, kept with
+    // their account so every device shows the same catalog.
+    r.get('/me/tags', (_req, res) => {
+      const tags = parseJson<{ tags?: { include?: string[]; exclude?: string[] } }>(this.current().prefs, {}).tags
+      // Until a person chooses, the admin's default for everyone.
+      if (!tags) {
+        const d = readDefaults(this.db)
+        res.json({ include: [], exclude: d.tagsExclude, source: d.tagsExclude.length ? 'admin' : 'default' } satisfies TagPrefs)
+        return
+      }
+      res.json({ include: tags.include ?? [], exclude: tags.exclude ?? [], source: 'you' } satisfies TagPrefs)
+    })
+    r.put('/me/tags', (req, res) => {
+      const list = (v: unknown): string[] => {
+        if (!isTagIdList(v)) throw new HttpError(400, 'Tags are lists of tag ids')
+        return [...new Set(v)]
+      }
+      const include = list(req.body?.include ?? [])
+      const exclude = list(req.body?.exclude ?? []).filter((t) => !include.includes(t))
+      const u = this.current()
+      const prefs = { ...parseJson<Record<string, unknown>>(u.prefs, {}), tags: { include, exclude } }
+      this.db.raw.prepare('UPDATE users SET prefs = ? WHERE id = ?').run(JSON.stringify(prefs), u.id)
+      res.json({ include, exclude, source: 'you' } satisfies TagPrefs)
+    })
+    r.get('/me/adult', (_req, res) => {
+      const u = this.current()
+      const ceiling = this.content.ceilingOf(u)
+      const choice = this.content.choiceOf(u)
+      res.json({
+        installation: { level: this.content.level, fixed: this.content.locked, chosen: this.content.chosen },
+        ceiling: { level: ceiling, managed: this.managed(u.id).adultManaged ? 'group' : null },
+        choice,
+        effective: lowestLevel(this.content.level, ceiling, choice),
+      } satisfies AdultState)
+    })
+    r.put('/me/adult', (req, res) => {
+      const level = parseAdultLevel(req.body?.level)
+      if (!level) throw new HttpError(400, 'Choose Off, Blurred or Shown')
+      const u = this.current()
+      const ceiling = this.content.ceilingOf(u)
+      if (lowestLevel(level, ceiling) !== level) throw new HttpError(409, `Your account allows at most ${ceiling}`)
+      this.writeLevels(u.id, { choice: level })
+      res.json({ ok: true, choice: level })
+    })
+    r.get('/me/sessions', (_req, res) => res.json({ sessions: (this.db.raw.prepare('SELECT hash AS id, created_at, touched_at, expires_at, label FROM sessions WHERE user_id = ? AND expires_at > ?').all(this.current().id, Date.now()) as unknown as Array<Omit<Session, 'current'>>).map((s) => ({ ...s, current: s.id === viewer()?.session })) } satisfies Sessions))
+    r.delete('/me/sessions', (req, res) => { this.revoke(this.current().id, viewer()!.session, this.device(req)); res.json({ ok: true }) })
+    r.delete('/me/sessions/:id', (req, res) => { this.db.raw.prepare('DELETE FROM sessions WHERE user_id = ? AND hash = ?').run(this.current().id, req.params.id); this.invalidate(); res.json({ ok: true }) })
+    r.get('/me/tokens', (_req, res) => res.json({ tokens: this.db.raw.prepare('SELECT id, name, created_at FROM tokens WHERE user_id = ?').all(this.current().id) as unknown as Token[] } satisfies Tokens))
+    r.post('/me/tokens', (req, res) => {
+      const token = random(), id = randomBytes(12).toString('hex')
+      this.db.raw.prepare('INSERT INTO tokens VALUES (?, ?, ?, ?, ?)').run(hash(token), id, this.current().id, validName(req.body?.name), Date.now())
+      res.json({ id, token } satisfies TokenCreated)
+    })
+    r.delete('/me/tokens/:id', (req, res) => { this.db.raw.prepare('DELETE FROM tokens WHERE user_id = ? AND id = ?').run(this.current().id, req.params.id); res.json({ ok: true }) })
+    return r
+  }
+}

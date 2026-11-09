@@ -1,40 +1,16 @@
 import type { Readable } from 'node:stream'
 import type { SourceEntry } from './archive.js'
 import { detectLayout, type Layout } from './project.js'
+import type { EngineInfo, Family } from '../shared/api.js'
 
 /**
  * Engine families. Ren'Py is what Renplay is for; the others are recognized so
  * a download says what it is, and some of them install (see INSTALLABLE).
  * docs.renplay.org/engines has the plan for each.
  */
-export type Family = 'renpy' | 'html' | 'godot' | 'unity' | 'rpgmaker-rgss' | 'wolf' | 'kirikiri' | 'unreal' | 'gamemaker' | 'flash'
 
 /** Families this version of Renplay can install. */
-export const INSTALLABLE = new Set<Family>(['renpy', 'html'])
-
-export interface EngineInfo {
-  family: Family
-  /** A finer kind within the family: twine-sugarcube, rpgmaker-mz, unity-webgl… */
-  kind?: string
-  /** The engine's version as the game names it: 2.36.1, 4.6.2, 6000.6.0f1… */
-  version?: string
-  /**
-   * What to show, led by the engine names players know from F95zone (Ren'Py, HTML, RPGM, Unity,
-   * Godot): "HTML (SugarCube 2.36.1)", "Godot 4.6.2"…
-   */
-  label: string
-  /** Folder in the archive the game lives in, '' or ending in '/'. */
-  root: string
-  /** The file it starts from, relative to root (a page, a .pck). */
-  entry?: string
-  /** Game title found in its files. */
-  title?: string
-  installable: boolean
-  /** Why it cannot be installed, for people. */
-  reason?: string
-  /** Things that may not work in a browser, for people. */
-  warnings: string[]
-}
+const INSTALLABLE = new Set<Family>(['renpy', 'html'])
 
 const NOT_YET = 'Renplay recognizes it, but cannot install it yet.'
 

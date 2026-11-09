@@ -8,7 +8,7 @@ import { pagePath, render } from '../../../docs/site/scripts/gen-config.mjs'
 describe('environment variables', () => {
   it('lists every variable config.ts and the container user switch read, once', () => {
     const source = readFileSync(new URL('../config.ts', import.meta.url), 'utf8')
-    const read = [...source.matchAll(/\b(?:env(?:Int|Bool)?|secret)\('([A-Z_]+)'/g), ...source.matchAll(/process\.env\['([A-Z_]+)'\]/g)].map(
+    const read = [...source.matchAll(/\b(?:text|int|bool|secret)\('([A-Z_]+)'/g), ...source.matchAll(/process\.env\['([A-Z_]+)'\]/g)].map(
       (m) => m[1],
     )
     const entrypoint = readFileSync(new URL('../../../image/entrypoint.sh', import.meta.url), 'utf8')
@@ -26,7 +26,6 @@ describe('environment variables', () => {
       expect(cfg.port).toBe(3000)
       expect(cfg.gamesDir).toBe('/games')
       expect(cfg.archivesDir).toBe('/games/_archives')
-      expect(cfg.savesDir).toBe('/data/saves')
       expect(cfg.keepDownloads).toBe(true)
       expect(cfg.keepDownloadsLocked).toBe(false)
       expect(cfg.imageQuality).toBe(88)

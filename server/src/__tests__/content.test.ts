@@ -6,10 +6,11 @@ import request from 'supertest'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
-import { ArtStore } from '../art.js'
-import { Catalog } from '../catalog.js'
+import { ArtStore } from '../art/store.js'
+import { Catalog, sfwIndexUrl } from '../catalog/catalog.js'
 import { loadConfig } from '../config.js'
-import { ContentMode, legacyInstallMirror, legacyMirror, lowestLevel, parseAdultLevel, sfwIndexUrl } from '../content.js'
+import { ContentMode } from '../content/mode.js'
+import { lowestLevel, parseAdultLevel } from '../shared/levels.js'
 import { Db } from '../db.js'
 
 const ENV = ['RENPLAY_ADULT_GAMES', 'RENPLAY_CATALOG_URLS', 'RENPLAY_ENGINES_URL', 'DATA_DIR', 'GAMES_DIR']
@@ -28,7 +29,7 @@ const TEMPLATE = `<!doctype html><html><head><title>Ren'Py Web Game</title><meta
 </body></html>`
 
 describe('the three levels', () => {
-  it('parses levels and the 3.x aliases, and orders them', () => {
+  it('parses levels and their allow and block spellings, and orders them', () => {
     expect(parseAdultLevel('off')).toBe('off')
     expect(parseAdultLevel(' Blurred ')).toBe('blurred')
     expect(parseAdultLevel('SHOWN')).toBe('shown')
@@ -42,17 +43,6 @@ describe('the three levels', () => {
     expect(lowestLevel('blurred', 'shown', 'off')).toBe('off')
   })
 
-  it('keeps the 3.2 columns a downgrade reads in step with the levels', () => {
-    expect(legacyMirror('shown', 'shown')).toEqual({ adultAccess: 1, adultPictures: 'show' })
-    expect(legacyMirror('shown', 'blurred')).toEqual({ adultAccess: 1, adultPictures: 'hide-pictures' })
-    expect(legacyMirror('blurred', 'shown')).toEqual({ adultAccess: 1, adultPictures: 'hide-pictures' })
-    expect(legacyMirror('off', 'shown')).toEqual({ adultAccess: 0, adultPictures: 'hide-games' })
-    expect(legacyMirror('shown', 'off')).toEqual({ adultAccess: 1, adultPictures: 'hide-games' })
-    expect(legacyInstallMirror('shown')).toBe('allow')
-    expect(legacyInstallMirror('blurred')).toBe('allow')
-    expect(legacyInstallMirror('off')).toBe('block')
-  })
-
   it('reads RENPLAY_ADULT_GAMES: a level fixes the installation, unset leaves it open at shown', () => {
     const open = tempConfig()
     const db = Db.open(open.cfg.dataDir)
@@ -61,11 +51,8 @@ describe('the three levels', () => {
     mode.set('blurred')
     expect(mode).toMatchObject({ locked: false, chosen: true, level: 'blurred' })
     expect(db.getSetting('adult_level', '')).toBe('blurred')
-    // The 3.x key is written too, so a downgrade to 3.2 keeps working (blurred reads as allow there).
-    expect(db.getSetting('adult_games', '')).toBe('allow')
     mode.set('off')
     expect(mode.level).toBe('off')
-    expect(db.getSetting('adult_games', '')).toBe('block')
     db.close()
 
     for (const [value, expected] of [['off', 'off'], ['blurred', 'blurred'], ['shown', 'shown'], ['allow', 'shown'], ['block', 'off'], ['SHOWN', 'shown'], ['nonsense', 'off']] as const) {
@@ -77,18 +64,22 @@ describe('the three levels', () => {
     delete process.env['RENPLAY_ADULT_GAMES']
   })
 
-  it('reads a 3.x installation setting and leaves a never-asked install unset', () => {
+  it('moves an installation level kept under the 3.x setting to the current one, and leaves a never-asked install unset', () => {
     const { cfg } = tempConfig()
     let db = Db.open(cfg.dataDir)
     expect(new ContentMode(cfg, db)).toMatchObject({ chosen: false, level: 'shown' })
-    db.setSetting('adult_games', 'allow')
-    expect(new ContentMode(cfg, db)).toMatchObject({ chosen: true, level: 'shown' })
-    db.setSetting('adult_games', 'block')
-    expect(new ContentMode(cfg, db)).toMatchObject({ chosen: true, level: 'off' })
-    // The 4.0 key wins once written; the 3.x key stays as the mirror.
-    db.setSetting('adult_level', 'blurred')
-    expect(new ContentMode(cfg, db)).toMatchObject({ chosen: true, level: 'blurred' })
     db.close()
+    for (const [old, level] of [['allow', 'shown'], ['block', 'off']] as const) {
+      db = Db.open(cfg.dataDir)
+      db.raw.exec("DELETE FROM settings WHERE key = 'adult_level'")
+      db.setSetting('adult_games', old)
+      db.raw.exec('PRAGMA user_version = 18')
+      db.close()
+      db = Db.open(cfg.dataDir)
+      expect(new ContentMode(cfg, db)).toMatchObject({ chosen: true, level })
+      expect(db.getSetting('adult_games', null)).toBeNull()
+      db.close()
+    }
   })
 
   it('derives the safe-for-work index from a catalog URL', () => {
@@ -138,9 +129,8 @@ describe('adult games in the catalog', () => {
     hasSfw = true
     const { cfg } = tempConfig({ RENPLAY_CATALOG_URLS: base, ...env })
     const db = Db.open(cfg.dataDir)
-    const content = new ContentMode(cfg, db)
-    const catalog = new Catalog(cfg, db, content)
-    catalog.art = new ArtStore(cfg, db, content)
+    const content: ContentMode = new ContentMode(cfg, db, () => catalog.adultSaveDirs())
+    const catalog = new Catalog(cfg, db, content, new ArtStore(cfg, db, content))
     // The originals the art cache downloaded, one file per picture.
     const originals = () => readdirSync(join(cfg.dataDir, 'art', 'src'), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name)
     return { cfg, db, content, catalog, originals }
@@ -277,8 +267,8 @@ describe('the levels in the API', () => {
     for (const id of ['adult', 'safe']) db.insertGame({ id, title: id, recipe_id: id, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: `${id}-1` })
     db.close()
     for (const id of ['adult', 'safe']) {
-      mkdirSync(join(t.cfg.savesDir, `${id}-1`), { recursive: true })
-      writeFileSync(join(t.cfg.savesDir, `${id}-1`, '1-1.save'), 'x')
+      mkdirSync(join(t.cfg.dataDir, 'users', '1', 'saves', `${id}-1`), { recursive: true })
+      writeFileSync(join(t.cfg.dataDir, 'users', '1', 'saves', `${id}-1`, '1-1.save'), 'x')
     }
     mkdirSync(join(t.cfg.archivesDir), { recursive: true })
     writeFileSync(join(t.cfg.archivesDir, 'adult.zip'), '1234')
@@ -311,7 +301,7 @@ describe('the levels in the API', () => {
     expect((await request(app.app).get('/api/saves/safe')).status).toBe(200)
     // Hidden, not deleted.
     expect(app.db.getGame('adult')).toMatchObject({ recipe_id: 'adult', adult: 1 })
-    expect(readdirSync(join(root, 'data', 'saves', 'adult-1'))).toEqual(['1-1.save'])
+    expect(readdirSync(join(root, 'data', 'users', '1', 'saves', 'adult-1'))).toEqual(['1-1.save'])
     const list = (await request(app.app).get('/api/catalog')).body.games as Array<{ id: string }>
     expect(list.map((g) => g.id)).toEqual(['safe'])
   })

@@ -4,14 +4,15 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it } from 'vitest'
 import yazl from 'yazl'
-import { readSaveMeta, readZipEntries, slotInfo } from '../saves/savefile.js'
+import { SAVES_ZIP,readSaveMeta, slotInfo } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
 import { SaveStore, fnv } from '../saves/store.js'
 import express from 'express'
 import request from 'supertest'
 import { loadConfig } from '../config.js'
-import { ContentMode } from '../content.js'
+import { ContentMode } from '../content/mode.js'
 import { Db } from '../db.js'
-import { createSavesRouter } from '../routes/saves.js'
+import { createSavesRouter } from '../saves/routes.js'
 
 function zip(entries: Record<string, Buffer | string>): Promise<Buffer> {
   return new Promise((resolve) => {
@@ -39,7 +40,7 @@ describe('SaveStore', () => {
     const db = Db.open(join(root, 'data'))
     db.insertGame({ id: 'g', title: 'G', status: 'installed', build: 'b1', save_dir: 'G-1' })
     const app = express()
-    app.use('/api/saves', createSavesRouter(store, db, new ContentMode(loadConfig(), db), undefined, { file: 100, total: 250, files: 3 }))
+    app.use('/api', createSavesRouter({ db, content: new ContentMode(loadConfig(), db), cfg: { syncServer: 'https://sync.renpy.org', saveLimits: { file: 100, total: 250, files: 3 } }, saves: store } as never))
     const put = (name: string, size: number) => request(app).put(`/api/saves/g/file?path=G-1/${name}`).set('content-type', 'application/octet-stream').send(Buffer.alloc(size, 1))
     await put('1-1-LT1.save', 101).expect(413)
     await put('1-1-LT1.save', 100).expect(200)
@@ -51,7 +52,7 @@ describe('SaveStore', () => {
     // And a number of files: many tiny ones fill it as well.
     const few = new SaveStore(join(root, 'few'), join(root, 'few-history'), 3)
     const small = express()
-    small.use('/api/saves', createSavesRouter(few, db, new ContentMode(loadConfig(), db), undefined, { file: 100, total: 10_000, files: 2 }))
+    small.use('/api', createSavesRouter({ db, content: new ContentMode(loadConfig(), db), cfg: { syncServer: 'https://sync.renpy.org', saveLimits: { file: 100, total: 10_000, files: 2 } }, saves: few } as never))
     const tiny = (name: string) => request(small).put(`/api/saves/g/file?path=G-1/${name}`).set('content-type', 'application/octet-stream').send(Buffer.from('x'))
     await tiny('1-1-LT1.save').expect(200)
     await tiny('1-2-LT1.save').expect(200)
@@ -77,7 +78,7 @@ describe('SaveStore', () => {
   })
 
   it('keeps every version of a pinned save', async () => {
-    store.pinned = (dir, rel) => dir === 'Game-1' && rel === 'pinned.save'
+    store = new SaveStore(join(root, 'saves'), join(root, 'history'), 3, (dir, rel) => dir === 'Game-1' && rel === 'pinned.save')
     for (let i = 0; i < 6; i++) {
       await store.write('Game-1', 'pinned.save', Buffer.from(`v${i}`))
       await store.write('Game-1', 'other.save', Buffer.from(`v${i}`))
@@ -140,10 +141,13 @@ describe('SaveStore', () => {
   it('keeps the only copy of something for 30 days, however many versions follow', async () => {
     await store.write('G', 'auto-1-LT1.save', Buffer.from('desktop'), { mtimeMs: Date.now() - 60_000, base: 0 })
     await store.write('G', 'auto-1-LT1.save', Buffer.from('phone'), { mtimeMs: Date.now() - 30_000, base: 0 })
+    // An admin's import over the save: what it replaced is the only copy too.
+    await store.write('G', 'auto-1-LT1.save', Buffer.from('imported'), { reason: 'user-import' })
     for (let i = 0; i < 10; i++) await store.write('G', 'auto-1-LT1.save', Buffer.from(`turn ${i}`))
     const reasons = (await store.history('G', 'auto-1-LT1.save')).map((v) => v.reason)
     expect(reasons.filter((r) => r === 'conflict')).toHaveLength(1)
-    expect(reasons.filter((r) => r === 'game' || r === 'overwrite')).toHaveLength(2)
+    expect(reasons.filter((r) => r === 'user-import')).toHaveLength(1)
+    expect(reasons.filter((r) => r === 'game' || r === 'overwrite')).toHaveLength(1)
   })
 
   it('never moves a save’s time into the future, and leaves a save another device changed when deleting', async () => {
@@ -219,7 +223,7 @@ describe('SaveStore', () => {
     const chunks: Buffer[] = []
     out.on('data', (c) => chunks.push(c))
     await store.exportZip(['G'], out, { includeTokens: true })
-    const entries = await readZipEntries(Buffer.concat(chunks), () => true)
+    const entries = await readZipEntries(Buffer.concat(chunks), () => true, SAVES_ZIP)
     expect([...entries.keys()].sort()).toEqual(['G/1-1-LT1.save', 'tokens/security_keys.txt'])
   })
 })

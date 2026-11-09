@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp, type App } from '../app.js'
 import sharp from 'sharp'
 import yazl from 'yazl'
-import { readZipEntries } from '../saves/savefile.js'
+import { SAVES_ZIP } from '../saves/savefile.js'
+import { readZipEntries } from '../util/zip.js'
 
 /** A minimal Ren'Py save holding a text, and the text back from one. */
 const renpySave = (text: string) =>
@@ -20,7 +21,7 @@ const renpySave = (text: string) =>
     z.outputStream.on('data', (c: Buffer) => chunks.push(c))
     z.outputStream.on('end', () => resolve(Buffer.concat(chunks)))
   })
-const saveText = async (data: Buffer) => JSON.parse((await readZipEntries(data, (n) => n === 'json')).get('json')!.toString())._save_name as string
+const saveText = async (data: Buffer) => JSON.parse((await readZipEntries(data, (n) => n === 'json', SAVES_ZIP)).get('json')!.toString())._save_name as string
 import { loadConfig } from '../config.js'
 import { Db } from '../db.js'
 
@@ -51,7 +52,7 @@ describe('status, rating, Not now and play history', () => {
 
   const game = async (id = 'story') => (await request(app.app).get(`/api/games/${id}`).expect(200)).body.game
 
-  it('keeps a status, with Finished in step with finished_at for Renplay 3.x', async () => {
+  it('keeps a status, and when it became Finished', async () => {
     expect(await game()).toMatchObject({ playStatus: null, rating: null, notNowAt: null, phone: 'great' })
     await request(app.app).put('/api/games/story/status').send({ status: 'stalled' }).expect(200)
     expect(await game()).toMatchObject({ playStatus: 'stalled', finishedAt: null })
@@ -59,11 +60,8 @@ describe('status, rating, Not now and play history', () => {
     const finished = await game()
     expect(finished.playStatus).toBe('finished')
     expect(finished.finishedAt).toMatch(/^\d{4}-/)
-    // The 3.x switch is the same thing.
-    await request(app.app).put('/api/games/story/finished').send({ on: false }).expect(200)
-    expect(await game()).toMatchObject({ playStatus: null, finishedAt: null })
-    await request(app.app).put('/api/games/story/finished').send({ on: true }).expect(200)
-    expect((await game()).playStatus).toBe('finished')
+    await request(app.app).put('/api/games/story/status').send({ status: 'playing' }).expect(200)
+    expect(await game()).toMatchObject({ playStatus: 'playing', finishedAt: null })
     await request(app.app).put('/api/games/story/status').send({ status: 'bored' }).expect(400)
     await request(app.app).put('/api/games/story/status').send({ status: '' }).expect(200)
   })
@@ -132,12 +130,6 @@ describe('status, rating, Not now and play history', () => {
     app.db.raw.prepare("DELETE FROM play_sessions WHERE game = 'third'").run()
   })
 
-  it('clears only Finished when a 3.x client marks a game not finished', async () => {
-    await request(app.app).put('/api/games/third/status').send({ status: 'dropped' }).expect(200)
-    await request(app.app).put('/api/games/third/finished').send({ on: false }).expect(200)
-    expect((await request(app.app).get('/api/games/third').expect(200)).body.game.playStatus).toBe('dropped')
-  })
-
   it('moves the play history along when one person is merged into another', async () => {
     const other = (await request(app.app).post('/api/users').send({ username: 'second', name: 'Second', password: 'second-password-1' }).expect(201)).body.user
     app.db.raw.prepare("INSERT INTO play_sessions (user_id, game, started_at, ended_at, seconds) VALUES (?, 'story', 1000, 2000, 60)").run(other.id)
@@ -188,10 +180,8 @@ describe('names, notes and pins of saves', () => {
     expect(slot).toMatchObject({ title: 'Before the storm', note: 'Choose the lake next time.' })
     expect(slot.pinnedAt).toMatch(/^\d{4}-/)
     expect((await app.saves.read('Story-1', '1-1-LT1.save')).toString()).toBe(before)
-    // A pinned save keeps its history.
-    expect(app.saves.pinned('Story-1', '1-1-LT1.save')).toBe(true)
     await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ pinned: false }).expect(200)
-    expect(app.saves.pinned('Story-1', '1-1-LT1.save')).toBe(false)
+    expect((await request(app.app).get('/api/saves/story').expect(200)).body.slots.find((s: { file: string }) => s.file === '1-1-LT1.save').pinnedAt).toBeNull()
     await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ title: 'x'.repeat(81) }).expect(400)
     await request(app.app).put('/api/saves/story/meta?file=../x.save').send({ title: 'x' }).expect(400)
     // Clearing everything removes the row.
@@ -254,7 +244,7 @@ describe('names, notes and pins of saves', () => {
     expect((await request(app.app).get('/api/me/tags').expect(200)).body).toEqual({ include: ['romance'], exclude: ['horror'], source: 'you' })
     await request(app.app).put('/api/me/tags').send({ include: ['Not A Tag'] }).expect(400)
     await request(app.app).put('/api/me/tags').send({ exclude: 'horror' }).expect(400)
-    // The 3.x picture preference stays beside it, for a downgrade.
+    // They live in the person's preferences.
     expect(JSON.parse((app.db.raw.prepare('SELECT prefs FROM users WHERE id = 1').get() as { prefs: string }).prefs)).toMatchObject({ tags: { include: ['romance'] } })
   })
 

@@ -7,11 +7,14 @@ import AvatarUpload from '../components/AvatarUpload'
 import LinkedSignIns from '../components/LinkedSignIns'
 import AdultChoice from '../components/AdultLadder'
 import WhoIsPlaying from '../components/WhoIsPlaying'
-import { Button, Confirm, Modal, Spinner, accountInput, errorText, useToast } from '../components/ui'
+import { Confirm, Spinner, errorText, useToast } from '../lantern/ui'
 import { useRoom } from '../lantern/Room'
 import { api, del, post, put } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { ago } from '../lib/format'
+import type { Sessions, TokenCreated, Tokens } from '@shared/api'
+import { Pill } from '../lantern/controls'
+import Sheet from '../lantern/Sheet'
 
 export function AccountSection({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -21,8 +24,6 @@ export function AccountSection({ title, children }: { title: string; children: R
     </section>
   )
 }
-interface Session { id: string; label: string; created_at: number; touched_at: number; expires_at: number; current: boolean }
-interface Token { id: string; name: string; created_at: number }
 
 function sessionLabel(label: string): string {
   const browser = /Edg\//.test(label) ? 'Edge' : /Firefox\//.test(label) ? 'Firefox' : /Chrome\//.test(label) ? 'Chrome' : /Safari\//.test(label) ? 'Safari' : 'Browser'
@@ -32,8 +33,8 @@ function sessionLabel(label: string): string {
 
 export default function Account() {
   const { data: me } = useAuth(), qc = useQueryClient(), toast = useToast()
-  const sessions = useQuery({ queryKey: ['sessions'], queryFn: () => api<{ sessions: Session[] }>('/api/me/sessions') })
-  const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => api<{ tokens: Token[] }>('/api/me/tokens') })
+  const sessions = useQuery({ queryKey: ['sessions'], queryFn: () => api<Sessions>('/api/me/sessions') })
+  const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => api<Tokens>('/api/me/tokens') })
   const [dialog, setDialog] = useState<'password' | 'token' | ''>('')
   const [confirm, setConfirm] = useState<{ title: string; action: () => Promise<unknown> } | null>(null)
   const [secret, setSecret] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('')
@@ -82,7 +83,7 @@ export default function Account() {
           <h2 className="h3">Claim the owner account</h2>
           <p className="small muted" style={{ marginTop: 6 }}>Keep the saves made before sign-in and bring your current saves with you. Replaced files stay in history.</p>
           <div style={{ marginTop: 10 }}>
-            <Button onClick={() => setConfirm({ title: 'Claim the owner account?', action: async () => { await post('/api/me/claim-owner'); window.location.reload() } })}>Claim the owner account</Button>
+            <Pill onClick={() => setConfirm({ title: 'Claim the owner account?', action: async () => { await post('/api/me/claim-owner'); window.location.reload() } })}>Claim the owner account</Pill>
           </div>
         </section>
       )}
@@ -96,17 +97,17 @@ export default function Account() {
             <form onSubmit={(e) => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(() => put('/api/me', { name: form.get('name') }), 'Display name saved') }} className="stack">
               <label className="field">
                 <span>Display name</span>
-                <input key={me.user.name} name="name" autoComplete="name" required maxLength={100} defaultValue={me.user.name} className={accountInput} />
+                <input key={me.user.name} name="name" autoComplete="name" required maxLength={100} defaultValue={me.user.name} className="input" />
               </label>
               <div>
-                <Button type="submit" size="sm" loading={busy}>Save name</Button>
+                <Pill type="submit" size="sm" loading={busy}>Save name</Pill>
               </div>
             </form>
             <p className="small muted">Username: {me.user.username}.</p>
             <AvatarUpload />
             {me.hasPassword && (
               <div>
-                <Button size="sm" onClick={() => { setError(''); setDialog('password') }}>Change password</Button>
+                <Pill size="sm" onClick={() => { setError(''); setDialog('password') }}>Change password</Pill>
               </div>
             )}
           </AccountSection>
@@ -131,14 +132,14 @@ export default function Account() {
                       <p className="small" style={{ overflowWrap: 'anywhere' }}>{session.current ? 'This session' : sessionLabel(session.label)}</p>
                       <p className="xs muted">Active {ago(session.touched_at)} · Expires {ago(session.expires_at, true)}</p>
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => setConfirm({ title: 'Sign out of this session?', action: async () => { await del(`/api/me/sessions/${session.id}`); if (session.current) window.location.assign('/signin') } })}>Sign out</Button>
+                    <Pill size="sm" variant="q" onClick={() => setConfirm({ title: 'Sign out of this session?', action: async () => { await del(`/api/me/sessions/${session.id}`); if (session.current) window.location.assign('/signin') } })}>Sign out</Pill>
                   </div>
                 ))}
                 {!sessions.data.sessions.length && <p className="small muted">No signed-in sessions. {me.auth ? '' : 'Sign-in is off.'}</p>}
               </div>
             )}
             <div>
-              <Button size="sm" disabled={!sessions.data?.sessions.some((s) => !s.current)} onClick={() => setConfirm({ title: 'Sign out everywhere else?', action: () => del('/api/me/sessions') })}>Sign out everywhere else</Button>
+              <Pill size="sm" disabled={!sessions.data?.sessions.some((s) => !s.current)} onClick={() => setConfirm({ title: 'Sign out everywhere else?', action: () => del('/api/me/sessions') })}>Sign out everywhere else</Pill>
             </div>
           </AccountSection>
         )}
@@ -153,32 +154,32 @@ export default function Account() {
                       <p className="small" style={{ overflowWrap: 'anywhere' }}>{token.name}</p>
                       <p className="xs muted">Created {ago(token.created_at)}</p>
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => setConfirm({ title: `Revoke ${token.name}?`, action: () => del(`/api/me/tokens/${token.id}`) })}>Revoke</Button>
+                    <Pill size="sm" variant="q" onClick={() => setConfirm({ title: `Revoke ${token.name}?`, action: () => del(`/api/me/tokens/${token.id}`) })}>Revoke</Pill>
                   </div>
                 ))}
                 {!tokens.data.tokens.length && <p className="small muted">No access tokens.</p>}
               </div>
             )}
             <div>
-              <Button size="sm" onClick={() => { setError(''); setSecret(''); setDialog('token') }}>New token</Button>
+              <Pill size="sm" onClick={() => { setError(''); setSecret(''); setDialog('token') }}>New token</Pill>
             </div>
           </AccountSection>
         )}
         <AccountSection title="Your saves">
           <p className="small muted">Export current saves for the games you can see, including shared keys and HTML game data, as one zip. Hidden games’ saves and save history stay on the server.</p>
           <div className="actions">
-            <Button size="sm" href="/api/saves-export">Export all my saves</Button>
-            {!me.demo && <Button size="sm" to="/import-saves">Import from a computer</Button>}
+            <Pill size="sm" href="/api/saves-export">Export all my saves</Pill>
+            {!me.demo && <Pill size="sm" to="/import-saves">Import from a computer</Pill>}
           </div>
         </AccountSection>
       </div>
-      <Modal open={!!dialog} onClose={() => { if (!busy) { setDialog(''); setSecret('') } }} title={dialog === 'password' ? 'Change password' : 'New token'}>
+      <Sheet open={!!dialog} onClose={() => { if (!busy) { setDialog(''); setSecret('') } }} title={dialog === 'password' ? 'Change password' : 'New token'}>
         {secret ? (
           <div className="stack">
             <p className="small muted-2">Copy this token now. It will not be shown again.</p>
             <textarea aria-label="Access token" readOnly value={secret} className="input mono" style={{ height: 112, padding: 12, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }} onFocus={(e) => e.target.select()} />
             <div>
-              <Button onClick={async () => { try { await navigator.clipboard.writeText(secret); toast('Token copied', 'success') } catch { toast('Select the token and copy it.', 'error') } }}>Copy token</Button>
+              <Pill onClick={async () => { try { await navigator.clipboard.writeText(secret); toast('Token copied', 'success') } catch { toast('Select the token and copy it.', 'error') } }}>Copy token</Pill>
             </div>
           </div>
         ) : (
@@ -186,24 +187,24 @@ export default function Account() {
             e.preventDefault(); const form = new FormData(e.currentTarget)
             if (dialog === 'password') {
               if (await run(() => post('/api/me/password', { current: form.get('current'), password: form.get('password') }), 'Password changed. Other sessions ended.')) setDialog('')
-            } else await run(async () => { const result = await post<{ token: string }>('/api/me/tokens', { name: form.get('name') }); setSecret(result.token) }, 'Token created')
+            } else await run(async () => { const result = await post<TokenCreated>('/api/me/tokens', { name: form.get('name') }); setSecret(result.token) }, 'Token created')
           }}>
             {dialog === 'password' ? (
               <>
                 <p className="small muted">Your other sessions will end. Your saves stay safe.</p>
-                <label className="field"><span>Current password</span><input name="current" type="password" autoComplete="current-password" required className={accountInput} /></label>
-                <label className="field"><span>New password</span><input name="password" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required className={accountInput} /></label>
+                <label className="field"><span>Current password</span><input name="current" type="password" autoComplete="current-password" required className="input" /></label>
+                <label className="field"><span>New password</span><input name="password" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required className="input" /></label>
               </>
             ) : (
-              <label className="field"><span>Token name</span><input name="name" required maxLength={100} placeholder="Upload script" className={accountInput} /></label>
+              <label className="field"><span>Token name</span><input name="name" required maxLength={100} placeholder="Upload script" className="input" /></label>
             )}
             {error && <p role="alert" className="small red">{error}</p>}
             <div>
-              <Button variant="primary" type="submit" loading={busy}>{dialog === 'password' ? 'Change password' : 'Create token'}</Button>
+              <Pill variant="p" type="submit" loading={busy}>{dialog === 'password' ? 'Change password' : 'Create token'}</Pill>
             </div>
           </form>
         )}
-      </Modal>
+      </Sheet>
       <Confirm open={!!confirm} onClose={() => !busy && setConfirm(null)} title={confirm?.title || ''} confirmLabel="Confirm" busy={busy} onConfirm={async () => { if (confirm && await run(confirm.action, 'Done')) setConfirm(null) }}>
         This takes effect immediately. Your saves are kept.
       </Confirm>
@@ -245,16 +246,16 @@ function PinSection({ admin, hasPin }: { admin: boolean; hasPin: boolean }) {
           <p className="small muted">With a PIN you can switch in on a shared device that someone is signed in on, without your password. It works only on browsers you signed in on before. Signing out everywhere or changing your password removes it.</p>
           <label className="field">
             <span>PIN, 4 to 8 digits</span>
-            <input className={accountInput} type="password" inputMode="numeric" autoComplete="new-password" pattern="\d{4,8}" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} />
+            <input className="input" type="password" inputMode="numeric" autoComplete="new-password" pattern="\d{4,8}" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} />
           </label>
           <div className="row" style={{ gap: 8 }}>
-            <Button type="submit" size="sm" disabled={pin.length < 4}>
+            <Pill type="submit" size="sm" disabled={pin.length < 4}>
               Save PIN
-            </Button>
+            </Pill>
             {hasPin && (
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              <Pill size="sm" variant="q" onClick={() => setEditing(false)}>
                 Cancel
-              </Button>
+              </Pill>
             )}
           </div>
         </form>
@@ -262,19 +263,19 @@ function PinSection({ admin, hasPin }: { admin: boolean; hasPin: boolean }) {
         <>
           <p className="small muted">You have a PIN for switching in on a shared device.</p>
           <div className="row wrap" style={{ gap: 8 }}>
-            <Button size="sm" onClick={() => setEditing(true)}>
+            <Pill size="sm" onClick={() => setEditing(true)}>
               Change PIN
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => void save('')}>
+            </Pill>
+            <Pill size="sm" variant="q" onClick={() => void save('')}>
               Remove PIN
-            </Button>
+            </Pill>
           </div>
         </>
       )}
       <div>
-        <Button size="sm" variant="ghost" onClick={() => setSwitching(true)}>
+        <Pill size="sm" variant="q" onClick={() => setSwitching(true)}>
           Who is playing?
-        </Button>
+        </Pill>
       </div>
       <WhoIsPlaying open={switching} onClose={() => setSwitching(false)} />
     </div>

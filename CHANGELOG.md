@@ -7,6 +7,40 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-11-09
+
+### Changed
+
+- On a phone, Settings, Play history, Activity and Import saves have a Back button, like a game's page. Import saves goes back to where you came from instead of always to Settings.
+
+### Fixed
+
+- On a browser set to hide adult games, Import saves leaves out those games' saves, as its list of what it will import already did. Before, it imported them.
+- `PORT` works in the image: nginx forwards to the port it names. Before, the server moved and every request failed.
+- `RENPLAY_LOG_LEVEL` is read the same way for the server and for the requests nginx logs, in any case and with spaces around it.
+- When Renplay starts and a game's files are missing, as when a network share is mounted late, the game shows as not installed and comes back by itself on a later start once the files are there. Before, it stayed not installed until it was installed again, and a share that could not be read at all made every game look missing.
+- What an admin's import of a person's saves replaced is kept in History for at least 30 days, like what any other import replaces.
+- A Ren'Py download installed over an HTML game of the same name now plays as a Ren'Py game.
+- A game kept offline still plays offline after Renplay is upgraded. Playing it once with a network keeps the new files its page needs, and the compiled scripts it stored while playing.
+- Offline, the pictures of adult games show as the person's level says. They were always blurred without a network.
+- Removing unused engines keeps the engine of a game whose files are missing, so it plays when they come back, and waits while a job runs instead of removing the engine an install is building with.
+- A mod uploaded as a zip may hold files of up to 256 MB and up to 10,000 files. It was held to the limits of a zip of saves (64 MB a file, 128 MB in all), whatever the upload allowed.
+- The nginx and Kubernetes examples allow the 600 MB bodies Renplay takes. Behind them, uploads of mods, walkthroughs and zips of saves over 40 MB failed, and behind the Kubernetes example any upload over 1 MB did.
+- On a phone, tapping a text field no longer zooms the page in, and Renplay does not zoom with a double tap or a pinch.
+- In the player, Escape on the question about saves that have not reached the server closes only the question, not the player menu behind it. The notice that you were signed out takes the keyboard's focus, and Tab stays in it.
+- A game's sheet in the catalog has a close button. On a phone it covered the page with no way to close it but the strip above it.
+- A game without a developer no longer shows a dot before its version on its page.
+- The footer on a phone no longer ends a line with a dot.
+- The Users page names each person's username instead of starting a line with it.
+- Import saves from a computer shows how far it is. Its progress bar was full as soon as it started.
+- Download log in the player's options says when the game has not written a log yet, instead of doing nothing.
+
+### Removed
+
+- Libraries from before 4.0 no longer open in this version: start Renplay 4.5.1 on one once, then this version. Going back from 4.x to 3.x is no longer possible.
+- `SAVES_DIR` and `SAVE_HISTORY_DIR`. Since 3.0 saves live under `/data/users/<id>/`, and these only placed links at the old folders for going back to 2.11.
+- The API's `PUT /api/games/<id>/finished`. Set the status `finished` with `PUT /api/games/<id>/status` instead.
+
 ## [4.5.1] - 2026-11-08
 
 ### Fixed
@@ -603,7 +637,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.5.1...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.6.0...dev
+[4.6.0]: https://github.com/renplay-org/renplay/compare/v4.5.1...v4.6.0
 [4.5.1]: https://github.com/renplay-org/renplay/compare/v4.5.0...v4.5.1
 [4.5.0]: https://github.com/renplay-org/renplay/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/renplay-org/renplay/compare/v4.3.1...v4.4.0

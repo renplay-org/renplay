@@ -11,7 +11,7 @@ import { mockOidc, signInFixture, site } from './sign-in-fixture.js'
 it.skipIf(!process.env.RENPLAY_UI_SHOTS)('checks SSO, avatar, provider-managed Users and search on desktop and phone', async () => {
   const provider = await mockOidc()
   provider.setClaims({ groups: ['admins', 'adults'] })
-  const app = await signInFixture({ publicUrl: 'http://127.0.0.1:3991', oidcIssuer: provider.issuer, oidcClientId: 'renplay', oidcName: 'Pocket ID', oidcAdminGroup: 'admins', oidcAdultGroup: 'adults', adminUsername: 'admin', adminPassword: 'local password' })
+  const app = await signInFixture({ publicUrl: 'http://127.0.0.1:3991', oidcIssuer: provider.issuer, oidcClientId: 'renplay', oidcName: 'Pocket ID', oidcAdminGroup: 'admins', oidcAdultGroups: { adults: 'shown' }, adminUsername: 'admin', adminPassword: 'local password' })
   app.app.use(express.static(resolve('../selector/dist')))
   app.app.get(/.*/, (_req, res) => res.sendFile(resolve('../selector/dist/index.html')))
   const server = createServer(app.app)

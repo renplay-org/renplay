@@ -18,4 +18,5 @@ games
 saves
 *.md
 mise.toml
+tasks.toml
 .env

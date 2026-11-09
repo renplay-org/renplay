@@ -2,39 +2,16 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Frame } from '../lantern/art'
 import { useRoom } from '../lantern/Room'
-import { Empty, Spinner, Button, errorText } from '../components/ui'
-import { api, type ArtFormat } from '../lib/api'
+import { Empty, Spinner, errorText } from '../lantern/ui'
+import { api } from '../lib/api'
+import type { ArtFormat } from '@shared/art'
 import { duration, timeZone } from '../lib/format'
+import type { HistoryPage } from '@shared/api'
+import { Pill } from '../lantern/controls'
+import BackLink from '../components/BackLink'
 
 /** A length of time in seconds: "45m", "1h 20m". */
 const length = (seconds: number) => (seconds < 60 ? 'Under a minute' : duration(seconds))
-
-interface HistorySession {
-  game: string
-  title: string
-  nsfw: boolean
-  startedAt: number
-  endedAt: number
-  seconds: number
-  icon: ArtFormat | null
-}
-interface HistoryGame {
-  id: string
-  title: string
-  nsfw: boolean
-  seconds: number
-  sessions: number
-  lastPlayedAt: number
-  rating: number | null
-  playStatus: 'playing' | 'stalled' | 'dropped' | 'finished' | null
-  icon: ArtFormat | null
-}
-interface HistoryPage {
-  totals: { seconds: number; sessions: number; games: number; since: number | null }
-  days: Array<{ day: string; seconds: number; sessions: HistorySession[] }>
-  games: HistoryGame[]
-  next: number | null
-}
 
 const STATUS: Record<string, string> = { playing: 'Playing', stalled: 'Stalled', dropped: 'Dropped', finished: 'Finished' }
 
@@ -77,6 +54,7 @@ export default function History() {
   return (
     <div className="stack" style={{ gap: 32 }}>
       <header>
+        <BackLink to="/account" />
         <h1 className="h1">History</h1>
         <p className="muted-2" style={{ marginTop: 8 }}>
           {length(first.totals.seconds)} in {first.totals.sessions} {first.totals.sessions === 1 ? 'session' : 'sessions'} across {first.totals.games} {first.totals.games === 1 ? 'game' : 'games'}
@@ -106,9 +84,9 @@ export default function History() {
             </div>
           ))}
           {pages.hasNextPage && (
-            <Button onClick={() => void pages.fetchNextPage()} loading={pages.isFetchingNextPage}>
+            <Pill onClick={() => void pages.fetchNextPage()} loading={pages.isFetchingNextPage}>
               Earlier days
-            </Button>
+            </Pill>
           )}
         </section>
 

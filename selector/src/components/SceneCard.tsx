@@ -1,9 +1,9 @@
 import { Play } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
-import type { Game } from '../lib/api'
+import type { Game } from '@shared/api'
 import { useAdultView } from '../lib/adult'
 import { hashUrl, hue } from '../lantern/art'
-import { cx } from './ui'
+import { cx } from '../lantern/ui'
 
 /** A save's own scene, 16:9, never catalog art. Below Shown, a save picture of an adult game is never requested. */
 export default function SceneCard({ game, save, className, play = false, style }: { game: Pick<Game, 'title' | 'nsfw'>; save?: { label: string; screenshot: string | null; screenshotHash?: string | null } | null; className?: string; play?: boolean; style?: CSSProperties }) {

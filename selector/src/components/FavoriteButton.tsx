@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Heart } from 'lucide-react'
 import { useState } from 'react'
-import { api, type Game } from '../lib/api'
-import { errorText, useToast } from './ui'
+import { api } from '../lib/api'
+import type { Game } from '@shared/api'
+import { errorText, useToast } from '../lantern/ui'
 
 export default function FavoriteButton({ game }: { game: Game }) {
   const qc = useQueryClient()

@@ -5,7 +5,7 @@ import { useAdultState, useDeviceLevel } from '../lib/adult'
 import { useAuth } from '../lib/auth'
 import { post } from '../lib/api'
 import Avatar from './Avatar'
-import { Menu, errorText } from './ui'
+import { Menu, errorText } from '../lantern/ui'
 import WhoIsPlaying from './WhoIsPlaying'
 
 /** The avatar in the header: a small menu under it with your account, the admin's pages, and the way out. */

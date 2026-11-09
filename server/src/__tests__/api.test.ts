@@ -1,14 +1,15 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import yazl from 'yazl'
-import { archiveIdentity } from '../archive-origin.js'
+import { archiveIdentity } from '../library/archives.js'
 import { createApp, type App } from '../app.js'
 import { loadConfig } from '../config.js'
-import { renderPage } from '../routes/play.js'
+import { renderPage } from '../play/routes.js'
 import { cleanRelPath, safeJoin } from '../util/paths.js'
+import { runImport } from '../pipeline/import.js'
 
 function zipBuffer(entries: Record<string, Buffer | string>): Promise<Buffer> {
   return new Promise((resolve) => {
@@ -55,16 +56,10 @@ describe('HTTP API', () => {
     process.env['RENPLAY_ENGINES_URL'] = 'http://127.0.0.1:9/none'
     // A leftover database of renplay 2.0 is dropped.
     mkdirSync(join(root, 'data'), { recursive: true })
-    writeFileSync(join(root, 'data', 'renplay.db'), 'old')
     app = await createApp(loadConfig(), { startJobs: false })
     app.db.insertGame({ id: 'fixture-game', title: 'Fixture Game', status: 'installed', engine: '8.5.3', build: 'b1', save_dir: 'MyGame-1234567890', screen_w: 1920, screen_h: 1080 })
   })
   afterAll(() => app?.close())
-
-  it('replaced the old database', () => {
-    expect(() => readFileSync(join(root, 'data', 'renplay.db'))).toThrow()
-    expect(readFileSync(join(root, 'data', 'library.db')).length).toBeGreaterThan(0)
-  })
 
   it('lists games by id with their play URL', async () => {
     const res = await request(app.app).get('/api/games').expect(200)
@@ -113,16 +108,15 @@ describe('HTTP API', () => {
     expect(app.db.getGame('favorite-game')).toBeNull()
   })
 
-  it('stores finished state and measured play time without changing saves', async () => {
+  it('stores when a game was finished and measured play time without changing saves', async () => {
     app.db.insertGame({ id: 'progress-game', title: 'Progress', save_dir: 'Progress-123' })
     const path = '/api/games/progress-game'
-    expect((app.db.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
     expect((await request(app.app).get(path)).body.game).toMatchObject({ playTime: 0, finishedAt: null, latestSave: null })
-    for (const on of [undefined, 'true', 1]) await request(app.app).put(`${path}/finished`).send({ on }).expect(400)
-    await request(app.app).put('/api/games/missing/finished').send({ on: true }).expect(404)
-    const timestamp = (await request(app.app).put(`${path}/finished`).send({ on: true }).expect(200)).body.game.finishedAt
+    for (const status of ['done', 1, true]) await request(app.app).put(`${path}/status`).send({ status }).expect(400)
+    await request(app.app).put('/api/games/missing/status').send({ status: 'finished' }).expect(404)
+    const timestamp = (await request(app.app).put(`${path}/status`).send({ status: 'finished' }).expect(200)).body.game.finishedAt
     expect(new Date(timestamp).toISOString()).toBe(timestamp)
-    expect((await request(app.app).put(`${path}/finished`).send({ on: true })).body.game.finishedAt).toBe(timestamp)
+    expect((await request(app.app).put(`${path}/status`).send({ status: 'finished' })).body.game.finishedAt).toBe(timestamp)
     for (const seconds of [-1, 0, 61, 1.5, '10', null]) await request(app.app).post(`${path}/play-time`).send({ seconds }).expect(400)
     await request(app.app).post('/api/games/missing/play-time').send({ seconds: 10 }).expect(404)
     await request(app.app).post(`${path}/play-time`).send({ seconds: 15 }).expect(200)
@@ -130,7 +124,7 @@ describe('HTTP API', () => {
     app.db.raw.prepare('UPDATE play_sessions SET started_at = started_at - 10000, ended_at = ended_at - 10000').run()
     await request(app.app).post(`${path}/play-time`).send({ seconds: 10 }).expect(200)
     expect((await request(app.app).delete(path).expect(200)).body.game).toMatchObject({ playTime: 25, finishedAt: timestamp })
-    expect((await request(app.app).put(`${path}/finished`).send({ on: false })).body.game.finishedAt).toBeNull()
+    expect((await request(app.app).put(`${path}/status`).send({ status: 'stalled' })).body.game).toMatchObject({ playStatus: 'stalled', finishedAt: null })
     app.db.deleteGame('progress-game')
   })
 
@@ -224,7 +218,7 @@ describe('HTTP API', () => {
     const unity = await request(app.app).get('/g/twine-story/h1/game/Build/Game.wasm.br').expect(200)
     expect(unity.headers['content-type']).toBe('application/wasm')
     expect(unity.headers['content-encoding']).toBeUndefined()
-    await app.saves.remove('story', 'localStorage.json', 'test')
+    await app.saves.remove('story', 'localStorage.json', 'user-delete')
     // The startup check knows HTML builds have no game.zip.
     const checked = await app.builds.verify()
     expect(checked.missing).not.toContain('twine-story')
@@ -339,6 +333,77 @@ describe('HTTP API', () => {
     const completed = await request(app.app).post(`/api/uploads/${r.body.id}/complete`).expect(200)
     const path = completed.body.path
     expect(app.db.isUploadedArchive(path, archiveIdentity(statSync(join(root, 'games', '_archives', path))))).toBe(true)
+  })
+
+  it('marks a game whose build went missing at start as not installed, and back when the folder returns', async () => {
+    const build = join(root, 'games', 'fixture-game', 'b1'), away = join(root, 'b1-away')
+    renameSync(build, away)
+    try {
+      expect((await app.builds.verify()).missing).toEqual(['fixture-game'])
+      expect(app.db.getGame('fixture-game')).toMatchObject({ status: 'not_installed', build: 'b1' })
+      // Its engine stays while it is away, so the game plays again when the folder comes back.
+      expect((await request(app.app).post('/api/system/prune').expect(200)).body.removed).toEqual([])
+      // Nothing changes on a second start while it is still away.
+      expect((await app.builds.verify()).missing).toEqual([])
+    } finally {
+      renameSync(away, build)
+    }
+    expect((await app.builds.verify()).back).toEqual(['fixture-game'])
+    expect(app.db.getGame('fixture-game')).toMatchObject({ status: 'installed', build: 'b1' })
+  })
+
+  it('installs a Ren’Py download over an HTML game of the same id as a Ren’Py game', async () => {
+    const engine = join(root, 'games', '_renplay', 'engines', '8.5.3')
+    writeFileSync(join(engine, 'renpy.zip'), await zipBuffer({ 'renpy/__init__.py': '', 'main.py': '' }))
+    mkdirSync(join(root, 'games', '_archives'), { recursive: true })
+    writeFileSync(join(root, 'games', '_archives', 'Dual-1.0-pc.zip'), await zipBuffer({ 'Dual-1.0-pc/game/script.rpy': 'label start:\n    "Hi"\n', 'Dual-1.0-pc/renpy/__init__.py': '' }))
+    app.db.insertGame({ id: 'dual', title: 'Dual', status: 'installed', build: 'h1', family: 'html', engine_label: 'HTML (SugarCube 2.36.1)', entry: 'Dual.html' })
+    const ctx = { id: 'test-install', params: { source: { kind: 'archive' as const, path: 'Dual-1.0-pc.zip' }, game: 'dual', engine: '8.5.3' }, signal: new AbortController().signal, progress() {}, log() {}, checkAbort() {} }
+    await runImport(ctx, app.services)
+    expect(app.db.getGame('dual')).toMatchObject({ status: 'installed', family: 'renpy', engine_label: '', entry: '' })
+    expect((await request(app.app).get('/api/games/dual').expect(200)).body.game.playUrl).toMatch(/^\/g\/dual\/[a-z0-9]+\/$/)
+  })
+
+  it('starts a checksum for a draft recipe’s own download, not one whose name contains it', async () => {
+    const archives = join(root, 'games', '_archives')
+    mkdirSync(archives, { recursive: true })
+    for (const name of ['a.zip', 'data-a.zip']) writeFileSync(join(archives, name), name)
+    // A job that waits holds the queue, so both checksums stay queued while the drafts are asked for.
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    app.jobs.register('hold', 'Hold', () => gate)
+    app.jobs.enqueue('hold', '', {})
+    const other = app.jobs.enqueue('hash-archive', '', { path: 'data-a.zip' })
+    app.db.insertGame({ id: 'short-name', title: 'Short', status: 'installed', build: 'b1', source: JSON.stringify({ archive: 'a.zip', size: 5 }) })
+    try {
+      const draft = (await request(app.app).get('/api/games/short-name/recipe').expect(200)).body
+      expect(draft.hashJob).toBeTruthy()
+      expect(draft.hashJob).not.toBe(other)
+      // Asked again, it finds its own job.
+      expect((await request(app.app).get('/api/games/short-name/recipe').expect(200)).body.hashJob).toBe(draft.hashJob)
+    } finally {
+      release()
+      await vi.waitFor(() => expect(app.jobs.isBusy()).toBe(false))
+    }
+    expect((await request(app.app).get('/api/games/short-name/recipe').expect(200)).body).toMatchObject({ sha256Pending: false, hashJob: null })
+  })
+
+  it('removes no engine while a job runs, since an install names its engine only when it ends', async () => {
+    const busy = vi.spyOn(app.jobs, 'isBusy').mockReturnValue(true)
+    try {
+      await request(app.app).post('/api/system/prune').expect(409)
+    } finally {
+      busy.mockRestore()
+    }
+    expect(statSync(join(root, 'games', '_renplay', 'engines', '8.5.3', '.ready')).isFile()).toBe(true)
+  })
+
+  it('takes a mod as a zip with a file larger than a save zip may hold', async () => {
+    const zip = await zipBuffer({ 'game/movies/intro.webm': Buffer.alloc(65 << 20) })
+    const res = await request(app.app).post('/api/games/fixture-game/files/upload').field('dir', 'game').attach('files', zip, 'movie-mod.zip').expect(200)
+    expect(res.body.written).toEqual(['game/movies/intro.webm'])
+    await request(app.app).post('/api/games/fixture-game/files/reset').expect(200)
+    await vi.waitFor(() => expect(app.jobs.isBusy()).toBe(false), { timeout: 10_000 })
   })
 
   it('keeps saves when a game is uninstalled', async () => {

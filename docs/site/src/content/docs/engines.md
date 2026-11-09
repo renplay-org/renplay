@@ -56,7 +56,8 @@ fullscreen, mute, wake lock, phones) is shared.
    itself, as HTML games do.
 3. **Runtime**: a small script in the game's frame that tells the player when the game is ready,
    keeps its saves on the server, and handles mute. Ren'Py's is `runtime/renplay-runtime.js`,
-   HTML games' is `runtime/renplay-html.js`.
+   HTML games' is `runtime/renplay-html.js`, and both start with `runtime/renplay-player.js`, what
+   they share: messages to the player, muting and Esc in fullscreen.
 4. **Player**: the shared player, with the features the runtime supports.
 
 ## Security
@@ -93,4 +94,4 @@ releases:
 `saveDir` keeps its name. What it means depends on the engine: Ren'Py's `config.save_directory`, or
 a SugarCube story's save id. The catalog still publishes schema 2 as `index.json` for Renplay 2.5
 and older (Ren'Py games only) and schema 3 as `index.v3.json` for Renplay 2.6 to 3.x.
-`normalizeRecipe` in `catalog.ts` reads all of them.
+`normalizeRecipe` in `shared/recipe.ts` reads all of them.

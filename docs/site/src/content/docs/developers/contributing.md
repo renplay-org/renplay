@@ -17,18 +17,18 @@ Thanks for helping with Renplay. Pick what fits:
 ## Development setup
 
 You need [mise](https://mise.jdx.dev) and, for the image, Docker. mise installs the pinned tools
-(Node 24, Python, Helm and the linters) and runs the tasks in `mise.toml`, the same ones CI runs.
+(Node 24, Python, Helm and the linters) and runs the tasks in `tasks.toml`, the same ones CI runs.
 
 ```sh
 mise install          # the tools
-mise run install      # the npm packages
+mise run install      # the npm packages, and a pre-push hook with the quick checks
 mise run dev          # the server on port 3999 and the library on http://localhost:5199
 mise run check        # everything CI checks
 mise tasks            # every task: test, docs, image, contract, screenshots, release
 ```
 
 `RENPLAY_BACKEND=https://renplay.example mise run dev:ui` runs the library against a deployed
-Renplay. Without mise, each task is a plain npm or node command you can read in `mise.toml`.
+Renplay. Without mise, each task is a plain npm or node command you can read in `tasks.toml`.
 
 Put a game’s PC zip into `/tmp/rp/games/_archives/` and install it from the library.
 
@@ -74,8 +74,9 @@ These decide most review comments:
 
 1. Branch from `dev` and open the pull request against `dev`.
 2. Keep it focused. The title follows Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`).
-3. Run `npx tsc -p . && npx vitest run` in `server` and `npx tsc -b --noEmit && npm run build` in
-   `selector`. Add a test for new server behavior.
+3. Run `mise run check`: type checks, tests, the structure rules (no import cycles, layers that
+   point down, no unused exports, files of at most 600 lines) and the writing rule. Add a test for
+   new server behavior.
 4. For UI changes, look at them on a phone size and a desktop size
    (`cd server && npm run screenshots -- http://localhost:5199 /tmp/shots --sfw`).
 5. Add a line to `CHANGELOG.md` under `Unreleased` for anything users notice.

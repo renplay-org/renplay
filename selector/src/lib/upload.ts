@@ -1,4 +1,6 @@
 import { api, post } from './api'
+import { deviceHeaders } from './device'
+import type { UploadStarted } from '@shared/api'
 
 export interface UploadHandle {
   promise: Promise<string>
@@ -48,6 +50,7 @@ export function uploadArchive(file: File, onProgress: (sent: number, total: numb
     new Promise<number>((resolve, reject) => {
       xhr = new XMLHttpRequest()
       xhr.open('PUT', `/api/uploads/${id}?offset=${offset}`)
+      for (const [name, value] of Object.entries(deviceHeaders())) xhr.setRequestHeader(name, value)
       xhr.upload.onprogress = (e) => onProgress(offset + e.loaded, file.size)
       xhr.onload = () => {
         if (xhr!.status === 409) {
@@ -78,7 +81,7 @@ export function uploadArchive(file: File, onProgress: (sent: number, total: numb
       }
     }
     if (!id) {
-      const r = await post<{ id: string; chunkSize: number }>('/api/uploads', { name: file.name, size: file.size })
+      const r = await post<UploadStarted>('/api/uploads', { name: file.name, size: file.size })
       id = r.id
       chunk = r.chunkSize
       remember(file, id)
@@ -124,7 +127,7 @@ export function uploadArchive(file: File, onProgress: (sent: number, total: numb
       wake?.()
       const id = recall(file)
       forget(file)
-      if (id) void fetch(`/api/uploads/${id}`, { method: 'DELETE' })
+      if (id) void fetch(`/api/uploads/${id}`, { method: 'DELETE', headers: deviceHeaders() })
     },
   }
 }

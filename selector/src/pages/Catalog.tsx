@@ -8,8 +8,8 @@ import { useRoom } from '../lantern/Room'
 import Sheet from '../lantern/Sheet'
 import RecipeCard from '../components/RecipeCard'
 import CatalogTags, { matchesTags, useTagPrefs } from '../components/CatalogTags'
-import { Button, Empty, Spinner, errorText } from '../components/ui'
-import type { Recipe } from '../lib/api'
+import { Empty, Spinner, errorText } from '../lantern/ui'
+import type { CatalogGame } from '@shared/api'
 import { ago } from '../lib/format'
 import { post } from '../lib/api'
 import { useCatalog } from '../lib/queries'
@@ -19,7 +19,7 @@ import { matchesSearch, stateLabel } from '../lib/tags'
 const REQUEST_URL = 'https://renplay.org/catalog/request'
 
 /** One catalog entry: the grid tile with In your library and Free pills, opening the recipe sheet. */
-function RecipeTile({ recipe: r, onOpen }: { recipe: Recipe; onOpen: () => void }) {
+function RecipeTile({ recipe: r, onOpen }: { recipe: CatalogGame; onOpen: () => void }) {
   const extra = r.local ? (
     <span className="corner">
       <TagPill tone="dark">
@@ -56,14 +56,14 @@ export default function Catalog() {
   const [tagPrefs, setTagPrefs] = useTagPrefs()
   const [limit, setLimit] = useState(36)
   const [filter, setFilter] = useState('all')
-  const [sheetFor, setSheetFor] = useState<Recipe | null>(null)
+  const [sheetFor, setSheetFor] = useState<CatalogGame | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const admin = useAuth().data?.user.role === 'admin'
   useRoom({ game: null, quiet: true })
   if (isLoading) return <Spinner />
   if (error || !data)
     return (
-      <Empty title="Could not load the catalog" action={<Button onClick={() => void refetch()}>Retry</Button>}>
+      <Empty title="Could not load the catalog" action={<Pill onClick={() => void refetch()}>Retry</Pill>}>
         {errorText(error)}
       </Empty>
     )
@@ -84,7 +84,7 @@ export default function Catalog() {
         </div>
         <div className="actions">
           {/* Refreshing the catalog is for admins. */}
-          {admin && <Button size="sm" loading={refreshing} icon={<RefreshCw />} onClick={async () => {
+          {admin && <Pill size="sm" loading={refreshing} icon={<RefreshCw />} onClick={async () => {
             setRefreshing(true)
             try {
               await post('/api/catalog/refresh')
@@ -95,7 +95,7 @@ export default function Catalog() {
             }
           }}>
             Refresh
-          </Button>}
+          </Pill>}
           <Pill variant="s" size="sm" href={REQUEST_URL} target="_blank" rel="noreferrer" icon={<ExternalLink />}>
             Request a game
           </Pill>
@@ -147,7 +147,7 @@ export default function Catalog() {
         }}
       />
       {!filtered.length ? (
-        <Empty title="No games match" action={<Button onClick={() => { setSearch(''); setTagPrefs({ include: [], exclude: [] }); setFilter('all') }}>Clear filters</Button>}>
+        <Empty title="No games match" action={<Pill onClick={() => { setSearch(''); setTagPrefs({ include: [], exclude: [] }); setFilter('all') }}>Clear filters</Pill>}>
           Nothing in the catalog matches. Try a different search or tag.
         </Empty>
       ) : (
@@ -163,7 +163,7 @@ export default function Catalog() {
       </p>
       {filtered.length > limit && (
         <div className="center" style={{ marginTop: 14 }}>
-          <Button onClick={() => setLimit(limit + 36)}>Show more</Button>
+          <Pill onClick={() => setLimit(limit + 36)}>Show more</Pill>
         </div>
       )}
       {sheet && (

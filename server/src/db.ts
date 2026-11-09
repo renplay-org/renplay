@@ -1,8 +1,7 @@
-import { mkdirSync, rmSync, existsSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
-import { migrateAccountFolders } from './accounts-migration.js'
-import { log } from './util/log.js'
+import { isRenpy } from './shared/family.js'
 
 export type GameStatus = 'installed' | 'not_installed' | 'installing'
 
@@ -29,6 +28,9 @@ export interface WalkthroughRow {
   position: number
 }
 
+/** A game that is a web page of its own (HTML, Unity WebGL and the like): every family but Ren'Py. */
+export const isWebGame = (g: Pick<GameRow, 'family'>): boolean => !isRenpy(g)
+
 export interface GameRow {
   id: string
   title: string
@@ -54,20 +56,9 @@ export interface GameRow {
   save_dir: string
   source: string
   build_options: string
-  walkthrough: string
   created_at: string
   installed_at: string
-  last_played_at: string
-  favorite_at: string
-  finished_at: string
-  play_time: number
-  /** The person's status (user_games): playing, stalled, dropped, finished, or '' when not set. */
-  play_status?: string
-  /** The person's rating, 1 to 5, or 0 for none (user_games). */
-  rating?: number
-  /** When the person said Not now: the game leaves Up next until it is played again (user_games). */
-  not_now_at?: string
-  /** 1 when the game's recipe is adult: the last thing the catalog said, kept for when it can no longer say (content.ts). */
+  /** 1 when the game's recipe is adult: the last thing the catalog said, kept for when it can no longer say (content/mode.ts). */
   adult: number
   updated_at: string
 }
@@ -100,28 +91,37 @@ export interface ArchiveRow {
 
 const now = () => new Date().toISOString()
 
+/** The schema of a new library, at VERSION. */
 const SCHEMA = `
   CREATE TABLE games (
-    id              TEXT PRIMARY KEY,
-    title           TEXT NOT NULL,
-    recipe_id       TEXT NOT NULL DEFAULT '',
-    version         TEXT NOT NULL DEFAULT '',
-    renpy_version   TEXT NOT NULL DEFAULT '',
-    engine          TEXT NOT NULL DEFAULT '',
-    build           TEXT NOT NULL DEFAULT '',
-    status          TEXT NOT NULL DEFAULT 'not_installed',
-    size_bytes      INTEGER NOT NULL DEFAULT 0,
-    file_count      INTEGER NOT NULL DEFAULT 0,
-    screen_w        INTEGER NOT NULL DEFAULT 0,
-    screen_h        INTEGER NOT NULL DEFAULT 0,
-    save_dir        TEXT NOT NULL DEFAULT '',
-    source          TEXT NOT NULL DEFAULT '{}',
-    build_options   TEXT NOT NULL DEFAULT '{}',
-    walkthrough     TEXT NOT NULL DEFAULT '',
-    created_at      TEXT NOT NULL,
-    installed_at    TEXT NOT NULL DEFAULT '',
-    last_played_at  TEXT NOT NULL DEFAULT '',
-    updated_at      TEXT NOT NULL
+    id            TEXT PRIMARY KEY,
+    title         TEXT NOT NULL,
+    recipe_id     TEXT NOT NULL DEFAULT '',
+    version       TEXT NOT NULL DEFAULT '',
+    renpy_version TEXT NOT NULL DEFAULT '',
+    engine        TEXT NOT NULL DEFAULT '',
+    family        TEXT NOT NULL DEFAULT 'renpy',
+    engine_label  TEXT NOT NULL DEFAULT '',
+    entry         TEXT NOT NULL DEFAULT '',
+    build         TEXT NOT NULL DEFAULT '',
+    status        TEXT NOT NULL DEFAULT 'not_installed',
+    size_bytes    INTEGER NOT NULL DEFAULT 0,
+    file_count    INTEGER NOT NULL DEFAULT 0,
+    screen_w      INTEGER NOT NULL DEFAULT 0,
+    screen_h      INTEGER NOT NULL DEFAULT 0,
+    save_dir      TEXT NOT NULL DEFAULT '',
+    source        TEXT NOT NULL DEFAULT '{}',
+    build_options TEXT NOT NULL DEFAULT '{}',
+    adult         INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL,
+    installed_at  TEXT NOT NULL DEFAULT '',
+    updated_at    TEXT NOT NULL,
+    -- Unused, kept so Renplay 4.5 can still open the library (it writes them).
+    walkthrough    TEXT NOT NULL DEFAULT '',
+    last_played_at TEXT NOT NULL DEFAULT '',
+    favorite_at    TEXT NOT NULL DEFAULT '',
+    finished_at    TEXT NOT NULL DEFAULT '',
+    play_time      INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX games_save_dir ON games(save_dir);
   CREATE TABLE jobs (
@@ -149,177 +149,119 @@ const SCHEMA = `
     info       TEXT NOT NULL DEFAULT '{}',
     scanned_at TEXT NOT NULL DEFAULT ''
   );
-  CREATE TABLE settings (
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
+  CREATE TABLE uploaded_archives (path TEXT PRIMARY KEY, identity TEXT NOT NULL);
+  CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  CREATE TABLE users (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    username         TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    name             TEXT NOT NULL,
+    role             TEXT NOT NULL CHECK(role IN ('admin','player')),
+    disabled         INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL,
+    prefs            TEXT NOT NULL DEFAULT '{}',
+    avatar           TEXT NOT NULL DEFAULT '',
+    avatar_uploaded  INTEGER NOT NULL DEFAULT 0,
+    admin_source     TEXT NOT NULL DEFAULT 'manual',
+    admin_provider   TEXT NOT NULL DEFAULT '',
+    admin_subject    TEXT NOT NULL DEFAULT '',
+    adult_ceiling    TEXT NOT NULL DEFAULT '',
+    adult_choice     TEXT NOT NULL DEFAULT '',
+    pin_hash         TEXT NOT NULL DEFAULT '',
+    pin_failures     INTEGER NOT NULL DEFAULT 0,
+    pin_locked_until INTEGER NOT NULL DEFAULT 0,
+    -- Unused, kept so Renplay 4.5 can still open the library (it writes it).
+    adult_access     INTEGER NOT NULL DEFAULT 0
   );
+  CREATE TABLE identities (provider TEXT NOT NULL, subject TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id), password TEXT NOT NULL DEFAULT '', PRIMARY KEY(provider, subject));
+  CREATE TABLE identity_metadata (provider TEXT NOT NULL, subject TEXT NOT NULL, username TEXT NOT NULL, PRIMARY KEY(provider, subject));
+  CREATE TABLE sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), created_at INTEGER NOT NULL, touched_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '');
+  CREATE TABLE tokens (hash TEXT PRIMARY KEY, id TEXT NOT NULL UNIQUE, user_id INTEGER NOT NULL REFERENCES users(id), name TEXT NOT NULL, created_at INTEGER NOT NULL);
+  CREATE TABLE device_people (device TEXT NOT NULL, user_id INTEGER NOT NULL, seen_at INTEGER NOT NULL, PRIMARY KEY (device, user_id));
+  CREATE TABLE user_games (user_id INTEGER NOT NULL REFERENCES users(id), game TEXT NOT NULL, favorite_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', last_played_at TEXT NOT NULL DEFAULT '', play_time INTEGER NOT NULL DEFAULT 0, play_status TEXT NOT NULL DEFAULT '', rating INTEGER NOT NULL DEFAULT 0, not_now_at TEXT NOT NULL DEFAULT '', PRIMARY KEY(user_id, game));
+  CREATE TABLE play_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, game TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, seconds INTEGER NOT NULL);
+  CREATE INDEX play_sessions_user ON play_sessions (user_id, ended_at);
+  CREATE TABLE safe_games (game TEXT PRIMARY KEY);
+  CREATE TABLE save_meta (user_id INTEGER NOT NULL, save_dir TEXT NOT NULL, file TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', pinned_at TEXT NOT NULL DEFAULT '', PRIMARY KEY (user_id, save_dir, file));
+  CREATE TABLE walkthroughs (file TEXT PRIMARY KEY, game TEXT NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, added_at TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0);
+  CREATE INDEX walkthroughs_game ON walkthroughs (game, position);
+  CREATE TABLE art_made (key TEXT PRIMARY KEY, file1x TEXT NOT NULL, file2x TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL, made TEXT NOT NULL DEFAULT '', adult INTEGER NOT NULL DEFAULT 0, dark INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+  CREATE INDEX art_made_file1x ON art_made (file1x);
+  CREATE INDEX art_made_file2x ON art_made (file2x);
+  CREATE TABLE art_choices (game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, candidate TEXT NOT NULL, PRIMARY KEY (game, kind, scope));
+  CREATE TABLE art_uploads (id TEXT NOT NULL, game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, focal TEXT NOT NULL DEFAULT '', thumbhash TEXT NOT NULL, tint TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (id, game, kind, scope));
+  CREATE TABLE art_measured (id TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL);
 `
+
+/** The schema version SCHEMA creates and the migrations below reach. */
+const VERSION = 19
+/** The oldest library this version opens: Renplay 4.0's. */
+const OLDEST = 16
+
+/**
+ * The steps from one 4.x schema to the next. A library from before 4.0 is not opened: Renplay 4.5.1
+ * brings it up to date first.
+ */
+const MIGRATIONS: Record<number, (raw: DatabaseSync) => void> = {
+  // 4.1: a PIN to switch to a person on a device that is already signed in.
+  17: (raw) => {
+    const columns = columnsOf(raw, 'users')
+    if (!columns.includes('pin_hash')) raw.exec("ALTER TABLE users ADD COLUMN pin_hash TEXT NOT NULL DEFAULT ''")
+    if (!columns.includes('pin_failures')) raw.exec('ALTER TABLE users ADD COLUMN pin_failures INTEGER NOT NULL DEFAULT 0')
+    if (!columns.includes('pin_locked_until')) raw.exec('ALTER TABLE users ADD COLUMN pin_locked_until INTEGER NOT NULL DEFAULT 0')
+  },
+  // 4.1: the people who signed in on each browser (its cookie, hashed), the only ones Who is playing offers there.
+  18: (raw) => raw.exec('CREATE TABLE IF NOT EXISTS device_people (device TEXT NOT NULL, user_id INTEGER NOT NULL, seen_at INTEGER NOT NULL, PRIMARY KEY (device, user_id))'),
+  // 4.6: the installation's adult level from its 3.x setting moves to the current one, and a
+  // person's 3.x picture preference goes. The columns earlier versions wrote for 3.x stay (SCHEMA).
+  19: (raw) => {
+    raw.exec(`INSERT INTO settings (key, value)
+      SELECT 'adult_level', CASE value WHEN '"allow"' THEN '"shown"' ELSE '"off"' END FROM settings
+      WHERE key = 'adult_games' AND value IN ('"allow"', '"block"') AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'adult_level')`)
+    raw.exec("DELETE FROM settings WHERE key = 'adult_games'")
+    raw.exec("UPDATE users SET prefs = json_remove(prefs, '$.adultPictures') WHERE json_valid(prefs)")
+  },
+}
+
+function columnsOf(raw: DatabaseSync, table: string): string[] {
+  return raw.prepare(`PRAGMA table_info(${table})`).all().map((c) => String(c['name']))
+}
 
 export class Db {
   readonly raw: DatabaseSync
 
-  constructor(path: string, folders?: { saves: string; history: string }) {
+  constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
     this.raw = new DatabaseSync(path)
     this.raw.exec('PRAGMA journal_mode = WAL')
     this.raw.exec('PRAGMA synchronous = NORMAL')
     this.raw.exec('PRAGMA busy_timeout = 5000')
     try {
-    const v = (this.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
-    const oldSaves = folders?.saves ?? join(dirname(path), 'saves'), oldHistory = folders?.history ?? join(dirname(path), 'save-history')
-    const upgraded = v > 0 || path !== ':memory:' && (existsSync(oldSaves) || existsSync(oldHistory))
-    if (upgraded && v < 7 && path !== ':memory:') migrateAccountFolders(this.raw, dirname(path), oldSaves, oldHistory)
-    if (v === 0) this.raw.exec(SCHEMA)
-    // 2.2: title, tags and cover come from the catalog; nothing is set by hand.
-    if (v === 1) this.raw.exec('ALTER TABLE games DROP COLUMN save_dir_locked; ALTER TABLE games DROP COLUMN tags; ALTER TABLE games DROP COLUMN cover;')
-    if (v < 2) this.raw.exec('PRAGMA user_version = 2')
-    // 2.6: games of other engines (docs.renplay.org/engines). engine stays the Ren'Py runtime version.
-    if (v < 3) {
-      this.raw.exec(
-        "ALTER TABLE games ADD COLUMN family TEXT NOT NULL DEFAULT 'renpy'; ALTER TABLE games ADD COLUMN engine_label TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN entry TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 3",
-      )
+      const v = (this.raw.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+      if (v === 0) {
+        // A new library: its owner starts at Shown like any first admin, and sign-in is on.
+        this.raw.exec(`BEGIN; ${SCHEMA};
+          INSERT INTO users (id, username, name, role, adult_ceiling, adult_choice, created_at) VALUES (1, 'owner', 'Owner', 'admin', 'shown', 'shown', '${now()}');
+          INSERT INTO settings (key, value) VALUES ('auth_default', '"on"');
+          PRAGMA user_version = ${VERSION}; COMMIT;`)
+      } else if (v < OLDEST) {
+        throw new Error('This library was made by a Renplay older than 4.0. Start Renplay 4.5.1 on it once to bring it up to date, then this version.')
+      } else if (v > VERSION) {
+        throw new Error(`This library was made by a newer Renplay (database version ${v}). Start that version, or a newer one.`)
+      }
+      for (let next = v + 1; v !== 0 && next <= VERSION; next++) {
+        this.raw.exec('BEGIN')
+        MIGRATIONS[next]!(this.raw)
+        this.raw.exec(`PRAGMA user_version = ${next}; COMMIT`)
+      }
+    } catch (error) {
+      if (this.raw.isTransaction) this.raw.exec('ROLLBACK')
+      this.raw.close()
+      throw error
     }
-    // 2.10: favourites belong to the library entry, not its installed build.
-    if (v < 4) this.raw.exec("ALTER TABLE games ADD COLUMN favorite_at TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 4")
-    // 2.11: reading progress survives uninstall and rebuilds; saves are untouched.
-    if (v < 5) this.raw.exec("BEGIN; ALTER TABLE games ADD COLUMN finished_at TEXT NOT NULL DEFAULT ''; ALTER TABLE games ADD COLUMN play_time INTEGER NOT NULL DEFAULT 0; PRAGMA user_version = 5; COMMIT")
-    // 2.12: adult games can be switched off install-wide. A library that existed before keeps showing them.
-    if (v < 6) {
-      this.raw.exec('BEGIN; ALTER TABLE games ADD COLUMN adult INTEGER NOT NULL DEFAULT 0')
-      if (v > 0) this.raw.exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('adult_games', '\"allow\"')")
-      this.raw.exec('PRAGMA user_version = 6; COMMIT')
-    }
-    if (v < 7) {
-      this.raw.exec(`BEGIN;
-        CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','player')), adult_access INTEGER NOT NULL DEFAULT 0, disabled INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, prefs TEXT NOT NULL DEFAULT '{}');
-        CREATE TABLE IF NOT EXISTS identities (provider TEXT NOT NULL, subject TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id), password TEXT NOT NULL DEFAULT '', PRIMARY KEY(provider, subject));
-        CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), created_at INTEGER NOT NULL, touched_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '');
-        CREATE TABLE IF NOT EXISTS tokens (hash TEXT PRIMARY KEY, id TEXT NOT NULL UNIQUE, user_id INTEGER NOT NULL REFERENCES users(id), name TEXT NOT NULL, created_at INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS user_games (user_id INTEGER NOT NULL REFERENCES users(id), game TEXT NOT NULL, favorite_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', last_played_at TEXT NOT NULL DEFAULT '', play_time INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, game));
-        CREATE TABLE IF NOT EXISTS safe_games (game TEXT PRIMARY KEY);
-        INSERT OR IGNORE INTO users (id, username, name, role, adult_access, created_at) VALUES (1, 'owner', 'Owner', 'admin', 1, '${now()}');
-        INSERT OR IGNORE INTO user_games (user_id, game, favorite_at, finished_at, last_played_at, play_time) SELECT 1, id, favorite_at, finished_at, last_played_at, play_time FROM games;
-        INSERT OR IGNORE INTO settings (key, value) VALUES ('auth_default', '${JSON.stringify(upgraded ? 'off' : 'on')}');
-        PRAGMA user_version = 7; COMMIT;
-      `)
-    }
-    // Upload ownership is separate from the scan cache: rescans must not claim copied files.
-    if (v < 8) this.raw.exec(`BEGIN;
-      CREATE TABLE IF NOT EXISTS uploaded_archives (path TEXT PRIMARY KEY, identity TEXT NOT NULL);
-      PRAGMA user_version = 8; COMMIT;
-    `)
-    if (v < 9) {
-      const columns = this.raw.prepare('PRAGMA table_info(users)').all().map(c => c.name)
-      this.raw.exec('BEGIN')
-      if (!columns.includes('avatar')) this.raw.exec("ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT ''")
-      if (!columns.includes('avatar_uploaded')) this.raw.exec('ALTER TABLE users ADD COLUMN avatar_uploaded INTEGER NOT NULL DEFAULT 0')
-      this.raw.exec('PRAGMA user_version = 9; COMMIT')
-    }
-    if (v < 10) {
-      const columns = this.raw.prepare('PRAGMA table_info(users)').all().map(c => c.name)
-      this.raw.exec('BEGIN')
-      if (!columns.includes('admin_source')) this.raw.exec("ALTER TABLE users ADD COLUMN admin_source TEXT NOT NULL DEFAULT 'manual'")
-      if (!columns.includes('admin_provider')) this.raw.exec("ALTER TABLE users ADD COLUMN admin_provider TEXT NOT NULL DEFAULT ''")
-      if (!columns.includes('admin_subject')) this.raw.exec("ALTER TABLE users ADD COLUMN admin_subject TEXT NOT NULL DEFAULT ''")
-      this.raw.exec(`CREATE TABLE IF NOT EXISTS identity_metadata (provider TEXT NOT NULL, subject TEXT NOT NULL, username TEXT NOT NULL, PRIMARY KEY(provider, subject));
-        PRAGMA user_version = 10; COMMIT;`)
-    }
-    // 4.0: three adult levels. The 3.x access becomes the ceiling. The choice keeps what the person
-    // saw: their 3.x picture preference (show, hide-pictures, hide-games), where hide-pictures was
-    // also the default. adult_access and prefs stay written (content.ts legacyMirror) so a
-    // downgrade to 3.2 reads the same levels.
-    if (v < 11) {
-      const columns = this.raw.prepare('PRAGMA table_info(users)').all().map(c => c.name)
-      this.raw.exec('BEGIN')
-      if (!columns.includes('adult_ceiling')) this.raw.exec("ALTER TABLE users ADD COLUMN adult_ceiling TEXT NOT NULL DEFAULT ''")
-      if (!columns.includes('adult_choice')) this.raw.exec("ALTER TABLE users ADD COLUMN adult_choice TEXT NOT NULL DEFAULT ''")
-      this.raw.exec(`UPDATE users SET
-        adult_ceiling = CASE adult_access WHEN 1 THEN 'shown' ELSE 'off' END,
-        adult_choice = CASE
-          WHEN adult_access != 1 THEN 'off'
-          WHEN (CASE WHEN json_valid(prefs) THEN json_extract(prefs, '$.adultPictures') END) = 'show' THEN 'shown'
-          WHEN (CASE WHEN json_valid(prefs) THEN json_extract(prefs, '$.adultPictures') END) = 'hide-games' THEN 'off'
-          ELSE 'blurred' END
-        WHERE adult_ceiling = ''`)
-      // A new database has only the owner, who starts at shown like any first admin.
-      if (v === 0) this.raw.exec("UPDATE users SET adult_choice = 'shown' WHERE id = 1 AND adult_ceiling = 'shown'")
-      this.raw.exec('PRAGMA user_version = 11; COMMIT')
-    }
-    // 4.0: the art cache (art.ts). Made pictures by the key of their source and method, the
-    // choices of each person (scope = user id) and of the admin for everyone (scope 0), uploads,
-    // and the sizes of catalog pictures the index gave none for. Choices and uploads outlive a
-    // removed game, like saves.
-    if (v < 12) this.raw.exec(`BEGIN;
-      CREATE TABLE IF NOT EXISTS art_made (key TEXT PRIMARY KEY, file1x TEXT NOT NULL, file2x TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL, made TEXT NOT NULL DEFAULT '', adult INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS art_made_file1x ON art_made (file1x);
-      CREATE INDEX IF NOT EXISTS art_made_file2x ON art_made (file2x);
-      CREATE TABLE IF NOT EXISTS art_choices (game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, candidate TEXT NOT NULL, PRIMARY KEY (game, kind, scope));
-      CREATE TABLE IF NOT EXISTS art_uploads (id TEXT NOT NULL, game TEXT NOT NULL, kind TEXT NOT NULL, scope INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, focal TEXT NOT NULL DEFAULT '', thumbhash TEXT NOT NULL, tint TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (id, game, kind, scope));
-      CREATE TABLE IF NOT EXISTS art_measured (id TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL);
-      PRAGMA user_version = 12; COMMIT;`)
-    // 4.0: a made logo knows whether it is dark lettering, so it is inverted on ink even when the
-    // catalog does not say so. Pictures made before are made again (art.ts ART_VERSION).
-    if (v < 13) {
-      const columns = this.raw.prepare('PRAGMA table_info(art_made)').all().map(c => c.name)
-      this.raw.exec('BEGIN')
-      if (!columns.includes('dark')) this.raw.exec('ALTER TABLE art_made ADD COLUMN dark INTEGER NOT NULL DEFAULT 0')
-      this.raw.exec('PRAGMA user_version = 13; COMMIT')
-    }
-    // 4.0: each person's status, rating and Not now for a game, and their play sessions for
-    // History. A finished game becomes the status Finished, and finished_at stays in step so a
-    // downgrade to 3.2 still shows it finished.
-    if (v < 14) {
-      const columns = this.raw.prepare('PRAGMA table_info(user_games)').all().map(c => c.name)
-      this.raw.exec('BEGIN')
-      if (!columns.includes('play_status')) this.raw.exec("ALTER TABLE user_games ADD COLUMN play_status TEXT NOT NULL DEFAULT ''")
-      if (!columns.includes('rating')) this.raw.exec('ALTER TABLE user_games ADD COLUMN rating INTEGER NOT NULL DEFAULT 0')
-      if (!columns.includes('not_now_at')) this.raw.exec("ALTER TABLE user_games ADD COLUMN not_now_at TEXT NOT NULL DEFAULT ''")
-      this.raw.exec(`UPDATE user_games SET play_status = 'finished' WHERE finished_at != '' AND play_status = '';
-        CREATE TABLE IF NOT EXISTS play_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, game TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, seconds INTEGER NOT NULL);
-        CREATE INDEX IF NOT EXISTS play_sessions_user ON play_sessions (user_id, ended_at);
-        PRAGMA user_version = 14; COMMIT;`)
-    }
-    // 4.0: several walkthrough files per game, each with a title and a place in the list. The 3.x
-    // walkthrough becomes the first, and games.walkthrough stays the first file so 3.2 finds it.
-    if (v < 15) this.raw.exec(`BEGIN;
-      CREATE TABLE IF NOT EXISTS walkthroughs (file TEXT PRIMARY KEY, game TEXT NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, added_at TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0);
-      CREATE INDEX IF NOT EXISTS walkthroughs_game ON walkthroughs (game, position);
-      INSERT OR IGNORE INTO walkthroughs (file, game, title, kind, added_at, position) SELECT walkthrough, id, 'Walkthrough', 'pdf', COALESCE(NULLIF(installed_at, ''), '${now()}'), 0 FROM games WHERE walkthrough != '';
-      PRAGMA user_version = 15; COMMIT;`)
-    // 4.0: each person's name, note and pin for a save file. A pinned save keeps every version
-    // in its history (saves/store.ts). The file itself is untouched.
-    if (v < 16) this.raw.exec(`BEGIN;
-      CREATE TABLE IF NOT EXISTS save_meta (user_id INTEGER NOT NULL, save_dir TEXT NOT NULL, file TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', pinned_at TEXT NOT NULL DEFAULT '', PRIMARY KEY (user_id, save_dir, file));
-      PRAGMA user_version = 16; COMMIT;`)
-    // 4.1: a PIN to switch to a person on a device that is already signed in.
-    if (v < 17) {
-      const columns = this.raw.prepare('PRAGMA table_info(users)').all().map((c) => c.name)
-      this.raw.exec('BEGIN')
-      if (!columns.includes('pin_hash')) this.raw.exec("ALTER TABLE users ADD COLUMN pin_hash TEXT NOT NULL DEFAULT ''")
-      if (!columns.includes('pin_failures')) this.raw.exec('ALTER TABLE users ADD COLUMN pin_failures INTEGER NOT NULL DEFAULT 0')
-      if (!columns.includes('pin_locked_until')) this.raw.exec('ALTER TABLE users ADD COLUMN pin_locked_until INTEGER NOT NULL DEFAULT 0')
-      this.raw.exec('PRAGMA user_version = 17; COMMIT')
-    }
-    // 4.1: the people who signed in on each browser (its cookie, hashed), the only ones Who is playing offers there.
-    if (v < 18) this.raw.exec(`BEGIN;
-      CREATE TABLE IF NOT EXISTS device_people (device TEXT NOT NULL, user_id INTEGER NOT NULL, seen_at INTEGER NOT NULL, PRIMARY KEY (device, user_id));
-      PRAGMA user_version = 18; COMMIT;`)
-    } catch (error) { this.raw.close(); throw error }
   }
 
-  /**
-   * Opens library.db. The database of renplay 1.x / 2.0 (renplay.db) described
-   * the old build layout and is dropped; saves live in files and are untouched.
-   */
-  static open(dataDir: string, folders?: { saves: string; history: string }): Db {
-    for (const old of ['renplay.db', 'renplay.db-wal', 'renplay.db-shm']) {
-      const p = join(dataDir, old)
-      if (existsSync(p)) {
-        rmSync(p, { force: true })
-        if (old === 'renplay.db') log('server', 'Removed the old library database (renplay.db)')
-      }
-    }
-    return new Db(join(dataDir, 'library.db'), folders)
+  static open(dataDir: string): Db {
+    return new Db(join(dataDir, 'library.db'))
   }
 
   // ---- games -------------------------------------------------------------
@@ -351,11 +293,6 @@ export class Db {
   /** A game's walkthrough files, in their order. */
   walkthroughs(game: string): WalkthroughRow[] {
     return this.raw.prepare('SELECT * FROM walkthroughs WHERE game = ? ORDER BY position, added_at').all(game) as unknown as WalkthroughRow[]
-  }
-
-  /** Keeps games.walkthrough the first file, which Renplay 3.x reads. */
-  syncFirstWalkthrough(game: string): void {
-    this.raw.prepare('UPDATE games SET walkthrough = ? WHERE id = ?').run(this.walkthroughs(game)[0]?.file ?? '', game)
   }
 
   deleteGame(id: string): boolean {

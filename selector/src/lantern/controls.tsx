@@ -1,11 +1,17 @@
+import { Loader2 } from 'lucide-react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-/** The pill: the one button shape. Primary is the brand gradient (one lit pill per visible task), plate secondary, quiet text, danger red text. */
+/**
+ * The pill: the one button shape. Primary is the brand gradient (one lit pill per visible task),
+ * plate secondary, quiet text, danger red text. While `loading` it spins and takes no taps.
+ */
 export function Pill({
   variant = 's',
   size,
   icon,
+  loading,
+  disabled,
   href,
   to,
   className,
@@ -15,6 +21,7 @@ export function Pill({
   variant?: 'p' | 's' | 'q' | 'd'
   size?: 'sm' | 'lg'
   icon?: ReactNode
+  loading?: boolean
   href?: string
   to?: string
   target?: string
@@ -24,7 +31,7 @@ export function Pill({
   const cls = `btn ${variant} ${size ?? ''} ${className ?? ''}`.replace(/\s+/g, ' ').trim()
   const body = (
     <>
-      {icon}
+      {loading ? <Loader2 className="animate-spin" /> : icon}
       {children}
     </>
   )
@@ -43,7 +50,7 @@ export function Pill({
     )
   }
   return (
-    <button type="button" className={cls} {...rest}>
+    <button type="button" className={cls} disabled={disabled || loading} {...rest}>
       {body}
     </button>
   )
@@ -125,7 +132,7 @@ export function LanternSwitch({ checked, onChange, label }: { checked: boolean; 
   return <button type="button" role="switch" aria-checked={checked} aria-label={label} className={`sw ${checked ? 'on' : ''}`} onClick={() => onChange?.(!checked)} />
 }
 
-export type SourceKind = 'def' | 'here' | 'you' | 'admin' | 'admin-you' | 'group' | 'server'
+type SourceKind = 'def' | 'here' | 'you' | 'admin' | 'admin-you' | 'group' | 'server'
 
 /** Every value says where it comes from. */
 export function SourceLabel({ kind, label, onReset }: { kind: SourceKind; label?: string; onReset?: () => void }) {
@@ -152,19 +159,11 @@ export function Tag({ dim, children }: { dim?: boolean; children: ReactNode }) {
 }
 
 /** A progress bar in the brand gradient. */
-export function Bar({ value, thin, style }: { value: number; thin?: boolean; style?: CSSProperties }) {
+/** A progress bar, `value` from 0 to 1. Indeterminate: a shimmer while the size is not known yet. */
+export function Bar({ value, thin, indeterminate, style }: { value: number; thin?: boolean; indeterminate?: boolean; style?: CSSProperties }) {
   return (
     <div className={`bar ${thin ? 'thin' : ''}`} style={style}>
-      <i style={{ width: `${Math.max(2, Math.min(100, value * 100))}%` }} />
-    </div>
-  )
-}
-
-export function Notice({ tone, icon, children }: { tone?: 'amber' | 'red' | 'green'; icon: ReactNode; children: ReactNode }) {
-  return (
-    <div className={`notice ${tone ?? ''}`.trim()}>
-      {icon}
-      <div className="grow">{children}</div>
+      {indeterminate ? <div className="skeleton" style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} /> : <i style={{ width: `${Math.max(2, Math.min(100, value * 100))}%` }} />}
     </div>
   )
 }

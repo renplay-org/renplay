@@ -21,13 +21,15 @@ fi
 export GAMES_DIR="${GAMES_DIR:-/games}"
 export DATA_DIR="${DATA_DIR:-/data}"
 export RENPLAY_DIR="${RENPLAY_DIR:-$GAMES_DIR/_renplay}"
-export RENPLAY_RUNTIME_PATH=/app/runtime/renplay-runtime.js
+# The server's port inside the container, which nginx forwards to.
+export PORT="${PORT:-3000}"
 export HOME="${HOME:-/tmp/home}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-# RENPLAY_LOG_LEVEL also decides which requests nginx logs (the server reads it for its own lines).
-# The rules match "<path is worth logging>:<the request's level>".
-case "${RENPLAY_LOG_LEVEL:-info}" in
+# RENPLAY_LOG_LEVEL also decides which requests nginx logs (the server reads it for its own lines,
+# trimmed and in any case, as here). The rules match "<path is worth logging>:<the request's level>".
+log_level=$(printf '%s' "${RENPLAY_LOG_LEVEL:-info}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+case "$log_level" in
   debug) log_rules='"~^1:" 1;' nginx_errors=warn ;;
   warn) log_rules='"~^1:(warn|error)" 1;' nginx_errors=warn ;;
   error) log_rules='"~^1:error" 1;' nginx_errors=error ;;
@@ -36,7 +38,7 @@ esac
 export RENPLAY_LOG_RULES="$log_rules" RENPLAY_NGINX_ERRORS="$nginx_errors"
 
 mkdir -p /tmp/nginx "$HOME" "$DATA_DIR" "$RENPLAY_DIR/engines"
-envsubst '${GAMES_DIR} ${DATA_DIR} ${RENPLAY_DIR} ${RENPLAY_LOG_RULES} ${RENPLAY_NGINX_ERRORS}' < /app/deploy/nginx.conf.template > /tmp/nginx/nginx.conf
+envsubst '${PORT} ${GAMES_DIR} ${DATA_DIR} ${RENPLAY_DIR} ${RENPLAY_LOG_RULES} ${RENPLAY_NGINX_ERRORS}' < /app/deploy/nginx.conf.template > /tmp/nginx/nginx.conf
 
 node /app/server/dist/index.js &
 server=$!
@@ -47,7 +49,7 @@ for _ in $(seq 1 80); do
     exit 1
   fi
   # Quiet: the server is expected to refuse connections until it is listening.
-  if curl -fs -o /dev/null http://127.0.0.1:3000/api/health; then
+  if curl -fs -o /dev/null "http://127.0.0.1:$PORT/api/health"; then
     break
   fi
   sleep 0.25

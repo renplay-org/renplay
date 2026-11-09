@@ -1,7 +1,7 @@
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
-import * as avatars from '../avatars.js'
+import * as avatars from '../accounts/avatars.js'
 import { signInFixture, mockOidc, site } from './sign-in-fixture.js'
 
 let provider: Awaited<ReturnType<typeof mockOidc>>, app: Awaited<ReturnType<typeof signInFixture>>
@@ -20,13 +20,13 @@ describe('OIDC authorization code sign-in', () => {
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
     provider.setClaims({ groups: ['admins', 'adults'] })
     const agent = await start({ oidcAdminGroup: 'admins', oidcAdultGroups: { adults: 'shown' } })
-    await app.accounts.store(1).write('test', 'persistent', Buffer.from('owner save'))
+    await app.services.saveStores.of(1).write('test', 'persistent', Buffer.from('owner save'))
     expect((await callback(agent)).status).toBe(302)
     expect(provider.authorize?.searchParams.get('code_challenge_method')).toBe('S256')
     expect(provider.authorize?.searchParams.get('scope')).toBe('openid profile email groups')
     expect(provider.tokenBody?.get('code_verifier')).toHaveLength(43)
     expect((await agent.get('/api/me')).body).toMatchObject({ user: { id: 1, role: 'admin', adult_ceiling: 'shown', adult_choice: 'shown' }, unclaimed: false })
-    expect((await app.accounts.store(1).read('test', 'persistent')).toString()).toBe('owner save')
+    expect((await app.services.saveStores.of(1).read('test', 'persistent')).toString()).toBe('owner save')
     const users = (await agent.get('/api/users')).body.users
     expect(users[0]).toMatchObject({ roleManaged: true, adultManaged: true })
     await agent.put('/api/users/1').set(site).send({ adultCeiling: 'off' }).expect(409)
@@ -101,14 +101,14 @@ describe('OIDC authorization code sign-in', () => {
     expect((await callback(agent)).status).toBe(302)
     const id = (await agent.get('/api/me')).body.user.id
     expect(id).toBe(2)
-    await app.accounts.store(1).write('test', 'persistent', Buffer.from('owner save'))
-    await app.accounts.store(id).write('test', '1-1.save', Buffer.from('personal save'))
+    await app.services.saveStores.of(1).write('test', 'persistent', Buffer.from('owner save'))
+    await app.services.saveStores.of(id).write('test', '1-1.save', Buffer.from('personal save'))
     provider.setClaims({ groups: ['admins'] })
     expect((await callback(agent)).status).toBe(302)
     await agent.post('/api/me/claim-owner').set(site).send({}).expect(200)
     expect((await agent.get('/api/me')).body).toMatchObject({ user: { id: 1, adult_ceiling: 'off' }, unclaimed: false })
-    expect((await app.accounts.store(1).read('test', 'persistent')).toString()).toBe('owner save')
-    expect((await app.accounts.store(1).read('test', '1-1.save')).toString()).toBe('personal save')
+    expect((await app.services.saveStores.of(1).read('test', 'persistent')).toString()).toBe('owner save')
+    expect((await app.services.saveStores.of(1).read('test', '1-1.save')).toString()).toBe('personal save')
   })
   it('honors auto-create off but permits explicit linking, rejects an identity belonging to someone else and keeps the last method', async () => {
     const agent = await start({ oidcAutoCreate: false, adminUsername: 'admin', adminPassword: 'local password' })

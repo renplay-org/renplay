@@ -16,20 +16,13 @@
  *   caches (Unity's) are refused: the game fetches again instead of holding
  *   them in memory.
  *
- * It also tells the player when the game is ready, mutes on request (media
- * elements and Web Audio), and reports Esc held in fullscreen.
+ * It also tells the player when the game is ready and mutes media elements on
+ * request. Messages, Web Audio muting and Esc come from renplay-player.js, which
+ * the server puts in front of this script.
  */
 ;(function () {
   'use strict'
-  var cfg = window.__renplay || {}
   var parentWin = window.parent
-  function post(type, data) {
-    var msg = { type: 'renplay:' + type, game: cfg.id, userId: cfg.userId }
-    if (data) for (var k in data) msg[k] = data[k]
-    // Only the player, on Renplay's own address, may read it. A sandboxed page's own origin is
-    // opaque, but its address still names Renplay's.
-    parentWin.postMessage(msg, location.origin)
-  }
 
   // ------------------------------------------------------------- storage
 
@@ -377,34 +370,6 @@
 
   // ------------------------------------------------------------- mute
 
-  var muted = false
-  var outputs = []
-  if (typeof AudioNode !== 'undefined' && typeof AudioDestinationNode !== 'undefined') {
-    var nativeConnect = AudioNode.prototype.connect
-    var nativeDisconnect = AudioNode.prototype.disconnect
-    var gains = new Map()
-    var outputFor = function (dest) {
-      var g = gains.get(dest)
-      if (!g) {
-        g = dest.context.createGain()
-        g.gain.value = muted ? 0 : 1
-        nativeConnect.call(g, dest)
-        gains.set(dest, g)
-        outputs.push(g)
-      }
-      return g
-    }
-    var redirect = function (native) {
-      return function (target) {
-        if (!(target instanceof AudioDestinationNode)) return native.apply(this, arguments)
-        var args = Array.prototype.slice.call(arguments)
-        args[0] = outputFor(target)
-        return native.apply(this, args)
-      }
-    }
-    AudioNode.prototype.connect = redirect(nativeConnect)
-    AudioNode.prototype.disconnect = redirect(nativeDisconnect)
-  }
   // Media elements follow the player's choice; the game's own muting is kept apart.
   var own = new WeakMap()
   var mutedDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'muted')
@@ -416,12 +381,12 @@
       },
       set: function (v) {
         own.set(this, !!v)
-        mutedDesc.set.call(this, !!v || muted)
+        mutedDesc.set.call(this, !!v || isMuted())
       },
     })
   }
   function applyMedia(el) {
-    if (mutedDesc && mutedDesc.set) mutedDesc.set.call(el, muted || (own.has(el) && own.get(el)))
+    if (mutedDesc && mutedDesc.set) mutedDesc.set.call(el, isMuted() || (own.has(el) && own.get(el)))
   }
   var nativePlay = HTMLMediaElement.prototype.play
   HTMLMediaElement.prototype.play = function () {
@@ -429,10 +394,7 @@
     return nativePlay.apply(this, arguments)
   }
   function setMuted(on) {
-    muted = !!on
-    outputs.forEach(function (g) {
-      g.gain.value = muted ? 0 : 1
-    })
+    setAudioMuted(on)
     Array.prototype.forEach.call(document.querySelectorAll('audio, video'), applyMedia)
   }
 
@@ -469,21 +431,6 @@
         break
     }
   })
-
-  window.addEventListener(
-    'keydown',
-    function (e) {
-      if (e.key === 'Escape' && !e.repeat) post('escape', { down: true })
-    },
-    true,
-  )
-  window.addEventListener(
-    'keyup',
-    function (e) {
-      if (e.key === 'Escape') post('escape', { down: false })
-    },
-    true,
-  )
 
   window.addEventListener('load', function () {
     post('ready')

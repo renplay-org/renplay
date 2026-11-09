@@ -1,17 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Copy, FolderOpen, Laptop } from 'lucide-react'
+import { Copy, FolderOpen, Laptop } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useRoom } from '../lantern/Room'
 import { api } from '../lib/api'
+import { deviceHeaders } from '../lib/device'
 import { readZip } from '../lib/zipread'
-import { Button, Progress, Spinner, errorText, useToast } from '../components/ui'
-
-interface Index {
-  dirs: Record<string, Record<string, { mtime: number; size: number }>>
-  games: Record<string, { id: string; title: string }>
-  catalog: Record<string, string>
-}
+import { Spinner, errorText, useToast } from '../lantern/ui'
+import type { SaveImportIndex } from '@shared/api'
+import { computerSystem, type ComputerSystem } from '../lib/platform'
+import { Bar, Pill } from '../lantern/controls'
+import BackLink from '../components/BackLink'
 
 /** A file found in the chosen folder or zip, by its path from the Ren'Py folder. */
 interface Found {
@@ -21,19 +19,11 @@ interface Found {
   read: () => Promise<Blob>
 }
 
-type Computer = 'mac' | 'windows' | 'linux'
 
-const FOLDERS: Record<Computer, { name: string; path: string; how: string }> = {
+const FOLDERS: Record<ComputerSystem, { name: string; path: string; how: string }> = {
   mac: { name: 'a Mac', path: '~/Library/RenPy', how: 'In the folder window press Shift, Command and G, paste the path, then choose the folder.' },
   windows: { name: 'Windows', path: '%APPDATA%\\RenPy', how: 'Paste the path into the folder window’s address bar, then choose the folder.' },
   linux: { name: 'Linux', path: '~/.renpy', how: 'In the folder window press Control and L, paste the path, then choose the folder.' },
-}
-
-function computer(): Computer | null {
-  const ua = navigator.userAgent.toLowerCase()
-  if (/iphone|ipad|android/.test(ua) || (ua.includes('mac') && navigator.maxTouchPoints > 1)) return null
-  const p = (((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || ua) as string).toLowerCase()
-  return p.includes('mac') ? 'mac' : p.includes('win') ? 'windows' : p.includes('linux') ? 'linux' : null
 }
 
 /** Where a file goes: `<save folder>/<file>` for saves and persistent data, the save keys, or nothing. */
@@ -61,7 +51,7 @@ function collect(items: Array<{ path: string; size: number; mtime: number; read:
 
 type State = 'new' | 'newer' | 'older' | 'same'
 
-function compare(index: Index, f: Found): State {
+function compare(index: SaveImportIndex, f: Found): State {
   const [dir, name] = [f.rel.slice(0, f.rel.indexOf('/')), f.rel.slice(f.rel.indexOf('/') + 1)]
   const there = index.dirs[dir]?.[name]
   if (!there) return 'new'
@@ -78,7 +68,7 @@ interface Row {
   counts: Record<State, number>
 }
 
-function rowsOf(index: Index, found: Found[]): Row[] {
+function rowsOf(index: SaveImportIndex, found: Found[]): Row[] {
   const rows = new Map<string, Row>()
   for (const f of found) {
     if (f.rel.startsWith('tokens/')) continue
@@ -111,9 +101,9 @@ export default function ImportSaves() {
   useRoom({ game: null, quiet: true })
   const qc = useQueryClient()
   const toast = useToast()
-  const system = computer()
+  const system = computerSystem()
   const folder = system ? FOLDERS[system] : null
-  const index = useQuery({ queryKey: ['saves-import'], queryFn: () => api<Index>('/api/saves-import') })
+  const index = useQuery({ queryKey: ['saves-import'], queryFn: () => api<SaveImportIndex>('/api/saves-import') })
   const dirInput = useRef<HTMLInputElement>(null)
   const zipInput = useRef<HTMLInputElement>(null)
   const [found, setFound] = useState<Found[] | null>(null)
@@ -160,7 +150,7 @@ export default function ImportSaves() {
         const form = new FormData()
         form.append('meta', JSON.stringify(batch.map((f) => ({ path: f.rel, mtime: f.mtime }))))
         for (const f of batch) form.append('files', await f.read(), f.rel.split('/').pop()!)
-        const res = await fetch('/api/saves-import', { method: 'POST', body: form })
+        const res = await fetch('/api/saves-import', { method: 'POST', body: form, headers: deviceHeaders() })
         const r = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(r.error || (res.status === 413 ? 'Those files are too large to send at once.' : 'The import failed. Try again.'))
         for (const k of Object.keys(total) as Array<keyof typeof total>) total[k] += r[k] ?? 0
@@ -190,9 +180,7 @@ export default function ImportSaves() {
   return (
     <div className="stack page-col" style={{ gap: 24 }}>
       <header>
-        <Link to="/settings" className="link small row" style={{ gap: 6, minHeight: 'var(--hit)', width: 'fit-content' }}>
-          <ArrowLeft className="size-4" /> Settings
-        </Link>
+        <BackLink to="/settings" desktop />
         <h1 className="h1">Import saves from a computer</h1>
         <p className="muted-2" style={{ marginTop: 8 }}>
           Bring the saves you made in desktop Ren’Py. Choose the Ren’Py save folder and Renplay matches each game.
@@ -227,10 +215,10 @@ export default function ImportSaves() {
             .{done.keys ? ' Saves from that computer load without a warning.' : ''}
           </p>
           <div className="row wrap" style={{ gap: 8 }}>
-            <Button variant="primary" to="/">
+            <Pill variant="p" to="/">
               Library
-            </Button>
-            <Button onClick={() => setDone(null)}>Import more</Button>
+            </Pill>
+            <Pill onClick={() => setDone(null)}>Import more</Pill>
           </div>
         </section>
       ) : !found ? (
@@ -243,17 +231,17 @@ export default function ImportSaves() {
                   <p>This looks like {folder.name}. Ren’Py keeps saves here:</p>
                   <div className="row wrap" style={{ gap: 8 }}>
                     <code className="path-chip">{folder.path}</code>
-                    <Button
+                    <Pill
                       size="sm"
                       icon={<Copy />}
                       onClick={() => void navigator.clipboard?.writeText(folder.path).then(() => toast('Copied', 'success'), () => toast('Select the path and copy it.'))}
                     >
                       Copy
-                    </Button>
+                    </Pill>
                   </div>
                   <p className="small muted">{folder.how}</p>
                   <p className="xs muted">
-                    {(Object.keys(FOLDERS) as Computer[])
+                    {(Object.keys(FOLDERS) as ComputerSystem[])
                       .filter((k) => k !== system)
                       .map((k) => `On ${FOLDERS[k].name.replace(/^a /, '')} the folder is ${FOLDERS[k].path}.`)
                       .join(' ')}
@@ -261,12 +249,12 @@ export default function ImportSaves() {
                 </div>
               </div>
               <div className="row wrap" style={{ gap: 8 }}>
-                <Button variant="primary" icon={<FolderOpen />} onClick={() => dirInput.current?.click()}>
+                <Pill variant="p" icon={<FolderOpen />} onClick={() => dirInput.current?.click()}>
                   Choose the Ren’Py folder
-                </Button>
-                <Button loading={reading} onClick={() => zipInput.current?.click()}>
+                </Pill>
+                <Pill loading={reading} onClick={() => zipInput.current?.click()}>
                   Or a zip of it
-                </Button>
+                </Pill>
               </div>
             </>
           ) : (
@@ -276,9 +264,9 @@ export default function ImportSaves() {
                 that folder here, you can choose it.
               </p>
               <div>
-                <Button loading={reading} onClick={() => zipInput.current?.click()}>
+                <Pill loading={reading} onClick={() => zipInput.current?.click()}>
                   Choose a zip
-                </Button>
+                </Pill>
               </div>
             </>
           )}
@@ -309,16 +297,16 @@ export default function ImportSaves() {
               ))}
             </div>
           )}
-          {progress !== null && <Progress value={progress * 100} />}
+          {progress !== null && <Bar value={progress} />}
           <div className="row wrap" style={{ gap: 8 }}>
             {send.length > 0 && (
-              <Button variant="primary" loading={progress !== null} onClick={() => void run()}>
+              <Pill variant="p" loading={progress !== null} onClick={() => void run()}>
                 {saves ? `Import ${plural(saves, 'save')}` : 'Import the save keys'}
-              </Button>
+              </Pill>
             )}
-            <Button variant="ghost" disabled={progress !== null} onClick={() => setFound(null)}>
+            <Pill variant="q" disabled={progress !== null} onClick={() => setFound(null)}>
               {send.length ? 'Cancel' : 'Back'}
-            </Button>
+            </Pill>
           </div>
           <p className="xs muted">
             Older copies never replace newer ones: they are kept in History. Saves for games you do not have yet wait on the server and appear when

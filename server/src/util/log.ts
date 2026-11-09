@@ -73,12 +73,6 @@ export function routeConsole(): void {
   }
 }
 
-/** 812 B, 64 KB, 3.2 MB: a size for people. */
-export function size(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
 
 /** 3 m 12 s, 840 ms: a duration for people. */
 export function took(ms: number): string {

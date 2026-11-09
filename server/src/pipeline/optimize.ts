@@ -68,7 +68,7 @@ export class ImageProcessor {
  * image loader detects the format from the file contents, so scripts that
  * reference "bg.png" keep working.
  */
-export async function transcodeImage(data: Buffer, rel: string, policy: ImagePolicy): Promise<TranscodeResult> {
+async function transcodeImage(data: Buffer, rel: string, policy: ImagePolicy): Promise<TranscodeResult> {
   if (!policy.enabled || data.length < 2048 || !isOptimizableImage(rel)) return { data, changed: false }
   // Already WebP (some games ship mislabeled files).
   if (data.subarray(0, 4).toString('latin1') === 'RIFF' && data.subarray(8, 12).toString('latin1') === 'WEBP') {

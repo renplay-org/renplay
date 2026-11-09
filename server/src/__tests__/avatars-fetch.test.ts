@@ -3,7 +3,7 @@ import { Readable } from 'node:stream'
 import { request } from 'node:https'
 import { lookup } from 'node:dns'
 import { beforeEach, expect, it, vi } from 'vitest'
-import { AVATAR_LIMIT, fetchAvatar } from '../avatars.js'
+import { AVATAR_LIMIT, fetchAvatar } from '../accounts/avatars.js'
 
 vi.mock('node:https', () => ({ request: vi.fn() }))
 vi.mock('node:dns', () => ({ lookup: vi.fn() }))

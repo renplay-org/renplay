@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ArtStore, catalogPictures, enlarges, keeps, planFormat, type CatalogImage, type Picture } from '../art.js'
+import { ArtStore, catalogPictures, enlarges, keeps, planFormat, type Picture } from '../art/store.js'
+import type { CatalogImage } from '../shared/recipe.js'
 import type { Config } from '../config.js'
 import { Db } from '../db.js'
 import { isPrivateAddress, resolver } from '../util/net.js'
@@ -101,7 +102,7 @@ describe('the art cache', () => {
       fetched.push(u)
       const body = files[u]
       if (!body) return new Response('missing', { status: 404 })
-      return new Response(body, { status: 200, headers: { 'content-type': 'image/png' } })
+      return new Response(new Uint8Array(body), { status: 200, headers: { 'content-type': 'image/png' } })
     })
   })
   afterEach(() => {
@@ -155,7 +156,7 @@ describe('the art cache', () => {
     const subject = Buffer.from('<svg width="200" height="200"><circle cx="100" cy="100" r="90" fill="rgb(220,40,40)"/></svg>')
     const poster = await sharp({ create: { width: 600, height: 900, channels: 3, background: '#2a2a40' } })
       .composite([{ input: subject, left: 200, top: 150 }, { input: title, left: 0, top: 680 }]).png().toBuffer()
-    const { focalOf } = await import('../art.js')
+    const { focalOf } = await import('../art/store.js')
     const [, y] = await focalOf(poster, { width: 600, height: 900 }, null, 0.6)
     expect(y).toBeLessThan(0.6)
     expect(await focalOf(poster, { width: 600, height: 900 }, [0.5, 0.85], 0.6)).toEqual([0.5, 0.85])

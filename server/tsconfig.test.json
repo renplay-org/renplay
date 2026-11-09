@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    // The tests type check parts of the library too, and the library names the shared contract
+    // the same way the selector's build does.
+    "paths": { "@shared/*": ["./src/shared/*"] }
+  },
+  "include": ["src"],
+  "exclude": []
+}

@@ -582,6 +582,12 @@ main.mid {
   font-size: 12px;
   color: var(--fg-4);
 }
+/* On a phone the footer wraps, and a dot would end a line: the gap alone separates the links. */
+@media (max-width: 639px) {
+  .foot > .sep {
+    display: none;
+  }
+}
 @media (min-width: 720px) {
   .foot {
     padding: 10px var(--gutter) 40px;
@@ -1851,26 +1857,32 @@ select.input option {
     opacity: 1;
   }
 }
+/* The way back, one pill: above a page's title, and on the stage over the art. */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  margin-bottom: 12px;
+  padding: 0 12px 0 8px;
+  border-radius: 999px;
+  background: var(--plate);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.back svg {
+  width: 15px;
+  height: 15px;
+}
 .stage .back {
   position: absolute;
   z-index: 3;
   top: 12px;
   left: var(--gutter);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 12px 0 8px;
-  border-radius: 999px;
+  margin: 0;
   background: rgba(8, 8, 12, 0.5);
   backdrop-filter: blur(8px);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fg-2);
-}
-.stage .back svg {
-  width: 15px;
-  height: 15px;
 }
 /* The phone stage carousel: one stage per slide, the next one peeks. */
 .carousel {
@@ -2167,6 +2179,9 @@ select.input option {
   gap: 16px;
   margin-bottom: 12px;
   flex: none;
+}
+.sheet .sheet-h .sheet-close {
+  margin-left: auto;
 }
 .sheet .sheet-b {
   min-height: 0;
@@ -2650,7 +2665,7 @@ select.input option {
 .sec-h a,
 .src a,
 button.tag,
-.crumb {
+.back {
   position: relative;
 }
 .btn::before,
@@ -2673,8 +2688,7 @@ button.tag,
 .sec-h a::before,
 .src a::before,
 button.tag::before,
-.crumb::before,
-.stage .back::before {
+.back::before {
   content: "";
   position: absolute;
   left: 50%;
@@ -2683,12 +2697,7 @@ button.tag::before,
   height: max(100%, var(--hit));
   transform: translate(-50%, -50%);
 }
-.crumb {
-  display: inline-flex;
-  margin: 6px 0 6px;
-}
-
-/* The ring of the hold-Esc hint in the player (Player.tsx). */
+/* The ring of the hold-Esc hint in the player (player/EscapeHint.tsx). */
 @keyframes escape-hold {
   to {
     stroke-dashoffset: 0;
@@ -2843,7 +2852,7 @@ input[type="range"] {
   flex: 1 1 220px;
 }
 
-/* The player (DESIGN 2.4): two quiet pills over the game, one drawer, the walkthrough beside it. */
+/* The player: two quiet pills over the game, one drawer, the walkthrough beside it. */
 .rp-pill {
   position: absolute;
   z-index: 30;
@@ -3384,4 +3393,20 @@ button.frow:hover {
   border-radius: 10px;
   background: var(--plate);
   overflow-wrap: anywhere;
+}
+
+/*
+ * Phones: Renplay does not resize like a page. iOS zooms into any field with text under 16 px and
+ * stays zoomed, so fields are 16 px on touch screens. A double tap does not zoom either.
+ */
+html {
+  touch-action: manipulation;
+}
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
 }
