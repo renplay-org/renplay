@@ -58,9 +58,10 @@ description = "Everything CI checks, except the image"
 depends = ["check:server", "check:runtime", "check:copy", "check:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples"]
 
 [tasks."check:server"]
-description = "Server type check and tests"
+description = "Server type check, the tests' type check, and the tests"
 dir = "server"
-run = ["npx tsc --noEmit", "npx vitest run"]
+# Vitest runs the tests without checking their types: tsconfig.test.json does.
+run = ["npx tsc --noEmit", "npx tsc -p tsconfig.test.json", "npx vitest run"]
 
 [tasks."check:runtime"]
 description = "The game runtimes parse"

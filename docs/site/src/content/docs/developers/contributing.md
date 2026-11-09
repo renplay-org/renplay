@@ -74,7 +74,7 @@ These decide most review comments:
 
 1. Branch from `dev` and open the pull request against `dev`.
 2. Keep it focused. The title follows Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`).
-3. Run `npx tsc -p . && npx vitest run` in `server` and `npx tsc -b --noEmit && npm run build` in
+3. Run `npx tsc -p . && npx tsc -p tsconfig.test.json && npx vitest run` in `server` and `npx tsc -b --noEmit && npm run build` in
    `selector`. Add a test for new server behavior.
 4. For UI changes, look at them on a phone size and a desktop size
    (`cd server && npm run screenshots -- http://localhost:5199 /tmp/shots --sfw`).

@@ -102,7 +102,7 @@ describe('the art cache', () => {
       fetched.push(u)
       const body = files[u]
       if (!body) return new Response('missing', { status: 404 })
-      return new Response(body, { status: 200, headers: { 'content-type': 'image/png' } })
+      return new Response(new Uint8Array(body), { status: 200, headers: { 'content-type': 'image/png' } })
     })
   })
   afterEach(() => {

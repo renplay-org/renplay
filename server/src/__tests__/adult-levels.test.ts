@@ -9,7 +9,6 @@ import yazl from 'yazl'
 import { createApp, type App } from '../app.js'
 import { loadConfig, type Config } from '../config.js'
 import { groupCeiling, parseAdultGroups } from '../content/levels.js'
-import { parseAdultLevel } from '../shared/levels.js'
 import { adultFlag } from '../pipeline/import.js'
 import { Db } from '../db.js'
 import { readZipEntries } from '../saves/savefile.js'
@@ -149,7 +148,7 @@ describe('OIDC sign-in groups set the ceiling', () => {
 describe('the levels on every route', () => {
   let root = ''
   let app: App
-  let zip = Buffer.alloc(0)
+  let zip: Buffer = Buffer.alloc(0)
   let archivesDir = ''
   /** The made grid of each game: the picture routes the levels guard. */
   let adultPic = ''
@@ -208,8 +207,8 @@ describe('the levels on every route', () => {
     const recipe = (id: string, nsfw: boolean) => ({ id, title: id, nsfw, engine: 'renpy', saveDir: `${id}-1`, art: [{ kind: 'grid', url: `https://art.example/${id}.png`, source: 'steam', sha256: grids[id]!.sha256, width: 600, height: 900, thumbhash: '1QcSHQRnh493V4dIh4eXh1h4kJUI', tint: '#aa3333' }], releases: [{ version: '1', status: 'verified', archives: [{ name: `${id}.zip`, size: 4 }] }] })
     fullCatalog = { at: Date.now(), games: [recipe('adult', true), recipe('safe', false)], vocabulary: {}, adultGames: 'shown' }
     db.setSetting('catalog_cache', fullCatalog)
-    db.insertGame({ id: 'adult', title: 'Adult', recipe_id: 'adult', adult: 1, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'adult-1', walkthrough: 'adult.pdf' })
-    db.insertGame({ id: 'safe', title: 'Safe', recipe_id: 'safe', status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'safe-1', walkthrough: 'safe.pdf' })
+    db.insertGame({ id: 'adult', title: 'Adult', recipe_id: 'adult', adult: 1, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'adult-1' })
+    db.insertGame({ id: 'safe', title: 'Safe', recipe_id: 'safe', status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'safe-1' })
     for (const id of ['adult', 'safe']) db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at) VALUES (?, ?, 'Walkthrough', 'pdf', '2026-01-01')").run(`${id}.pdf`, id)
     db.insertGame({ id: 'adult-two', title: 'Adult Two', recipe_id: '', adult: 1, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'adult-two-1', source: JSON.stringify({ archive: 'adult2.zip' }) })
     db.insertJob({ id: 'j-adult-failed', type: 'import', game: 'adult', params: '{}' })
