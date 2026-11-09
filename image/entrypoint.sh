@@ -28,7 +28,7 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
 # RENPLAY_LOG_LEVEL also decides which requests nginx logs (the server reads it for its own lines,
 # trimmed and in any case, as here). The rules match "<path is worth logging>:<the request's level>".
-log_level=$(printf '%s' "${RENPLAY_LOG_LEVEL:-info}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+log_level=$(printf '%s' "${RENPLAY_LOG_LEVEL:-info}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')
 case "$log_level" in
   debug) log_rules='"~^1:" 1;' nginx_errors=warn ;;
   warn) log_rules='"~^1:(warn|error)" 1;' nginx_errors=warn ;;

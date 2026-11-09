@@ -1,6 +1,7 @@
 // Checks the structure of the server and the library, so it stays the way it was untangled:
-// no import cycles, each layer importing only what is below it, no exports nothing uses, and no
-// source file growing past the size budget. AGENTS.md › Structure rules says why.
+// no import cycles, each layer importing only what is below it, no exports nothing uses, controls
+// only from the UI kit, and no source file growing past the size budget. AGENTS.md › Structure
+// rules says why.
 //
 //   node scripts/check-structure.mjs
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
@@ -123,6 +124,17 @@ for (const [p, to] of imports) {
   }
 }
 
+// ---- controls come from the UI kit ---------------------------------------------------------------
+
+// The kit's button classes, written by hand outside lantern/: use Pill or IconBtn instead.
+const KIT_CLASS = /className=(?:"|\{`)(?:ib|btn)(?:[ "`])/
+for (const [p, s] of text) {
+  if (!inside(p, SELECTOR) || inside(p, join(SELECTOR, 'lantern')) || isTest(p)) continue
+  s.split('\n').forEach((line, i) => {
+    if (KIT_CLASS.test(line)) problems.push(`${rel(p)}:${i + 1}: a button styled by hand. Use Pill or IconBtn from lantern/controls.tsx`)
+  })
+}
+
 // ---- the size budget -----------------------------------------------------------------------------
 
 for (const p of [...walk(SERVER), ...walk(SELECTOR), ...walk(join(root, 'runtime')), ...walk(join(root, 'scripts'))]) {
@@ -145,4 +157,4 @@ if (problems.length) {
   console.error(`\n${problems.length} structure ${problems.length === 1 ? 'problem' : 'problems'}. AGENTS.md › Structure rules says what each rule is for.`)
   process.exit(1)
 }
-console.log('The structure holds: no import cycles, layers in order, no unused exports, files within budget.')
+console.log('The structure holds: no import cycles, layers in order, no unused exports, controls from the kit, files within budget.')

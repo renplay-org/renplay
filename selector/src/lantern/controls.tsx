@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 /**
@@ -56,7 +56,21 @@ export function Pill({
   )
 }
 
-export function IconBtn({ label, className, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+/** An icon button: a button, or a link when it has an address. A link takes only link attributes. */
+type IconBtnProps =
+  | (ButtonHTMLAttributes<HTMLButtonElement> & { label: string; href?: undefined })
+  | (AnchorHTMLAttributes<HTMLAnchorElement> & { label: string; href: string })
+
+export function IconBtn(props: IconBtnProps) {
+  if (props.href !== undefined) {
+    const { label, className, children, ...rest } = props
+    return (
+      <a aria-label={label} title={label} className={`ib ${className ?? ''}`.trim()} {...rest}>
+        {children}
+      </a>
+    )
+  }
+  const { label, className, children, href: _, ...rest } = props
   return (
     <button type="button" aria-label={label} title={label} className={`ib ${className ?? ''}`.trim()} {...rest}>
       {children}

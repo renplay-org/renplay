@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useModal } from './modal'
+import { IconBtn } from './controls'
 
 /**
  * A sheet is a modal dialog: opening moves focus inside, Tab stays inside,
@@ -48,9 +49,9 @@ export default function Sheet({
         {/* Every sheet can be closed with a tap, titled or not: a phone has no other way. */}
         <div className="sheet-h">
           {title && <h2 className="h2">{title}</h2>}
-          <button type="button" className="ib sheet-close" aria-label="Close" onClick={onClose}>
+          <IconBtn label="Close" className="sheet-close" onClick={onClose}>
             <X />
-          </button>
+          </IconBtn>
         </div>
         <div className="sheet-b">{children}</div>
         {footer && <div className="sheet-f">{footer}</div>}

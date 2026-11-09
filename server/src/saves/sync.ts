@@ -2,8 +2,8 @@ import { createHash, randomInt } from 'node:crypto'
 import yazl from 'yazl'
 import { HttpError } from '../util/paths.js'
 import { secretboxDecrypt, secretboxEncrypt } from './hydrogen.js'
-import { readSaveMeta } from './savefile.js'
-import { readZipEntries } from '../util/zip.js'
+import { readSaveMeta, SAVE_ZIP_FILES } from './savefile.js'
+import { readZipEntries, type ZipLimits } from '../util/zip.js'
 import type { SaveStore } from './store.js'
 import type { Db } from '../db.js'
 
@@ -21,6 +21,8 @@ export const SYNC_SETTING = 'renpy_sync'
 const DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const SIZE_LIMIT = 10 << 20
 const SYNC_LIFETIME = 3600_000
+/** What a sync code's zip may hold. */
+const SYNC_ZIP: ZipLimits = { files: SAVE_ZIP_FILES, fileBytes: SIZE_LIMIT * 2, totalBytes: SIZE_LIMIT * 2 }
 
 function sha256Rounds(data: Buffer, rounds: number): Buffer {
   let hashed = data
@@ -162,7 +164,7 @@ export async function downloadSync(server: string, store: SaveStore, saveDir: st
     throw new HttpError(409, 'That code did not work for this game.')
   }
   const times = new Map<string, number>()
-  const entries = await readZipEntries(plain, (n) => n === 'save_directory' || n === 'persistent' || syncable(n), { files: 2048, fileBytes: SIZE_LIMIT * 2, totalBytes: SIZE_LIMIT * 2 }, times)
+  const entries = await readZipEntries(plain, (n) => n === 'save_directory' || n === 'persistent' || syncable(n), SYNC_ZIP, times)
   if (entries.get('save_directory')?.toString('utf8') !== saveDir) throw new HttpError(409, 'The sync belongs to a different game.')
   const report = { added: 0, replaced: 0, kept: 0, same: 0 }
   for (const [name, data] of entries) {

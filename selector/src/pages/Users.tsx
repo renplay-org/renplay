@@ -3,7 +3,7 @@ import { MoreHorizontal, Plus } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Avatar from '../components/Avatar'
 import { Spinner, errorText, useToast } from '../lantern/ui'
-import { Pill, TagPill } from '../lantern/controls'
+import { Pill, TagPill, IconBtn } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { adultLabels } from '../lib/adult'
 import { ADULT_LEVELS, parseAdultLevel, type AdultLevel } from '@shared/levels'
@@ -76,9 +76,9 @@ export default function Users() {
               </div>
               <div className="end">
                 <Pill variant="s" size="sm" onClick={() => open('edit', user)}>Edit</Pill>
-                <button className="ib" aria-label={`More actions for ${user.name}`} onClick={() => setMenu(user)}>
+                <IconBtn label={`More actions for ${user.name}`} onClick={() => setMenu(user)}>
                   <MoreHorizontal />
-                </button>
+                </IconBtn>
               </div>
             </div>
           ))}

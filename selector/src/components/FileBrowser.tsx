@@ -25,7 +25,7 @@ import type { FileEntry, Game } from '@shared/api'
 import { bytes } from '@shared/format'
 import { useFiles, useJobs } from '../lib/queries'
 import { Confirm, Empty, Menu, MenuItem, Spinner, cx, errorText, useToast } from '../lantern/ui'
-import { Pill, TagPill, Bar } from '../lantern/controls'
+import { Pill, TagPill, Bar, IconBtn } from '../lantern/controls'
 import Sheet from '../lantern/Sheet'
 
 const CodeEditor = lazy(() => import('./CodeEditor'))
@@ -168,9 +168,9 @@ export default function FileBrowser({ game }: { game: Game }) {
           </nav>
           <Menu
             trigger={(toggle) => (
-              <button type="button" className="ib plate" aria-label="Add a file here" onClick={toggle}>
+              <IconBtn label="Add a file here" className="plate" onClick={toggle}>
                 <Plus />
-              </button>
+              </IconBtn>
             )}
           >
             {(close) => (
@@ -315,9 +315,9 @@ function FileRow({ game, file, onEdit, onChanged }: { game: Game; file: FileEntr
       />
       <Menu
         trigger={(toggle) => (
-          <button type="button" onClick={toggle} className="ib" aria-label={`${file.name}, actions`}>
+          <IconBtn label={`${file.name}, actions`} onClick={toggle}>
             <MoreHorizontal />
-          </button>
+          </IconBtn>
         )}
       >
         {(close) => (

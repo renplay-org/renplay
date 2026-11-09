@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { api } from '../lib/api'
 import type { Game } from '@shared/api'
 import { errorText, useToast } from '../lantern/ui'
+import { Pill } from '../lantern/controls'
 
 export default function FavoriteButton({ game }: { game: Game }) {
   const qc = useQueryClient()
@@ -22,16 +23,16 @@ export default function FavoriteButton({ game }: { game: Game }) {
     }
   }
   return (
-    <button
-      type="button"
+    <Pill
+      variant="q"
+      size="lg"
       disabled={busy}
       aria-label={game.favoriteAt ? 'Remove from favourites' : 'Add to favourites'}
       aria-pressed={!!game.favoriteAt}
-      className="btn q lg"
       style={game.favoriteAt ? { color: 'var(--pink-2)' } : undefined}
       onClick={() => void toggle()}
     >
       <Heart fill={game.favoriteAt ? 'currentColor' : 'none'} />
-    </button>
+    </Pill>
   )
 }

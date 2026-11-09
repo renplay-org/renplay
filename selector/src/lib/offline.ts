@@ -77,7 +77,7 @@ export function offlineSupport(): 'ok' | 'browser' | 'home-screen' {
  * device's adult level is not part of it. A mod build streams its base build's files, so they are
  * kept once for both, and changing mods downloads only the game itself again.
  */
-function keyOf(url: string): string {
+export function keyOf(url: string): string {
   const u = new URL(url, location.origin)
   const path = u.pathname
     .replace(/^(\/g\/[^/]+\/[a-z0-9]+)\.m[a-z0-9]+(\/game\/)/, '$1$2')
@@ -172,6 +172,17 @@ export async function refreshShell(signal?: AbortSignal): Promise<void> {
   for (const req of await shell.keys()) if (new URL(req.url).pathname.startsWith('/assets/') && !wanted.has(req.url)) await shell.delete(req)
 }
 
+/** The answers the library and the player read, and that are kept for offline. */
+export const keptAnswers = (id: string): string[] => [
+  '/api/me',
+  '/api/me/adult',
+  '/api/auth/providers',
+  '/api/defaults',
+  '/api/content',
+  '/api/games',
+  `/api/games/${encodeURIComponent(id)}`,
+]
+
 /**
  * Keeps a game in this browser: the library's own files, the game's page, engine, build and every
  * streamed file, its pictures and the answers the player reads. Files already kept are skipped, so a
@@ -207,7 +218,7 @@ async function keepNow(game: Game, signal: AbortSignal, onProgress: (done: numbe
   await refreshShell(signal)
   // The answers the library and the player read.
   const answers = await caches.open(API)
-  for (const url of ['/api/me', '/api/me/adult', '/api/auth/providers', '/api/defaults', '/api/content', '/api/games', `/api/games/${encodeURIComponent(game.id)}`]) {
+  for (const url of keptAnswers(game.id)) {
     const res = await fetch(url, { cache: 'no-store', signal }).catch(() => null)
     if (res?.ok) await answers.put(url, res)
   }
