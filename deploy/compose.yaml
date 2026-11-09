@@ -8,7 +8,7 @@
 # `docker compose up -d` again.
 services:
   renplay:
-    image: ghcr.io/renplay-org/renplay:4.6.1
+    image: ghcr.io/renplay-org/renplay:4.6.2
     container_name: renplay
     restart: unless-stopped
     ports:
