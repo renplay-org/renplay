@@ -13,6 +13,8 @@ release notes say what).
 
 ### Fixed
 
+- `PORT` works in the image: nginx forwards to the port it names. Before, the server moved and every request failed.
+- `RENPLAY_LOG_LEVEL` is read the same way for the server and for the requests nginx logs, in any case and with spaces around it.
 - When Renplay starts and a game's files are missing, as when a network share is mounted late, the game shows as not installed and comes back by itself on a later start once the files are there. Before, it stayed not installed until it was installed again, and a share that could not be read at all made every game look missing.
 - What an admin's import of a person's saves replaced is kept in History for at least 30 days, like what any other import replaces.
 - A Ren'Py download installed over an HTML game of the same name now plays as a Ren'Py game.

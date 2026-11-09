@@ -150,7 +150,8 @@ def users():
 def smoke():
     lib = Library('smoke')
     try:
-        lib.start()
+        # Another port for the server inside, and a log level in other case: nginx follows both.
+        lib.start(options=('-e', 'PORT=3100', '-e', 'RENPLAY_LOG_LEVEL=Warn'))
         system = lib.request('/api/system')
         assert system['paths']['archives'] == ('/downloads' if DOWNLOADS else '/games/_archives'), system
         assert system['keepDownloads'] is True
