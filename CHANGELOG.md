@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- Games that use `requests`, such as ones with a news feed or an update check, start on the web instead of failing with a missing `js` module.
+
 ## [4.6.2] - 2026-11-09
 
 ### Added
