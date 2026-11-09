@@ -179,10 +179,8 @@ describe('names, notes and pins of saves', () => {
     expect(slot).toMatchObject({ title: 'Before the storm', note: 'Choose the lake next time.' })
     expect(slot.pinnedAt).toMatch(/^\d{4}-/)
     expect((await app.saves.read('Story-1', '1-1-LT1.save')).toString()).toBe(before)
-    // A pinned save keeps its history.
-    expect(app.saves.pinned('Story-1', '1-1-LT1.save')).toBe(true)
     await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ pinned: false }).expect(200)
-    expect(app.saves.pinned('Story-1', '1-1-LT1.save')).toBe(false)
+    expect((await request(app.app).get('/api/saves/story').expect(200)).body.slots.find((s: { file: string }) => s.file === '1-1-LT1.save').pinnedAt).toBeNull()
     await request(app.app).put('/api/saves/story/meta?file=1-1-LT1.save').send({ title: 'x'.repeat(81) }).expect(400)
     await request(app.app).put('/api/saves/story/meta?file=../x.save').send({ title: 'x' }).expect(400)
     // Clearing everything removes the row.

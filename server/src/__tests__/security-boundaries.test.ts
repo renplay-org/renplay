@@ -75,8 +75,10 @@ describe('security boundary regressions', () => {
     await vi.waitFor(() => paths.forEach((path) => expect(() => readFileSync(path)).toThrow()))
     await request(app).post('/import').set('Content-Length', String(IMPORT_MAX_BYTES + (2 << 20))).send('x').expect(413)
     await request(app).post('/import').attach('files', Buffer.alloc(IMPORT_MAX_FILE_BYTES + 1), 'persistent').expect(400)
-    // Three individually valid files cross the aggregate limit, including chunked requests.
-    await request(app).post('/import').attach('files', Readable.from([Buffer.alloc(48 << 20)]), 'persistent').attach('files', Readable.from([Buffer.alloc(48 << 20)]), 'persistent').attach('files', Readable.from([Buffer.alloc(48 << 20)]), 'persistent').expect(413)
+    // Three individually valid files cross the aggregate limit, including chunked requests. Streams
+    // are what makes them chunked, and supertest's types leave them out.
+    const chunked = () => Readable.from([Buffer.alloc(48 << 20)]) as unknown as Buffer
+    await request(app).post('/import').attach('files', chunked(), 'persistent').attach('files', chunked(), 'persistent').attach('files', chunked(), 'persistent').expect(413)
   })
   it('keeps offline HTML state through A → B → A and uploads only owner-bound snapshots', async () => {
     const window: any = {}

@@ -77,7 +77,7 @@ describe('SaveStore', () => {
   })
 
   it('keeps every version of a pinned save', async () => {
-    store.pinned = (dir, rel) => dir === 'Game-1' && rel === 'pinned.save'
+    store = new SaveStore(join(root, 'saves'), join(root, 'history'), 3, (dir, rel) => dir === 'Game-1' && rel === 'pinned.save')
     for (let i = 0; i < 6; i++) {
       await store.write('Game-1', 'pinned.save', Buffer.from(`v${i}`))
       await store.write('Game-1', 'other.save', Buffer.from(`v${i}`))

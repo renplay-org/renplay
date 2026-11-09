@@ -211,8 +211,8 @@ mise run screenshots http://localhost:5199 /tmp/shots --sfw   # phone and deskto
 mise run release 4.4.0              # a release branch's versions and changelog (release skill)
 ```
 
-Inside `server/`: `npx tsc -p .` builds to `dist/`, `npx vitest run src/__tests__/x.test.ts` runs one
-test file. Screenshots need `npx playwright install chromium webkit` once.
+Inside `server/`: `npx tsc -p .` builds to `dist/`, `npx tsc -p tsconfig.test.json` type-checks the
+tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs one test file. Screenshots need `npx playwright install chromium webkit` once.
 
 ## Definition of done
 

@@ -1,7 +1,6 @@
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, lstatSync, readdirSync, realpathSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { createHash, scryptSync } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import request from 'supertest'
@@ -46,9 +45,10 @@ async function login(a: App, username = 'admin', password = 'correct password') 
 async function add(a: App, cookie: string, username = 'player') {
   return (await request(a.app).post('/api/users').set(site).set('Cookie', cookie).send({ username, password: 'player password' }).expect(201)).body.user.id as number
 }
-function game(a: App, id = 'safe', extras: Partial<GameRow> = {}) {
+/** A library game, with a walkthrough file when one is named. */
+function game(a: App, id = 'safe', { walkthroughFile, ...extras }: Partial<GameRow> & { walkthroughFile?: string } = {}) {
   a.db.insertGame({ id, title: id, recipe_id: `recipe-${id}`, status: 'installed', build: 'b1', save_dir: id, ...extras })
-  if (extras.walkthrough) a.db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at) VALUES (?, ?, 'Walkthrough', 'pdf', '2026-01-01')").run(extras.walkthrough, id)
+  if (walkthroughFile) a.db.raw.prepare("INSERT INTO walkthroughs (file, game, title, kind, added_at) VALUES (?, ?, 'Walkthrough', 'pdf', '2026-01-01')").run(walkthroughFile, id)
 }
 
 describe('accounts authentication and security', () => {
@@ -580,7 +580,7 @@ describe('adult access and signed game URLs', () => {
     db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'safe', title: 'Safe', art: await art('safe'), releases: [] }, { id: 'adult', title: 'Adult', nsfw: true, art: await art('adult'), releases: [] }] })
     db.close()
     const a = await start(cfg), admin = await login(a); await add(a, admin); const player = await login(a, 'player', 'player password')
-    for (const id of ['safe', 'adult']) { game(a, id, { recipe_id: id, adult: id === 'adult' ? 1 : 0, walkthrough: `${id}.pdf` }); writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), 'pdf') }
+    for (const id of ['safe', 'adult']) { game(a, id, { recipe_id: id, adult: id === 'adult' ? 1 : 0, walkthroughFile: `${id}.pdf` }); writeFileSync(join(cfg.walkthroughsDir, `${id}.pdf`), 'pdf') }
     await a.catalog.syncArt()
     const picture = (id: string) => (a.catalog.recipeArt(a.catalog.recipe(id)!) as Record<string, { url1x: string }>)['grid']!.url1x
     const adultPic = picture('adult'), safePic = picture('safe')
