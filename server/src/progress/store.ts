@@ -50,7 +50,6 @@ export class ProgressStore {
     this.set(user, row.id, { favorite_at: on ? this.of(user, row).favorite_at || new Date().toISOString() : '' })
   }
 
-  /** finished_at is when the status became finished. */
   setStatus(user: number, row: GameRow, status: PlayStatus | ''): void {
     const previous = this.of(user, row).finished_at
     this.set(user, row.id, { play_status: status, finished_at: status === 'finished' ? previous || new Date().toISOString() : '' })
@@ -106,7 +105,6 @@ export class ProgressStore {
     this.db.raw.prepare('UPDATE play_sessions SET user_id = ? WHERE user_id = ?').run(to, from)
   }
 
-  /** Removes a person's progress and sessions. */
   forget(user: number): void {
     for (const table of ['user_games', 'play_sessions']) this.db.raw.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(user)
   }

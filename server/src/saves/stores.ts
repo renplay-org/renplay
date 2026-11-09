@@ -33,7 +33,6 @@ export class SaveStores {
     return join(this.cfg.dataDir, 'users', String(user))
   }
 
-  /** A person's saves. */
   of(user: number): SaveStore {
     if (!this.db.raw.prepare('SELECT 1 FROM users WHERE id = ?').get(user)) throw new HttpError(404, 'User not found')
     let s = this.stores.get(user)

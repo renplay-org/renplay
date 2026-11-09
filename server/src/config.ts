@@ -141,7 +141,7 @@ export interface Config {
   uploadsDir: string
   enginesUrl: string
   catalogUrls: string[]
-  /** RENPLAY_ADULT_GAMES: a level fixes the installation; empty leaves it to the stored setting (content.ts). */
+  /** RENPLAY_ADULT_GAMES: a level fixes the installation; empty leaves it to the stored setting (content/mode.ts). */
   adultGames: '' | AdultLevel
   /** A public demo: a shared guest, no uploads or account changes, a stop after 4 hours (RENPLAY_DEMO). */
   demo: boolean

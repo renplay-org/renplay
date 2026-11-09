@@ -9,7 +9,7 @@ export type DrawerTab = 'saves' | 'guide' | 'options'
 type Walkthrough = Game['walkthroughs'][number]
 
 /**
- * The player's one drawer (DESIGN 2.4): from the left, a sheet from the bottom on a portrait
+ * The player's one drawer: from the left, a sheet from the bottom on a portrait
  * phone. The icon and title, three tabs, and a footer with Save now as a plate, Save and exit as
  * the one primary, a line on what happens to saves that have not synced, and the other ways out.
  * Rendered only while open, so nothing in it can take focus while it is closed.
