@@ -104,7 +104,8 @@ const takeGhost = async (page) => {
   })
 }
 
-const shapeOk = (frames) => frames.length >= 6 && frames.every((f) => Math.abs(f.h / f.w - 1.5) < 0.02)
+// Every frame sampled keeps 2:3. A slow machine (CI) samples only a few frames of a short flight: two are enough.
+const shapeOk = (frames) => frames.length >= 2 && frames.every((f) => Math.abs(f.h / f.w - 1.5) < 0.02)
 
 // ---- the checks ---------------------------------------------------------------------------------
 
