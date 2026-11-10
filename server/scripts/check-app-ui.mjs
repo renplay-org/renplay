@@ -67,25 +67,38 @@ async function growBy(page, batches) {
   return sizes
 }
 
-/** The flying picture on every frame of the next `ms`: its shape and where it started and landed. */
+/**
+ * The flying picture on every frame, and where its animation ends (the last keyframe, since the last frame seen
+ * may be a few hundredths of a second short of it): its shape and place.
+ */
 const recordGhost = (page) =>
   page.evaluate(() => {
     window.__ghost = []
+    window.__end = null
     const tick = () => {
       const el = document.querySelector('.ghost')
       if (el) {
         const r = el.getBoundingClientRect()
         window.__ghost.push({ w: r.width, h: r.height, x: r.x, y: r.y })
+        if (!window.__end) {
+          const last = el.getAnimations()[0]?.effect.getKeyframes().at(-1)
+          const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([-\d.]+)\)/.exec(last?.transform ?? '')
+          if (m) window.__end = { x: +m[1], y: +m[2], width: el.offsetWidth * +m[3] }
+        }
       }
       window.__recording = requestAnimationFrame(tick)
     }
     window.__recording = requestAnimationFrame(tick)
   })
-const takeGhost = (page) =>
-  page.evaluate(() => {
+/** The frames recorded, once the flying picture has landed. */
+const takeGhost = async (page) => {
+  await page.waitForTimeout(300)
+  await page.waitForFunction(() => !document.querySelector('.ghost'), null, { timeout: 5000 })
+  return page.evaluate(() => {
     cancelAnimationFrame(window.__recording)
-    return window.__ghost
+    return { frames: window.__ghost, end: window.__end }
   })
+}
 
 const shapeOk = (frames) => frames.length >= 6 && frames.every((f) => Math.abs(f.h / f.w - 1.5) < 0.02)
 
@@ -176,7 +189,7 @@ async function flight(browser, base, errors, options, label) {
   await mock(page, errors, label)
   // A pointer left over a tile lifts it 4 percent: the tile's place is measured without that.
   await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => document.head.insertAdjacentHTML('beforeend', '<style>.card:not(.on):hover .frame { transform: none !important }</style>')))
-  const near = (a, b) => Math.abs(a.x - b.x) <= 3 && Math.abs(a.y - b.y) <= 3 && Math.abs(a.w - b.width) <= 3
+  const near = (a, b) => Math.abs(a.x - b.x) <= 3 && Math.abs(a.y - b.y) <= 3 && Math.abs((a.w ?? a.width) - b.width) <= 3
   const rectOf = (selector) => page.evaluate((s) => {
     const r = document.querySelector(s)?.getBoundingClientRect()
     return r && { x: r.x, y: r.y, width: r.width, height: r.height }
@@ -193,16 +206,17 @@ async function flight(browser, base, errors, options, label) {
     await page.waitForSelector('.stage')
     await page.waitForTimeout(900)
     const forward = await takeGhost(page)
-    check(shapeOk(forward), `${label}: from ${where} the picture keeps a 2:3 shape on all ${forward.length} frames`)
-    check(forward.length > 0 && near(forward.at(-1), await rectOf('.stage .cover .frame')), `${label}: from ${where} it lands on the stage's cover`)
+    check(shapeOk(forward.frames), `${label}: from ${where} the picture keeps a 2:3 shape on all ${forward.frames.length} frames`)
+    const cover = await rectOf('.stage .cover .frame')
+    check(!!forward.end && near(forward.end, cover), `${label}: from ${where} it lands on the stage's cover${forward.end && !near(forward.end, cover) ? ` (ends at ${JSON.stringify(forward.end)}, cover ${JSON.stringify(cover)})` : ''}`)
     await recordGhost(page)
     await page.goBack()
     await page.waitForSelector('.grid[data-row] .card')
     await page.waitForTimeout(900)
     const back = await takeGhost(page)
-    check(shapeOk(back), `${label}: back to ${where} the picture keeps a 2:3 shape on all ${back.length} frames`)
+    check(shapeOk(back.frames), `${label}: back to ${where} the picture keeps a 2:3 shape on all ${back.frames.length} frames`)
     const home = await rectOf(`${selector.split(' ')[0] === '.shelf' ? '.shelf' : '.grid[data-row]'} .card[data-id="${gameId}"] .frame`)
-    check(back.length > 0 && near(back.at(-1), home) && (await page.evaluate(() => document.querySelectorAll('.ghost').length)) === 0, `${label}: back to ${where} it lands on the tile and leaves no picture behind`)
+    check(!!back.end && near(back.end, home) && (await page.evaluate(() => document.querySelectorAll('.ghost').length)) === 0, `${label}: back to ${where} it lands on the tile and leaves no picture behind${back.end && !near(back.end, home) ? ` (ends at ${JSON.stringify(back.end)}, tile ${JSON.stringify(home)})` : ''}`)
   }
   // A tile that is off screen once the list has restored its place gets no flight back.
   await page.goto(base + '/')
@@ -214,8 +228,8 @@ async function flight(browser, base, errors, options, label) {
   await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith('renplay:scroll:')).forEach((k) => sessionStorage.setItem(k, '0')))
   await recordGhost(page)
   await page.goBack()
-  await page.waitForTimeout(1200)
-  check((await takeGhost(page)).length === 0, `${label}: a tile off screen gets no flight back`)
+  await page.waitForTimeout(1500)
+  check((await page.evaluate(() => (cancelAnimationFrame(window.__recording), window.__ghost.length))) === 0, `${label}: a tile off screen gets no flight back`)
   await ctx.close()
 }
 
