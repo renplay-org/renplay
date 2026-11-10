@@ -70,6 +70,8 @@ jobs:
       - run: mise run check:ui
       - run: mise run check:docs
       - run: mise run check:website
+      - run: npx --prefix server playwright install --with-deps chromium webkit
+      - run: mise run check:layout
       - run: mise run check:chart
       - run: mise run check:workflows
       - run: mise run check:examples
