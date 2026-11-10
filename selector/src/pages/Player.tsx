@@ -36,6 +36,7 @@ import { useFullscreen } from './player/useFullscreen'
 import { useMute } from './player/useMute'
 import { useHtmlSaves, useSaving } from './player/useSaving'
 import { usePlayTime } from './player/usePlayTime'
+import { useTelemetry } from './player/useTelemetry'
 import { useElementSize, useSafeInsets, useWakeLock } from './player/useScreen'
 import GameOptions, { type GameOptionsState } from './player/GameOptions'
 import { Bar, Pill } from '../lantern/controls'
@@ -128,6 +129,7 @@ export default function Player() {
   const insets = useSafeInsets()
   useWakeLock(ready)
   usePlayTime(ready && !exiting && !failed, gameId, userId, sandboxed, frameRef, () => setSignedOut(true))
+  const telemetry = useTelemetry(gameId, userId, { ready, online, fullscreen, failed })
 
   useEffect(() => {
     const signedOut = () => setSignedOut(true)
@@ -214,6 +216,9 @@ export default function Player() {
           break
         case 'renplay:escape':
           setEscHeld(!!d.down)
+          break
+        case 'renplay:perf':
+          if (typeof d.fps === 'number') telemetry.fps(d.fps)
           break
         case 'renplay:menu':
           // The controller's Menu button in the game.

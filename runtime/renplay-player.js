@@ -14,6 +14,7 @@ var inFrame = window.parent && window.parent !== window
 
 function post(type, data) {
   if (!inFrame) return
+  if (type === 'ready') measureFrames()
   var msg = { type: 'renplay:' + type, game: cfg.id, userId: cfg.userId }
   if (data) for (var k in data) msg[k] = data[k]
   // Only the player, on Renplay's own address, may read it. A sandboxed page's own origin is
@@ -21,6 +22,38 @@ function post(type, data) {
   try {
     window.parent.postMessage(msg, location.origin)
   } catch (e) {}
+}
+
+// ------------------------------------------------------------------ frame rate
+
+// For the anonymous usage report: how smoothly the page ran, as the frames the browser asked for in
+// five seconds, measured once. It starts half a minute after the game is ready, and a hidden page
+// waits for a later try. The player turns the number into a bucket and never shows it.
+var framesMeasured = false
+function measureFrames() {
+  if (framesMeasured) return
+  framesMeasured = true
+  var tries = 0
+  var later = function (attempt) {
+    if (++tries < 8) setTimeout(attempt, 15000)
+  }
+  var attempt = function () {
+    if (document.visibilityState !== 'visible') return later(attempt)
+    var frames = 0
+    var first = 0
+    var tick = function (now) {
+      if (document.visibilityState !== 'visible') return later(attempt)
+      if (!first) first = now
+      if (now - first >= 5000) {
+        post('perf', { fps: Math.round((frames * 1000) / (now - first)) })
+        return
+      }
+      frames++
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }
+  setTimeout(attempt, 30000)
 }
 
 // ------------------------------------------------------------------ mute

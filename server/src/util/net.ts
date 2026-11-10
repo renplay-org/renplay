@@ -1,6 +1,7 @@
 import { promises as dns, type LookupAddress, type LookupOptions } from 'node:dns'
 import { BlockList, isIP } from 'node:net'
 import { Agent } from 'undici'
+import { USER_AGENT } from './version.js'
 
 /*
  * Downloads that follow addresses from a catalog (art, recipe patches) go only to the public
@@ -68,6 +69,23 @@ function pinned(allowHosts: ReadonlySet<string>): Agent {
   return agent
 }
 
+/** Renplay's own hosts: renplay.org and what is under it (the catalog, the engines, the report). */
+export function isRenplayHost(url: string | URL): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase()
+    return host === 'renplay.org' || host.endsWith('.renplay.org')
+  } catch {
+    return false
+  }
+}
+
+/** The headers of a request: to a renplay.org host they name Renplay and its version. */
+export function renplayHeaders(url: string | URL, headers?: HeadersInit): Headers {
+  const out = new Headers(headers)
+  if (isRenplayHost(url)) out.set('user-agent', USER_AGENT)
+  return out
+}
+
 /**
  * fetch() for addresses that come from a catalog: each address, and each address a redirect leads
  * to (at most three), must be on the public internet unless its host is in `allowHosts`, when it is
@@ -78,7 +96,7 @@ export async function fetchPublic(input: string | URL, init: RequestInit & { all
   let url = new URL(input)
   for (let hop = 0; hop <= 3; hop++) {
     await checkPublic(url, allowHosts)
-    const res = await fetch(url, { ...rest, redirect: 'manual', dispatcher: pinned(allowHosts) } as RequestInit).catch((e: Error) => {
+    const res = await fetch(url, { ...rest, headers: renplayHeaders(url, rest.headers), redirect: 'manual', dispatcher: pinned(allowHosts) } as RequestInit).catch((e: Error) => {
       throw e.cause instanceof NotPublic ? e.cause : e
     })
     const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null

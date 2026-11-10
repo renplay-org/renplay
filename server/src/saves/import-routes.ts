@@ -81,6 +81,7 @@ export function createSavesImportRouter(s: Services): Router {
       const written = await saves.write(dir, name, data, { mtimeMs: mtime, reason: 'import', base: 0, everyKind: true })
       report[written.outcome]++
     }
+    s.telemetry.feature('saveImports')
     res.json(report)
   }, { fields: 1 }))
 

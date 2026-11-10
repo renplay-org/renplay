@@ -213,14 +213,26 @@ function gameSaves(s: Services): Router {
     return requireSaveDir(g)
   }
 
+  /** A sync, counted for the usage report: it works, or the sync server (not the person) is why it did not. */
+  const synced = async <T>(req: Request, run: (saveDir: string) => Promise<T>): Promise<T> => {
+    try {
+      const out = await run(syncGame(req))
+      s.telemetry.feature('syncCodes')
+      return out
+    } catch (error) {
+      if (!(error instanceof HttpError) || error.status >= 500) s.telemetry.error(db.getGame(String(req.params['id'])), 'sync', (error as Error).message)
+      throw error
+    }
+  }
+
   /** Sends this person's saves of the game to Ren'Py's sync server and returns the code. */
   router.post('/:id/sync', async (req, res) => {
-    res.json(await uploadSync(syncServer, s.saves, syncGame(req), typeof req.body?.tz === 'string' ? req.body.tz : undefined))
+    res.json(await synced(req, (dir) => uploadSync(syncServer, s.saves, dir, typeof req.body?.tz === 'string' ? req.body.tz : undefined)))
   })
 
   /** Fetches the saves for a code made on another device. */
   router.post('/:id/sync/download', async (req, res) => {
-    res.json(await downloadSync(syncServer, s.saves, syncGame(req), req.body?.code) satisfies SyncDownloaded)
+    res.json(await synced(req, (dir) => downloadSync(syncServer, s.saves, dir, req.body?.code)) satisfies SyncDownloaded)
   })
 
   /** A save's name, note and pin for this person. The save file itself is not touched. */
@@ -292,6 +304,7 @@ function gameSaves(s: Services): Router {
       const part = await s.saves.importFiles(dir, [{ filename: Buffer.from(f.originalname, 'latin1').toString('utf-8'), data: await readFile(f.path) }])
       report.imported.push(...part.imported); report.skipped.push(...part.skipped); report.trustedKeys += part.trustedKeys
     }
+    s.telemetry.feature('saveImports')
     res.json(report)
   }))
 
@@ -373,6 +386,7 @@ export function createSavesRouter(s: Services): Router {
       if (f.dir === 'tokens' && f.file === 'security_keys.txt') await target.mergeSecurityKeys(f.data.toString('utf-8'))
       else await target.write(f.dir, f.file, f.data, { reason: 'user-import' })
     }
+    s.telemetry.feature('saveImports')
     res.json({ imported: files.length })
   }))
 

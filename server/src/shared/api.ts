@@ -161,6 +161,8 @@ export interface SystemInfo {
   version: string
   /** Ren'Py Sync codes: off until an admin turns them on. */
   sync?: { on: boolean; server: string; chosen?: boolean }
+  /** The anonymous usage report: on or off, and whether the server fixes it (RENPLAY_TELEMETRY) or an admin chose. */
+  telemetry?: { on: boolean; locked: boolean; chosen: boolean }
   /** For each variable Settings shows: set on the server, or the default. */
   setBy?: Record<string, 'server' | 'default'>
   /** An admin chose whether downloads are kept (else the default). */
