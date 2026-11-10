@@ -121,6 +121,8 @@ docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renpl
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
 website/           renplay.org: plain HTML and CSS (home, catalog browser), _redirects for the stable
                      addresses (/docs, /github, /demo...), www/ the www.renplay.org redirect
+telemetry/         The collector for the daily usage report: a Cloudflare Worker with D1 (telemetry.renplay.org),
+                     its tests (`mise run check:telemetry`), deploy.sh. Not part of the image
 tests/             The image's install contract, the chart's tests, the deploy/ examples
 scripts/           Repo checks (writing rule, built library, website links), release.mjs, package-chart.py
 mise.toml          Pinned tools, locally and in CI (CI caches them by this file)
