@@ -28,6 +28,7 @@ import { createPlayRouter } from './play/routes.js'
 import { createSavesRouter } from './saves/routes.js'
 import { createMetricsRouter } from './system/metrics.js'
 import { createSystemRouter } from './system/routes.js'
+import { createTelemetryRouter } from './telemetry/routes.js'
 import type { SaveStore } from './saves/store.js'
 import { createServices, type Services } from './services.js'
 import { HttpError } from './util/paths.js'
@@ -52,7 +53,7 @@ export interface App {
 
 export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {}): Promise<App> {
   const services = await createServices(cfg)
-  const { db, content, accounts, art, catalog, jobs, builds, engines, purger, backups, version } = services
+  const { db, content, accounts, art, catalog, jobs, builds, engines, purger, backups, telemetry, version } = services
 
   const app = express()
   app.disable('x-powered-by')
@@ -112,10 +113,12 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
   app.use(createPlayRouter(services))
 
   if (opts.startJobs !== false) backups.start()
+  if (opts.startJobs !== false) telemetry.start()
   app.use('/api', createSystemRouter(services))
   app.use('/api', createDefaultsRouter(services))
   app.use('/api', createJobsRouter(services))
   app.use('/api', createMetricsRouter(services))
+  app.use('/api', createTelemetryRouter(services))
   app.use('/api', createContentRouter(services))
   app.use('/api', createSavesRouter(services))
   app.use('/api', createFilesRouter(services))
@@ -170,5 +173,5 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
     ]
   }
 
-  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(OWNER_ID), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), db.close()) }
+  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(OWNER_ID), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), telemetry.stop(), db.close()) }
 }

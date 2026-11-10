@@ -163,6 +163,11 @@ export interface Config {
   recipesDir: string
   /** Ren'Py's sync server, for Sync codes. */
   syncServer: string
+  /** RENPLAY_TELEMETRY: 'on' or 'off' wins over the switch in Settings; empty leaves it to the switch (telemetry/telemetry.ts). */
+  telemetry: '' | 'on' | 'off'
+  telemetryUrl: string
+  /** How this Renplay was installed, as the image and the chart say (RENPLAY_INSTALL). */
+  install: string
 }
 
 export function loadConfig(): Config {
@@ -250,5 +255,8 @@ export function loadConfig(): Config {
     backupKeep: Math.max(1, int('RENPLAY_BACKUP_KEEP')),
     recipesDir: text('RENPLAY_RECIPES_DIR') || join(dataDir, 'recipes'),
     syncServer: text('RENPLAY_SYNC_SERVER').replace(/\/+$/, ''),
+    telemetry: process.env['RENPLAY_TELEMETRY']?.trim() ? (bool('RENPLAY_TELEMETRY') ? 'on' : 'off') : '',
+    telemetryUrl: text('RENPLAY_TELEMETRY_URL'),
+    install: text('RENPLAY_INSTALL'),
   }
 }

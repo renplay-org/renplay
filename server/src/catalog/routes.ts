@@ -13,7 +13,7 @@ const RECIPE_SCHEMA_URL = 'https://catalog.renplay.org/recipe.schema.json'
 
 /** The catalog as this person may see it, its refresh, and a draft recipe for a library game. */
 export function createCatalogRouter(s: Services): Router {
-  const { cfg, db, jobs, catalog, content, version } = s
+  const { cfg, db, jobs, catalog, content, telemetry, version } = s
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/catalog', async (_req, res) => {
@@ -32,7 +32,9 @@ export function createCatalogRouter(s: Services): Router {
   })
 
   router.post('/catalog/refresh', async (_req, res) => {
-    res.json(await catalog.refresh())
+    const refreshed = await catalog.refresh()
+    telemetry.feature('catalogRefresh')
+    res.json(refreshed)
   })
 
 

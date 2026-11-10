@@ -61,6 +61,8 @@ spec:
               value: /games
             - name: RENPLAY_DIR
               value: /games/_renplay
+            - name: RENPLAY_INSTALL
+              value: chart
             {{- if .Values.persistence.downloads.enabled }}
             # Explicit for compatibility with images before automatic detection.
             - name: ARCHIVES_DIR

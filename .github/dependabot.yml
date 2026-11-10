@@ -20,7 +20,7 @@ updates:
         patterns: ['*']
 
   - package-ecosystem: npm
-    directories: [/server, /selector, /docs/site]
+    directories: [/server, /selector, /docs/site, /telemetry]
     schedule:
       interval: weekly
       day: monday

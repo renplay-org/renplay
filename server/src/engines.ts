@@ -8,6 +8,7 @@ import type { Config } from './config.js'
 import type { Db } from './db.js'
 import type { JobContext } from './jobs/manager.js'
 import { dirSize, exists } from './util/fsx.js'
+import { renplayHeaders } from './util/net.js'
 import { HttpError } from './util/paths.js'
 import type { Purger } from './util/purge.js'
 
@@ -83,7 +84,7 @@ export class EngineStore {
     this.index ??= this.db.getSetting<{ at: number; engines: EngineEntry[] } | null>(INDEX_KEY, null)
     if (!force && this.index && Date.now() - this.index.at < INDEX_MAX_AGE) return this.index.engines
     try {
-      const res = await fetch(this.cfg.enginesUrl, { signal: AbortSignal.timeout(15_000) })
+      const res = await fetch(this.cfg.enginesUrl, { signal: AbortSignal.timeout(15_000), headers: renplayHeaders(this.cfg.enginesUrl) })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const idx = (await res.json()) as EngineIndex
       const listed = [...(idx.engines ?? []), ...(idx.prereleases ?? []).map((e) => ({ ...e, prerelease: true }))]
@@ -172,7 +173,7 @@ export class EngineStore {
       for (const [name, f] of files) {
         if (!/^[A-Za-z0-9._-]+$/.test(name)) continue
         ctx?.log(`Downloading engine ${version}: ${name}`)
-        const res = await fetch(f.url, { signal: ctx?.signal, redirect: 'follow' })
+        const res = await fetch(f.url, { signal: ctx?.signal, redirect: 'follow', headers: renplayHeaders(f.url) })
         if (!res.ok || !res.body) throw new Error(`Engine download failed: HTTP ${res.status} for ${name}`)
         const hash = createHash('sha256')
         const body = Readable.fromWeb(res.body as any)

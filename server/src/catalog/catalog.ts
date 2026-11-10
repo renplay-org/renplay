@@ -12,7 +12,7 @@ import { parseJson, type Db, type GameRow, type GameSource } from '../db.js'
 import type { JobContext } from '../jobs/manager.js'
 import { cleanRelPath } from '../util/paths.js'
 import { log } from '../util/log.js'
-import { catalogHosts, fetchPublic } from '../util/net.js'
+import { catalogHosts, fetchPublic, isRenplayHost, renplayHeaders } from '../util/net.js'
 import { readLocalFile, readLocalRecipes } from '../recipes/local.js'
 import { installedRelease, normalizeRecipe, type BuildSettings, type Recipe, type RecipeMatch, type RecipeRelease, type Vocabulary } from '../shared/recipe.js'
 
@@ -52,6 +52,7 @@ function withoutLocalFiles(g: Recipe): Recipe {
 function stub(r: Recipe): Recipe {
   return {
     id: r.id,
+    _origin: r._origin,
     title: '',
     nsfw: true,
     engine: r.engine,
@@ -85,7 +86,7 @@ interface Index {
 }
 
 async function fetchIndex(url: string): Promise<Index> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: { accept: 'application/json' } })
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: renplayHeaders(url, { accept: 'application/json' }) })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const idx = (await res.json()) as Index
   if ((idx.schema ?? 1) < 2) throw new Error(`catalog schema ${idx.schema ?? 1} is too old`)
@@ -366,6 +367,15 @@ export class Catalog {
    */
   listed(): Recipe[] {
     return this.list().filter((r) => r.releases[0]?.status !== 'broken')
+  }
+
+  /**
+   * A recipe of the official catalog (a renplay.org address), whoever asks: the usage report names
+   * games only by these. A catalog of your own, Your recipes and anything else is nothing here.
+   */
+  officialRecipe(id: string): Recipe | null {
+    const recipe = this.recipes.get(id) ?? this.adult.get(id)
+    return recipe && /^[a-z0-9-]{1,80}$/.test(recipe.id) && isRenplayHost(recipe._origin ?? '') ? recipe : null
   }
 
   recipe(id: string): Recipe | null {

@@ -38,7 +38,7 @@ function cacheName(raw: unknown): string {
 }
 
 export function createGamesRouter(deps: Services): Router {
-  const { cfg, db, jobs, builds } = deps
+  const { cfg, db, jobs, builds, telemetry } = deps
   const router = Router({ caseSensitive: true, strict: true })
 
   const get = (req: Request): GameRow => deps.content.game(req.params.id)
@@ -144,6 +144,7 @@ export function createGamesRouter(deps: Services): Router {
     const title = typeof req.body?.title === 'string' && req.body.title.trim() ? req.body.title.trim().slice(0, 100) : fallback
     const position = (db.walkthroughs(g.id).at(-1)?.position ?? -1) + 1
     db.raw.prepare('INSERT INTO walkthroughs (file, game, title, kind, size, added_at, position) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, g.id, title, kind.kind, f.size, new Date().toISOString(), position)
+    telemetry.feature('walkthroughs')
     res.json({ ok: true, game: await toGame(db.getGame(g.id)!, deps) })
   })
 

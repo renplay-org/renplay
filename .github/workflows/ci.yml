@@ -74,6 +74,30 @@ jobs:
       - run: mise run check:workflows
       - run: mise run check:examples
 
+  # The telemetry collector (telemetry/): its types, its tests on a local D1 and a dry run of its deploy.
+  telemetry:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          version: 2026.11.4
+          install_args: node
+          cache_key: "{{cache_key_prefix}}-{{platform}}-{{version}}-${{ hashFiles('mise.toml') }}"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.npm
+          key: npm-telemetry-${{ runner.os }}-${{ hashFiles('telemetry/package-lock.json') }}
+          restore-keys: npm-telemetry-${{ runner.os }}-
+
+      - run: mise run check:telemetry
+
   # Whether the image or the chart can have changed. Docs, the website and the demo cannot.
   changes:
     runs-on: ubuntu-24.04

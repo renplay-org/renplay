@@ -30,7 +30,7 @@ export function playPath(g: GameRow): string {
  * and the files of a build and the engines. nginx serves the static files in production.
  */
 export function createPlayRouter(s: Services): Router {
-  const { cfg, db, builds, engines, content, accounts } = s
+  const { cfg, db, builds, engines, content, accounts, telemetry } = s
   const runtimes = readRuntimes()
   const runtimeVersion = runtimes.version
   const router = Router({ caseSensitive: true, strict: true })
@@ -99,6 +99,7 @@ export function createPlayRouter(s: Services): Router {
     const streamed = JSON.parse(await readFile(at(base, 'assets.json'), 'utf-8').catch(() => '{}')) as Record<string, [number, number]>
     for (const [name, [, bytes]] of Object.entries(streamed)) files.push({ url: `${page}game/${name.split('/').map(encodeURIComponent).join('/')}`, bytes })
     res.setHeader('Cache-Control', 'private, no-store')
+    telemetry.feature('keptOffline')
     res.json({ id, build: game.build, page, bytes: files.reduce((n, f) => n + f.bytes, 0), files } satisfies OfflineManifest)
   })
 

@@ -1,0 +1,23 @@
+{
+  "name": "renplay-telemetry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The collector for Renplay's daily usage report (a Cloudflare Worker with D1)",
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit && vitest run",
+    "test": "vitest run",
+    "dry-run": "wrangler deploy --dry-run --outdir /tmp/renplay-telemetry-dry"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.6.1",
+    "@cloudflare/workers-types": "^5.20261110.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.159.0"
+  },
+  "allowScripts": {
+    "workerd@1.20261109.1": true,
+    "esbuild@0.28.2": true
+  }
+}

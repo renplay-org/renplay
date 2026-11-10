@@ -5,6 +5,24 @@ export function isAppleTouch(): boolean {
   return /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
 }
 
+/** The kind of device, from its browser's own description. */
+export function deviceKind(): 'phone' | 'tablet' | 'desktop' {
+  const ua = navigator.userAgent
+  if (/iPhone|iPod/.test(ua)) return 'phone'
+  if (/iPad/.test(ua) || isAppleTouch()) return 'tablet'
+  if (/Android/.test(ua)) return /Mobile/.test(ua) ? 'phone' : 'tablet'
+  return 'desktop'
+}
+
+/** The browser's engine: every browser on an iPhone or iPad is WebKit. */
+export function browserEngine(): 'webkit' | 'blink' | 'gecko' {
+  const ua = navigator.userAgent
+  if (isAppleTouch()) return 'webkit'
+  if (/Firefox\//.test(ua)) return 'gecko'
+  if (/Chrome\/|Chromium\/|Edg\//.test(ua)) return 'blink'
+  return /Safari\//.test(ua) ? 'webkit' : 'blink'
+}
+
 /** A Mac computer: no touch, so not an iPad that says it is a Mac. */
 export function isMacComputer(): boolean {
   return /Macintosh|Mac OS X/.test(navigator.userAgent) && navigator.maxTouchPoints <= 1

@@ -142,8 +142,8 @@ export function Stars({ value, onChange, label = 'Your rating' }: { value: numbe
 }
 
 /** A switch: a 48 by 30 button with role="switch", its state exposed. */
-export function LanternSwitch({ checked, onChange, label }: { checked: boolean; onChange?: (v: boolean) => void; label: string }) {
-  return <button type="button" role="switch" aria-checked={checked} aria-label={label} className={`sw ${checked ? 'on' : ''}`} onClick={() => onChange?.(!checked)} />
+export function LanternSwitch({ checked, onChange, label, disabled }: { checked: boolean; onChange?: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} style={disabled ? { opacity: 0.5 } : undefined} className={`sw ${checked ? 'on' : ''}`} onClick={() => onChange?.(!checked)} />
 }
 
 type SourceKind = 'def' | 'here' | 'you' | 'admin' | 'admin-you' | 'group' | 'server'

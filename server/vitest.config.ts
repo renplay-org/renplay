@@ -7,7 +7,8 @@ const shared = fileURLToPath(new URL('./src/shared', import.meta.url))
 export default defineConfig({
   resolve: { alias: { '@shared': shared } },
   test: {
-    env: { RENPLAY_AUTH: 'off' },
+    // Tests never send the report; the ones about it turn it on against a stub.
+    env: { RENPLAY_AUTH: 'off', RENPLAY_TELEMETRY: 'off' },
     include: ['src/**/__tests__/**/*.test.ts'],
     testTimeout: 15000,
     passWithNoTests: true,

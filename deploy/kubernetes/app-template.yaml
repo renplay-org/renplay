@@ -10,7 +10,7 @@ controllers:
       app:
         image:
           repository: ghcr.io/renplay-org/renplay
-          tag: 4.7.0
+          tag: 4.8.0
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
