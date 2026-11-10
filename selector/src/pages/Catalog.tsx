@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Card from '../lantern/Tile'
 import { Pill, Seg, TagPill } from '../lantern/controls'
+import SearchField from '../lantern/Search'
 import { useRoom } from '../lantern/Room'
 import Sheet from '../lantern/Sheet'
 import RecipeCard from '../components/RecipeCard'
@@ -145,8 +146,8 @@ export default function Catalog() {
           </>
         )
       })()}
-      <div className="toolbar" style={{ marginTop: 14 }}>
-        <input aria-label="Search the catalog" placeholder="Search the catalog" value={typed} onChange={(e) => setTyped(e.target.value)} className="input" />
+      <div className="toolbar wrap" style={{ marginTop: 14 }}>
+        <SearchField label="Search the catalog" value={typed} onChange={setTyped} />
         <Seg
           small
           value={filter}

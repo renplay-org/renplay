@@ -1,0 +1,107 @@
+/* The carousel: the Library's Up next, one stage per slide, each as wide as the page so no neighbour's edge shows. */
+.carousel-wrap {
+  position: relative;
+  margin: -6px 0 0;
+}
+.carousel {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--gutter));
+}
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+.carousel:focus-visible {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+.carousel .slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  /* Room for the cover's shadow, which the scrolling box would cut. */
+  padding-bottom: 24px;
+}
+.carousel .stage {
+  margin: 0;
+}
+@media (max-width: 719px) {
+  .carousel .slide {
+    padding: 4px var(--gutter) 6px;
+  }
+  .carousel .stage .art.wide-a {
+    border-radius: 14px;
+  }
+  .carousel .stage .in {
+    padding: 0;
+  }
+  .carousel .stage .art::after {
+    background: linear-gradient(180deg, rgba(10, 10, 15, 0.2) 0%, rgba(10, 10, 15, 0) 30%, rgba(10, 10, 15, 0) 60%, rgba(10, 10, 15, 0.75) 100%);
+  }
+}
+.carousel-wrap > .car-arrow {
+  position: absolute;
+  top: calc(clamp(230px, 25vw, 380px) / 2 - 20px);
+  z-index: 3;
+  background: rgba(8, 8, 12, 0.55);
+  backdrop-filter: blur(8px);
+  color: #fff;
+}
+.carousel-wrap > .car-arrow:hover {
+  background: rgba(8, 8, 12, 0.8);
+}
+.carousel-wrap > .car-arrow[disabled] {
+  opacity: 0;
+  pointer-events: none;
+}
+.carousel-wrap > .car-arrow.prev {
+  left: 16px;
+}
+.carousel-wrap > .car-arrow.next {
+  right: 16px;
+}
+/* The dots: one per slide, each a 40 px target around a small mark; the current one is longer and lit. */
+.dots {
+  display: flex;
+  justify-content: center;
+  height: 40px;
+  margin-top: -10px;
+}
+@media (max-width: 719px) {
+  .dots {
+    margin-top: 0;
+  }
+}
+.dot {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+.dot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--fg-4);
+  transform: translate(-50%, -50%);
+  transition:
+    width var(--t-focus),
+    background var(--t-focus);
+}
+.dot[aria-current="true"]::after {
+  width: 22px;
+  background: var(--fg);
+}
+.dot:hover::after {
+  background: var(--fg-2);
+}
+.dot:focus-visible {
+  border-radius: 999px;
+}

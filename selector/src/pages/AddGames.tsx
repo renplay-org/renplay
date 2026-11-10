@@ -35,9 +35,9 @@ export default function AddGames() {
   )
 }
 
-/** The install job of an archive, while it is queued or running. */
+/** The install job of an archive, while it is queued, paused or running. */
 function activeJob(jobs: Job[] | undefined, a: Archive): Job | undefined {
-  return jobs?.find((j) => j.type === 'import' && j.params?.source?.path === a.path && (j.status === 'queued' || j.status === 'running'))
+  return jobs?.find((j) => j.type === 'import' && j.params?.source?.path === a.path && (j.status === 'queued' || j.status === 'paused' || j.status === 'running'))
 }
 
 function Downloads() {
@@ -233,6 +233,7 @@ function ArchiveRow({ archive: a, job, onInstall }: { archive: Archive; job?: Jo
 
 function JobLine({ job }: { job: Job }) {
   if (job.status === 'queued') return <div className="m">Waiting for the install before it</div>
+  if (job.status === 'paused') return <div className="m">Paused. Resume it in Activity.</div>
   return (
     <div style={{ marginTop: 10, maxWidth: 420 }}>
       <div className="row between xs muted" style={{ marginBottom: 6 }}>

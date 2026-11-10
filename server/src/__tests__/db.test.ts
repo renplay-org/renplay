@@ -35,7 +35,8 @@ it('brings a 4.0 library up to date, keeping its people, progress and save notes
     // A 4.0 library: no PINs, no people per device, and the installation level still under its 3.x setting.
     let db = new Db(path)
     db.raw.exec(`ALTER TABLE users DROP COLUMN pin_hash; ALTER TABLE users DROP COLUMN pin_failures; ALTER TABLE users DROP COLUMN pin_locked_until;
-      DROP TABLE device_people; PRAGMA user_version = 16`)
+      DROP TABLE device_people; ALTER TABLE jobs DROP COLUMN retry_of; ALTER TABLE jobs DROP COLUMN position; PRAGMA user_version = 16`)
+    db.raw.exec("INSERT INTO jobs (id, type, game, status, created_at) VALUES ('old', 'import', 'story', 'queued', '2026-01-01')")
     db.raw.prepare("INSERT INTO users (username, name, role, adult_ceiling, adult_choice, prefs, created_at) VALUES ('kim', 'Kim', 'player', 'shown', 'blurred', ?, '2026-01-01')").run(JSON.stringify({ adultPictures: 'hide-pictures', tags: { include: ['romance'] } }))
     db.raw.prepare("INSERT INTO user_games (user_id, game, play_time, play_status, rating) VALUES (2, 'story', 3600, 'finished', 5)").run()
     db.raw.prepare("INSERT INTO save_meta (user_id, save_dir, file, title) VALUES (2, 'Story-1', '1-1-LT1.save', 'Before the storm')").run()
@@ -52,6 +53,9 @@ it('brings a 4.0 library up to date, keeping its people, progress and save notes
     expect(db.raw.prepare('SELECT COUNT(*) AS n FROM device_people').get()).toEqual({ n: 0 })
     expect(db.getSetting('adult_level', '')).toBe('off')
     expect(db.getSetting('adult_games', null)).toBeNull()
+    // A job waiting then is still waiting, a first try, and a new one goes behind it.
+    db.insertJob({ id: 'new', type: 'import', game: 'story', params: '{}' })
+    expect(db.waitingJobs().map((j) => [j.id, j.retry_of, db.attempts(j)])).toEqual([['old', '', 1], ['new', '', 1]])
     db.close()
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
@@ -70,5 +74,26 @@ it('refuses a library from before 4.0, or from a newer Renplay, and leaves it as
       file.close()
       rmSync(path, { force: true })
     }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+it('adds the queue columns to a 4.8 library without a new version, so 4.8 still opens it after an upgrade', () => {
+  const root = mkdtempSync(join(tmpdir(), 'renplay-db-'))
+  const path = join(root, 'library.db')
+  try {
+    let db = new Db(path)
+    db.raw.exec('ALTER TABLE jobs DROP COLUMN retry_of; ALTER TABLE jobs DROP COLUMN position; PRAGMA user_version = 19')
+    db.raw.exec("INSERT INTO jobs (id, type, game, status, created_at) VALUES ('old', 'import', 'story', 'queued', '2026-01-01')")
+    db.close()
+
+    db = new Db(path)
+    // The version stays where 4.8 left it: a version above it would make 4.8 refuse the library.
+    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 })
+    const columns = (db.raw.prepare('PRAGMA table_info(jobs)').all() as { name: string }[]).map((c) => c.name)
+    expect(columns).toEqual(expect.arrayContaining(['retry_of', 'position']))
+    expect(db.waitingJobs().map((j) => j.id)).toEqual(['old'])
+    db.close()
+    // Opening it again does not add them twice.
+    new Db(path).close()
   } finally { rmSync(root, { recursive: true, force: true }) }
 })

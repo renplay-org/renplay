@@ -1,7 +1,7 @@
 import { layoutColumns } from '../lib/grow'
 import './LibrarySkeleton.css'
 
-/** What the Library last looked like on this device: with a stage and the Up next shelf above its grid, or the grid alone. */
+/** What the Library last looked like on this device: with the Up next carousel above its grid, or the grid alone. */
 const SHAPE = 'renplay:library-shape'
 export const rememberShape = (stage: boolean) => {
   try {
@@ -44,7 +44,7 @@ const Stage = (
 )
 
 /**
- * The Library while its games load, in the shape of the loaded page: the stage, the Up next shelf and
+ * The Library while its games load, in the shape of the loaded page: the carousel with its dots and
  * the grid with its toolbar, in the same sizes, so the page does not rearrange when the games arrive.
  */
 export default function LibrarySkeleton() {
@@ -54,22 +54,16 @@ export default function LibrarySkeleton() {
     <div role="status" aria-label="Loading the library">
       {stage && (
         <>
-          <div className="hide-phone">{Stage}</div>
-          <div className="hide-desk">
+          <div className="carousel-wrap">
             <div className="carousel">
               <div className="slide">{Stage}</div>
             </div>
-          </div>
-          <section className="sec">
-            <div className="sec-h" style={{ minHeight: 29 }}>
-              <div className="skel skel-line" style={{ width: 110, height: 24 }} />
-            </div>
-            <div className="shelf">
-              {Array.from({ length: cols }, (_, i) => (
-                <Tile key={i} />
+            <div className="dots">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="dot" />
               ))}
             </div>
-          </section>
+          </div>
         </>
       )}
       <section className="sec">
@@ -77,8 +71,8 @@ export default function LibrarySkeleton() {
           <div className="skel skel-line" style={{ width: 130, height: 24 }} />
         </div>
         <div className="toolbar" style={{ position: 'static' }}>
-          <div className="skel" style={{ width: 280, height: 46, borderRadius: 999 }} />
-          <div className="skel" style={{ width: 110, height: 46, borderRadius: 999 }} />
+          <div className="skel" style={{ flex: '1 1 200px', maxWidth: 360, height: 44, borderRadius: 999 }} />
+          <div className="skel" style={{ width: 110, height: 44, borderRadius: 999, flex: 'none' }} />
         </div>
         <div className="chip-bar" style={{ marginBottom: 16, minHeight: 48 }}>
           <div className="skel" style={{ width: 150, height: 40, borderRadius: 999 }} />

@@ -1,20 +1,21 @@
 import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, Sparkles, User } from 'lucide-react'
 import { keptGames, removeKept, useOnline } from '../lib/offline'
 import ChooseArtwork from './ChooseArtwork'
-import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { api } from '../lib/api'
 import { jobTitle } from '../lib/format'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useAuth } from '../lib/auth'
 import AccountMenu from './AccountMenu'
-import SearchPalette from './SearchPalette'
 import { useGames, useJobs } from '../lib/queries'
 import { RoomProvider } from '../lantern/Room'
 import { useArrowFocus } from '../lantern/focus'
 import { useFlightBack } from '../lantern/flight'
 import type { Health } from '@shared/api'
 import { Pill } from '../lantern/controls'
+import { focusSearch, wantSearch } from '../lantern/Search'
+import { isApple } from '../lib/platform'
 
 // Links go through renplay.org (redirects on the website), so moving GitHub or Ko-fi needs no release.
 const REPO_URL = 'https://renplay.org/github'
@@ -110,8 +111,25 @@ function useScrollMemory() {
   }, [location.key, type])
 }
 
+/** Ctrl K or ⌘K goes to the search above the list, opening the Library first from a page that has none. */
+function useSearchShortcut() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'k' || !(isApple() ? e.metaKey : e.ctrlKey)) return
+      e.preventDefault()
+      if (focusSearch()) return
+      wantSearch()
+      navigate('/')
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [navigate])
+}
+
 function Shell() {
   useScrollMemory()
+  useSearchShortcut()
   useFlightBack()
   const { data } = useAuth()
   const admin = data?.user.role === 'admin'
@@ -155,7 +173,6 @@ function Shell() {
               </Pill>
             )}
             {admin && <ActivityRing />}
-            <SearchPalette />
             <span className="hide-phone">
               <AccountMenu />
             </span>

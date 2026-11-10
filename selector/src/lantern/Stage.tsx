@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { artCarriesTitle, formatFor, Frame, hashUrl, TitleArt, tintOf, useHidden, type ArtGame } from './art'
 import { cameFromList, useGoBack } from './flight'
-import { flyGhost, startTravel, takeTravel } from './travel'
+import { flyGhost, startTravel, takeTravel, travelSource } from './travel'
 
 /** Pressing Resume: the stage's art grows to the whole screen and becomes the door. */
 export function travelToDoor(game: ArtGame & { id: string }, hidden: boolean, from?: Element | null): void {
@@ -13,6 +13,12 @@ export function travelToDoor(game: ArtGame & { id: string }, hidden: boolean, fr
   const f = formatFor(game.art, 'hero')
   const src = (!hidden && f?.url1x) || hashUrl(f?.thumbhash)
   startTravel({ id: game.id, src, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } })
+}
+
+/** Opening the game's page from its stage: the cover flies to the page's cover, and back when the person goes back. */
+export function travelToPage(game: ArtGame & { id: string }, hidden: boolean, from?: Element | null): void {
+  const rect = from?.getBoundingClientRect()
+  if (rect) startTravel({ id: game.id, src: travelSource(game.art, hidden), rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } })
 }
 
 /** Crossfading art for the stage and the room: the previous picture stays under while the new one fades in. */
@@ -81,6 +87,7 @@ export default function Stage({
   body,
   back,
   actsRef,
+  coverTo,
 }: {
   game: ArtGame & { id: string }
   eyebrow?: ReactNode
@@ -91,6 +98,8 @@ export default function Stage({
   back?: { to: string; label: string }
   /** Watches the actions row: the phone action bar appears once it leaves view. */
   actsRef?: React.RefObject<HTMLDivElement | null>
+  /** The cover opens this game page. The page's buttons say the same, so keyboard and screen readers skip it. */
+  coverTo?: string
 }) {
   const hidden = useHidden(game)
   const goBack = useGoBack()
@@ -116,7 +125,13 @@ export default function Stage({
       )}
       <div className="in">
         <div className="cover">
-          <StageCover game={game} hidden={hidden} />
+          {coverTo ? (
+            <Link to={coverTo} tabIndex={-1} aria-hidden="true" onClick={(e) => travelToPage(game, hidden, e.currentTarget.querySelector('.frame'))}>
+              <StageCover game={game} hidden={hidden} />
+            </Link>
+          ) : (
+            <StageCover game={game} hidden={hidden} />
+          )}
         </div>
         <div className="tb">
           <div className="in-t" key={game.id}>

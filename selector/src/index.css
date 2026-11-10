@@ -369,32 +369,6 @@ code {
   gap: 8px;
   flex: none;
 }
-.search {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  width: 230px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: var(--plate);
-  color: var(--fg-3);
-  font-size: 14px;
-  flex: none;
-}
-.search kbd {
-  margin-left: auto;
-}
-.search svg {
-  width: 18px;
-  height: 18px;
-  flex: none;
-}
-@media (min-width: 720px) {
-  .search {
-    display: flex;
-  }
-}
 .ib {
   display: inline-flex;
   align-items: center;
@@ -431,15 +405,6 @@ code {
   flex: none;
 }
 @media (min-width: 720px) and (max-width: 1099px) {
-  .search {
-    width: 40px;
-    padding: 0;
-    justify-content: center;
-  }
-  .search .lbl,
-  .search kbd {
-    display: none;
-  }
   .act .lbl {
     display: none;
   }
@@ -1303,19 +1268,15 @@ select.input option {
 .toolbar::-webkit-scrollbar {
   display: none;
 }
-.toolbar .input {
-  flex: none;
-  width: 220px;
+/* A toolbar with more than the search and one control wraps on a phone, instead of scrolling sideways. */
+.toolbar.wrap {
+  flex-wrap: wrap;
+  overflow: visible;
 }
 @media (min-width: 720px) {
   .toolbar {
     margin: 0;
     padding: 10px 0;
-  }
-  .toolbar .input {
-    flex: 1;
-    width: auto;
-    max-width: 320px;
   }
 }
 .actionbar {
@@ -1894,38 +1855,6 @@ select.input option {
   background: rgba(8, 8, 12, 0.5);
   backdrop-filter: blur(8px);
 }
-/* The phone stage carousel: one stage per slide, the next one peeks. */
-.carousel {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  margin: 0 calc(-1 * var(--gutter));
-  padding: 4px var(--gutter) 0;
-}
-.carousel::-webkit-scrollbar {
-  display: none;
-}
-.carousel .slide {
-  flex: none;
-  width: calc(100vw - 2 * var(--gutter) - 14px);
-  scroll-snap-align: start;
-  scroll-margin-left: var(--gutter);
-}
-.carousel .stage {
-  margin: 0;
-}
-.carousel .stage .in {
-  padding: 0;
-}
-.carousel .stage .art.wide-a {
-  border-radius: 14px;
-}
-.carousel .stage .art::after {
-  background: linear-gradient(180deg, rgba(10, 10, 15, 0.2) 0%, rgba(10, 10, 15, 0) 30%, rgba(10, 10, 15, 0) 60%, rgba(10, 10, 15, 0.75) 100%);
-}
-
 /* Rows for downloads, activity, users. */
 .rows {
   display: flex;
@@ -2649,7 +2578,6 @@ select.input option {
 .side-nav a,
 .side-nav button,
 .act,
-.search,
 .sort,
 .card,
 .save,
@@ -2676,7 +2604,6 @@ button.tag,
 .side-nav a::before,
 .side-nav button::before,
 .act::before,
-.search::before,
 .sort::before,
 .logo::before,
 .avatar::before,

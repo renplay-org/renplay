@@ -20,7 +20,7 @@ export type JobHandler = (ctx: JobContext) => Promise<unknown>
 
 export class JobManager {
   private handlers = new Map<string, { name: string; run: JobHandler }>()
-  private running: { id: string; abort: AbortController } | null = null
+  private running: { id: string; abort: AbortController; pausing: boolean } | null = null
   private logs: JobLogs
   private liveLog = ''
   private logWriteFailed = false
@@ -55,24 +55,24 @@ export class JobManager {
     void this.pump()
   }
 
-  enqueue(type: string, game: string, params: unknown): string {
+  enqueue(type: string, game: string, params: unknown, retryOf = ''): string {
     if (!this.handlers.has(type)) throw new Error(`Unknown job type ${type}`)
     const id = newId('j')
-    this.db.insertJob({ id, type, game, params: JSON.stringify(params ?? {}) })
+    this.db.insertJob({ id, type, game, params: JSON.stringify(params ?? {}), retry_of: retryOf })
     // Installs are shared work, not extensions of the enqueuing user's permissions.
     viewers.exit(() => void this.pump())
     return id
   }
 
-  /** Returns the active (queued or running) job of a game. */
+  /** Returns the active (queued, paused or running) job of a game. */
   activeFor(game: string): JobRow | null {
-    return this.db.listJobs(200).find((j) => j.game === game && (j.status === 'queued' || j.status === 'running')) ?? null
+    return this.db.listJobs(200).find((j) => j.game === game && (j.status === 'queued' || j.status === 'paused' || j.status === 'running')) ?? null
   }
 
   cancel(id: string): boolean {
     const job = this.db.getJob(id)
     if (!job) return false
-    if (job.status === 'queued') {
+    if (job.status === 'queued' || job.status === 'paused') {
       this.db.updateJob(id, { status: 'cancelled', finished_at: new Date().toISOString() })
       return true
     }
@@ -85,8 +85,46 @@ export class JobManager {
 
   retry(id: string): string | null {
     const job = this.db.getJob(id)
-    if (!job || job.status === 'queued' || job.status === 'running') return null
-    return this.enqueue(job.type, job.game, parseJson(job.params, {}))
+    if (!job || job.status === 'queued' || job.status === 'paused' || job.status === 'running') return null
+    return this.enqueue(job.type, job.game, parseJson(job.params, {}), job.id)
+  }
+
+  /**
+   * Holds a job back. A queued one stays in the queue and is skipped. A running one stops the way a
+   * cancel does and goes back to the front of the queue as paused. Resuming starts it again from its
+   * parameters: an install reads its archive again, since a build is only kept once it is whole.
+   */
+  pause(id: string): boolean {
+    const job = this.db.getJob(id)
+    if (!job) return false
+    if (job.status === 'queued') {
+      this.db.updateJob(id, { status: 'paused' })
+      return true
+    }
+    if (job.status === 'running' && this.running?.id === id && !this.running.pausing) {
+      this.running.pausing = true
+      this.running.abort.abort(new Error('Paused'))
+      return true
+    }
+    return false
+  }
+
+  resume(id: string): boolean {
+    if (this.db.getJob(id)?.status !== 'paused') return false
+    this.db.updateJob(id, { status: 'queued' })
+    viewers.exit(() => void this.pump())
+    return true
+  }
+
+  /** Moves a waiting job one place earlier or later in the queue, or to the front. */
+  move(id: string, to: 'up' | 'down' | 'first'): boolean {
+    const waiting = this.db.waitingJobs().map((j) => j.id)
+    const at = waiting.indexOf(id)
+    if (at < 0) return false
+    waiting.splice(at, 1)
+    waiting.splice(to === 'first' ? 0 : Math.max(0, Math.min(waiting.length, at + (to === 'up' ? -1 : 1))), 0, id)
+    waiting.forEach((jobId, i) => this.db.updateJob(jobId, { position: i + 1 }))
+    return true
   }
 
   /** A job's log. Jobs from before 2.11 have it only in the database. */
@@ -108,9 +146,8 @@ export class JobManager {
   private async pump(): Promise<void> {
     if (this.running) return
     const next = this.db
-      .listJobs(500)
-      .filter((j) => j.status === 'queued')
-      .sort((a, b) => a.created_at.localeCompare(b.created_at))[0]
+      .waitingJobs()
+      .find((j) => j.status === 'queued')
     if (!next) {
       this.keepalive?.stop()
       this.keepalive = null
@@ -118,7 +155,8 @@ export class JobManager {
     }
     const handler = this.handlers.get(next.type)
     const abort = new AbortController()
-    this.running = { id: next.id, abort }
+    const running = { id: next.id, abort, pausing: false }
+    this.running = running
     this.liveLog = ''
     this.logWriteFailed = false
     this.keepalive ??= startKeepalive(this.cfg)
@@ -171,6 +209,13 @@ export class JobManager {
       this.flush()
       const cancelled = abort.signal.aborted
       const msg = e instanceof Error ? e.message : String(e)
+      if (cancelled && running.pausing) {
+        // Back to the front of the queue as paused, as if it had not started.
+        ctx.log('Paused. Resuming starts again from the archive.')
+        log('job', `${what} paused`)
+        this.db.updateJob(next.id, { status: 'paused', stage: 'Paused', progress: 0, message: '', error: '', started_at: '', finished_at: '', position: -1 })
+        return
+      }
       ctx.log(`${cancelled ? 'Cancelled' : 'Failed'}: ${msg}`)
       if (cancelled) log('job', `${what} cancelled`)
       else log('job', `${what} failed after ${took(Date.now() - started)}: ${msg}`, 'error')

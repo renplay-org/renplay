@@ -18,7 +18,7 @@ const games = Array.from({ length: GAMES }, (_, i) => ({
   version: '1.0', detectedVersion: '1.0', favoriteAt: null, finishedAt: null, playTime: 0, playStatus: null, rating: null, notNowAt: null, phone: null, latestSave: null,
   free: true, renpyVersion: '8.3.7', engine: '8.5.3', sizeBytes: 1e8, fileCount: 4, screen: [1280, 720], saveDir: `save-${i}`, source: { archive: null, size: null },
   canReinstall: false, recipe: null, update: null, createdAt: '2026-01-01T00:00:00.000Z', installedAt: '2026-01-01T00:00:00.000Z',
-  lastPlayedAt: i < 4 ? `2026-11-0${9 - i}T10:00:00.000Z` : null, saves: { count: 0, latest: 0 }, mods: { files: 0, hash: '', applied: false }, job: null,
+  lastPlayedAt: i < 7 ? `2026-11-0${9 - i}T10:00:00.000Z` : null, saves: { count: 0, latest: 0 }, mods: { files: 0, hash: '', applied: false }, job: null,
 }))
 const recipes = Array.from({ length: RECIPES }, (_, i) => ({
   id: id('game', i), title: `Recipe ${i}`, developer: 'Studio', tags: ['romance', i % 2 ? 'fantasy' : 'drama'], tagIds: ['romance', i % 2 ? 'fantasy' : 'drama'], content: [], state: 'completed', summary: 'A short story.',
