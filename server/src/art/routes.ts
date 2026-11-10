@@ -8,7 +8,7 @@ import type { ArtCandidates, ArtUploaded } from '../shared/api.js'
 
 /** A game's pictures: the choices and uploads for each format, and the made pictures themselves. */
 export function createArtRouter(s: Services): Router {
-  const { accounts, art, catalog, content } = s
+  const { accounts, art, catalog, content, telemetry } = s
   const router = Router({ caseSensitive: true, strict: true })
 
   /** The game, when this person may see its pictures: below Shown an adult game's art does not exist. */
@@ -55,6 +55,7 @@ export function createArtRouter(s: Services): Router {
     if (scope === EVERYONE && picture.upload && !art.isShared(picture.id, g.id))
       throw new HttpError(409, 'Upload this picture for everyone first, then choose it for everyone.')
     art.choose(g.id, kind, req.body.candidate, scope)
+    telemetry.feature('artChoices')
     await art.ready(subject, scope)
     res.json({ art: art.forSubject(subject) })
   })
@@ -80,6 +81,7 @@ export function createArtRouter(s: Services): Router {
     const { id, warning } = await art.upload(g.id, kind, req.body, focal, scope)
     // An upload is made to be used: it becomes the choice at the scope it was uploaded for.
     art.choose(g.id, kind, id, scope)
+    telemetry.feature('artChoices')
     const subject = catalog.gameSubject(g)
     await art.ready(subject, scope)
     res.json({ id, warning, art: art.forSubject(subject) } satisfies ArtUploaded)

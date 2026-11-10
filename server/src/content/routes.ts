@@ -7,7 +7,7 @@ import type { ContentState } from '../shared/api.js'
 
 /** The adult levels: the installation's, what admins see of the setup, and marking a game safe for work. */
 export function createContentRouter(s: Services): Router {
-  const { cfg, db, content, catalog } = s
+  const { cfg, db, content, catalog, telemetry } = s
   const router = Router({ caseSensitive: true, strict: true })
   const state = (): ContentState => {
     const installation = { level: content.level, fixed: content.locked, chosen: content.chosen, variable: 'RENPLAY_ADULT_GAMES' }
@@ -35,6 +35,7 @@ export function createContentRouter(s: Services): Router {
     const level = parseAdultLevel(req.body?.level)
     if (!level) throw new HttpError(400, 'level must be "off", "blurred" or "shown"')
     content.set(level)
+    telemetry.feature('adultLevelsChanged')
     await catalog.modeChanged()
     res.json(state())
   })

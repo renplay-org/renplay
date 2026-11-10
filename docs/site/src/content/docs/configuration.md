@@ -782,6 +782,48 @@ Run Renplay as a public demo. The sign-in page offers Try the demo, a shared gue
 
 </div>
 
+<div class="config-entry" id="renplay-telemetry">
+
+**`RENPLAY_TELEMETRY`**
+
+<div class="config-default">
+
+Default: on
+
+</div>
+
+Renplay sends an anonymous usage report once a day. `off` sends nothing at all. When this is set, it wins over the switch in Settings. The Telemetry page of the docs says what the report holds.
+
+</div>
+
+<div class="config-entry" id="renplay-telemetry-url">
+
+**`RENPLAY_TELEMETRY_URL`**
+
+<div class="config-default">
+
+Default: `https://telemetry.renplay.org/v1/report`
+
+</div>
+
+Where the usage report goes. Change it only to try the report against a collector of your own.
+
+</div>
+
+<div class="config-entry" id="renplay-install">
+
+**`RENPLAY_INSTALL`**
+
+<div class="config-default">
+
+Default: `source`
+
+</div>
+
+The image and the chart set this to image or chart, so the usage report can count how Renplay was installed. Leave it alone.
+
+</div>
+
 <div class="config-entry" id="renplay-admin-username">
 
 **`RENPLAY_ADMIN_USERNAME`**

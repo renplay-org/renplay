@@ -1,7 +1,4 @@
-import { readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { hashArchive } from './library/archives.js'
 import { ArtStore } from './art/store.js'
 import { Accounts } from './accounts/accounts.js'
@@ -17,19 +14,11 @@ import { ProgressStore } from './progress/store.js'
 import { Overlays } from './games/mods.js'
 import { applyMods } from './pipeline/applymods.js'
 import { runImport } from './pipeline/import.js'
+import { Telemetry } from './telemetry/telemetry.js'
 import type { SaveStore } from './saves/store.js'
 import { SaveStores } from './saves/stores.js'
 import { Purger } from './util/purge.js'
-
-const here = dirname(fileURLToPath(import.meta.url))
-
-function packageVersion(): string {
-  try {
-    return JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf-8')).version
-  } catch {
-    return '0.0.0'
-  }
-}
+import { VERSION } from './util/version.js'
 
 /**
  * What the server's parts share, made once at start. Every router and job gets it. The signed-in
@@ -54,6 +43,7 @@ export interface Services {
   art: ArtStore
   catalog: Catalog
   backups: SaveBackups
+  telemetry: Telemetry
 }
 
 export async function createServices(cfg: Config): Promise<Services> {
@@ -78,7 +68,7 @@ export async function createServices(cfg: Config): Promise<Services> {
   const s: Services = {
     cfg,
     db,
-    version: packageVersion(),
+    version: VERSION,
     content,
     accounts,
     progress,
@@ -94,9 +84,14 @@ export async function createServices(cfg: Config): Promise<Services> {
     catalog,
     saveStores,
     backups: new SaveBackups(cfg, db, saveStores),
+    telemetry: new Telemetry({ cfg, db, catalog, content, accounts, saveStores, version: VERSION }),
   }
-  s.jobs.register('import', 'Install', (ctx) => runImport(ctx, s))
-  s.jobs.register('apply-mods', 'Mod build', (ctx) => applyMods(ctx, s))
+  s.jobs.register('import', 'Install', (ctx) => s.telemetry.install(ctx, async () => (await runImport(ctx, s)) as { recipe?: string | null; engine?: string }))
+  s.jobs.register('apply-mods', 'Mod build', async (ctx) => {
+    const built = await applyMods(ctx, s)
+    s.telemetry.feature('modBuilds')
+    return built
+  })
   s.jobs.register('hash-archive', 'Checksum', (ctx) => hashArchive(ctx, s))
   return s
 }

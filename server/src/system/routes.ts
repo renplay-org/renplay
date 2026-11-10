@@ -19,7 +19,7 @@ async function disk(path: string) {
 }
 
 /** Variables whose effect Settings shows, so it can say whether the server sets them. */
-const PROVENANCE = ['RENPLAY_AUTH', 'GAMES_DIR', 'ARCHIVES_DIR', 'DATA_DIR', 'RENPLAY_BACKUP_DIR', 'RENPLAY_CATALOG_URLS', 'RENPLAY_RECIPES_DIR', 'RENPLAY_LOG_LEVEL', 'RENPLAY_SYNC_SERVER', 'RENPLAY_ENGINES_URL']
+const PROVENANCE = ['RENPLAY_AUTH', 'GAMES_DIR', 'ARCHIVES_DIR', 'DATA_DIR', 'RENPLAY_BACKUP_DIR', 'RENPLAY_CATALOG_URLS', 'RENPLAY_RECIPES_DIR', 'RENPLAY_LOG_LEVEL', 'RENPLAY_SYNC_SERVER', 'RENPLAY_ENGINES_URL', 'RENPLAY_TELEMETRY']
 
 export function createSystemRouter(s: Services): Router {
   const { cfg, db, jobs, engines, builds, purger, version, content, catalog } = s
@@ -115,6 +115,7 @@ export function createSystemRouter(s: Services): Router {
     res.json({
       version,
       sync: { on: syncCodesOn(db), server: cfg.syncServer, chosen: db.getSetting<unknown>(SYNC_SETTING, null) !== null },
+      telemetry: s.telemetry.status(),
       // Where each value comes from: a variable on the server, or the default. No values of secrets.
       setBy: Object.fromEntries(PROVENANCE.map((name) => [name, process.env[name]?.trim() ? 'server' : 'default'])),
       keepDownloadsChosen: db.getSetting<unknown>(KEEP_DOWNLOADS, null) !== null,

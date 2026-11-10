@@ -8,7 +8,7 @@ export function playerRoute(method: string, path: string): boolean {
   if ((method === 'GET' || method === 'HEAD') && (/^\/g\//.test(path) || /^\/api\/(art|walkthroughs)\//.test(path) || ['/api/games', '/api/catalog', '/api/content'].includes(path) || /^\/api\/games\/[^/]+(?:\/art|\/offline)?$/.test(path))) return true
   // A player chooses and uploads art for their own view (the route refuses everyone).
   if ((method === 'GET' || method === 'HEAD') && (path === '/api/history' || path === '/api/widget' || path === '/api/defaults')) return true
-  return /^(PUT \/api\/games\/[^/]+\/(favorite|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
+  return /^(PUT \/api\/games\/[^/]+\/(favorite|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|POST \/api\/telemetry\/client|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
 }
 
 /**

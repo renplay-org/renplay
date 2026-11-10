@@ -39,6 +39,7 @@ ENV NODE_ENV=production \
     LD_PRELOAD=/usr/local/lib/libjemalloc.so.2 \
     GAMES_DIR=/games \
     DATA_DIR=/data \
+    RENPLAY_INSTALL=image \
     HOME=/tmp/home \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning \
     UV_THREADPOOL_SIZE=16

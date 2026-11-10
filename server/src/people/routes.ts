@@ -16,7 +16,7 @@ import type { People, PersonListed } from '../shared/api.js'
  * art, through their stores.
  */
 export function createPeopleRouter(s: Services): Router {
-  const { cfg, db, accounts, content, progress, saveStores, art } = s
+  const { cfg, db, accounts, content, progress, saveStores, art, telemetry } = s
   const router = Router({ caseSensitive: true, strict: true })
   /** People being removed: they cannot be changed or removed again meanwhile. */
   const removing = new Set<number>()
@@ -68,7 +68,10 @@ export function createPeopleRouter(s: Services): Router {
     if (b.role !== undefined && managed.roleManaged || ceiling !== undefined && managed.adultManaged) throw new HttpError(409, 'This permission is set by the sign-in provider')
     accounts.guardLastAdmin(target, b)
     db.raw.prepare('UPDATE users SET name = ?, role = ?, disabled = ? WHERE id = ?').run(b.name === undefined ? target.name : validName(b.name), b.role ?? target.role, b.disabled === undefined ? target.disabled : Number(b.disabled), target.id)
-    if (ceiling !== undefined || choice !== undefined) accounts.writeLevels(target.id, { ceiling, choice })
+    if (ceiling !== undefined || choice !== undefined) {
+      accounts.writeLevels(target.id, { ceiling, choice })
+      telemetry.feature('adultLevelsChanged')
+    }
     if (b.role !== undefined) db.raw.prepare("UPDATE users SET admin_source = 'manual', admin_provider = '', admin_subject = '' WHERE id = ?").run(target.id)
     accounts.invalidate(); await accounts.tag(accounts.user(target.id)); res.json({ user: publicUser(accounts.user(target.id)) })
   })
