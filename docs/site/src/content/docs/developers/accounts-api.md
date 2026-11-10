@@ -4,7 +4,7 @@ description: Local accounts, sessions, tokens, permissions and save transfers.
 ---
 
 These endpoints back the Account and Users screens. `identities` is keyed by `(provider, subject)`:
-OIDC providers include the issuer and use the token subject; LDAP providers include directory URL
+OIDC providers include the issuer and use the token subject. LDAP providers include directory URL
 and base DN and use entryUUID (or DN). Linking is explicit, never based on an email or name.
 See [Accounts](/accounts/) for provider configuration.
 
@@ -30,7 +30,7 @@ all work. Bearer tokens bypass CSRF checks.
 
 ## Endpoints
 
-All paths below start with `/api`. Management endpoints require an admin; `/me` is personal.
+All paths below start with `/api`. Management endpoints require an admin, and `/me` is personal.
 Passwords must have 10 to 1024 characters. Usernames use 2 to 64 ASCII letters, numbers, dots, dashes or
 underscores and are case-insensitive. API paths, unlike usernames, are case-sensitive and have
 no trailing slash (including `/api/auth/check`). Repeated slashes and encoded path separators
@@ -38,8 +38,8 @@ are rejected rather than matched differently by authorization and routing.
 
 | Method and path | Body or result |
 |---|---|
-| `GET /auth/providers` | `{ enabled, setup, local, oidc, ldap }`; public. `local` means the password form is available (local or LDAP); `oidc` is its button name or null |
-| `POST /auth/setup/verify` | `{ code }` → `{ grant }`; public, ten attempts per boot |
+| `GET /auth/providers` | `{ enabled, setup, local, oidc, ldap }`, public. `local` means the password form is available (local or LDAP), and `oidc` is its button name or null |
+| `POST /auth/setup/verify` | `{ code }` → `{ grant }`, public, ten attempts per boot |
 | `POST /auth/setup` | `{ grant, username, name, password }`; claims owner and sets a cookie |
 | `POST /auth/login` | `{ username, password }`; rate limited per address and account |
 | `GET /auth/oidc/start` | Starts sign-in. Sets a ten-minute httpOnly state cookie and redirects to the provider |
@@ -49,7 +49,7 @@ are rejected rather than matched differently by authorization and routing.
 | `POST /me/identities/ldap` | `{ username, password }`. Verifies credentials and rechecks the initiating session or token before linking |
 | `DELETE /me/identities` | `{ provider, subject }`. Keeps a usable method, removes current grants from that identity and ends other sessions. Admin access assigned in Users is kept |
 | `POST /me/avatar` | Raw JPEG, PNG or WebP, up to 2 MiB and 16 megapixels. Returns `{ avatar }` filename |
-| `GET /avatars/:file` | Authenticated WebP; private/no-store |
+| `GET /avatars/:file` | Authenticated WebP, private and no-store |
 | `POST /auth/logout` | Revokes the current cookie session |
 | `GET /me` | `{ user, auth, unclaimed, hasPassword }` |
 | `PUT /me` | `{ name }` |
@@ -188,7 +188,7 @@ Sandboxed HTML frames have an opaque origin and no cookie. Their URL is
 game and build. Every request verifies that session (or access token) and uses its user's save
 store for the entry page. Relative URLs continue to work. Sign-out, disabling the account, token
 revocation and restart invalidate these URLs. They do not expire midway through a live session.
-The middleware sets an explicit verified-capability flag; URL query text cannot stand in for a
+The middleware sets an explicit verified-capability flag, and URL query text cannot stand in for a
 verified signature. Every HTML page (also SVG/XML documents) in an HTML game's asset pack sends
 a response-level CSP `sandbox` without `allow-same-origin` or popup escape. The iframe uses the
 same restrictions. Popups may open, but inherit the opaque-origin sandbox, even outside the

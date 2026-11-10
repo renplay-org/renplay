@@ -17,7 +17,7 @@ You can also put Renplay behind a VPN or your proxy's authentication.
   chunks of 32 MB, but a mod, a walkthrough or a zip of saves comes in one request, so allow bodies of
   600 MB, as Renplay's own nginx does. Do not set a short read timeout.
 - **Set `RENPLAY_PUBLIC_URL`** to your public HTTPS address when the proxy terminates HTTPS.
-  Cookies are marked `Secure` over HTTPS; plain HTTP remains usable on a local NAS. Set
+  Cookies are marked `Secure` over HTTPS, and plain HTTP remains usable on a local NAS. Set
   `RENPLAY_TRUSTED_HOPS` to the trusted proxy hop count for client-address rate limits (the
   included nginx counts as one). Do not expose Node directly with a nonzero count.
 - **Serve HTTPS.** Browsers only keep the game’s offline cache, and iPhone only treats Renplay as a

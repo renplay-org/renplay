@@ -16,6 +16,8 @@ const ADULT_SITE = 'https://adult.renplay.org'
 const INDEX_URL = 'https://catalog.renplay.org/index.v4.sfw.json'
 const neverCovers = ['1', 'true'].includes(process.env.NEVER_SHOW_ADULT_COVERS ?? '')
 const FIRST = 24
+// Free, safe-for-work games with strong official art, offered on the home page as places to start.
+const STARTERS = ['butterfly-soup', 'starry-flowers', 'a-date-with-death']
 
 const read = (path) => readFileSync(join(root, path), 'utf8')
 const write = (dir, path, text) => {
@@ -49,7 +51,8 @@ function render(template, vars) {
   })
 }
 
-const trim = (text, max) => (text.length <= max ? text : `${text.slice(0, max - 1).replace(/\s+\S*$/, '')}…`)
+/** Cut at a word, ending with a full stop: the writing rule has no ellipses. */
+const cut = (text, max) => (text.length <= max ? text : `${text.slice(0, max - 1).replace(/[\s,;:.!?]*\S*$/, '')}.`)
 const json = (data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`
 
 /** The tags in a page's head: title, description, address, cards and icons. */
@@ -77,6 +80,7 @@ function head({ title, description, canonical, image, imageAlt, imageSize, card:
     image && `<meta name="twitter:image:alt" content="${esc(imageAlt)}">`,
     '<meta name="theme-color" content="#0a0a0f">',
     '<link rel="icon" href="/logo.svg" type="image/svg+xml">',
+    '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">',
     '<link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48">',
     '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
     ...['/site.css', ...css].map((href) => `<link rel="stylesheet" href="${href}">`),
@@ -99,11 +103,17 @@ if (games.some((g) => !/^[a-z0-9][a-z0-9-]*$/.test(g.id) || g.id === 'request'))
 const here = (site) => ({ site, catalogCurrent: '' })
 const inCatalog = (site) => ({ site, catalogCurrent: ' aria-current="page"' })
 
+const starters = STARTERS.map((id) => {
+  const g = games.find((x) => x.id === id)
+  if (!g) throw new Error(`The home page offers ${id} as a game to start with, and the catalog has no such game that works. Change STARTERS in build.mjs.`)
+  return card(g, { link: true })
+}).join('')
+
 // ---- renplay.org ----------------------------------------------------------------------------------------------------
 const OUT = 'dist'
 rmSync(join(root, OUT), { recursive: true, force: true })
 rmSync(join(root, 'dist-adult'), { recursive: true, force: true })
-for (const f of ['site.css', 'catalog.css', 'logo.svg', 'logo.png', 'favicon-48.png', 'apple-touch-icon.png', 'img', 'js', '_redirects', '_headers', 'NOTICE']) {
+for (const f of ['site.css', 'catalog.css', 'logo.svg', 'logo.png', 'favicon.ico', 'favicon-48.png', 'apple-touch-icon.png', 'img', 'js', '_redirects', '_headers', 'NOTICE']) {
   cpSync(join(root, f), join(root, OUT, f), { recursive: true })
 }
 cpSync(join(root, '../LICENSE'), join(root, OUT, 'LICENSE'))
@@ -127,6 +137,7 @@ const software = {
 write(OUT, 'index.html', render(read('index.html'), {
   modes: ['sfw'],
   ...here(''),
+  starters,
   footnote: FOOTNOTE_HOME,
   head: head({
     title: 'Renplay · Your Ren’Py games on every screen',
@@ -176,9 +187,15 @@ write(OUT, 'catalog/index.html', render(read('pages/catalog.html'), {
 const gameTemplate = read('pages/game.html')
 const describe = (g) => {
   const store = ['itch', 'steam', 'patreon', 'subscribestar', 'website'].find((k) => /^https?:\/\//i.test(g.links?.[k] ?? ''))
-  const lead = g.summary ? `${g.summary.replace(/[.!?…]+$/, '')}. ` : ''
-  const by = g.developer ? `${g.free ? 'A free game' : 'A game'} by ${g.developer}` : g.free ? 'A free game' : 'A game'
-  return trim(`${lead}${by}, tested in Renplay. Get it${store ? ` on ${LINKS[store]}` : ' from its developer'}, add it and play it in your browser.`, 158)
+  // As much as fits a search result: the summary first, then who made it, then where to get it.
+  const parts = [
+    g.summary ? `${g.summary.replace(/[.!?…]+$/, '')}.` : `A visual novel${shownTags(g, vocab).length ? `: ${shownTags(g, vocab).slice(0, 3).map((t) => tagLabel(vocab, t)).join(', ')}` : ''}.`,
+    g.developer && `${g.free ? 'A free game' : 'A game'} by ${g.developer}, tested in Renplay.`,
+    `Get it${store ? ` on ${LINKS[store]}` : ' from its developer'} and play it in your browser.`,
+  ].filter(Boolean)
+  let text = parts[0]
+  for (const part of parts.slice(1)) if (`${text} ${part}`.length <= 158) text += ` ${part}`
+  return cut(text, 158)
 }
 for (const g of games) {
   const p = poster(g)
@@ -233,6 +250,13 @@ for (const g of games) {
   }))
 }
 
+const notFound = (site) => render(read('pages/404.html'), {
+  modes: ['sfw'],
+  ...here(site),
+  footnote: FOOTNOTE_CATALOG,
+  head: head({ title: 'Page not found · Renplay', description: 'This page is not here. Go to the Renplay home page or the catalog.', robots: [['robots', 'noindex']] }),
+})
+write(OUT, '404.html', notFound(''))
 write(OUT, 'sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${[['/', undefined], ['/catalog', updated], ...games.map((g) => [gamePath(g), updated])].map(([path, date]) => `  <url><loc>${SITE}${path}</loc>${date ? `<lastmod>${date}</lastmod>` : ''}</url>`).join('\n')}
@@ -242,7 +266,7 @@ write(OUT, 'robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xm
 
 // ---- adult.renplay.org ----------------------------------------------------------------------------------------------------
 const ADULT_OUT = 'dist-adult'
-for (const f of ['site.css', 'catalog.css', 'logo.svg', 'favicon-48.png', 'apple-touch-icon.png', 'js', 'NOTICE']) {
+for (const f of ['site.css', 'catalog.css', 'logo.svg', 'favicon.ico', 'favicon-48.png', 'apple-touch-icon.png', 'js', 'NOTICE']) {
   cpSync(join(root, f), join(root, ADULT_OUT, f), { recursive: true })
 }
 cpSync(join(root, '../LICENSE'), join(root, ADULT_OUT, 'LICENSE'))
@@ -269,6 +293,7 @@ write(ADULT_OUT, 'index.html', render(read('pages/catalog.html'), {
     css: ['/catalog.css'],
   }),
 }))
+write(ADULT_OUT, '404.html', notFound(SITE))
 write(ADULT_OUT, 'robots.txt', 'User-agent: *\nDisallow: /\n')
 write(ADULT_OUT, '_headers', `/*
   X-Content-Type-Options: nosniff

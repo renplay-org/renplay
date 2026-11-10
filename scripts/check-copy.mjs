@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Checks the writing rule in text people read: no semicolons, em dashes, en dashes or ellipses in
-// the interface, the docs, server messages and logs, and the changelog's Unreleased section. Code
+// the interface, the docs, the website's pages, server messages and logs, and the changelog's Unreleased section. Code
 // is left alone: only strings and text that read as sentences are checked.
 // Usage: node scripts/check-copy.mjs [--docs] (exits 1 and lists each place that breaks the rule).
 // The docs are checked with --docs, as CI does.
@@ -28,6 +28,9 @@ const files = (dir, ext) => {
 const semicolon = /[a-z)]; [a-z]/
 const dashes = /[—–…]/
 const breaks = (text) => /[A-Za-z]{3}/.test(text) && (dashes.test(text) || semicolon.test(text))
+// Running text (docs, changelog) has no code in it, so any semicolon is prose: also one that ends a line, or follows a
+// link, bold text or a closing bracket. HTML entities such as &amp; end in one and are not prose.
+const prosebreaks = (text) => breaks(text) || /[\w)\]*_];(\s|$)/.test(text.replace(/&#?\w+;/g, ''))
 const report = (file, line, text) => problems.push(`${relative(root, file)}:${line}: ${text.trim().slice(0, 120)}`)
 
 // Strings in code that are known not to be prose.
@@ -61,8 +64,15 @@ if (process.argv.includes('--docs')) for (const file of files('docs/site/src/con
     if (/^\s*(```|~~~)/.test(line)) fenced = !fenced
     if (fenced || /^\s*(<|import |\|?\s*-{3})/.test(line)) return
     const prose = line.replace(/`[^`]*`/g, '').replace(/\]\([^)]*\)/g, ']').replace(/<[^>]+>/g, '')
-    if (breaks(prose)) report(file, i + 1, prose)
+    if (prosebreaks(prose)) report(file, i + 1, prose)
   })
+}
+
+/** The text of the website's pages (website/, not what its build wrote), outside scripts, styles and code. */
+if (process.argv.includes('--docs')) for (const file of files('website', /\.html$/).filter((f) => !/\/dist(-adult)?\//.test(f))) {
+  const blank = (m) => m.replace(/[^\n]/g, '')
+  const text = readFileSync(file, 'utf8').replace(/<(script|style|pre|code)[\s\S]*?<\/\1>/g, blank).replace(/<[^>]+>/g, '')
+  text.split('\n').forEach((line, i) => { if (prosebreaks(line)) report(file, i + 1, line) })
 }
 
 /** The changelog's Unreleased section (released sections predate the rule). */
@@ -72,7 +82,7 @@ if (process.argv.includes('--docs')) for (const file of files('docs/site/src/con
   const start = lines.findIndex((l) => l.startsWith('## [Unreleased]'))
   for (let i = start + 1; i < lines.length && !lines[i].startsWith('## ['); i++) {
     const prose = lines[i].replace(/`[^`]*`/g, '')
-    if (breaks(prose)) report(file, i + 1, prose)
+    if (prosebreaks(prose)) report(file, i + 1, prose)
   }
 }
 

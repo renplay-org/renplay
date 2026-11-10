@@ -17,7 +17,7 @@ TrueNAS SCALE and Community editions run containers as Apps. Datasets give you t
    `renplay/renplay` on Docker Hub). Pin a version tag.
 3. Map port **8080** of the container to a port on the NAS.
 4. Mount the games folder at `/games` and the data folder at `/data`.
-5. Make both folders writable by the container's user. The default is 1000:1000; TrueNAS's
+5. Make both folders writable by the container's user. The default is 1000:1000, and TrueNAS's
    568:568 works too. Set the container's user and group to match the dataset permissions.
 
 The names of the screens differ between versions of the system, so these steps stay general. The

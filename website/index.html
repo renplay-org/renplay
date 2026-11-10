@@ -11,21 +11,21 @@
 <header class="hero">
   <div class="aurora"><span></span><span></span><span></span></div>
   <div class="wrap">
-    <span class="chip intro" style="--d:0ms"><b>Free</b> Open source and self-hosted</span>
-    <h1 class="intro" style="--d:80ms">Your Ren’Py games,<br><span class="rotator" aria-label="on every screen."><span class="grad-text on">on every screen.</span><span class="grad-text" aria-hidden="true">on your phone.</span><span class="grad-text" aria-hidden="true">on your laptop.</span><span class="grad-text" aria-hidden="true">on your tablet.</span></span></h1>
-    <p class="sub intro" style="--d:160ms">Renplay plays <strong>the games you get from itch.io, Patreon and F95zone</strong>, adult and not, in any browser: your computer, your tablet, your phone. Every save lands on your own server, so you start a chapter at your desk and finish it on the couch.</p>
-    <div class="cta intro" style="--d:240ms">
+    <span class="chip"><b>Free</b> Open source and self-hosted</span>
+    <h1>Your Ren’Py games,<br><span class="rotator"><span class="grad-text on">on every screen.</span></span></h1>
+    <p class="sub">Renplay plays <strong>the games you get from itch.io, Patreon and F95zone</strong>, adult and not, in any browser: your computer, your tablet, your phone. Every save lands on your own server, so you start a chapter at your desk and finish it on the couch.</p>
+    <div class="cta">
       <a class="btn primary" href="#install">Install
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </a>
       <a class="btn" href="/demo">Try the demo</a>
     </div>
-    <div class="trust intro" style="--d:300ms">
+    <div class="trust">
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>One Docker container</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Your server, no tracking</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>MIT licensed</span>
     </div>
-    <div class="stage intro" style="--d:380ms">
+    <div class="stage intro">
       <div class="laptop">
         <div class="screen"><img src="/img/desktop-library.webp" alt="The Renplay library in a browser, with a game ready to resume" width="1600" height="1000" fetchpriority="high"></div>
         <div class="base"></div>
@@ -136,26 +136,35 @@
         <p class="lead">If you can run a Docker container, you can run Renplay. Point it at a folder for games and one for your saves.</p>
         <ol class="after">
           <li><span>Run the command and open <b>http://localhost:8080</b>. Enter the setup code from <code>docker logs renplay</code> and create your account. Renplay then asks whether to show adult games.</span></li>
-          <li><span>Go to <b>Add games</b> and upload a game’s PC download, then press <b>Install</b> and <b>Play</b>. On your phone, add Renplay to the home screen.</span></li>
-          <li><span><b>Start with a free game.</b> <a href="/catalog/butterfly-soup/">Butterfly Soup</a> and <a href="/catalog/stillwater/">Stillwater</a> are free and safe for work. Get one from its developer, add it, and play.</span></li>
+          <li><span>Go to <b>Add games</b> and upload a game’s PC download, then press <b>Install</b> and <b>Play</b>. On your phone, add Renplay to the home screen. The <a href="https://docs.renplay.org/start-here/quick-start/">quick start</a> shows each step.</span></li>
+          <li><span><b>Start with a free game.</b> These are free and safe for work. Get one from its developer, add it, and play.</span></li>
         </ol>
-        <div class="cta next"><a class="btn" href="https://docs.renplay.org/start-here/quick-start/">Read the install guide</a></div>
-        <p class="fine">Docker Compose, the NAS guides and every setting are in the <a href="https://docs.renplay.org">docs</a>.</p>
+        <div class="starters">{{starters}}</div>
+        <div class="cta next"><a class="btn primary" href="https://docs.renplay.org/start-here/quick-start/">Read the install guide</a></div>
+        <ul class="platforms" aria-label="Install guides for each system">
+          <li><a href="https://docs.renplay.org/install/docker/">Docker and Compose</a></li>
+          <li><a href="https://docs.renplay.org/install/kubernetes/">Kubernetes</a></li>
+          <li><a href="https://docs.renplay.org/install/truenas/">TrueNAS</a></li>
+          <li><a href="https://docs.renplay.org/install/unraid/">Unraid</a></li>
+          <li><a href="https://docs.renplay.org/install/synology/">Synology</a></li>
+          <li><a href="https://docs.renplay.org/install/ugreen/">UGREEN</a></li>
+          <li><a href="https://docs.renplay.org/install/qnap/">QNAP</a></li>
+        </ul>
       </div>
       <div class="reveal">
-        <div class="tabs" role="tablist">
-          <button class="on" data-tab="docker">Docker</button>
-          <button data-tab="compose">Docker Compose</button>
+        <div class="tabs" role="tablist" aria-label="How to run it">
+          <button class="on" role="tab" id="tab-docker" aria-selected="true" aria-controls="pane-docker" data-tab="docker">Docker</button>
+          <button role="tab" id="tab-compose" aria-selected="false" aria-controls="pane-compose" tabindex="-1" data-tab="compose">Docker Compose</button>
         </div>
-        <div class="code" data-pane="docker">
-          <pre><span class="k">docker</span> run -d --name renplay -p 8080:8080 \
+        <div class="code" role="tabpanel" id="pane-docker" aria-labelledby="tab-docker" data-pane="docker">
+          <pre tabindex="0"><span class="k">docker</span> run -d --name renplay -p 8080:8080 \
   -v ./games:/games \
   -v ./data:/data \
   ghcr.io/renplay-org/renplay:latest</pre>
           <button class="btn sm copy">Copy</button>
         </div>
-        <div class="code" data-pane="compose" hidden>
-          <pre><span class="c"># compose.yaml</span>
+        <div class="code" role="tabpanel" id="pane-compose" aria-labelledby="tab-compose" data-pane="compose" hidden>
+          <pre tabindex="0"><span class="c"># compose.yaml</span>
 <span class="k">services</span>:
   <span class="k">renplay</span>:
     image: ghcr.io/renplay-org/renplay:latest
@@ -224,10 +233,18 @@
   const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) } }), { threshold: 0.12, rootMargin: '0px 0px -40px 0px' })
   document.querySelectorAll('.reveal').forEach((el, i) => { el.style.transitionDelay = (el.closest('.steps, .bento, .numbers, .versus, .faq') ? (i % 4) * 70 : 0) + 'ms'; io.observe(el) })
   // Install tabs and copy buttons.
-  document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
-    document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b))
+  const tabs = [...document.querySelectorAll('.tabs button')]
+  const pick = (b) => {
+    tabs.forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', String(x === b)); x.tabIndex = x === b ? 0 : -1 })
     document.querySelectorAll('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== b.dataset.tab))
-  }))
+  }
+  tabs.forEach((b) => b.addEventListener('click', () => pick(b)))
+  document.querySelector('.tabs').addEventListener('keydown', (e) => {
+    const to = { ArrowRight: 1, ArrowLeft: -1 }[e.key]
+    if (!to) return
+    const next = tabs[(tabs.indexOf(document.activeElement) + to + tabs.length) % tabs.length]
+    next.focus(); pick(next)
+  })
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches
   const fine = matchMedia('(hover: hover) and (pointer: fine)').matches
   // Cursor spotlight on cards.
@@ -246,7 +263,9 @@
     hero.addEventListener('pointerleave', () => (stage.style.transform = ''))
   }
   // Headline: the engines Renplay plays, Ren'Py the longest.
-  const words = [...document.querySelectorAll('.rotator > span')]
+  const rotator = document.querySelector('.rotator')
+  for (const w of ['on your phone.', 'on your laptop.', 'on your tablet.']) rotator.insertAdjacentHTML('beforeend', `<span class="grad-text" aria-hidden="true">${w}</span>`)
+  const words = [...rotator.children]
   if (words.length > 1 && !still) {
     let i = 0
     const next = () => {

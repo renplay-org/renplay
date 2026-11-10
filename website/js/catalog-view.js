@@ -52,7 +52,7 @@ export function art(g, { hidden = false, blur = '', eager = false, alt = '' } = 
 export function card(g, { link, ...cover }) {
   const inner = `${art(g, cover)}
       <h3>${esc(g.title)}</h3>
-      <div class="meta">${dots([g.developer && esc(g.developer), g.state && esc(stateLabel(g.state)), g.free && '<span class="free">Free</span>'])}</div>`
+      <div class="meta">${dots([g.developer && esc(g.developer), g.state && esc(stateLabel(g.state)), g.free === false && '<span class="paid">Paid</span>'])}</div>`
   return link ? `<a class="game" href="${gamePath(g)}">${inner}</a>` : `<button class="game" data-id="${esc(g.id)}">${inner}</button>`
 }
 
@@ -76,7 +76,7 @@ export function detail(g, vocab, { heading = 'h2', ...cover } = {}) {
       <div>${art(g, { ...cover, alt: `${g.title} cover` })}</div>
       <div>
         <${heading}>${esc(g.title)}</${heading}>
-        <div class="by">${[g.developer && `By ${esc(g.developer)}`, g.state && esc(stateLabel(g.state)), ENGINES[g.engine ?? 'renpy'] ?? esc(g.engine), g.free && '<span class="free">Free</span>'].filter(Boolean).join(' · ')}</div>
+        <div class="by">${[g.developer && `By ${esc(g.developer)}`, g.state && esc(stateLabel(g.state)), ENGINES[g.engine ?? 'renpy'] ?? esc(g.engine), g.free === false && '<span class="paid">Paid</span>'].filter(Boolean).join(' · ')}</div>
         ${g.summary ? `<p class="summary">${esc(g.summary)}</p>` : ''}
         ${tags.length ? `<div class="chips">${tags.map((t) => `<span>${esc(tagLabel(vocab, t))}</span>`).join('')}</div>` : ''}
         <div class="actions-row">
