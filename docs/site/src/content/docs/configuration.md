@@ -358,7 +358,7 @@ Default: `1000`
 
 </div>
 
-Container only: when started as root, drop to this non-root user ID before starting Renplay. Ignored when started with --user. Make the mounted folders writable by this user; Renplay does not change their ownership.
+Container only: when started as root, drop to this non-root user ID before starting Renplay. Ignored when started with --user. Make the mounted folders writable by this user. Renplay does not change their ownership.
 
 </div>
 
@@ -750,7 +750,7 @@ Default: `1`
 
 </div>
 
-Account id used without sign-in. The owner is 1; other accounts and their saves stay untouched.
+Account id used without sign-in. The owner is 1. Other accounts and their saves stay untouched.
 
 </div>
 

@@ -3,6 +3,7 @@
 /saves/
 **/node_modules/
 **/dist/
+**/dist-adult/
 *.env
 *.log
 *.tsbuildinfo

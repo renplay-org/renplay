@@ -155,7 +155,7 @@ function Shell() {
           <p className="notice" role="note" style={{ margin: '12px 16px 0' }}>
             <Sparkles aria-hidden />
             <span>
-              This is a demo of Renplay with free games. It starts fresh every few hours, so nothing you do here is kept.{' '}
+              This is a demo of Renplay with free games. It starts fresh every few hours, so nothing you do here is kept. The demo has adult games turned off.{' '}
               <a className="link" href="https://renplay.org/#install">
                 Install your own
               </a>

@@ -7,6 +7,17 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- The website has a page for each safe-for-work game in the catalog, with its cover, where to get it and how to play it in Renplay.
+- The whole catalog, adult games included, is at adult.renplay.org, behind a question about your age, with adult covers blurred until you show them. The catalog at renplay.org lists only safe-for-work games.
+- The catalog on the website scrolls on as you near the end, and takes you back to the same place when you return from a game.
+
+### Changed
+
+- The demo has adult games turned off, and its banner says so.
+- The docs and the website no longer shift while they load, and their buttons and links are at least 40 px tall on a phone. A check in CI keeps it so.
+
 ## [4.8.0] - 2026-11-10
 
 ### Added

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en" data-mode="{{mode}}" data-covers="{{covers}}"{{ok}}>
+<head>
+{{head}}
+<!--if adult--><script>try { if (localStorage.getItem('renplay-adult:18') === '1') document.documentElement.setAttribute('data-ok', '') } catch {}</script><!--endif-->
+<script>try { if (sessionStorage.getItem('renplay-catalog:{{mode}}')) { document.documentElement.classList.add('restoring'); setTimeout(() => document.documentElement.classList.remove('restoring'), 2000) } } catch {}</script>
+</head>
+<body>
+<div class="grain"></div>
+{{nav}}
+<main class="wrap">
+<!--if adult-->
+  <section class="gate">
+    <div>
+      <h1>Are you 18 or older?</h1>
+      <p>This catalog lists adult games next to the others. Their covers stay blurred until you choose to show them.</p>
+      <div class="row">
+        <button class="btn primary" type="button" id="yes">Yes, I’m 18 or older</button>
+        <a class="btn" href="https://renplay.org/catalog/">No, take me to the safe-for-work catalog</a>
+      </div>
+    </div>
+  </section>
+<!--endif-->
+  <div class="after-gate">
+    <header class="page-head">
+      <p class="eyebrow">{{eyebrow}}</p>
+      <h1>{{heading}}</h1>
+      <p class="lead">{{lead}}</p>
+    </header>
+
+    <div class="bar">
+      <label class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Search by title, developer or tag" autocomplete="off" aria-label="Search the catalog">
+      </label>
+    </div>
+<!--if sfw-->
+    <p class="adult-note">Adult games are listed in <a href="https://adult.renplay.org">the adult catalog</a>, not here.</p>
+    <p class="hash-note" id="hash-note" hidden>This game is in <a href="https://adult.renplay.org">the adult catalog</a>.</p>
+<!--endif-->
+    <div class="chip-row" id="states" role="group" aria-label="Game state">{{states}}</div>
+    <div class="chip-row" id="tags" role="group" aria-label="Tags">{{tags}}</div>
+
+    <div class="count-row">
+      <span class="count" id="count" aria-live="polite">{{count}}</span>
+<!--if adult-->
+      <button class="link-btn" type="button" id="covers" hidden></button>
+<!--endif-->
+    </div>
+
+    <h2 class="sr-only">Games</h2>
+    <div class="games" id="games"{{prerendered}}>{{games}}</div>
+    <div class="end" id="end"></div>
+<!--if sfw-->
+    <details class="all-games">
+      <summary>All games as a list</summary>
+      <ul>{{list}}</ul>
+    </details>
+<!--endif-->
+
+    <section class="request">
+      <div class="band">
+        <div>
+          <p class="eyebrow">Missing a game?</p>
+          <h2>Ask for it, or add it yourself.</h2>
+          <p>Tell us the game and where its developer publishes it. Got it working already? A recipe is a short text file, and Renplay fills most of it in for you.</p>
+        </div>
+        <div class="actions">
+          <button class="btn primary" data-request>Request a game</button>
+          <a class="btn" href="https://github.com/renplay-org/catalog/blob/main/CONTRIBUTING.md">Add a game yourself</a>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!--if adult-->
+<dialog id="detail" aria-label="Game details"><button class="close" aria-label="Close" data-close>×</button><div id="detail-body"></div></dialog>
+<!--endif-->
+
+<dialog id="request">
+  <button class="close" aria-label="Close" data-close>×</button>
+  <form class="req" id="req-form" method="dialog">
+    <h2>Request a game</h2>
+    <p>Requests are public issues on GitHub, where the catalog lives. Fill this in, then GitHub opens the full request with your answers.</p>
+    <label class="field"><span>Game</span><input name="game" required placeholder="Title as the developer writes it"></label>
+    <label class="field"><span>Version</span><input name="version" placeholder="0.9.23 or Chapter 4"></label>
+    <label class="field"><span>Official page</span><input name="page" type="url" required placeholder="https://developer.itch.io/game"></label>
+    <div class="note">GitHub asks you to sign in to send it. No account yet? <a href="https://github.com/signup" target="_blank" rel="noopener">Making one</a> is free and takes a minute.</div>
+    <div class="row">
+      <button class="btn primary" type="submit">Continue on GitHub</button>
+      <button class="btn" type="button" data-close>Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+{{footer}}
+
+<script src="/js/menu.js" defer></script>
+<script src="/js/catalog.js" type="module"></script>
+</body>
+</html>

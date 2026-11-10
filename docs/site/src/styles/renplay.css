@@ -173,3 +173,15 @@ starlight-toc a { font-size: .8rem; }
 }
 @media (prefers-reduced-motion: reduce) { .sl-markdown-content .path-card { transition: none; } }
 :root:not([data-has-sidebar]) .docs-search { visibility: hidden; }
+
+/* Touch targets of at least 40 px, and a search pill that says what it is on a phone. */
+.docs-links a, .family-footer a, .docs-home-menu-panel a { display: inline-flex; align-items: center; min-height: 40px; }
+.docs-brand { min-height: 40px; }
+.family-footer a { padding-block: 0; }
+site-search button[data-open-modal], a[href*="/edit/dev/"] { min-height: 40px; min-width: 40px; }
+a[href*="/edit/dev/"] { display: inline-flex; align-items: center; }
+.home-search site-search button[data-open-modal] > span { display: block !important; }
+.sl-menu-button { min-width: 40px; min-height: 40px; }
+@media (max-width: 50rem) {
+  .sidebar-content a[href], starlight-toc a[href], mobile-starlight-toc a[href] { min-height: 40px; display: flex; align-items: center; }
+}

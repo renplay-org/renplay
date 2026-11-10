@@ -17,7 +17,7 @@ UGOS runs containers with its Docker app, with shared folders for the two folder
    `renplay/renplay` on Docker Hub). Pin a version tag.
 3. Map port **8080** of the container to a port on the NAS.
 4. Mount the games folder at `/games` and the data folder at `/data`.
-5. Make sure the container may write to both folders. The image runs as user and group 1000; if
+5. Make sure the container may write to both folders. The image runs as user and group 1000. If
    your system cannot give that user access, run the container as a user that owns the folders.
 
 The names of the screens differ between versions of the system, so these steps stay general. The

@@ -16,8 +16,8 @@ docker logs renplay | grep "Setup code"
 ```
 
 Choose the owner's name, username and password (at least 10 characters). The owner keeps any saves
-made before sign-in was enabled. The code changes on each server start and allows ten attempts;
-restart Renplay if those attempts run out.
+made before sign-in was enabled. The code changes on each server start and allows ten attempts.
+Restart Renplay if those attempts run out.
 
 To seed the owner instead, set `RENPLAY_ADMIN_USERNAME` and `RENPLAY_ADMIN_PASSWORD_FILE` (a file
 containing the password). `RENPLAY_ADMIN_PASSWORD` also works. Set only one password source. These
@@ -46,8 +46,8 @@ if that sync fails. Do not clear browser storage while changes are waiting to sy
 
 Browser saves from before accounts are attributed only to the known owner of an upgraded
 single-user installation, never to an arbitrary player. If their owner cannot be established,
-Renplay keeps them and shows a notice. Ask an admin to recover those files on the same device;
-[developer recovery notes](/developers/accounts-api/#unowned-browser-save-recovery) explain how.
+Renplay keeps them and shows a notice. Ask an admin to recover those files on the same device.
+The [developer recovery notes](/developers/accounts-api/#unowned-browser-save-recovery) explain how.
 
 Use HTTPS outside a trusted local network. Cookies are httpOnly and SameSite=Lax. They also have
 `Secure` over HTTPS, but work on plain HTTP for local NAS installs. Set `RENPLAY_PUBLIC_URL` to
@@ -90,8 +90,8 @@ RENPLAY_OIDC_ADULT_GROUPS=renplay-adults=shown,renplay-family=blurred
 
 Accounts are matched by issuer and subject, never by email or display name. First sign-in creates
 a player unless an admin rule matches. Set `RENPLAY_OIDC_AUTO_CREATE=false` to require linking from
-an existing signed-in account first. This also prevents creating the first owner through OIDC;
-claim a local owner before disabling local sign-in in that mode.
+an existing signed-in account first. This also prevents creating the first owner through OIDC.
+Claim a local owner before disabling local sign-in in that mode.
 
 `RENPLAY_ADMINS` is a comma-separated list of provider usernames or emails. An email only counts
 when the OIDC token has `email_verified: true`. An admin group, when configured, takes precedence
@@ -173,7 +173,7 @@ RENPLAY_LDAP_ADULT_GROUPS=renplay-adults=shown,renplay-family=blurred
 
 For LLDAP's default internal listener use `ldap://lldap:3890` only on a trusted private network.
 For other directories offering StartTLS, use `ldap://` with `RENPLAY_LDAP_STARTTLS=true`. TLS is
-verified; `RENPLAY_LDAP_CA_FILE` accepts your private PEM CA. A failed TLS upgrade never falls
+verified, and `RENPLAY_LDAP_CA_FILE` accepts your private PEM CA. A failed TLS upgrade never falls
 back to plaintext. Do not send directory passwords over an untrusted plaintext network.
 
 Attribute settings are `RENPLAY_LDAP_USERNAME_ATTRIBUTE=uid`,
@@ -327,8 +327,8 @@ The owner and the account selected for no-sign-in play cannot be removed.
 
 Save imports accept up to 200 files, 64 MiB per uploaded file and 128 MiB per request. A zip may
 contain at most 2,048 entries, 64 MiB per expanded entry and 128 MiB of expanded contents. Links,
-special files and unsafe paths are refused before extraction. Two imports can run at once;
-try again shortly if another import is using the available slots.
+special files and unsafe paths are refused before extraction. Two imports can run at once.
+Try again shortly if another import is using the available slots.
 
 ## Backups and rollback
 

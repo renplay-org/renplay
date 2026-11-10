@@ -44,7 +44,7 @@ run = "npm run screenshots --"
 
 [check]
 description = "Everything CI checks, except the image"
-depends = ["check:server", "check:structure", "check:runtime", "check:copy", "check:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
+depends = ["check:server", "check:structure", "check:runtime", "check:copy", "check:ui", "check:docs", "check:website", "check:layout", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
 
 ["check:server"]
 description = "Server type check, the tests' type check, and the tests"
@@ -85,6 +85,11 @@ run = ["npm run check:config", "npm run build"]
 ["check:website"]
 description = "Website build, with every local link and picture checked"
 run = ["sh website/build.sh", "node scripts/check-website.mjs"]
+
+["check:layout"]
+description = "No page of the website or the docs shifts by more than 0.02 while it loads and scrolls (Cumulative Layout Shift, at 390 px in WebKit and 1440 px in Chromium)"
+depends = ["check:website", "check:docs"]
+run = ["npx --prefix server playwright install chromium webkit", "node scripts/check-layout-shift.mjs"]
 
 ["check:chart"]
 description = "Chart lint and tests, and its values reference up to date"
