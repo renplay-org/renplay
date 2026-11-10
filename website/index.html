@@ -284,11 +284,15 @@
     counters.unobserve(e.target)
     const el = e.target, to = +el.dataset.to, pre = el.dataset.prefix ?? '', suf = el.dataset.suffix ?? ''
     if (still) return
+    // The count never changes the height of the number: a card with text that wraps one way at one value and
+    // another way at the next would move everything under it with each step.
+    el.style.minHeight = `${el.offsetHeight}px`
     const t0 = performance.now()
     const tick = (t) => {
       const k = Math.min(1, (t - t0) / 1200)
       el.textContent = pre + Math.round(to * (1 - Math.pow(1 - k, 3))) + suf
       if (k < 1) requestAnimationFrame(tick)
+      else el.style.minHeight = ''
     }
     requestAnimationFrame(tick)
   }), { threshold: 0.6 })

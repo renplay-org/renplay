@@ -10,6 +10,9 @@
  * and adds up the share of the screen that moved times how far, which is the API's own formula.
  * Pictures from other hosts are answered with a small grey one, and the catalog's index comes from the catalog (or
  * CATALOG_INDEX_FILE), so the run does not depend on the network's speed. LAYOUT_DEBUG=1 lists what moved.
+ * To hunt a page that fails now and then: LAYOUT_ONLY="home" runs the pages whose name starts with it, LAYOUT_RUNS=10
+ * runs each of them that many times, and LAYOUT_WIDTH=360 tries a phone of another width (the text of a card wraps
+ * differently there, as it does in another browser's fonts).
  */
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
@@ -22,7 +25,10 @@ const dirs = {
   adult: new URL('../website/dist-adult/', import.meta.url).pathname,
   docs: new URL('../docs/site/dist/', import.meta.url).pathname,
 }
+const only = process.env.LAYOUT_ONLY ?? ''
+const runsOf = Math.max(1, Number(process.env.LAYOUT_RUNS) || 1)
 for (const [name, dir] of Object.entries(dirs)) {
+  if (only && !({ website: 'home catalog game', adult: 'adult', docs: 'docs' }[name] ?? '').split(' ').some((n) => only.includes(n))) continue
   if (!existsSync(dir)) {
     console.error(`Build the ${name} first: sh website/build.sh, and npm run build in docs/site`)
     process.exit(1)
@@ -134,8 +140,8 @@ async function scrollThrough(page) {
 }
 
 const results = []
-async function check(browser, label, name, open) {
-  const ctx = await browser.newContext(label.startsWith('390') ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } })
+async function check(browser, label, name, open, width = Number(process.env.LAYOUT_WIDTH) || 390) {
+  const ctx = await browser.newContext(label.endsWith('WebKit') ? { viewport: { width, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { viewport: { width: 1440, height: 900 } })
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -156,8 +162,8 @@ async function check(browser, label, name, open) {
 }
 
 const { server: ws, base: web } = await serve(dirs.website)
-const { server: as, base: adult } = await serve(dirs.adult)
-const { server: ds, base: docs } = await serve(dirs.docs)
+const { server: as, base: adult } = existsSync(dirs.adult) ? await serve(dirs.adult) : { server: { close() {} }, base: '' }
+const { server: ds, base: docs } = existsSync(dirs.docs) ? await serve(dirs.docs) : { server: { close() {} }, base: '' }
 const firstGame = readFileSync(join(dirs.website, 'sitemap.xml'), 'utf8').match(/<loc>https:\/\/renplay\.org\/(catalog\/[a-z0-9-]+\/)<\/loc>/g).map((l) => l.match(/renplay\.org(\/[^<]*)/)[1]).find((p) => p !== '/catalog/')
 const pages = [
   ['home', (p) => p.goto(`${web}/`)],
@@ -167,10 +173,17 @@ const pages = [
   ['docs home', (p) => p.goto(`${docs}/`)],
   ['docs guide', (p) => p.goto(`${docs}/start-here/quick-start/`)],
 ]
-const runs = [[webkit, '390 px WebKit'], [chromium, '1440 px Chromium']]
+const runs = [[webkit, `${Number(process.env.LAYOUT_WIDTH) || 390} px WebKit`], [chromium, '1440 px Chromium']]
 for (const [engine, label] of runs) {
   const browser = await engine.launch()
-  for (const [name, open] of pages) await check(browser, label, name, open)
+  for (const [name, open] of pages.filter(([name]) => !only || name.startsWith(only))) {
+    for (let run = 0; run < runsOf; run++) await check(browser, label, name, open)
+  }
+  // The text of a card wraps at another place on a narrower or a wider phone, and in another browser's fonts: the home
+  // page's counting numbers once moved everything under them at 360 px, and now and then at 390 in CI.
+  if (engine === webkit && !process.env.LAYOUT_WIDTH && (!only || 'home'.startsWith(only))) {
+    for (const width of [360, 430]) await check(browser, `${width} px WebKit`, 'home', pages[0][1], width)
+  }
   await browser.close()
 }
 for (const s of [ws, as, ds]) s.close()
