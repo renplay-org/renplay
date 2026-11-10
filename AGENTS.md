@@ -119,8 +119,13 @@ deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kub
 demo/              The public demo's image (demo.renplay.org)
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
-website/           renplay.org: plain HTML and CSS (home, catalog browser), _redirects for the stable
-                     addresses (/docs, /github, /demo...), www/ the www.renplay.org redirect
+website/           renplay.org and adult.renplay.org: plain HTML and CSS, built by `build.mjs` (`sh build.sh`) into
+                     dist/ and dist-adult/. The safe-for-work catalog index gives each game a page (pages/game.html)
+                     and /catalog its first screen. The adult catalog is pages/catalog.html built in adult mode (a
+                     build-time setting, never the hostname), behind an age question, noindex. js/catalog-view.js is
+                     what the browser and the build both draw with. NEVER_SHOW_ADULT_COVERS=1 keeps adult covers
+                     blurred. _redirects holds the stable addresses (/docs, /github, /demo, /adult...), www/ the
+                     www.renplay.org redirect
 telemetry/         The collector for the daily usage report: a Cloudflare Worker with D1 (telemetry.renplay.org),
                      its tests (`mise run check:telemetry`), deploy.sh. Not part of the image
 tests/             The image's install contract, the chart's tests, the deploy/ examples
@@ -232,7 +237,8 @@ mise install && mise run install    # tools and npm packages
 mise run dev                        # server on :3999 (data in /tmp/rp) and library on http://localhost:5199
 RENPLAY_BACKEND=https://renplay.example mise run dev:ui   # library against a deployed server
 mise run check                      # everything CI checks, or one part: check:server, check:ui,
-                                    # check:docs, check:chart, check:copy, check:workflows, check:examples
+                                    # check:docs, check:website, check:layout (layout shift of the website and docs),
+                                    # check:chart, check:copy, check:workflows, check:examples
 mise run test                       # server tests only
 mise run image && mise run contract # the image as renplay:dev, its install contract, deploy/compose.yaml
 mise run screenshots http://localhost:5199 /tmp/shots --sfw   # phone and desktop, read-only
@@ -271,7 +277,7 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
   Upgrades are tested from the newest release.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
-  `sites.yml` (the docs and the website, with each release or by hand), `demo.yml` (the demo, with each release or
+  `sites.yml` (the docs and the website, with each release or by hand, and the website also daily and on a `catalog-updated` repository_dispatch, since its game pages follow the catalog), `demo.yml` (the demo, with each release or
   by hand). Actions are pinned by commit SHA, Dependabot keeps them and the
   npm and Docker dependencies current (weekly, grouped, into `dev`). `actionlint` and `zizmor` check the workflows.
 - **Releases:** see the `release` skill. A `release-X.Y.Z` branch from `dev` bumps
@@ -301,3 +307,11 @@ Procedures for agents live in `.agents/skills/` (linked as `.claude/skills/`):
 
 - `release`: cut a release (versions, changelog, PR, tag, image, deployment).
 - `ui-check`: look at UI changes on a phone and a desktop before calling them done.
+- `ui-review`: audit the app, the website, the docs and the catalog's pages, and rank what feels off
+  (layout shift, transitions, grids, scroll memory, touch, search engines).
+- `diagnosing-bugs`: a loop for hard bugs and slow paths, a failing test first.
+- `untangle-codebase`: find and remove tangles (dead code, cycles, things written twice).
+- `tdd`, `code-review`, `prototype`, `research`, `writing-for-agents`: from mattpocock/skills (see
+  `.agents/skills/THIRD-PARTY.md`): test-first work, a review of a diff against the standards and the spec,
+  a throwaway prototype for a design question, research into primary sources, and writing skills and
+  AGENTS.md for agents.

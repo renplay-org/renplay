@@ -1,77 +1,36 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Renplay · Your Ren’Py games on every screen</title>
-  <meta name="description" content="Renplay is a self-hosted player for Ren’Py games in the browser, with saves on your own server.">
-  <meta property="og:title" content="Renplay · Your Ren’Py games on every screen">
-  <meta property="og:description" content="Renplay is a self-hosted player for Ren’Py games in the browser, with saves on your own server.">
-  <meta property="og:image" content="https://renplay.org/img/og.jpg">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="theme-color" content="#0a0a0f">
-  <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="site.css">
+{{head}}
 </head>
 <body>
 <div class="grain"></div>
 
-<nav id="nav">
-  <div class="wrap">
-    <a class="brand" href="./"><img src="logo.svg" alt="">Renplay</a>
-    <div class="links" id="nav-links">
-      <a href="./#why">Why</a>
-      <a href="./#how">How it works</a>
-      <a href="./#phones">Phones</a>
-      <a href="./#install">Install</a>
-      <a href="/catalog">Catalog</a>
-      <a href="./#faq">FAQ</a>
-      <a class="in-menu" href="/docs">Docs</a>
-      <a class="in-menu" href="/github">GitHub</a>
-      <a class="in-menu" href="/support">Support</a>
-    </div>
-    <div class="right">
-      <a class="btn sm" href="/github" aria-label="Renplay on GitHub">
-        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-        <span class="lbl">GitHub</span>
-      </a>
-      <a class="btn sm" href="/support" aria-label="Support Renplay on Ko-fi">
-        <svg viewBox="0 0 24 24" fill="#ff9ec0" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.6 2.9 5 6.3 5c2.1 0 3.5 1.2 4.2 2.4h3c.7-1.2 2.1-2.4 4.2-2.4 3.4 0 5.4 3.6 3.9 6.8C19.5 16.4 12 21 12 21Z"/></svg>
-        <span class="lbl">Support</span>
-      </a>
-      <a class="btn sm bar-catalog" href="/catalog">Catalog</a>
-      <a class="btn sm" href="/docs">Docs</a>
-      <a class="btn sm primary" href="./#install">Install</a>
-      <button class="btn sm menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-      </button>
-    </div>
-  </div>
-</nav>
+{{nav}}
 
 <header class="hero">
   <div class="aurora"><span></span><span></span><span></span></div>
   <div class="wrap">
-    <span class="chip intro" style="--d:0ms"><b>Free</b> Open source and self-hosted</span>
-    <h1 class="intro" style="--d:80ms">Your Ren’Py games,<br><span class="rotator" aria-label="on every screen."><span class="grad-text on">on every screen.</span><span class="grad-text" aria-hidden="true">on your phone.</span><span class="grad-text" aria-hidden="true">on your laptop.</span><span class="grad-text" aria-hidden="true">on your tablet.</span></span></h1>
-    <p class="sub intro" style="--d:160ms">Renplay plays <strong>the games you get from itch.io, Patreon and F95zone</strong>, adult and not, in any browser: your computer, your tablet, your phone. Every save lands on your own server, so you start a chapter at your desk and finish it on the couch.</p>
-    <div class="cta intro" style="--d:240ms">
+    <span class="chip"><b>Free</b> Open source and self-hosted</span>
+    <h1>Your Ren’Py games,<br><span class="rotator"><span class="grad-text on">on every screen.</span></span></h1>
+    <p class="sub">Renplay plays <strong>the games you get from itch.io, Patreon and F95zone</strong>, adult and not, in any browser: your computer, your tablet, your phone. Every save lands on your own server, so you start a chapter at your desk and finish it on the couch.</p>
+    <div class="cta">
       <a class="btn primary" href="#install">Install
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </a>
       <a class="btn" href="/demo">Try the demo</a>
     </div>
-    <div class="trust intro" style="--d:300ms">
+    <div class="trust">
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>One Docker container</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Your server, no tracking</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>MIT licensed</span>
     </div>
-    <div class="stage intro" style="--d:380ms">
+    <div class="stage intro">
       <div class="laptop">
-        <div class="screen"><img src="img/desktop-library.webp" alt="The Renplay library in a browser" width="1600" height="1000"></div>
+        <div class="screen"><img src="/img/desktop-library.webp" alt="The Renplay library in a browser, with a game ready to resume" width="1600" height="1000" fetchpriority="high"></div>
         <div class="base"></div>
       </div>
-      <div class="phone-land"><img src="img/phone-player.webp" alt="A visual novel playing on a phone" width="1400" height="646"></div>
+      <div class="phone-land"><img src="/img/phone-player.webp" alt="A visual novel playing on a phone in landscape" width="1400" height="646"></div>
     </div>
   </div>
 </header>
@@ -131,39 +90,16 @@
     </div>
   </section>
 
-  <section>
-    <div class="show">
-      <div class="text reveal">
-        <p class="eyebrow">Your library</p>
-        <h2>Feels like a store you own.</h2>
-        <p class="lead">Every game gets its official art, the developer’s links and the version you have. The first thing you see is the game you were playing.</p>
-        <ul class="bullets">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Resume in one tap</b> from your latest save, on any device.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Every save kept</b>, with earlier versions you can restore.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Update notices</b> when a newer tested version of a game is out.</span></li>
-        </ul>
-      </div>
-      <div class="frame reveal"><img src="img/desktop-game.webp" alt="A game’s page: Resume, its walkthrough, and your progress" width="1600" height="1000"></div>
+  <section id="library">
+    <div class="center reveal">
+      <p class="eyebrow">Your library</p>
+      <h2>Feels like a store you own.</h2>
+      <p class="lead">Every game gets its official art, the developer’s links and the version you have. The first thing you see is the game you were playing.</p>
     </div>
-  </section>
-
-  <section id="phones">
-    <div class="show flip">
-      <div class="phones reveal">
-        <div class="phone-port"><img src="img/phone-library-tall.webp" alt="The library on a phone" width="600" height="1301"></div>
-        <div class="phone-land"><img src="img/phone-player.webp" alt="A game on a phone in landscape" width="1400" height="646"></div>
-      </div>
-      <div class="text reveal">
-        <p class="eyebrow">Made for phones</p>
-        <h2>The couch is a great place to read.</h2>
-        <p class="lead">Renplay is built for small screens as much as big ones, down to the camera cutout.</p>
-        <ul class="bullets">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Full screen</b>, on iPhone from the home screen, on Android with one tap.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Offline</b>: keep a game on the phone and read on the plane. Saves go up when you land.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Fits your screen</b>, clear of the notch, and follows you when you turn the phone.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>The screen stays on</b> while you read a long scene.</span></li>
-        </ul>
-      </div>
+    <div class="bento three">
+      <div class="tile reveal spot"><h3>Resume in one tap</h3><p>From your latest save, on any device.</p></div>
+      <div class="tile reveal spot"><h3>Every save kept</h3><p>With earlier versions you can restore.</p></div>
+      <div class="tile reveal spot"><h3>Update notices</h3><p>When a newer tested version of a game is out.</p></div>
     </div>
   </section>
 
@@ -179,10 +115,10 @@
       <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></div><h3>Mods in the browser</h3><p>Edit scripts or upload a mod. Your changes survive updates.</p></div>
       <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></div><h3>A tested catalog</h3><p>Known games come with their art, links and the settings that work.</p></div>
       <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h3>Private by design</h3><p>Everything runs on your own hardware: no telemetry, nobody else’s cloud. Games are prepared without running their code on your server, and every person on it has their own saves, history and level for adult games.</p></div>
-      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M10.7 5.1A15 15 0 0 1 22 8.8"/><path d="M5 12.9a10 10 0 0 1 5.2-2.8"/><path d="M12 20h.01"/></svg></div><h3>Play offline</h3><p>Keep a game in the browser and play with no network. Saves wait and go up when you are back.</p></div>
+      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg></div><h3>Made for phones</h3><p>Full screen, on iPhone from the home screen and on Android with one tap. It fits your screen, clear of the notch, and follows you when you turn the phone. The screen stays on while you read, and a kept game plays on a plane: saves go up when you land.</p></div>
       <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h4M8 10v4"/><path d="M15 13h.01M18 11h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6L2 15a3 3 0 0 0 5.1 2.3L9 15h6l1.9 2.3A3 3 0 0 0 22 15l-.7-6.4A4 4 0 0 0 17.3 5z"/></svg></div><h3>A controller works</h3><p>The d-pad moves around your library, and the game plays with Ren’Py’s own buttons.</p></div>
-      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18.5 14a6.5 6.5 0 0 1 3 6"/></svg></div><h3>One tablet, many readers</h3><p>Who is playing? switches person with a PIN, each with their own saves.</p></div>
-      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div><h3>Dashboards</h3><p>Prometheus metrics and a Homepage widget show what your server is doing.</p></div>
+      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18.5 14a6.5 6.5 0 0 1 3 6"/></svg></div><h3>One tablet, many readers</h3><p>Who is playing? switches person with a PIN, each with their own saves.</p></div>
+      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div><h3>Dashboards</h3><p>Prometheus metrics and a Homepage widget show what your server is doing.</p></div>
     </div>
     <div class="numbers">
       <div class="num reveal spot"><b class="grad-text" data-to="60" data-suffix=" fps">60 fps</b><span>Smooth playback in the browser</span></div>
@@ -200,25 +136,35 @@
         <p class="lead">If you can run a Docker container, you can run Renplay. Point it at a folder for games and one for your saves.</p>
         <ol class="after">
           <li><span>Run the command and open <b>http://localhost:8080</b>. Enter the setup code from <code>docker logs renplay</code> and create your account. Renplay then asks whether to show adult games.</span></li>
-          <li><span>Go to <b>Add games</b> and upload a game’s PC download, then press <b>Install</b> and <b>Play</b>. On your phone, add Renplay to the home screen.</span></li>
-          <li><span><b>Start with a free game.</b> <a href="/catalog#dear-devere">Dear Devere</a> and <a href="/catalog#frightwood">Frightwood</a> are free and safe for work. Get one from its developer, add it, and play.</span></li>
+          <li><span>Go to <b>Add games</b> and upload a game’s PC download, then press <b>Install</b> and <b>Play</b>. On your phone, add Renplay to the home screen. The <a href="https://docs.renplay.org/start-here/quick-start/">quick start</a> shows each step.</span></li>
+          <li><span><b>Start with a free game.</b> These are free and safe for work. Get one from its developer, add it, and play.</span></li>
         </ol>
-        <p class="fine"><a href="/docs/install/docker/">Docker and Docker Compose</a>, the NAS guides and every setting are in the <a href="/docs">docs</a>.</p>
+        <div class="starters">{{starters}}</div>
+        <div class="cta next"><a class="btn primary" href="https://docs.renplay.org/start-here/quick-start/">Read the install guide</a></div>
+        <ul class="platforms" aria-label="Install guides for each system">
+          <li><a href="https://docs.renplay.org/install/docker/">Docker and Compose</a></li>
+          <li><a href="https://docs.renplay.org/install/kubernetes/">Kubernetes</a></li>
+          <li><a href="https://docs.renplay.org/install/truenas/">TrueNAS</a></li>
+          <li><a href="https://docs.renplay.org/install/unraid/">Unraid</a></li>
+          <li><a href="https://docs.renplay.org/install/synology/">Synology</a></li>
+          <li><a href="https://docs.renplay.org/install/ugreen/">UGREEN</a></li>
+          <li><a href="https://docs.renplay.org/install/qnap/">QNAP</a></li>
+        </ul>
       </div>
       <div class="reveal">
-        <div class="tabs" role="tablist">
-          <button class="on" data-tab="docker">Docker</button>
-          <button data-tab="compose">Docker Compose</button>
+        <div class="tabs" role="tablist" aria-label="How to run it">
+          <button class="on" role="tab" id="tab-docker" aria-selected="true" aria-controls="pane-docker" data-tab="docker">Docker</button>
+          <button role="tab" id="tab-compose" aria-selected="false" aria-controls="pane-compose" tabindex="-1" data-tab="compose">Docker Compose</button>
         </div>
-        <div class="code" data-pane="docker">
-          <pre><span class="k">docker</span> run -d --name renplay -p 8080:8080 \
+        <div class="code" role="tabpanel" id="pane-docker" aria-labelledby="tab-docker" data-pane="docker">
+          <pre tabindex="0"><span class="k">docker</span> run -d --name renplay -p 8080:8080 \
   -v ./games:/games \
   -v ./data:/data \
   ghcr.io/renplay-org/renplay:latest</pre>
           <button class="btn sm copy">Copy</button>
         </div>
-        <div class="code" data-pane="compose" hidden>
-          <pre><span class="c"># compose.yaml</span>
+        <div class="code" role="tabpanel" id="pane-compose" aria-labelledby="tab-compose" data-pane="compose" hidden>
+          <pre tabindex="0"><span class="c"># compose.yaml</span>
 <span class="k">services</span>:
   <span class="k">renplay</span>:
     image: ghcr.io/renplay-org/renplay:latest
@@ -242,8 +188,8 @@
         <p>The community catalog lists games that work in Renplay: which download to get from the developer, its official art, and any settings it needs. It never hosts game files. Got one working? Add it in a pull request.</p>
       </div>
       <div class="actions">
-        <a class="btn primary" href="/catalog">Browse the catalog</a>
-        <a class="btn" href="/catalog#request">Request a game</a>
+        <a class="btn primary" href="/catalog/">Browse the catalog</a>
+        <a class="btn" href="/catalog/#request">Request a game</a>
         <a class="btn" href="https://github.com/renplay-org/catalog/blob/main/CONTRIBUTING.md">Add one yourself</a>
       </div>
     </div>
@@ -260,7 +206,7 @@
       <details class="reveal"><summary>Does it need a powerful server?</summary><p>No. Installing a game uses some CPU for a few minutes, and playing is just serving files. Games run in your browser, so a small home server or NAS is plenty. Plan disk space like for the downloads themselves.</p></details>
       <details class="reveal"><summary>Can I still play on desktop Ren’Py?</summary><p>Yes. Export a game’s saves and they work in the desktop version, and the other way round. Games made with Ren’Py 8.1 or newer can also move saves with a Sync code.</p></details>
       <details class="reveal"><summary>Does it work without the internet?</summary><p>Yes, once a game is kept. <b>Keep offline</b> on a game’s page stores it in your browser, so it plays on a plane or a train, and the saves you make wait until you are back.</p></details>
-      <details class="reveal"><summary>What about adult games?</summary><p>They work like any other game, and adult games are a big part of what Renplay is for. There are three levels: Off leaves them out completely, Blurred shows them without their pictures, Shown shows everything. A new install asks once, or you set <code>RENPLAY_ADULT_GAMES</code>. Each person chooses their own level within yours, and <b>Hide adult games here</b> covers a screen other people can see.</p></details>
+      <details class="reveal"><summary>What about adult games?</summary><p>They work like any other game, and adult games are a big part of what Renplay is for. There are three levels: Off leaves them out completely, Blurred shows them without their pictures, Shown shows everything. A new install asks once, or you set <code>RENPLAY_ADULT_GAMES</code>. Each person chooses their own level within yours, and <b>Hide adult games here</b> covers a screen other people can see. The catalog at renplay.org lists the safe-for-work games, and <a href="https://adult.renplay.org">adult.renplay.org</a> lists every game, adult ones included.</p></details>
       <details class="reveal"><summary>Is it really free?</summary><p>Yes, free and open source under the MIT license. If it makes your evenings better, you can support it on <a href="/support">Ko-fi</a>.</p></details>
     </div>
   </section>
@@ -279,42 +225,26 @@
 
 </main>
 
-<footer>
-  <div class="wrap">
-    <div class="row">
-      <a class="brand" href="#"><img src="logo.svg" alt="" style="width:26px;height:26px;border-radius:8px">Renplay</a>
-      <a href="/">Website</a>
-      <a href="/docs">Docs</a>
-      <a href="/catalog">Catalog</a>
-      <a href="/demo">Try the demo</a>
-      <a href="/github">GitHub</a>
-      <a href="/releases">Release notes</a>
-      <a href="/catalog#request">Request a game</a>
-      <a href="/support">Support</a>
-    </div>
-    <small>Renplay is free and open source (MIT), made by the Renplay Team. It is not affiliated with Ren’Py, which is © Tom Rothamel and contributors. Games and their art belong to their developers. The screenshots show Dear Devere by Katy133, and adult games blurred.</small>
-  </div>
-</footer>
+{{footer}}
 
+<script src="/js/menu.js" defer></script>
 <script>
-  { // Phone menu
-    const nav = document.getElementById('nav'), menu = nav.querySelector('.menu')
-    const set = (open) => { nav.classList.toggle('open', open); menu.setAttribute('aria-expanded', String(open)) }
-    menu.addEventListener('click', () => set(!nav.classList.contains('open')))
-    nav.querySelectorAll('.links a').forEach((a) => a.addEventListener('click', () => set(false)))
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false) })
-  }
   // Reveal on scroll.
   const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) } }), { threshold: 0.12, rootMargin: '0px 0px -40px 0px' })
   document.querySelectorAll('.reveal').forEach((el, i) => { el.style.transitionDelay = (el.closest('.steps, .bento, .numbers, .versus, .faq') ? (i % 4) * 70 : 0) + 'ms'; io.observe(el) })
-  // Nav border once scrolled.
-  const nav = document.getElementById('nav')
-  addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 10), { passive: true })
   // Install tabs and copy buttons.
-  document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
-    document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b))
+  const tabs = [...document.querySelectorAll('.tabs button')]
+  const pick = (b) => {
+    tabs.forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', String(x === b)); x.tabIndex = x === b ? 0 : -1 })
     document.querySelectorAll('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== b.dataset.tab))
-  }))
+  }
+  tabs.forEach((b) => b.addEventListener('click', () => pick(b)))
+  document.querySelector('.tabs').addEventListener('keydown', (e) => {
+    const to = { ArrowRight: 1, ArrowLeft: -1 }[e.key]
+    if (!to) return
+    const next = tabs[(tabs.indexOf(document.activeElement) + to + tabs.length) % tabs.length]
+    next.focus(); pick(next)
+  })
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches
   const fine = matchMedia('(hover: hover) and (pointer: fine)').matches
   // Cursor spotlight on cards.
@@ -333,7 +263,9 @@
     hero.addEventListener('pointerleave', () => (stage.style.transform = ''))
   }
   // Headline: the engines Renplay plays, Ren'Py the longest.
-  const words = [...document.querySelectorAll('.rotator > span')]
+  const rotator = document.querySelector('.rotator')
+  for (const w of ['on your phone.', 'on your laptop.', 'on your tablet.']) rotator.insertAdjacentHTML('beforeend', `<span class="grad-text" aria-hidden="true">${w}</span>`)
+  const words = [...rotator.children]
   if (words.length > 1 && !still) {
     let i = 0
     const next = () => {
@@ -352,11 +284,15 @@
     counters.unobserve(e.target)
     const el = e.target, to = +el.dataset.to, pre = el.dataset.prefix ?? '', suf = el.dataset.suffix ?? ''
     if (still) return
+    // The count never changes the height of the number: a card with text that wraps one way at one value and
+    // another way at the next would move everything under it with each step.
+    el.style.minHeight = `${el.offsetHeight}px`
     const t0 = performance.now()
     const tick = (t) => {
       const k = Math.min(1, (t - t0) / 1200)
       el.textContent = pre + Math.round(to * (1 - Math.pow(1 - k, 3))) + suf
       if (k < 1) requestAnimationFrame(tick)
+      else el.style.minHeight = ''
     }
     requestAnimationFrame(tick)
   }), { threshold: 0.6 })

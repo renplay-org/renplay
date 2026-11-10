@@ -8,7 +8,7 @@
 - One game to play: **The Question**, Ren'Py's own sample game, without its music. Its art (MIT,
   like Ren'Py) is in the demo's own recipe, `recipes/the-question.yaml`. The Ren'Py Tutorial
   cannot be distributed outside Ren'Py, and other free games need their developers' permission.
-- The whole catalog, with adult games blurred. Nothing can be installed.
+- The catalog's safe-for-work games. Adult games are turned off, and the banner says so. Nothing can be installed.
 - The guest can play, save, rate, mark a status and keep a game offline. They cannot upload,
   install, change the account or open Settings. Saves come only from playing: no imports, copies or
   Sync codes. A save file is at most 2 MB, all saves with their history at most 32 MB and 1,000

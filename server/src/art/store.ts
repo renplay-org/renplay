@@ -464,7 +464,7 @@ export class ArtStore {
     return [...new Map(uploads.map((u) => [`${u.id}:${u.kind}`, u])).values()]
   }
 
-  /** The chosen picture of each format: the person's choice, the admin's choice for everyone, the catalog's default. */
+  /** The chosen picture of each format: the person's choice, the admin's for everyone, then the catalog's art in the format's own shape (its default first), else its default. */
   chosen(subject: ArtSubject, scope: number): Partial<Record<ArtKind, Picture>> {
     const out: Partial<Record<ArtKind, Picture>> = {}
     const choices = subject.game
@@ -473,7 +473,7 @@ export class ArtStore {
     for (const kind of ART_KINDS) {
       const of = subject.pictures.filter((p) => p.kind === kind)
       const pick = (s: number) => of.find((p) => p.id === choices.find((c) => c.kind === kind && c.scope === s)?.candidate)
-      const picked = (scope !== EVERYONE ? pick(scope) : undefined) ?? pick(EVERYONE) ?? of.find((p) => p.default && !p.upload) ?? of.find((p) => !p.upload && inShapeKnown(p)) ?? of.find((p) => !p.upload)
+      const picked = (scope !== EVERYONE ? pick(scope) : undefined) ?? pick(EVERYONE) ?? of.find((p) => p.default && !p.upload && inShapeKnown(p)) ?? of.find((p) => !p.upload && inShapeKnown(p)) ?? of.find((p) => p.default && !p.upload) ?? of.find((p) => !p.upload)
       if (picked) out[kind] = picked
     }
     return out

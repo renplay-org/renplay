@@ -67,7 +67,7 @@ export interface JobRow {
   id: string
   type: string
   game: string
-  status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
+  status: 'queued' | 'paused' | 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
   stage: string
   progress: number
   message: string
@@ -75,6 +75,10 @@ export interface JobRow {
   result: string
   error: string
   log: string
+  /** The job this one is a retry of, or ''. Only a retry makes an attempt. */
+  retry_of: string
+  /** Where a waiting job (queued or paused) stands in the queue: the lowest runs first. */
+  position: number
   created_at: string
   started_at: string
   finished_at: string
@@ -136,6 +140,8 @@ const SCHEMA = `
     result      TEXT NOT NULL DEFAULT '{}',
     error       TEXT NOT NULL DEFAULT '',
     log         TEXT NOT NULL DEFAULT '',
+    retry_of    TEXT NOT NULL DEFAULT '',
+    position    INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
     started_at  TEXT NOT NULL DEFAULT '',
     finished_at TEXT NOT NULL DEFAULT ''
@@ -192,6 +198,9 @@ const SCHEMA = `
   CREATE TABLE art_measured (id TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL);
 `
 
+/** Not a job that a retry took over from. */
+const SHOWN = "id NOT IN (SELECT retry_of FROM jobs WHERE retry_of != '')"
+
 /** The schema version SCHEMA creates and the migrations below reach. */
 const VERSION = 19
 /** The oldest library this version opens: Renplay 4.0's. */
@@ -220,6 +229,23 @@ const MIGRATIONS: Record<number, (raw: DatabaseSync) => void> = {
     raw.exec("DELETE FROM settings WHERE key = 'adult_games'")
     raw.exec("UPDATE users SET prefs = json_remove(prefs, '$.adultPictures') WHERE json_valid(prefs)")
   },
+}
+
+/**
+ * Columns added without a new schema version, on every start: the newest release must still open a
+ * library this version has opened (the install contract's way back), and it refuses a higher version.
+ * Each has a default, so a release that does not know it reads and writes the table as before.
+ */
+const ADDED: [table: string, column: string, definition: string][] = [
+  // 4.9: a job knows which job it retries, and a waiting job its place in the queue.
+  ['jobs', 'retry_of', "TEXT NOT NULL DEFAULT ''"],
+  ['jobs', 'position', 'INTEGER NOT NULL DEFAULT 0'],
+]
+
+function addColumns(raw: DatabaseSync): void {
+  for (const [table, column, definition] of ADDED) {
+    if (!columnsOf(raw, table).includes(column)) raw.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+  }
 }
 
 function columnsOf(raw: DatabaseSync, table: string): string[] {
@@ -253,6 +279,7 @@ export class Db {
         MIGRATIONS[next]!(this.raw)
         this.raw.exec(`PRAGMA user_version = ${next}; COMMIT`)
       }
+      addColumns(this.raw)
     } catch (error) {
       if (this.raw.isTransaction) this.raw.exec('ROLLBACK')
       this.raw.close()
@@ -320,24 +347,54 @@ export class Db {
 
   // ---- jobs --------------------------------------------------------------
 
-  insertJob(job: Pick<JobRow, 'id' | 'type' | 'game' | 'params'>): void {
+  insertJob(job: Pick<JobRow, 'id' | 'type' | 'game' | 'params'> & Partial<Pick<JobRow, 'retry_of'>>): void {
+    // A new job goes to the back of the queue.
     this.raw
-      .prepare("INSERT INTO jobs (id, type, game, status, params, created_at) VALUES (?, ?, ?, 'queued', ?, ?)")
-      .run(job.id, job.type, job.game, job.params, now())
+      .prepare(
+        `INSERT INTO jobs (id, type, game, status, params, retry_of, position, created_at)
+         VALUES (?, ?, ?, 'queued', ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM jobs WHERE status IN ('queued', 'paused')), ?)`,
+      )
+      .run(job.id, job.type, job.game, job.params, job.retry_of ?? '', now())
   }
 
   getJob(id: string): JobRow | null {
     return (this.raw.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as unknown as JobRow) ?? null
   }
 
+  /** The jobs people see: a job that was retried gives way to its retry (see `attempts`). */
   countJobs(): number {
-    return (this.raw.prepare('SELECT COUNT(*) AS total FROM jobs').get() as { total: number }).total
+    return (this.raw.prepare(`SELECT COUNT(*) AS total FROM jobs WHERE ${SHOWN}`).get() as { total: number }).total
   }
 
+  /** Running first, then the waiting ones in the order they will run, then the finished, newest first. */
   listJobs(limit = 50, offset = 0): JobRow[] {
     return this.raw
-      .prepare("SELECT * FROM jobs ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, created_at DESC, id DESC LIMIT ? OFFSET ?")
+      .prepare(
+        `SELECT * FROM jobs WHERE ${SHOWN} ORDER BY
+           CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 WHEN 'paused' THEN 1 ELSE 2 END,
+           CASE WHEN status IN ('queued', 'paused') THEN position END, CASE WHEN status IN ('queued', 'paused') THEN created_at END,
+           created_at DESC, id DESC LIMIT ? OFFSET ?`,
+      )
       .all(limit, offset) as unknown as JobRow[]
+  }
+
+  /** The jobs waiting to run or paused, in queue order. */
+  waitingJobs(): JobRow[] {
+    return this.raw.prepare("SELECT * FROM jobs WHERE status IN ('queued', 'paused') ORDER BY position, created_at, id").all() as unknown as JobRow[]
+  }
+
+  /** How many times the job has been tried: itself and the earlier attempts it retries. */
+  attempts(job: Pick<JobRow, 'retry_of'>): number {
+    const seen = new Set<string>()
+    let count = 1
+    for (let id = job.retry_of; id && !seen.has(id); ) {
+      seen.add(id)
+      const earlier = this.getJob(id)
+      if (!earlier) break
+      count++
+      id = earlier.retry_of
+    }
+    return count
   }
 
   updateJob(id: string, updates: Partial<JobRow>): void {

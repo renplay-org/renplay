@@ -75,7 +75,7 @@ downloads you no longer need.
 ## Where do I ask something?
 
 Questions, such as whether a game works, go to
-[Discussions](https://renplay.org/discussions); bugs to
+[Discussions](https://renplay.org/discussions), and bugs to
 [issues](https://renplay.org/issues). For a failed install, attach the job log
 from **Activity**.
 

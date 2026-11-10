@@ -320,6 +320,7 @@ code {
 .logo {
   display: flex;
   align-items: center;
+  min-height: 40px;
   gap: 10px;
   font-weight: 700;
   font-size: 17px;
@@ -368,32 +369,6 @@ code {
   gap: 8px;
   flex: none;
 }
-.search {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  width: 230px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: var(--plate);
-  color: var(--fg-3);
-  font-size: 14px;
-  flex: none;
-}
-.search kbd {
-  margin-left: auto;
-}
-.search svg {
-  width: 18px;
-  height: 18px;
-  flex: none;
-}
-@media (min-width: 720px) {
-  .search {
-    display: flex;
-  }
-}
 .ib {
   display: inline-flex;
   align-items: center;
@@ -430,15 +405,6 @@ code {
   flex: none;
 }
 @media (min-width: 720px) and (max-width: 1099px) {
-  .search {
-    width: 40px;
-    padding: 0;
-    justify-content: center;
-  }
-  .search .lbl,
-  .search kbd {
-    display: none;
-  }
   .act .lbl {
     display: none;
   }
@@ -496,6 +462,10 @@ code {
   flex: none;
   overflow: hidden;
 }
+button.avatar {
+  width: 40px;
+  height: 40px;
+}
 .avatar img {
   width: 100%;
   height: 100%;
@@ -517,9 +487,8 @@ code {
   right: 0;
   bottom: 0;
   z-index: 40;
-  background: var(--glass-deep);
-  backdrop-filter: blur(24px) saturate(140%);
-  border-top: 1px solid var(--line);
+  background: #0a0a10;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
   padding-bottom: var(--sab);
   display: grid;
 }
@@ -752,6 +721,13 @@ main.mid {
   flex-wrap: wrap;
   align-items: center;
 }
+/* A link is at least 40 px tall and wide by its padding, which its margin takes back: the text keeps its size and place. */
+.link,
+.link-q,
+.sec-h a {
+  padding: 13px 8px;
+  margin: -13px -8px;
+}
 .link {
   color: var(--pink-2);
 }
@@ -878,7 +854,7 @@ main.mid {
 .seg {
   display: inline-flex;
   height: 44px;
-  padding: 4px;
+  padding: 2px;
   border-radius: 999px;
   background: var(--plate);
   flex: none;
@@ -916,8 +892,7 @@ main.mid {
   box-shadow: inset 0 0 0 2px #fff;
 }
 .seg.sm {
-  height: 40px;
-  padding: 3px;
+  height: 44px;
 }
 .seg.sm button {
   padding: 0 12px;
@@ -1006,18 +981,21 @@ select.input option {
 }
 .sw {
   position: relative;
-  width: 48px;
-  height: 30px;
+  width: 60px;
+  height: 40px;
+  margin: -5px -6px;
+  padding: 5px 6px;
   border-radius: 999px;
   background: var(--plate-3-flat);
+  background-clip: content-box;
   flex: none;
   transition: background var(--t-focus);
 }
 .sw::after {
   content: "";
   position: absolute;
-  top: 3px;
-  left: 3px;
+  top: 8px;
+  left: 9px;
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -1028,7 +1006,7 @@ select.input option {
   background: var(--pink);
 }
 .sw.on::after {
-  left: 21px;
+  left: 27px;
 }
 
 /* Surfaces. Plates sit on the room. Glass is only for things that float over art. */
@@ -1290,19 +1268,15 @@ select.input option {
 .toolbar::-webkit-scrollbar {
   display: none;
 }
-.toolbar .input {
-  flex: none;
-  width: 220px;
+/* A toolbar with more than the search and one control wraps on a phone, instead of scrolling sideways. */
+.toolbar.wrap {
+  flex-wrap: wrap;
+  overflow: visible;
 }
 @media (min-width: 720px) {
   .toolbar {
     margin: 0;
     padding: 10px 0;
-  }
-  .toolbar .input {
-    flex: 1;
-    width: auto;
-    max-width: 320px;
   }
 }
 .actionbar {
@@ -1574,9 +1548,6 @@ select.input option {
   width: var(--tile-w);
   scroll-snap-align: start;
   scroll-margin-left: var(--gutter);
-}
-.shelf.wide .card {
-  width: calc(var(--tile-w) * 2 + var(--gap));
 }
 
 /* The stage: the game's door. The hero across the top on desktop, the wide grid on phones, the grid sunk into the bottom edge, the logo or title beside it, actions below. */
@@ -1862,7 +1833,7 @@ select.input option {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
+  height: 40px;
   margin-bottom: 12px;
   padding: 0 12px 0 8px;
   border-radius: 999px;
@@ -1884,38 +1855,6 @@ select.input option {
   background: rgba(8, 8, 12, 0.5);
   backdrop-filter: blur(8px);
 }
-/* The phone stage carousel: one stage per slide, the next one peeks. */
-.carousel {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  margin: 0 calc(-1 * var(--gutter));
-  padding: 4px var(--gutter) 0;
-}
-.carousel::-webkit-scrollbar {
-  display: none;
-}
-.carousel .slide {
-  flex: none;
-  width: calc(100vw - 2 * var(--gutter) - 14px);
-  scroll-snap-align: start;
-  scroll-margin-left: var(--gutter);
-}
-.carousel .stage {
-  margin: 0;
-}
-.carousel .stage .in {
-  padding: 0;
-}
-.carousel .stage .art.wide-a {
-  border-radius: 14px;
-}
-.carousel .stage .art::after {
-  background: linear-gradient(180deg, rgba(10, 10, 15, 0.2) 0%, rgba(10, 10, 15, 0) 30%, rgba(10, 10, 15, 0) 60%, rgba(10, 10, 15, 0.75) 100%);
-}
-
 /* Rows for downloads, activity, users. */
 .rows {
   display: flex;
@@ -2399,9 +2338,12 @@ select.input option {
 }
 .door .tb {
   position: absolute;
-  left: calc(var(--gutter) + var(--sal));
-  right: var(--gutter);
-  bottom: calc(40px + var(--sab));
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 72px var(--gutter) calc(40px + var(--sab)) calc(var(--gutter) + var(--sal));
+  /* The title and the loading line sit on a darkened strip, never straight on the art. */
+  background: linear-gradient(0deg, rgba(8, 8, 12, 0.94) 0%, rgba(8, 8, 12, 0.88) 65%, rgba(8, 8, 12, 0) 100%);
 }
 .door .tb .bar {
   max-width: 360px;
@@ -2540,31 +2482,15 @@ select.input option {
   padding-right: 0;
 }
 .rise > * {
-  animation: riseIn 0.45s var(--out) both;
+  animation: pageIn 0.2s ease-out both;
 }
-.rise > *:nth-child(2) {
-  animation-delay: 40ms;
-}
-.rise > *:nth-child(3) {
-  animation-delay: 80ms;
-}
-.rise > *:nth-child(4) {
-  animation-delay: 120ms;
-}
-.rise > *:nth-child(5) {
-  animation-delay: 160ms;
-}
-.rise > *:nth-child(n + 6) {
-  animation-delay: 200ms;
-}
-@keyframes riseIn {
+/* A page change fades in and nothing moves: the flight lands where the cover will be, and the page never settles late. */
+@keyframes pageIn {
   from {
     opacity: 0;
-    transform: translateY(14px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 .ghost {
@@ -2575,6 +2501,7 @@ select.input option {
   pointer-events: none;
   transform-origin: top left;
   will-change: transform, width, height;
+  background: var(--plate);
   box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.95);
 }
 .ghost img {
@@ -2651,7 +2578,6 @@ select.input option {
 .side-nav a,
 .side-nav button,
 .act,
-.search,
 .sort,
 .card,
 .save,
@@ -2678,7 +2604,6 @@ button.tag,
 .side-nav a::before,
 .side-nav button::before,
 .act::before,
-.search::before,
 .sort::before,
 .logo::before,
 .avatar::before,
@@ -2717,6 +2642,8 @@ input[type="range"] {
   display: inline-flex;
   align-items: center;
   min-height: var(--hit);
+  padding: 0 6px;
+  margin: 0 -6px;
 }
 
 /* Stars: five 44 px buttons. Filled pink when rated, an outline otherwise. */

@@ -2,14 +2,12 @@ import {
   ArrowLeft,
   Expand,
   Shrink,
-  SquarePlus,
   Volume2,
   VolumeX,
-  X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { formatFor, hashUrl, TitleArt, useHidden } from '../../lantern/art'
-import { Bar, IconBtn, Pill } from '../../lantern/controls'
+import { Bar, Pill } from '../../lantern/controls'
 import { flyGhost, takeTravel } from '../../lantern/travel'
 import { cx } from '../../lantern/ui'
 import type { Game } from '@shared/api'
@@ -26,9 +24,6 @@ export default function Door({
   sandboxed,
   onRetry,
   onShowGame,
-  homeTip,
-  onHomeTip,
-  onDismissHomeTip,
   muted,
   onMute,
   fsMode,
@@ -54,9 +49,6 @@ export default function Door({
   sandboxed: boolean
   onRetry: () => void
   onShowGame: () => void
-  homeTip: boolean
-  onHomeTip: () => void
-  onDismissHomeTip: () => void
 }) {
   const hidden = useHidden(game)
   const hero = formatFor(game.art, 'hero')
@@ -104,20 +96,6 @@ export default function Door({
           </div>
         ) : (
           <div style={{ marginTop: 14, maxWidth: 360 }}>{progress && progress.total > 0 ? <Bar value={loadPct} /> : <Bar value={0} indeterminate />}</div>
-        )}
-        {homeTip && (
-          <div className="notice" style={{ marginTop: 16, maxWidth: 420 }}>
-            <SquarePlus />
-            <span className="grow small">
-              For full screen, add Renplay to your home screen.{' '}
-              <button className="link" onClick={onHomeTip}>
-                How
-              </button>
-            </span>
-            <IconBtn label="Dismiss" onClick={onDismissHomeTip}>
-              <X className="size-4" />
-            </IconBtn>
-          </div>
         )}
         {slow && !failed && (
           <button onClick={onShowGame} className="link-q xs" style={{ marginTop: 14, display: 'inline-block' }}>

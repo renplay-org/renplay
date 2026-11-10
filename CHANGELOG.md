@@ -7,6 +7,39 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.9.0] - 2026-11-10
+
+### Added
+
+- Activity lets an admin move a waiting job up or down, put it first with **Do next**, and pause a waiting or running job. A paused job waits in the queue until you resume it, and says what resuming does: an install starts again from its archive. The order and the paused jobs are kept when Renplay restarts.
+- The Library's top is one **Up next** carousel of the games you are playing, up to eight. Swipe or scroll it sideways, use the arrows on a computer, the dots under it or the arrow keys. It moves on by itself every few seconds, waits while a finger, the mouse or the keyboard is on it, and stays where you leave it once you have moved it. With reduced motion it does not move by itself.
+- The website has a page for each safe-for-work game in the catalog, with its cover, where to get it and how to play it in Renplay.
+- The whole catalog, adult games included, is at adult.renplay.org, behind a question about your age, with adult covers blurred until you show them. The catalog at renplay.org lists only safe-for-work games.
+- The catalog on the website scrolls on as you near the end, and takes you back to the same place when you return from a game.
+- A game's cover now flies back to its tile when you go back from a game page, with the back button, the browser's back or a swipe. The flight works on phones too, and is skipped when the tile is off screen.
+- The Library and the Catalog grow as you scroll, in whole rows, so no row is half full in the middle of the list. Coming back from a game puts you at the same place with the same games loaded.
+- The Catalog's search, filter and tags are in the address, and a game opened in the Catalog is a page in your history: the back button closes it.
+
+### Changed
+
+- Activity and the header's activity ring name a job by its game's title, from the library or from the catalog recipe the download matched. The file name shows only when no game is known.
+- The Library and the Catalog have one search each, a pill the height of the controls beside it that narrows the list as you type. Ctrl+K or ⌘K goes to it on a computer. The search in the header and its menu of pages are gone, since the pages are one tap away in the header and the tab bar. A search that finds nothing in your library offers the Catalog.
+- The demo has adult games turned off, and its banner says so.
+- The docs and the website no longer shift while they load, and their buttons and links are at least 40 px tall on a phone. A check in CI keeps it so.
+- Every tile is the game's vertical cover, including the Up next shelf, and the picture that flies from a tile to the game page always keeps that shape. When the catalog has a vertical picture for a game, it is used even if its default is another shape.
+- Pages fade in instead of rising a few pixels, and the Library shows a loading page in the shape of the real one, so nothing jumps when the games arrive.
+- The game page does not draw the title a third time: when the cover or the banner already shows it, the logo stays out.
+- The phone tab bar is solid with a hairline on top, the loading line of the player is on a darkened strip, and the tip about the home screen shows once, after the game has started.
+- The All, Installed and Not installed picker is gone from the Library. Not installed games are in All games as before, dimmed and marked. A shelf's See all link shows its list as a chip you can take off.
+- The catalog tiles no longer say Free, since nearly every game is. The Free filter stays.
+
+### Fixed
+
+- Activity no longer counts a mod added, a mod removed and a mod build of one game as attempts. Only a job you retried counts, and the tag shows only from the second attempt.
+- Links, chips, switches and the buttons of the game page are at least 40 pixels tall on a phone, and the page can be pinch zoomed.
+- Screen readers hear the visible text first in the name of the tag chips, the sort button and the search button, and the sign-in page has a main region.
+- A page opened in a tab that already had another page no longer takes that page's remembered place.
+
 ## [4.8.0] - 2026-11-10
 
 ### Added
@@ -681,7 +714,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.8.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.9.0...dev
+[4.9.0]: https://github.com/renplay-org/renplay/compare/v4.8.0...v4.9.0
 [4.8.0]: https://github.com/renplay-org/renplay/compare/v4.7.0...v4.8.0
 [4.7.0]: https://github.com/renplay-org/renplay/compare/v4.6.3...v4.7.0
 [4.6.3]: https://github.com/renplay-org/renplay/compare/v4.6.2...v4.6.3

@@ -31,6 +31,32 @@ export function createJobsRouter(s: Services): Router {
     }
   }
 
+  /**
+   * The game a job is about, for its title: the library's game, or the recipe the archive matched.
+   * Null when no game is known, and the page falls back to the file name.
+   */
+  const jobTitle = (j: Pick<JobRow, 'game' | 'params' | 'result'>): string | null => {
+    const params = parseJson<{ recipeId?: unknown; path?: unknown; source?: { path?: unknown } }>(j.params, {})
+    const result = parseJson<{ recipe?: unknown; game?: unknown } | null>(j.result, null)
+    for (const id of [j.game, result?.game]) {
+      const game = typeof id === 'string' && id ? db.getGame(id) : null
+      if (game) return game.title
+    }
+    for (const id of [params.recipeId, result?.recipe]) {
+      const recipe = typeof id === 'string' && id ? catalog.recipe(id) : null
+      if (recipe) return recipe.title
+    }
+    const archive = [params.source?.path, params.path].find((x): x is string => typeof x === 'string' && x !== '')
+    if (!archive) return null
+    try {
+      const rel = cleanRelPath(archive)
+      const row = db.getArchive(rel)
+      return catalog.match({ name: rel, size: row?.size, sha256: row?.sha256 || undefined })?.recipe.title ?? null
+    } catch {
+      return null
+    }
+  }
+
   router.get('/keepalive', (req, res) => {
     if (req.get('authorization') !== `Bearer ${keepaliveToken}`) throw new HttpError(401, 'Invalid keepalive token')
     const hold = Math.min(150, Math.max(0, Number(req.query['hold']) || 0))
@@ -63,6 +89,8 @@ export function createJobsRouter(s: Services): Router {
         id: j.id,
         type: j.type,
         game: j.game,
+        title: jobTitle(j),
+        attempts: db.attempts(j),
         status: j.status,
         stage: j.stage,
         progress: j.progress,
@@ -94,6 +122,26 @@ export function createJobsRouter(s: Services): Router {
   router.post('/jobs/:id/cancel', (req, res) => {
     visibleJob(req.params.id)
     if (!jobs.cancel(req.params.id)) throw new HttpError(409, 'Job is not running or queued')
+    res.json({ ok: true })
+  })
+
+  router.post('/jobs/:id/pause', (req, res) => {
+    visibleJob(req.params.id)
+    if (!jobs.pause(req.params.id)) throw new HttpError(409, 'Only a job that is queued or running can be paused')
+    res.json({ ok: true })
+  })
+
+  router.post('/jobs/:id/resume', (req, res) => {
+    visibleJob(req.params.id)
+    if (!jobs.resume(req.params.id)) throw new HttpError(409, 'Job is not paused')
+    res.json({ ok: true })
+  })
+
+  router.post('/jobs/:id/move', (req, res) => {
+    visibleJob(req.params.id)
+    const to = (req.body as { to?: unknown } | undefined)?.to
+    if (to !== 'up' && to !== 'down' && to !== 'first') throw new HttpError(400, 'Say where to move it: up, down or first')
+    if (!jobs.move(req.params.id, to)) throw new HttpError(409, 'Only a job that is waiting can be moved')
     res.json({ ok: true })
   })
 

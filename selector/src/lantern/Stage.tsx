@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { formatFor, Frame, hashUrl, TitleArt, tintOf, useHidden, type ArtGame } from './art'
-import { flyGhost, startTravel, takeTravel } from './travel'
+import { artCarriesTitle, formatFor, Frame, hashUrl, TitleArt, tintOf, useHidden, type ArtGame } from './art'
+import { cameFromList, useGoBack } from './flight'
+import { flyGhost, startTravel, takeTravel, travelSource } from './travel'
 
 /** Pressing Resume: the stage's art grows to the whole screen and becomes the door. */
 export function travelToDoor(game: ArtGame & { id: string }, hidden: boolean, from?: Element | null): void {
@@ -12,6 +13,12 @@ export function travelToDoor(game: ArtGame & { id: string }, hidden: boolean, fr
   const f = formatFor(game.art, 'hero')
   const src = (!hidden && f?.url1x) || hashUrl(f?.thumbhash)
   startTravel({ id: game.id, src, rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } })
+}
+
+/** Opening the game's page from its stage: the cover flies to the page's cover, and back when the person goes back. */
+export function travelToPage(game: ArtGame & { id: string }, hidden: boolean, from?: Element | null): void {
+  const rect = from?.getBoundingClientRect()
+  if (rect) startTravel({ id: game.id, src: travelSource(game.art, hidden), rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height } })
 }
 
 /** Crossfading art for the stage and the room: the previous picture stays under while the new one fades in. */
@@ -55,15 +62,7 @@ function StageCover({ game, hidden }: { game: ArtGame & { id: string }; hidden: 
     setSettling(true)
     requestAnimationFrame(() => {
       const target = el.getBoundingClientRect()
-      // Where the cover ends up: the page is still rising in (each of main's children moves on its
-      // own), so that offset comes off.
-      let page: Element | null = el
-      while (page && page.parentElement?.tagName !== 'MAIN') page = page.parentElement
-      const moved = page ? getComputedStyle(page).transform : 'none'
-      const rise = moved && moved !== 'none' ? new DOMMatrixReadOnly(moved) : null
-      const dx = rise?.m41 ?? 0
-      const dy = rise?.m42 ?? 0
-      flyGhost(t, { x: target.x - dx, y: target.y - dy, w: target.width, h: target.height }, () => setSettling(false))
+      flyGhost(t, { x: target.x, y: target.y, w: target.width, h: target.height }, () => setSettling(false))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.id])
@@ -88,6 +87,7 @@ export default function Stage({
   body,
   back,
   actsRef,
+  coverTo,
 }: {
   game: ArtGame & { id: string }
   eyebrow?: ReactNode
@@ -98,26 +98,46 @@ export default function Stage({
   back?: { to: string; label: string }
   /** Watches the actions row: the phone action bar appears once it leaves view. */
   actsRef?: React.RefObject<HTMLDivElement | null>
+  /** The cover opens this game page. The page's buttons say the same, so keyboard and screen readers skip it. */
+  coverTo?: string
 }) {
   const hidden = useHidden(game)
+  const goBack = useGoBack()
+  // From a list, the button goes back, so the cover flies to its tile and the list is where it was.
+  const returns = !!back && cameFromList()
   return (
     <section className="stage" data-id={game.id} style={{ ['--tint' as string]: tintOf(game.art) }}>
       <StageArt game={game} kind="hero" hidden={hidden} />
       <StageArt game={game} kind="wide" hidden={hidden} />
       {back && (
-        <Link to={back.to} className="back">
+        <Link
+          to={back.to}
+          className="back"
+          onClick={(e) => {
+            if (!returns) return
+            e.preventDefault()
+            goBack()
+          }}
+        >
           <ArrowLeft />
-          {back.label}
+          {returns ? 'Back' : back.label}
         </Link>
       )}
       <div className="in">
         <div className="cover">
-          <StageCover game={game} hidden={hidden} />
+          {coverTo ? (
+            <Link to={coverTo} tabIndex={-1} aria-hidden="true" onClick={(e) => travelToPage(game, hidden, e.currentTarget.querySelector('.frame'))}>
+              <StageCover game={game} hidden={hidden} />
+            </Link>
+          ) : (
+            <StageCover game={game} hidden={hidden} />
+          )}
         </div>
         <div className="tb">
           <div className="in-t" key={game.id}>
             {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-            <TitleArt game={game} hidden={hidden} />
+            {/* The poster or the banner already shows the title: the logo would draw it a third time, so only a screen reader gets it. */}
+            {!hidden && artCarriesTitle(game.art) ? <h1 className="sr-only">{game.title}</h1> : <TitleArt game={game} hidden={hidden} />}
             {meta && <div className="meta">{meta}</div>}
           </div>
         </div>

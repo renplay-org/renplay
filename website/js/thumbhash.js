@@ -1,5 +1,5 @@
 // ThumbHash decoder: thumbHashToDataURL, from https://github.com/evanw/thumbhash (MIT, Copyright (c) 2023 Evan Wallace).
-// Only the decoding half, unchanged. It draws the blur the Renplay app shows for a hidden adult cover.
+// Only the decoding half, as an ES module (the one change: `export`). It draws the blur the Renplay app shows for a hidden adult cover.
 function thumbHashToRGBA(hash) {
   let { PI, min, max, cos, round } = Math
 
@@ -183,7 +183,7 @@ function rgbaToDataURL(w, h, rgba) {
  * @param hash The bytes of the ThumbHash.
  * @returns A data URL containing a PNG for the rendered ThumbHash.
  */
-function thumbHashToDataURL(hash) {
+export function thumbHashToDataURL(hash) {
   let image = thumbHashToRGBA(hash)
   return rgbaToDataURL(image.w, image.h, image.rgba)
 }

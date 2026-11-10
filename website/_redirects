@@ -7,9 +7,10 @@
 /issues                https://github.com/renplay-org/renplay/issues 302
 /discussions           https://github.com/renplay-org/renplay/discussions 302
 /support               https://ko-fi.com/janpuc 302
-/catalog/request       /catalog#request 302
+/catalog/request       /catalog/#request 302
 /install               /#install 302
 /demo                  https://demo.renplay.org 302
 /docs                  https://docs.renplay.org 302
 /docs/*                https://docs.renplay.org/:splat 302
-/catalog.html          /catalog 301
+/catalog.html          /catalog/ 301
+/adult                 https://adult.renplay.org 302

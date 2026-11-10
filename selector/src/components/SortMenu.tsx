@@ -16,7 +16,7 @@ export default function SortMenu({ value, onChange }: { value: string; onChange:
   return (
     <ActionMenu
       trigger={(open) => (
-        <button className="sort" onClick={open} aria-label={`Sort games: ${label}`}>
+        <button className="sort" onClick={open} aria-label={`${label}, change the order`}>
           {label} <ChevronDown />
         </button>
       )}

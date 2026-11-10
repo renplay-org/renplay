@@ -46,7 +46,18 @@ export default defineConfig({
           content: "try{if(!localStorage.getItem('starlight-theme'))localStorage.setItem('starlight-theme','dark')}catch(e){}",
         },
         { tag: 'meta', attrs: { name: 'theme-color', content: '#07070a' } },
+        { tag: 'meta', attrs: { property: 'og:site_name', content: 'Renplay docs' } },
         { tag: 'meta', attrs: { property: 'og:image', content: 'https://renplay.org/img/og.jpg' } },
+        { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+        { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'Renplay: your Ren’Py games on every screen' } },
+        { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://renplay.org/img/og.jpg' } },
+        { tag: 'link', attrs: { rel: 'icon', href: '/favicon.ico', sizes: '16x16 32x32 48x48' } },
+        { tag: 'link', attrs: { rel: 'icon', href: '/favicon-48.png', type: 'image/png', sizes: '48x48' } },
+        { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },
+        // The search button's visible text holds the shortcut, so its name must too.
+        { tag: 'script', content: "addEventListener('DOMContentLoaded',()=>document.querySelectorAll('button[data-open-modal]').forEach((b)=>{const k=b.querySelector('kbd');if(k&&k.textContent.trim())b.setAttribute('aria-label','Search '+[...k.querySelectorAll('kbd')].map((x)=>x.textContent.trim()).join(' '))}))" },
       ],
       social: [
         { icon: 'external', label: 'Website', href: 'https://renplay.org' },

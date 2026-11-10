@@ -273,7 +273,7 @@ describe('the levels on every route', () => {
     ['GET /system/backups', 'tool'], ['POST /system/backups', 'tool'], ['GET /system/backups/:name', 'tool'], ['PUT /system/sync', 'none'], ['GET /system/storage', 'tool'], ['GET /defaults', 'none'], ['PUT /defaults', 'none'], ['POST /system/storage/refresh', 'none'],
     ['GET /health', 'none'], ['POST /telemetry/client', 'none'], ['PUT /system/telemetry', 'none'], ['GET /keepalive', 'none'], ['GET /renplay/runtime.js', 'none'], ['GET /system', 'list'], ['PUT /system/downloads', 'none'], ['POST /system/prune', 'none'],
     ['POST /system/engines/refresh', 'none'], ['GET /jobs', 'list'], ['GET /jobs/:id/log', 'tool'], ['POST /jobs/:id/cancel', 'tool'],
-    ['POST /jobs/:id/retry', 'tool'], ['DELETE /jobs', 'tool'], ['GET /content', 'none'], ['PUT /content', 'none'], ['GET /saves-export', 'list'],
+    ['POST /jobs/:id/pause', 'tool'], ['POST /jobs/:id/resume', 'tool'], ['POST /jobs/:id/move', 'tool'], ['POST /jobs/:id/retry', 'tool'], ['DELETE /jobs', 'tool'], ['GET /content', 'none'], ['PUT /content', 'none'], ['GET /saves-export', 'list'],
     // The guided import: the index leaves out adult save folders at Off, the import writes this person's saves.
     ['GET /', 'list'], ['POST /', 'person'],
     ['PUT /games/:id/status', 'game'], ['PUT /games/:id/rating', 'game'], ['POST /games/:id/not-now', 'game'], ['DELETE /games/:id/not-now', 'game'], ['GET /history', 'list'],
@@ -377,6 +377,7 @@ describe('the levels on every route', () => {
       ['delete', '/api/games/adult/files/raw?path=game/mod.txt'],
       ['post', '/api/games/adult/files/revert', { path: 'game/script.rpyc' }],
       ['post', '/api/jobs/j-adult-queued/cancel'], ['post', '/api/jobs/j-adult-failed/retry'],
+      ['post', '/api/jobs/j-adult-queued/pause'], ['post', '/api/jobs/j-adult-queued/resume'], ['post', '/api/jobs/j-adult-queued/move', { to: 'first' }],
     ]
     for (const [method, path, body, raw] of writes) {
       const call = (request(app.app) as any)[method](path)
@@ -469,6 +470,7 @@ describe('the levels on every route', () => {
       ['post', '/api/games/adult/not-now'], ['delete', '/api/games/adult/not-now'],
       ['delete', '/api/games/adult/art?kind=grid'], ['post', '/api/games/adult/art/upload?kind=grid'], ['delete', `/api/games/adult/art/uploads/${'a'.repeat(64)}?kind=grid`],
       ['get', '/api/jobs/j-adult-failed/log'], ['post', '/api/jobs/j-adult-failed/retry'], ['post', '/api/jobs/j-adult-queued/cancel'],
+      ['post', '/api/jobs/j-adult-queued/pause'], ['post', '/api/jobs/j-adult-queued/resume'], ['post', '/api/jobs/j-adult-queued/move', { to: 'first' }],
       ['post', '/api/imports', { source: { kind: 'archive', path: 'adult.zip' } }],
       ['post', '/api/imports', { source: { kind: 'archive', path: 'safe.zip' }, recipeId: 'adult' }],
       ['post', '/api/archives/inspect', { path: 'adult.zip' }], ['post', '/api/archives/hash', { path: 'adult.zip' }],

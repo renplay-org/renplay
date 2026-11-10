@@ -68,8 +68,12 @@ jobs:
       - run: mise run check:runtime
       - run: mise run check:copy
       - run: mise run check:ui
+      - run: npx --prefix server playwright install --with-deps chromium
+      - run: mise run check:app-ui
       - run: mise run check:docs
       - run: mise run check:website
+      - run: npx --prefix server playwright install --with-deps chromium webkit
+      - run: mise run check:layout
       - run: mise run check:chart
       - run: mise run check:workflows
       - run: mise run check:examples

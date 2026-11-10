@@ -15,7 +15,7 @@ export default function AuthLayout({ children, wide = false }: { children: React
   return (
     <RoomProvider>
       <BrandRoom />
-      <div className="auth">
+      <div className="auth" role="main">
         <div className="box" style={wide ? { maxWidth: 448 } : undefined}>
           {children}
           <p className="center xs muted" style={{ marginTop: 28 }}>

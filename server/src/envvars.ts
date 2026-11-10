@@ -16,7 +16,7 @@ export interface EnvVar {
 }
 
 export const ENV_VARS: readonly EnvVar[] = [
-  { name: 'PUID', group: 'Server', kind: 'number', fallback: 1000, description: 'Container only: when started as root, drop to this non-root user ID before starting Renplay. Ignored when started with --user. Make the mounted folders writable by this user; Renplay does not change their ownership.' },
+  { name: 'PUID', group: 'Server', kind: 'number', fallback: 1000, description: 'Container only: when started as root, drop to this non-root user ID before starting Renplay. Ignored when started with --user. Make the mounted folders writable by this user. Renplay does not change their ownership.' },
   { name: 'PGID', group: 'Server', kind: 'number', fallback: 1000, description: 'Container only: group ID to use with PUID when started as root. Ignored when started with --user.' },
   { name: 'RENPLAY_OIDC_ISSUER', group: 'Server', kind: 'text', fallback: '', description: 'OIDC issuer URL. Enables discovery and single sign-on. Requires HTTPS, except loopback test servers.' },
   { name: 'RENPLAY_OIDC_CLIENT_ID', group: 'Server', kind: 'text', fallback: '', description: 'OIDC client id. Register /api/auth/oidc/callback on RENPLAY_PUBLIC_URL as the callback URL.' },
@@ -44,7 +44,7 @@ export const ENV_VARS: readonly EnvVar[] = [
   { name: 'RENPLAY_LDAP_STARTTLS', group: 'Server', kind: 'yes/no', fallback: false, description: 'Require StartTLS before sending any credentials over ldap://. A failed TLS upgrade refuses sign-in.' },
   { name: 'RENPLAY_LDAP_CA_FILE', group: 'Server', kind: 'text', fallback: '', description: 'PEM CA certificate file for directory TLS. Certificate verification is always enabled.' },
   { name: 'RENPLAY_AUTH', group: 'Server', kind: 'choice', fallback: '', shown: 'on for new installs, off after an upgrade', description: '`on` requires sign-in. `off` lets everyone play as one account. Saves always stay separate per account. Upgraded installs show an admin reminder while sign-in is off.' },
-  { name: 'RENPLAY_AUTH_USER', group: 'Server', kind: 'number', fallback: 1, description: 'Account id used without sign-in. The owner is 1; other accounts and their saves stay untouched.' },
+  { name: 'RENPLAY_AUTH_USER', group: 'Server', kind: 'number', fallback: 1, description: 'Account id used without sign-in. The owner is 1. Other accounts and their saves stay untouched.' },
   { name: 'RENPLAY_AUTH_LOCAL', group: 'Server', kind: 'yes/no', fallback: true, description: 'Enable username and password sign-in. With sign-in on, disabling the only provider refuses startup.' },
   { name: 'RENPLAY_DEMO', group: 'Server', kind: 'yes/no', fallback: false, description: 'Run Renplay as a public demo. The sign-in page offers Try the demo, a shared guest who can play, save, rate and keep games offline, but cannot upload, install, change their account or see Settings. Saves come only from playing, at most 2 MB each and 32 MB in all. Sign-in is on. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.' },
   { name: 'RENPLAY_TELEMETRY', group: 'Server', kind: 'choice', fallback: '', shown: 'on', description: 'Renplay sends an anonymous usage report once a day. `off` sends nothing at all. When this is set, it wins over the switch in Settings. The Telemetry page of the docs says what the report holds.' },

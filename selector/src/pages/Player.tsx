@@ -100,7 +100,6 @@ export default function Player() {
   const touch = useMemo(isTouchDevice, [])
   const fsMode = useMemo(fullscreenMode, [])
   const [portraitOk, setPortraitOk] = useState(false)
-  const [homeTip, setHomeTip] = useState(() => fsMode === 'home-screen' && !localStorage.getItem(HOME_TIP_KEY))
   const resumed = useRef(false)
   // Other engines run their own JavaScript, so they play in a sandboxed frame
   // (opaque origin, no access to Renplay) and their storage comes through here.
@@ -130,6 +129,19 @@ export default function Player() {
   useWakeLock(ready)
   usePlayTime(ready && !exiting && !failed, gameId, userId, sandboxed, frameRef, () => setSignedOut(true))
   const telemetry = useTelemetry(gameId, userId, { ready, online, fullscreen, failed })
+  // On an iPhone in Safari, once the game has started and never while it loads: once, how to get full screen.
+  useEffect(() => {
+    if (!ready || fsMode !== 'home-screen' || localStorage.getItem(HOME_TIP_KEY)) return
+    localStorage.setItem(HOME_TIP_KEY, '1')
+    toast(
+      <>
+        For full screen, add Renplay to your home screen.{' '}
+        <button className="link" onClick={() => setPanel('fullscreen')}>
+          How
+        </button>
+      </>,
+    )
+  }, [ready, fsMode, toast])
 
   useEffect(() => {
     const signedOut = () => setSignedOut(true)
@@ -330,10 +342,6 @@ export default function Player() {
   const rect = frameRect(area.w, area.h, screenSize, prefs.fit)
   const hasCutout = notch > 0 || insets.top + insets.right + insets.bottom + insets.left > 0
   const portrait = touch && stage.h > stage.w && (!screenSize || screenSize[0] > screenSize[1])
-  const dismissHomeTip = () => {
-    localStorage.setItem(HOME_TIP_KEY, '1')
-    setHomeTip(false)
-  }
 
   if (isLoading)
     return (
@@ -380,7 +388,7 @@ export default function Player() {
       </div>
 
       {/* The door: the stage's art grown to the viewport while the game loads. */}
-      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} muted={muted} onMute={toggleMute} fsMode={fsMode} fullscreen={fullscreen} onFullscreen={() => void toggleFullscreen()} onBack={() => (progress ? void exit('game') : navigate(`/game/${gameId}`))} insets={insets} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} homeTip={homeTip} onHomeTip={() => setPanel('fullscreen')} onDismissHomeTip={dismissHomeTip} />
+      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} muted={muted} onMute={toggleMute} fsMode={fsMode} fullscreen={fullscreen} onFullscreen={() => void toggleFullscreen()} onBack={() => (progress ? void exit('game') : navigate(`/game/${gameId}`))} insets={insets} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} />
 
       {exiting && (
         <div className="absolute inset-0 z-50 flex animate-fade-in flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm">
@@ -534,10 +542,7 @@ export default function Player() {
       {panel === 'fullscreen' && (
         <SidePanel
           title="Full screen on iPhone"
-          onClose={() => {
-            dismissHomeTip()
-            setPanel(null)
-          }}
+          onClose={() => setPanel(null)}
           top={pad.top}
           narrow
         >

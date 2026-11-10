@@ -1,0 +1,118 @@
+.page-head { padding: 64px 0 24px; }
+.page-head h1 { font-size: clamp(38px, 6vw, 64px); margin: 10px 0 0; max-width: none; }
+.page-head .lead { margin-top: 14px; }
+.bar { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: center; margin: 18px 0 0; }
+.search { flex: 1 1 280px; position: relative; }
+.search input { width: 100%; height: 46px; border-radius: 14px; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); font: inherit; font-size: 16px; padding: 0 16px 0 44px; outline: none; transition: border-color .2s, background .2s; }
+.search input:focus { border-color: rgb(255 158 192 / .5); background: rgb(255 255 255 / .07); }
+.search svg { position: absolute; left: 15px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--faint); }
+.chip-btn:focus-visible, .game:focus-visible .art { outline: 2px solid rgb(255 158 192 / .7); outline-offset: 2px; }
+.adult-note { margin: 14px 0 0; color: var(--dim); font-size: 15px; }
+.adult-note a, .hash-note a { color: var(--fg); }
+.hash-note { margin: 18px 0 0; padding: 12px 16px; border-radius: 14px; background: rgb(255 255 255 / .05); border: 1px solid var(--line); color: var(--dim); font-size: 15px; }
+/* One row of chips, so the list below never moves when they arrive. A phone scrolls the row sideways. */
+.chip-row { display: flex; gap: 8px; margin-top: 12px; min-height: 40px; overflow-x: auto; scrollbar-width: none; }
+.chip-row::-webkit-scrollbar { display: none; }
+.chip-row.open { flex-wrap: wrap; overflow: visible; }
+.chip-btn { flex: none; font: inherit; font-size: 14px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: rgb(255 255 255 / .04); color: var(--dim); cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
+.chip-btn:hover { color: var(--fg); }
+.chip-btn[aria-pressed="true"] { background: rgb(255 158 192 / .16); border-color: rgb(255 158 192 / .5); color: #fff; }
+.link-btn { font: inherit; font-size: 14px; color: var(--dim); background: none; border: 0; padding: 8px 12px; min-height: 40px; text-decoration: underline; cursor: pointer; }
+.count { color: var(--faint); font-size: 14px; }
+.count-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 22px 0 14px; min-height: 40px; }
+.count-row .link-btn { margin-left: auto; }
+
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 26px 20px; }
+.game { display: block; text-decoration: none; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.game .art { border-radius: 18px; border: 1px solid var(--line); transition: transform .3s, border-color .3s, box-shadow .3s; }
+.game:hover .art, .game:focus-visible .art { transform: translateY(-4px); border-color: rgb(255 158 192 / .35); box-shadow: 0 24px 60px -24px rgb(0 0 0 / .9); }
+.game:focus-visible { outline: none; }
+.game h3 { margin: 12px 2px 0; font-size: 17px; letter-spacing: -.01em; line-height: 1.25; height: 2.5em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.game .meta { margin: 3px 2px 0; color: var(--dim); font-size: 14px; line-height: 22px; height: 22px; display: flex; gap: 8px; align-items: center; overflow: hidden; }
+.game.skel { cursor: default; }
+.game.skel .art { border-color: transparent; }
+.end { height: 1px; }
+
+.art { position: relative; aspect-ratio: 2 / 3; background: #15151c; overflow: hidden; }
+.art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* A cover of another shape, whole on its own colour, as the app shows it. */
+.art img.whole { object-fit: contain; }
+.art.blurred .tile-title { background: linear-gradient(180deg, transparent 40%, rgb(10 10 15 / .55)); }
+.art .tile-title { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 8% 9%; font-weight: 800; font-size: clamp(20px, 2.1vw, 26px); line-height: 1.12; letter-spacing: -.02em; text-wrap: balance; text-shadow: 0 2px 14px rgb(0 0 0 / .45); }
+.art .tag18 { position: absolute; top: 10px; right: 10px; padding: 2px 8px; border-radius: 8px; background: rgb(0 0 0 / .5); border: 1px solid rgb(255 255 255 / .16); font-size: 12px; font-weight: 700; backdrop-filter: blur(6px); }
+.paid { color: #fcd34d; font-weight: 600; }
+.empty { grid-column: 1 / -1; padding: 60px 20px; text-align: center; color: var(--dim); border: 1px dashed var(--line); border-radius: 20px; }
+
+/* Detail sheet and request dialog */
+dialog { border: 1px solid var(--line); border-radius: 26px; background: #0e0e14; color: var(--fg); padding: 0; width: min(880px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); box-shadow: 0 50px 140px -30px rgb(0 0 0 / .95); }
+dialog::backdrop { background: rgb(4 4 8 / .72); backdrop-filter: blur(6px); }
+dialog[open] { animation: pop .3s cubic-bezier(.2,.7,.2,1); }
+@keyframes pop { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+.sheet { display: grid; grid-template-columns: 300px 1fr; gap: 28px; padding: 28px; }
+.sheet .art { border-radius: 16px; border: 1px solid var(--line); }
+.close:focus { outline: none; }
+.close:focus-visible { outline: 2px solid rgb(255 158 192 / .7); outline-offset: 2px; }
+.close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: rgb(255 255 255 / .06); color: var(--fg); font-size: 20px; cursor: pointer; display: grid; place-items: center; z-index: 2; }
+.sheet h1, .sheet h2 { font-size: 30px; margin: 0; padding-right: 40px; }
+.sheet .by { color: var(--dim); margin-top: 4px; }
+.summary { color: var(--dim); font-size: 15px; margin: 14px 0 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.chips span { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / .06); border: 1px solid var(--line); color: var(--dim); }
+.actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.sheet .sub-h { margin: 26px 0 10px; font-size: 13px; color: var(--faint); font-weight: 650; letter-spacing: .02em; }
+.releases { display: grid; gap: 8px; }
+.rel { padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / .035); border: 1px solid var(--line); }
+.rel .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rel b { font-size: 15px; }
+.rel .when { color: var(--faint); font-size: 13px; }
+.st { font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
+.st.broken { color: #fca5a5; border-color: rgb(252 165 165 / .3); background: rgb(252 165 165 / .08); }
+.rel .file { margin-top: 6px; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); overflow-wrap: anywhere; }
+.rel .notes { margin-top: 6px; font-size: 14px; color: var(--dim); }
+.how { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: h; color: var(--dim); font-size: 15px; }
+.how li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; }
+.how li::before { counter-increment: h; content: counter(h); width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: linear-gradient(180deg, #f6609a, #d62a68); }
+.how b { color: var(--fg); font-weight: 600; }
+.recipe-link { display: inline-flex; align-items: center; min-height: 40px; margin-top: 10px; color: var(--faint); font-size: 14px; }
+
+.req { padding: 30px; max-width: 560px; }
+.req h2 { font-size: 28px; margin: 0; padding-right: 40px; }
+.req p { color: var(--dim); font-size: 15px; }
+.field { display: grid; gap: 6px; margin-top: 14px; }
+.field span { font-size: 14px; color: var(--dim); }
+.field input { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); font: inherit; font-size: 16px; padding: 0 14px; outline: none; }
+.field input:focus { border-color: rgb(255 158 192 / .5); }
+.req .note { margin-top: 18px; padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / .04); border: 1px solid var(--line); font-size: 14px; color: var(--dim); }
+.req .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.request { margin-top: 64px; }
+
+/* A game's own page */
+.game-page { padding-top: 40px; }
+.crumb { display: inline-flex; align-items: center; min-height: 40px; color: var(--faint); font-size: 14px; text-decoration: none; margin-bottom: 10px; }
+.crumb:hover { color: var(--fg); }
+.game-page .sheet { padding: 0; }
+.all-games { margin-top: 56px; }
+.all-games summary { font-size: 15px; padding: 14px 0; color: var(--dim); }
+.all-games ul { columns: 3 220px; column-gap: 28px; list-style: none; margin: 0 0 20px; padding: 0; color: var(--dim); font-size: 15px; }
+.all-games li { padding: 4px 0; break-inside: avoid; }
+
+/* The age question of the adult catalog: the whole first screen. */
+.gate { min-height: calc(100dvh - 68px); display: grid; place-items: center; text-align: center; padding: 40px 0; }
+.gate h1 { font-size: clamp(34px, 6vw, 56px); margin: 0; max-width: none; }
+.gate p { color: var(--dim); max-width: 520px; margin: 18px auto 0; }
+.gate .row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
+.gate .btn { height: auto; min-height: 50px; padding-top: 12px; padding-bottom: 12px; white-space: normal; }
+html[data-ok] .gate, html:not([data-ok]) .after-gate, html:not([data-ok]) footer { display: none; }
+/* Back from a game: nothing shows until the list and its place are restored. */
+html.restoring body { visibility: hidden; }
+@media (max-width: 760px) {
+  .sheet { grid-template-columns: 1fr; padding: 20px; gap: 18px; }
+  .sheet .art { max-width: 320px; }
+  dialog { border-radius: 22px; }
+  .req { padding: 22px; }
+  .games { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
+  .game h3 { font-size: 15px; }
+  .game .meta { font-size: 13px; }
+  .game-page { padding-top: 24px; }
+  .art .tile-title { font-size: 17px; }
+}

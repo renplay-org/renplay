@@ -67,3 +67,5 @@ Off, until an admin marks it safe.
 ## In these docs
 
 The docs never show adult art. Screenshots are of safe-for-work games or blurred.
+
+The catalog on the website comes in two. [renplay.org/catalog](https://renplay.org/catalog) lists only the safe-for-work games, each on a page of its own. [adult.renplay.org](https://adult.renplay.org) lists every game, adult ones included, behind a question about your age. Adult covers stay blurred there until you show them, and search engines do not list that site. The [demo](https://renplay.org/demo) has adult games turned off.

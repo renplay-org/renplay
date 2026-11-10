@@ -131,6 +131,15 @@ export function creditText(credit: ArtCredit | undefined): ReactNode {
   return <>from the developer</>
 }
 
+/**
+ * Whether the stage's own pictures already carry the game's title: the poster or the banner is real art
+ * (from a store or SteamGridDB, which draw it), not a picture Renplay made from blur, which holds none.
+ * The art data does not say more than that, so this is the best it can tell.
+ */
+export function artCarriesTitle(art: ArtSet | undefined): boolean {
+  return [art?.grid, art?.hero].some((f) => f && f.made !== 'glow' && (f.url1x || f.thumbhash))
+}
+
 /** The stage and door title: the logo when there is one and pictures are on, otherwise text. A dark logo is inverted on ink. */
 export function TitleArt({ game, hidden, className = 'h1 xl' }: { game: ArtGame; hidden: boolean; className?: string }) {
   const logo = game.art?.logo

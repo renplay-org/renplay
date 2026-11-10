@@ -5,7 +5,7 @@ description: How installs, builds, the player and saves fit together.
 
 Renplay turns the PC release of a Ren'Py game into a web build, serves it, and keeps the player's
 saves on the server. This page explains the parts and why they are built the way they are. HTML
-games take a shorter path through the same parts; [Engines](/engines/) covers them and the
+games take a shorter path through the same parts. [Engines](/engines/) covers them and the
 engines still to come.
 
 ```
@@ -58,7 +58,7 @@ archives, while they are kept).
    engine of the game's major version. Games made with Ren'Py 7 or older get the newest Ren'Py 8
    engine, which loads their scripts. Only Python 2-only code fails. Engine packs come from
    renplay-org/engines and are checksum-verified.
-4. **Split RPA archives** (`rpa.ts`) in one sequential pass. The archive index is a Python pickle;
+4. **Split RPA archives** (`rpa.ts`) in one sequential pass. The archive index is a Python pickle.
    `util/pickle.ts` reads it as data only, so nothing from the game is executed.
 5. **Optimize images** (`optimize.ts`): PNG and JPEG become WebP under the same names. Each
    streamed image gets a small placeholder. Image tasks reserve a slot before reading their input,
@@ -71,7 +71,7 @@ archives, while they are kept).
 6. **Decide what streams** (`progressive.ts`): images, audio and video stream on demand, everything
    the engine needs at start goes into `game.zip`. A developer's `progressive_download.txt` wins.
 7. **Write the build**: streamed files are appended to `assets.pack` (with an `assets.json`
-   index); `game.zip` (`assemble.ts`) holds the engine's Python package, the game's scripts and
+   index). `game.zip` (`assemble.ts`) holds the engine's Python package, the game's scripts and
    small files, the placeholders and the streaming list. The finished folder appears atomically.
    Script sources (`.rpy`) whose compiled `.rpyc` is there too go into the pack instead of
    `game.zip` (`setSourcesAside`), so Ren'Py loads the developer's compiled scripts: a `.rpyc`
@@ -167,7 +167,7 @@ for schema 7, migration, sessions, nginx protection and the request-local permis
 
 ## The catalog
 
-`catalog/catalog.ts` fetches the index (`index.v4.json`, catalog schema 4; `normalizeRecipe` also reads
+`catalog/catalog.ts` fetches the index (`index.v4.json`, catalog schema 4, and `normalizeRecipe` also reads
 schemas 2 and 3, turning a schema 3 cover into a grid) every hour (or from Settings). It links
 installed games to recipes (by id, archive or save folder) and reports newer working releases as
 updates. Library metadata (title, developer, tags, links, summary and game state) comes only from
@@ -179,7 +179,7 @@ from multiple indexes merge in configured order, with the first definition winni
 `tagIds`, `content`, `state` and `summary`; legacy `tags` labels still work without a vocabulary.
 Game JSON returns empty arrays for missing `tagIds`/`content` and null for missing `state`/`summary`.
 Content tags are not library chips. Display `version` uses the release matched by the installed
-archive's file name, then by version equality; `detectedVersion` keeps the raw detected value.
+archive's file name, then by version equality, and `detectedVersion` keeps the raw detected value.
 The same release determines playability status and available updates.
 
 ## Library preferences and activity
@@ -210,8 +210,8 @@ slots. A lost network report can undercount time, but never changes saves.
 
 Game JSON includes `playTime`, `finishedAt`, and `latestSave` (file, Ren'Py label, name, creation
 time in milliseconds, optional runtime in seconds, and screenshot URL, or null). Library and
-save-gallery metadata share a bounded cache keyed by store root, folder, filename, mtime and size;
-a changed or deleted save is reflected on the next list. Up next uses the newest played installed,
+save-gallery metadata share a bounded cache keyed by store root, folder, filename, mtime and size.
+A changed or deleted save is reflected on the next list. Up next uses the newest played installed,
 non-finished game and invalidates on player exit.
 
 The empty library's starter is the first Ren'Py recipe with `free: true` that is not `nsfw` and
@@ -235,8 +235,19 @@ the levels do on it, so a new route fails until it is classified.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1 to 200) and `offset` (default 0). Invalid or unsafe integers use the defaults.
-Jobs sort active first, then newest first, with the id breaking timestamp ties. Offset pages
-reflect the current queue. Running jobs can move between pages as their status changes.
+Jobs sort running first, then the waiting ones (queued or paused) in the order they will run, then
+the finished, newest first, with the id breaking timestamp ties. Offset pages reflect the current
+queue. Running jobs can move between pages as their status changes. A job that was retried gives
+way to its retry, which carries `attempts` (the chain of `retry_of`, so a mod added, a mod removed
+and a mod build of one game are three jobs of one attempt each) and `title` (the library's game or
+the recipe the archive matched, null when no game is known).
+
+`POST /api/jobs/:id/pause` holds a queued job back, or stops a running one the way a cancel does
+and returns it to the front of the queue as `paused`. `POST /api/jobs/:id/resume` queues it again,
+and it starts from its parameters: an install reads its archive again, since a build only appears
+once it is whole. `POST /api/jobs/:id/move` with `{ "to": "up" | "down" | "first" }` reorders a
+waiting job. The order (`position`) and the paused state are in the library, so a restart keeps
+them. All three are admin only, and a job about a game that does not exist for the admin answers 404.
 
 **Art** (`art/store.ts`). A game has five formats: grid 600x900, wide 920x430, hero 1920x620, a logo and
 a square icon. For each, the chosen picture is a person's choice, else the admin's for everyone
