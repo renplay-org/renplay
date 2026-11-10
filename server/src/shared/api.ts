@@ -122,7 +122,11 @@ export interface Job {
   id: string
   type: string
   game: string
-  status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
+  /** The game's title: the library's game, or the recipe the archive matched. Null when no game is known. */
+  title: string | null
+  /** How many times this job was tried: 1, or more for each Retry of it. */
+  attempts: number
+  status: 'queued' | 'paused' | 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted'
   stage: string
   progress: number
   message: string

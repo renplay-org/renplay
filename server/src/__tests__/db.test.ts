@@ -22,7 +22,7 @@ it('forgets personal progress and safe overrides with a library entry, never car
 it('creates a new library at the current version, with its owner at Shown and sign-in on', () => {
   const db = new Db(':memory:')
   try {
-    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 })
+    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 })
     expect(db.raw.prepare('SELECT username, role, adult_ceiling, adult_choice FROM users').all()).toEqual([{ username: 'owner', role: 'admin', adult_ceiling: 'shown', adult_choice: 'shown' }])
     expect(db.getSetting('auth_default', '')).toBe('on')
   } finally { db.close() }
@@ -35,7 +35,8 @@ it('brings a 4.0 library up to date, keeping its people, progress and save notes
     // A 4.0 library: no PINs, no people per device, and the installation level still under its 3.x setting.
     let db = new Db(path)
     db.raw.exec(`ALTER TABLE users DROP COLUMN pin_hash; ALTER TABLE users DROP COLUMN pin_failures; ALTER TABLE users DROP COLUMN pin_locked_until;
-      DROP TABLE device_people; PRAGMA user_version = 16`)
+      DROP TABLE device_people; ALTER TABLE jobs DROP COLUMN retry_of; ALTER TABLE jobs DROP COLUMN position; PRAGMA user_version = 16`)
+    db.raw.exec("INSERT INTO jobs (id, type, game, status, created_at) VALUES ('old', 'import', 'story', 'queued', '2026-01-01')")
     db.raw.prepare("INSERT INTO users (username, name, role, adult_ceiling, adult_choice, prefs, created_at) VALUES ('kim', 'Kim', 'player', 'shown', 'blurred', ?, '2026-01-01')").run(JSON.stringify({ adultPictures: 'hide-pictures', tags: { include: ['romance'] } }))
     db.raw.prepare("INSERT INTO user_games (user_id, game, play_time, play_status, rating) VALUES (2, 'story', 3600, 'finished', 5)").run()
     db.raw.prepare("INSERT INTO save_meta (user_id, save_dir, file, title) VALUES (2, 'Story-1', '1-1-LT1.save', 'Before the storm')").run()
@@ -43,7 +44,7 @@ it('brings a 4.0 library up to date, keeping its people, progress and save notes
     db.close()
 
     db = new Db(path)
-    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 })
+    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 })
     const kim = db.raw.prepare("SELECT * FROM users WHERE username = 'kim'").get() as Record<string, unknown>
     expect(kim).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred', pin_hash: '', pin_failures: 0 })
     expect(JSON.parse(String(kim['prefs']))).toEqual({ tags: { include: ['romance'] } })
@@ -52,6 +53,9 @@ it('brings a 4.0 library up to date, keeping its people, progress and save notes
     expect(db.raw.prepare('SELECT COUNT(*) AS n FROM device_people').get()).toEqual({ n: 0 })
     expect(db.getSetting('adult_level', '')).toBe('off')
     expect(db.getSetting('adult_games', null)).toBeNull()
+    // A job waiting then is still waiting, a first try, and a new one goes behind it.
+    db.insertJob({ id: 'new', type: 'import', game: 'story', params: '{}' })
+    expect(db.waitingJobs().map((j) => [j.id, j.retry_of, db.attempts(j)])).toEqual([['old', '', 1], ['new', '', 1]])
     db.close()
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
