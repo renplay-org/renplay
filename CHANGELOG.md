@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.9.0] - 2026-11-10
+
 ### Added
 
 - Activity lets an admin move a waiting job up or down, put it first with **Do next**, and pause a waiting or running job. A paused job waits in the queue until you resume it, and says what resuming does: an install starts again from its archive. The order and the paused jobs are kept when Renplay restarts.
@@ -712,7 +714,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.8.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.9.0...dev
+[4.9.0]: https://github.com/renplay-org/renplay/compare/v4.8.0...v4.9.0
 [4.8.0]: https://github.com/renplay-org/renplay/compare/v4.7.0...v4.8.0
 [4.7.0]: https://github.com/renplay-org/renplay/compare/v4.6.3...v4.7.0
 [4.6.3]: https://github.com/renplay-org/renplay/compare/v4.6.2...v4.6.3
