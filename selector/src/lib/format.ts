@@ -59,8 +59,13 @@ export function slotName(file: string): string {
 }
 
 /** What a job is about: the game's title, and the file name only when no game is known. */
+export function jobSubject(j: Job): string | undefined {
+  return j.title ?? (j.params?.source?.path ?? j.params?.path)?.split('/').pop() ?? (j.game || undefined)
+}
+
+/** The job in a sentence: Installing Pale Carnations. */
 export function jobTitle(j: Job, games: Game[]): string {
-  const name = j.title ?? (j.params?.source?.path ?? j.params?.path)?.split('/').pop() ?? (j.game || undefined)
+  const name = jobSubject(j)
   switch (j.type) {
     case 'import':
       if (j.status === 'done') return `Installed ${name || 'game'}`

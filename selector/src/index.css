@@ -1268,9 +1268,6 @@ select.input option {
 .toolbar::-webkit-scrollbar {
   display: none;
 }
-.toolbar .search-field {
-  flex: 1 1 200px;
-}
 /* A toolbar with more than the search and one control wraps on a phone, instead of scrolling sideways. */
 .toolbar.wrap {
   flex-wrap: wrap;
@@ -1280,10 +1277,6 @@ select.input option {
   .toolbar {
     margin: 0;
     padding: 10px 0;
-  }
-  .toolbar .search-field {
-    flex: 1;
-    max-width: 360px;
   }
 }
 .actionbar {

@@ -65,3 +65,21 @@
     display: block;
   }
 }
+/* In a toolbar the search shares the row with the controls beside it. */
+.toolbar .search-field {
+  flex: 1 1 200px;
+}
+@media (min-width: 720px) {
+  .toolbar .search-field {
+    flex: 1;
+    max-width: 360px;
+  }
+}
+/* The toolbar sticks under the header while the tiles scroll beneath it: its controls are nearly solid, so a
+   picture passing under a label does not make it hard to read. */
+.toolbar .search-field,
+.toolbar .sort,
+.toolbar .seg {
+  background: linear-gradient(rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.07)), rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(18px);
+}

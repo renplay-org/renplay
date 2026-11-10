@@ -19,7 +19,7 @@ import { useAddress, useTypedField, withParams } from '../lib/address'
 import { del, post } from '../lib/api'
 import { useGrowingGrid } from '../lib/grow'
 import type { Game } from '@shared/api'
-import { ago, capitalize, jobStage, pct, playedTime } from '../lib/format'
+import { ago, capitalize, jobStage, jobSubject, pct, playedTime } from '../lib/format'
 import { playLink } from '../lib/links'
 import { useCatalog, useGames, useJobs } from '../lib/queries'
 import { gameTags, matchesSearch, tagChips } from '../lib/tags'
@@ -255,7 +255,7 @@ export default function Library() {
           <Shelf title="Not finished installing" count={failedShown.length} href="/?filter=failed">
             {failedShown.slice(0, 12).map((job) => (
               <div key={job.id} className="panel" style={{ width: 'calc(var(--tile-w) * 2 + var(--gap))', flex: 'none' }}>
-                <p className="t" style={{ fontWeight: 650 }}>{all.find((g) => g.id === job.game)?.title || job.game || 'Install interrupted'}</p>
+                <p className="t" style={{ fontWeight: 650 }}>{jobSubject(job) || 'Install interrupted'}</p>
                 <p className="small muted" style={{ margin: '8px 0 12px' }}>{job.error || 'The install was interrupted. Your saves are kept.'}</p>
                 <Pill
                   size="sm"
