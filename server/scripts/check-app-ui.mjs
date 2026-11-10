@@ -402,7 +402,12 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
     if (swipe) {
       const cdp = await ctx.newCDPSession(page)
       await cdp.send('Input.synthesizeScrollGesture', { x: 300, y: 300, xDistance: -260, yDistance: 0, gestureSourceType: 'touch', speed: 900 })
-      await page.waitForTimeout(900)
+      // A slow machine (CI) finishes the gesture and the snap later: wait for the carousel to rest on a slide past the first.
+      await page.waitForFunction(() => {
+        const c = document.querySelector('.carousel')
+        return c.scrollLeft > c.clientWidth * 1.5 && c.scrollLeft % c.clientWidth === 0
+      }, null, { timeout: 4000, polling: 100 }).catch(() => {})
+      await page.waitForTimeout(300)
     } else {
       await page.evaluate(() => document.querySelector('.carousel').scrollBy({ left: 370, behavior: 'instant' }))
       await page.waitForTimeout(900)

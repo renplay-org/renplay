@@ -202,7 +202,7 @@ const SCHEMA = `
 const SHOWN = "id NOT IN (SELECT retry_of FROM jobs WHERE retry_of != '')"
 
 /** The schema version SCHEMA creates and the migrations below reach. */
-const VERSION = 20
+const VERSION = 19
 /** The oldest library this version opens: Renplay 4.0's. */
 const OLDEST = 16
 
@@ -229,13 +229,23 @@ const MIGRATIONS: Record<number, (raw: DatabaseSync) => void> = {
     raw.exec("DELETE FROM settings WHERE key = 'adult_games'")
     raw.exec("UPDATE users SET prefs = json_remove(prefs, '$.adultPictures') WHERE json_valid(prefs)")
   },
-  // 4.9: a job knows which job it retries, and a waiting job its place in the queue. Both have
-  // defaults, so the jobs already there (queued ones keep running oldest first) need no filling in.
-  20: (raw) => {
-    const columns = columnsOf(raw, 'jobs')
-    if (!columns.includes('retry_of')) raw.exec("ALTER TABLE jobs ADD COLUMN retry_of TEXT NOT NULL DEFAULT ''")
-    if (!columns.includes('position')) raw.exec('ALTER TABLE jobs ADD COLUMN position INTEGER NOT NULL DEFAULT 0')
-  },
+}
+
+/**
+ * Columns added without a new schema version, on every start: the newest release must still open a
+ * library this version has opened (the install contract's way back), and it refuses a higher version.
+ * Each has a default, so a release that does not know it reads and writes the table as before.
+ */
+const ADDED: [table: string, column: string, definition: string][] = [
+  // 4.9: a job knows which job it retries, and a waiting job its place in the queue.
+  ['jobs', 'retry_of', "TEXT NOT NULL DEFAULT ''"],
+  ['jobs', 'position', 'INTEGER NOT NULL DEFAULT 0'],
+]
+
+function addColumns(raw: DatabaseSync): void {
+  for (const [table, column, definition] of ADDED) {
+    if (!columnsOf(raw, table).includes(column)) raw.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+  }
 }
 
 function columnsOf(raw: DatabaseSync, table: string): string[] {
@@ -269,6 +279,7 @@ export class Db {
         MIGRATIONS[next]!(this.raw)
         this.raw.exec(`PRAGMA user_version = ${next}; COMMIT`)
       }
+      addColumns(this.raw)
     } catch (error) {
       if (this.raw.isTransaction) this.raw.exec('ROLLBACK')
       this.raw.close()

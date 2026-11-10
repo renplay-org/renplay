@@ -22,7 +22,7 @@ it('forgets personal progress and safe overrides with a library entry, never car
 it('creates a new library at the current version, with its owner at Shown and sign-in on', () => {
   const db = new Db(':memory:')
   try {
-    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 })
+    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 })
     expect(db.raw.prepare('SELECT username, role, adult_ceiling, adult_choice FROM users').all()).toEqual([{ username: 'owner', role: 'admin', adult_ceiling: 'shown', adult_choice: 'shown' }])
     expect(db.getSetting('auth_default', '')).toBe('on')
   } finally { db.close() }
@@ -44,7 +44,7 @@ it('brings a 4.0 library up to date, keeping its people, progress and save notes
     db.close()
 
     db = new Db(path)
-    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 })
+    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 })
     const kim = db.raw.prepare("SELECT * FROM users WHERE username = 'kim'").get() as Record<string, unknown>
     expect(kim).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred', pin_hash: '', pin_failures: 0 })
     expect(JSON.parse(String(kim['prefs']))).toEqual({ tags: { include: ['romance'] } })
@@ -74,5 +74,26 @@ it('refuses a library from before 4.0, or from a newer Renplay, and leaves it as
       file.close()
       rmSync(path, { force: true })
     }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+it('adds the queue columns to a 4.8 library without a new version, so 4.8 still opens it after an upgrade', () => {
+  const root = mkdtempSync(join(tmpdir(), 'renplay-db-'))
+  const path = join(root, 'library.db')
+  try {
+    let db = new Db(path)
+    db.raw.exec('ALTER TABLE jobs DROP COLUMN retry_of; ALTER TABLE jobs DROP COLUMN position; PRAGMA user_version = 19')
+    db.raw.exec("INSERT INTO jobs (id, type, game, status, created_at) VALUES ('old', 'import', 'story', 'queued', '2026-01-01')")
+    db.close()
+
+    db = new Db(path)
+    // The version stays where 4.8 left it: a version above it would make 4.8 refuse the library.
+    expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 })
+    const columns = (db.raw.prepare('PRAGMA table_info(jobs)').all() as { name: string }[]).map((c) => c.name)
+    expect(columns).toEqual(expect.arrayContaining(['retry_of', 'position']))
+    expect(db.waitingJobs().map((j) => j.id)).toEqual(['old'])
+    db.close()
+    // Opening it again does not add them twice.
+    new Db(path).close()
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
