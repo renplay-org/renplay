@@ -235,8 +235,19 @@ the levels do on it, so a new route fails until it is classified.
 
 `GET /api/jobs` retains `jobs` and `busy` and adds `total`. It accepts `limit` (default 30,
 clamped to 1 to 200) and `offset` (default 0). Invalid or unsafe integers use the defaults.
-Jobs sort active first, then newest first, with the id breaking timestamp ties. Offset pages
-reflect the current queue. Running jobs can move between pages as their status changes.
+Jobs sort running first, then the waiting ones (queued or paused) in the order they will run, then
+the finished, newest first, with the id breaking timestamp ties. Offset pages reflect the current
+queue. Running jobs can move between pages as their status changes. A job that was retried gives
+way to its retry, which carries `attempts` (the chain of `retry_of`, so a mod added, a mod removed
+and a mod build of one game are three jobs of one attempt each) and `title` (the library's game or
+the recipe the archive matched, null when no game is known).
+
+`POST /api/jobs/:id/pause` holds a queued job back, or stops a running one the way a cancel does
+and returns it to the front of the queue as `paused`. `POST /api/jobs/:id/resume` queues it again,
+and it starts from its parameters: an install reads its archive again, since a build only appears
+once it is whole. `POST /api/jobs/:id/move` with `{ "to": "up" | "down" | "first" }` reorders a
+waiting job. The order (`position`) and the paused state are in the library, so a restart keeps
+them. All three are admin only, and a job about a game that does not exist for the admin answers 404.
 
 **Art** (`art/store.ts`). A game has five formats: grid 600x900, wide 920x430, hero 1920x620, a logo and
 a square icon. For each, the chosen picture is a person's choice, else the admin's for everyone

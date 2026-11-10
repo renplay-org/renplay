@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { IconBtn } from './controls'
 import { reducedMotion } from './travel'
+import './Carousel.css'
 
 /** How long a slide stays before the next one comes. */
 const ROTATE_MS = 7000

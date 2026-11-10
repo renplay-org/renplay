@@ -5,10 +5,10 @@ description: Play on phones and computers, offline and with a controller, instal
 
 ## Find a game
 
-Open **Search** in the header (also available on phones), or press **⌘K** on Apple devices and
-**Ctrl+K** elsewhere. Search titles, developers and tags across your library and the catalog,
-open a page, or resume your Up next game. Use arrow keys and Enter or tap a result. Catalog
-results show where to get the game. Only admins see Add games, Activity and Users.
+The Library and the Catalog each have one search above their list. Type a title, a developer or a
+tag and the list narrows as you type. On a computer, press **⌘K** on Apple devices and **Ctrl+K**
+elsewhere to go to it. A search that finds nothing in your library offers the same words in the
+Catalog, where each game shows where to get it. Only admins see Add games, Activity and Users.
 Search follows your adult games level, as the library does.
 
 ## On a computer
@@ -46,7 +46,11 @@ it on a phone held upright.
 
 ## Up next, status and ratings
 
-**Up next** holds the games you are playing, newest first. **Not now** takes a game out of it until
+**Up next** is the top of the library: the games you are playing, newest first, up to eight, one
+after the other. It moves on by itself every few seconds. It waits while your finger, the mouse or
+the keyboard is on it, and stays where you leave it once you have moved it yourself, with a swipe,
+the arrows, the dots under it or the arrow keys. With reduced motion on, it never moves by itself.
+**Not now** takes a game out of it until
 you play it again. On a game's page, under **Play**, set its **Status**: Playing, Stalled, Dropped
 or Finished. Stalled, Dropped and Finished leave Up next, and your saves are kept. Rate a game with
 up to five stars. The library can sort by **Rating** and **Time played**.

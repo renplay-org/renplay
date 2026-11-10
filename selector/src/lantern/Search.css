@@ -1,0 +1,67 @@
+/* The search: a pill, the height of the controls beside it. */
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 4px 0 14px;
+  border-radius: 999px;
+  background: var(--plate);
+  color: var(--fg-3);
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.search-field > svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--fg);
+  font: inherit;
+  /* Under 16 px, iPhone Safari zooms the page when the field is focused. */
+  font-size: 16px;
+  outline: none;
+  box-shadow: none;
+}
+.search-field input::placeholder {
+  color: var(--fg-3);
+}
+.search-field:focus-within {
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 0 0 4px #fff;
+}
+.search-field .clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 999px;
+  color: var(--fg-3);
+}
+.search-field .clear:hover {
+  background: var(--plate-2);
+  color: var(--fg);
+}
+.search-field .clear svg {
+  width: 18px;
+  height: 18px;
+}
+/* The shortcut is for a keyboard: a desktop shows it, a phone does not. */
+.search-field .shortcut {
+  display: none;
+  margin-right: 10px;
+}
+@media (min-width: 720px) and (hover: hover) and (pointer: fine) {
+  .search-field .shortcut {
+    display: block;
+  }
+}

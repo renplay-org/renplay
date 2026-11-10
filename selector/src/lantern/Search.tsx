@@ -1,6 +1,7 @@
 import { Search, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { isApple } from '../lib/platform'
+import './Search.css'
 
 /** The field on screen, which Ctrl K or ⌘K goes to. */
 let field: HTMLInputElement | null = null

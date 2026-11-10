@@ -3,7 +3,7 @@ import { Heart, Play, Sparkles, X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '../lantern/Tile'
-import Stage, { travelToDoor } from '../lantern/Stage'
+import Stage, { travelToDoor, travelToPage } from '../lantern/Stage'
 import { Chip, Pill, TagPill, Bar } from '../lantern/controls'
 import Carousel from '../lantern/Carousel'
 import SearchField from '../lantern/Search'
@@ -116,7 +116,7 @@ function StageActions({ g }: { g: Game }) {
       <Pill variant="p" size="lg" icon={<Play />} to={playLink(g.id, g.latestSave?.file)} onClick={(e) => travelToDoor(g, hidden, e.currentTarget.closest('.stage')?.querySelector('.cover .frame'))}>
         {g.latestSave ? 'Resume' : 'Play'}
       </Pill>
-      <Pill variant="s" size="lg" to={`/game/${g.id}`}>
+      <Pill variant="s" size="lg" to={`/game/${g.id}`} onClick={(e) => travelToPage(g, hidden, e.currentTarget.closest('.stage')?.querySelector('.cover .frame'))}>
         Game page
       </Pill>
       <Pill variant="q" size="lg" className="not-now" onClick={() => void notNow()}>
@@ -128,7 +128,7 @@ function StageActions({ g }: { g: Game }) {
 
 /** Up next: the games in play, one stage each, turning by itself (see Carousel). */
 function UpNext({ games, onSlide }: { games: Game[]; onSlide: (id: string) => void }) {
-  return <Carousel items={games} label="Up next" onSlide={(g) => onSlide(g.id)} slide={(g) => <Stage game={g} eyebrow="Up next" meta={stageMeta(g)} actions={<StageActions g={g} />} />} />
+  return <Carousel items={games} label="Up next" onSlide={(g) => onSlide(g.id)} slide={(g) => <Stage game={g} eyebrow="Up next" meta={stageMeta(g)} actions={<StageActions g={g} />} coverTo={`/game/${g.id}`} />} />
 }
 
 export default function Library() {

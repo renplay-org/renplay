@@ -43,6 +43,13 @@ Press **Install**. A background job runs, and **Activity** (in the header, and i
 
 A big game takes minutes, mostly for image conversion. You can leave the page.
 
+One job runs at a time. In **Activity**, an admin can move a waiting job up or down, or press **Do
+next** to put it first, and can **Pause** a waiting or running job. A running job stops cleanly
+and waits as paused. **Resume** starts it again from the archive, since a build is only kept once it
+is whole. The order and the paused jobs are kept when Renplay restarts. Activity names a job by its
+game, and by the file name only when no game is known. Its attempts count only the times you
+pressed **Retry** on the same job.
+
 ## After an install
 
 - **Uninstall** removes the build. **Saves stay.** So do your mods, the library entry and
