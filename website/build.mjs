@@ -152,7 +152,7 @@ const listing = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',
   name: 'Renplay catalog',
-  url: `${SITE}/catalog`,
+  url: `${SITE}/catalog/`,
   mainEntity: { '@type': 'ItemList', itemListElement: games.map((g, i) => ({ '@type': 'ListItem', position: i + 1, name: g.title, url: `${SITE}${gamePath(g)}` })) },
 }
 const ui = { state: '', tags: [], moreTags: false }
@@ -176,7 +176,7 @@ write(OUT, 'catalog/index.html', render(read('pages/catalog.html'), {
   head: head({
     title: 'Renplay · Catalog of tested Ren’Py games',
     description: 'Ren’Py games tested in Renplay: where to get each one, which download works, and how to add it. Free to browse, safe for work.',
-    canonical: `${SITE}/catalog`,
+    canonical: `${SITE}/catalog/`,
     css: ['/catalog.css'],
     extra: json(listing),
     ...OG,
@@ -229,7 +229,7 @@ for (const g of games) {
       '@type': 'BreadcrumbList',
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Renplay', item: `${SITE}/` },
-        { '@type': 'ListItem', position: 2, name: 'Catalog', item: `${SITE}/catalog` },
+        { '@type': 'ListItem', position: 2, name: 'Catalog', item: `${SITE}/catalog/` },
         { '@type': 'ListItem', position: 3, name: g.title, item: url },
       ],
     },
@@ -259,7 +259,7 @@ const notFound = (site) => render(read('pages/404.html'), {
 write(OUT, '404.html', notFound(''))
 write(OUT, 'sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${[['/', undefined], ['/catalog', updated], ...games.map((g) => [gamePath(g), updated])].map(([path, date]) => `  <url><loc>${SITE}${path}</loc>${date ? `<lastmod>${date}</lastmod>` : ''}</url>`).join('\n')}
+${[['/', undefined], ['/catalog/', updated], ...games.map((g) => [gamePath(g), updated])].map(([path, date]) => `  <url><loc>${SITE}${path}</loc>${date ? `<lastmod>${date}</lastmod>` : ''}</url>`).join('\n')}
 </urlset>
 `)
 write(OUT, 'robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`)

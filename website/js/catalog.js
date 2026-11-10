@@ -68,7 +68,7 @@ function watch() { end.unobserve($('end')); end.observe($('end')) }
 const save = () => {
   if (!games.length) return
   try {
-    sessionStorage.setItem(KEY, JSON.stringify({ scroll: scrollY, shown: shownCount(), q: $q.value, ...ui, covers: ADULT && ui.covers, tags: ui.tags }))
+    sessionStorage.setItem(KEY, JSON.stringify({ scroll: scrollY, shown: shownCount(), q: $q.value, state: ui.state, tags: ui.tags, moreTags: ui.moreTags }))
   } catch {}
 }
 function restore(index) {
@@ -76,9 +76,11 @@ function restore(index) {
   try { saved = JSON.parse(sessionStorage.getItem(KEY) ?? 'null') } catch {}
   if (!saved || !index) return false
   $q.value = saved.q ?? ''
-  Object.assign(ui, { covers: !!saved.covers, state: saved.state ?? '', tags: saved.tags ?? [], moreTags: !!saved.moreTags })
+  // Adult covers are hidden again on every visit, so they are not kept.
+  Object.assign(ui, { state: saved.state ?? '', tags: saved.tags ?? [], moreTags: !!saved.moreTags })
   render(saved.shown || first())
-  scrollTo(0, saved.scroll || 0)
+  // At once: the page's smooth scrolling would show the list sliding to its place.
+  scrollTo({ top: saved.scroll || 0, behavior: 'instant' })
   return true
 }
 history.scrollRestoration = 'manual'
@@ -136,6 +138,7 @@ async function start() {
 }
 
 function wire() {
+  addEventListener('hashchange', hashed)
   $q.addEventListener('input', reset)
   $('states').addEventListener('click', (e) => {
     const b = e.target.closest('[data-state]')

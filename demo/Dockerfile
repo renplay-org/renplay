@@ -1,5 +1,5 @@
 # The public demo at demo.renplay.org: Renplay with free games installed, their recipes in Your
-# recipes, adult games blurred, and RENPLAY_DEMO on. Everything is in the image, so every start
+# recipes, adult games off, and RENPLAY_DEMO on. Everything is in the image, so every start
 # from it (after the demo's 4-hour stop, for one) is a fresh demo.
 #
 #   sh demo/build-games.sh 8.5.3 demo/games
@@ -13,7 +13,7 @@ USER 1000:1000
 COPY --chown=1000:1000 recipes/ /data/recipes/
 COPY --chown=1000:1000 games/ /games/_archives/
 COPY seed.mjs /tmp/seed.mjs
-ENV RENPLAY_ADULT_GAMES=blurred \
+ENV RENPLAY_ADULT_GAMES=off \
     RENPLAY_BACKUP_DIR=off
 RUN cd /games/_archives && node /tmp/seed.mjs *.zip
 
@@ -34,7 +34,7 @@ COPY --from=seed --chown=1000:1000 /data /data
 COPY --from=seed --chown=1000:1000 /games /games
 COPY --chmod=755 start.sh /app/deploy/demo-start.sh
 ENV RENPLAY_DEMO=on \
-    RENPLAY_ADULT_GAMES=blurred \
+    RENPLAY_ADULT_GAMES=off \
     RENPLAY_BACKUP_DIR=off \
     RENPLAY_SAVE_HISTORY=3 \
     RENPLAY_TRUSTED_HOPS=1 \
