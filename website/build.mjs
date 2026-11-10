@@ -89,7 +89,7 @@ function head({ title, description, canonical, image, imageAlt, imageSize, card:
 }
 
 const OG = { image: `${SITE}/img/og.jpg`, imageAlt: 'Renplay: your Ren’Py games on every screen', imageSize: [1200, 630] }
-const FOOTNOTE_HOME = 'Renplay is free and open source (MIT), made by the Renplay Team. It is not affiliated with Ren’Py, which is © Tom Rothamel and contributors. Games and their art belong to their developers. The screenshots show Dear Devere by Katy133, and adult games blurred.'
+const FOOTNOTE_HOME = 'Renplay is free and open source (MIT), made by the Renplay Team. It is not affiliated with Ren’Py, which is © Tom Rothamel and contributors. Games and their art belong to their developers. The screenshots show Butterfly Soup by Brianna Lei.'
 const FOOTNOTE_CATALOG = 'Renplay and its catalog are made by the Renplay Team. Covers are linked from where the catalog found them, such as the developers’ pages, Steam and SteamGridDB, and belong to their makers. The catalog never hosts game files: get games from their developers.'
 
 const idx = await loadIndex()
