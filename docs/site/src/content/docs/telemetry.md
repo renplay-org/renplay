@@ -5,7 +5,7 @@ description: The anonymous usage report Renplay sends once a day, what is in it 
 
 Renplay sends a small anonymous report once a day. It tells the maintainers which versions and
 setups are in use, which catalog games install and play well, and what breaks, so the next release
-can fix what matters. It is on by default. It holds counts, never names, titles, files or saves.
+can fix what matters. It is on by default. It holds counts, and names only games from the catalog, by their catalog id. It never holds people, the titles of your own games, files or saves.
 
 ## Turn it off
 

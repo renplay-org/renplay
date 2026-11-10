@@ -17,7 +17,7 @@ export function AboutPanel() {
         {sys.telemetry && (
           <Setting
             title="Send an anonymous usage report"
-            hint={<>Once a day Renplay sends counts of how it is used, never names, titles or saves. <DocsLink path="telemetry/">What it sends</DocsLink></>}
+            hint={<>Once a day Renplay sends counts of how it is used and how catalog games install and play. Never people, your own games or saves. <DocsLink path="telemetry/">What it sends</DocsLink></>}
             inline
             source={sys.telemetry.locked ? setBy(sys, 'RENPLAY_TELEMETRY') : <SourceLabel kind={sys.telemetry.chosen ? 'here' : 'def'} />}
           >
