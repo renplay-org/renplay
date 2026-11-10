@@ -81,6 +81,7 @@ export default defineConfig({
         { label: 'Guides', items: ['guides/adding-games', 'guides/playing', 'guides/dashboards'] },
         'accounts',
         'configuration',
+        'telemetry',
         'upgrading',
         'stability',
         'catalog',

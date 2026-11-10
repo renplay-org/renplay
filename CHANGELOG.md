@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Renplay sends an anonymous usage report once a day: counts of its setup, size and use, and how games from the catalog install and play, never names, titles or saves. An admin turns it off in Settings under About, or you set `RENPLAY_TELEMETRY=off`. The Telemetry page of the docs says what it holds.
+
 ## [4.7.0] - 2026-11-10
 
 ### Added
