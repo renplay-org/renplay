@@ -301,3 +301,11 @@ Procedures for agents live in `.agents/skills/` (linked as `.claude/skills/`):
 
 - `release`: cut a release (versions, changelog, PR, tag, image, deployment).
 - `ui-check`: look at UI changes on a phone and a desktop before calling them done.
+- `ui-review`: audit the app, the website, the docs and the catalog's pages, and rank what feels off
+  (layout shift, transitions, grids, scroll memory, touch, search engines).
+- `diagnosing-bugs`: a loop for hard bugs and slow paths, a failing test first.
+- `untangle-codebase`: find and remove tangles (dead code, cycles, things written twice).
+- `tdd`, `code-review`, `prototype`, `research`, `writing-for-agents`: from mattpocock/skills (see
+  `.agents/skills/THIRD-PARTY.md`): test-first work, a review of a diff against the standards and the spec,
+  a throwaway prototype for a design question, research into primary sources, and writing skills and
+  AGENTS.md for agents.
