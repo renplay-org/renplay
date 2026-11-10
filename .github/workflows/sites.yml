@@ -1,8 +1,10 @@
 name: Sites
 
-# Deploys docs.renplay.org and renplay.org (with www.renplay.org's redirect), with each release
-# (release.yml) or by hand from main for a fix between releases. Run by hand from another branch, it
-# publishes that branch's docs and website.
+# Deploys docs.renplay.org, renplay.org (with www.renplay.org's redirect) and adult.renplay.org, with each
+# release (release.yml) or by hand from main for a fix between releases. Run by hand from another branch, it
+# publishes that branch's docs and website. The website's game pages follow the catalog, so the website alone
+# is also deployed every day, and when the catalog repository sends a `catalog-updated` repository_dispatch.
+# Repository variable NEVER_SHOW_ADULT_COVERS=1 builds the adult catalog with its covers always blurred.
 
 on:
   workflow_call:
@@ -12,18 +14,25 @@ on:
       CLOUDFLARE_ACCOUNT_ID:
         required: true
   workflow_dispatch:
+  schedule:
+    - cron: "37 4 * * *"
+  repository_dispatch:
+    types: [catalog-updated]
 
 permissions: {}
 
+# A run waits for the one before it: a daily run must never cancel a release's deploy.
 concurrency:
   group: sites
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   WRANGLER: wrangler@4.158.0
 
 jobs:
   docs:
+    # The docs do not follow the catalog.
+    if: github.event_name != 'schedule' && github.event_name != 'repository_dispatch'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -57,9 +66,17 @@ jobs:
         with:
           node-version: 24
       - run: sh website/build.sh
+        env:
+          NEVER_SHOW_ADULT_COVERS: ${{ vars.NEVER_SHOW_ADULT_COVERS }}
       - name: renplay.org
         working-directory: website
         run: npx --yes "$WRANGLER" deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: adult.renplay.org
+        working-directory: website
+        run: npx --yes "$WRANGLER" deploy --config wrangler.adult.jsonc
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

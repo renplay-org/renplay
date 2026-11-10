@@ -225,8 +225,7 @@ footer small { display: block; margin-top: 18px; line-height: 1.6; }
   .brand img { width: 30px; height: 30px; }
   nav .right .lbl { display: none; }
   nav .right .btn:not(.primary) { padding: 8px 10px; }
-  nav .right a.btn[href="/github"] { display: none; }
-  nav .right a.btn[href="/support"] { display: none; }
+  nav .right .social { display: none; }
 }
 
 /* Interactivity */

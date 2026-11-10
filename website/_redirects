@@ -13,3 +13,4 @@
 /docs                  https://docs.renplay.org 302
 /docs/*                https://docs.renplay.org/:splat 302
 /catalog.html          /catalog 301
+/adult                 https://adult.renplay.org 302

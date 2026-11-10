@@ -1,0 +1,11 @@
+// The adult catalog at https://adult.renplay.org, served by Cloudflare as static files: the same page as /catalog, built in
+// adult mode (website/build.mjs), behind a full-page age question and not indexed. `sh build.sh` writes dist-adult/;
+// .github/workflows/sites.yml deploys it with the website.
+{
+  "name": "renplay-adult",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./dist-adult", "html_handling": "auto-trailing-slash", "not_found_handling": "404-page" },
+  "routes": [{ "pattern": "adult.renplay.org", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}
