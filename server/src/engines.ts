@@ -21,12 +21,16 @@ export interface EngineEntry {
   version: string
   renpy: string
   python: number
+  /** A public pre-release: picked only for a game made with a newer Ren'Py than every stable engine. */
+  prerelease?: boolean
   files: Record<string, EngineFile>
 }
 
 interface EngineIndex {
   schema: number
   engines: EngineEntry[]
+  /** Listed apart, so Renplay 4.6.3 and older, which read only `engines`, never build with one. */
+  prereleases?: EngineEntry[]
 }
 
 /** Files a pack must have; the rest (license) is kept when present. */
@@ -82,7 +86,8 @@ export class EngineStore {
       const res = await fetch(this.cfg.enginesUrl, { signal: AbortSignal.timeout(15_000) })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const idx = (await res.json()) as EngineIndex
-      const engines = (idx.engines ?? []).filter((e) => VERSION_RE.test(e.version) && REQUIRED.every((f) => e.files?.[f]?.url))
+      const listed = [...(idx.engines ?? []), ...(idx.prereleases ?? []).map((e) => ({ ...e, prerelease: true }))]
+      const engines = listed.filter((e) => VERSION_RE.test(e.version) && REQUIRED.every((f) => e.files?.[f]?.url))
       this.index = { at: Date.now(), engines }
       this.db.setSetting(INDEX_KEY, this.index)
     } catch (e) {
@@ -108,12 +113,16 @@ export class EngineStore {
 
   /**
    * Picks the engine for a game: an explicit version (recipe or user), the
-   * configured default, or the newest engine of the game's Ren'Py major.
+   * configured default, or the newest stable engine of the game's Ren'Py major.
+   * A pre-release engine is picked only for a game made with a newer Ren'Py
+   * than every stable engine, and then the lowest one that is new enough.
    */
   async pick(requested: string | undefined, gameRenpy: string | undefined): Promise<string> {
     const engines = await this.available().catch(() => [] as EngineEntry[])
     const installed = (await this.installed()).map((e) => e.version)
     const known = new Set([...engines.map((e) => e.version), ...installed])
+    // An installed engine the index does not list counts as stable.
+    const prereleases = new Set(engines.filter((e) => e.prerelease).map((e) => e.version))
     const want = requested || this.cfg.defaultEngine
     if (want) {
       if (!known.has(want)) throw new Error(`Engine ${want} is not available (have: ${[...known].join(', ') || 'none'})`)
@@ -122,8 +131,15 @@ export class EngineStore {
     // Games made with Ren'Py 7 or older run on the Ren'Py 8 engine: Ren'Py 8
     // loads their scripts, and most of their Python also runs on Python 3.
     const major = Math.max(8, Number((gameRenpy ?? '8').split('.')[0]) || 8)
-    const candidates = [...known].filter((v) => Number(v.split('.')[0]) === major).sort(cmp)
-    const best = candidates[candidates.length - 1]
+    const inMajor = [...known].filter((v) => Number(v.split('.')[0]) === major).sort(cmp)
+    const stable = inMajor.filter((v) => !prereleases.has(v))
+    const best = stable[stable.length - 1]
+    // The game's own version has a build number after the release (8.6.0.26110123).
+    const made = gameRenpy?.split('.').slice(0, 3).join('.')
+    if (made && (!best || cmp(made, best) > 0)) {
+      const needed = inMajor.find((v) => prereleases.has(v) && cmp(v, made) >= 0)
+      if (needed) return needed
+    }
     if (!best) throw new Error(`No Ren'Py ${major} engine is available`)
     return best
   }

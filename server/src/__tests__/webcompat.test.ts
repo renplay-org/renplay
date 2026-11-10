@@ -47,4 +47,14 @@ describe('web compatibility script', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('lets a game made with Ren’Py 7 import __builtin__, Python 2’s name for builtins', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'webcompat-'))
+    try {
+      const out = runGame(dir, 'import __builtin__, builtins\nprint(__builtin__ is builtins, __builtin__.len("ab"))')
+      expect(out).toBe('True 2')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
