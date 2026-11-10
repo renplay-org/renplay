@@ -9,6 +9,7 @@
 //   - scroll memory: scroll far, open a game, go back: the same place and the same tiles; the Catalog's
 //     search is in the address, and an open game is a history entry that back closes
 //   - the flight: the flying picture keeps a 2:3 shape on every frame, forward and back, on a desktop and a phone
+//   - the Library's loading state has the loaded page's shape: its grid starts where the loaded grid does
 //   - layout shift under 0.02 on the Library, the Catalog and a game page (Chromium only: WebKit does not report it)
 // --webkit adds the flight and the rows in WebKit. Needs the browsers once: npx playwright install chromium webkit
 import { createServer } from 'node:http'
@@ -312,6 +313,28 @@ async function shift(browser, base, errors) {
   await ctx.close()
 }
 
+async function skeleton(browser, base, errors, options, label) {
+  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label)
+  let release
+  const gate = new Promise((done) => (release = done))
+  await page.route('**/api/games', async (route) => {
+    await gate
+    await route.fallback()
+  })
+  const gridTop = () => page.evaluate(() => Math.round(document.querySelector('.grid').getBoundingClientRect().top + scrollY))
+  await page.goto(base + '/')
+  await page.waitForSelector('.sec .skel-line')
+  const loading = await gridTop()
+  release()
+  await page.waitForSelector('.card .frame')
+  await page.waitForTimeout(500)
+  const loaded = await gridTop()
+  check(Math.abs(loading - loaded) <= 12, `${label}: the Library's loading state has the loaded page's shape (its grid starts at ${loading}, loaded at ${loaded})`)
+  await ctx.close()
+}
+
 // ---- run ----------------------------------------------------------------------------------------
 
 const errors = []
@@ -325,6 +348,8 @@ await rowsAt(chrome, served.url, errors)
 await memory(chrome, served.url, errors, desktop, 'desktop')
 await flight(chrome, served.url, errors, desktop, 'desktop')
 await flight(chrome, served.url, errors, phoneChromium, 'phone')
+await skeleton(chrome, served.url, errors, desktop, 'desktop')
+await skeleton(chrome, served.url, errors, phoneChromium, 'phone')
 await shift(chrome, served.url, errors)
 await chrome.close()
 

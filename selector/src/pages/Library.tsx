@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Heart, Play, Sparkles } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '../lantern/Tile'
 import Stage, { travelToDoor } from '../lantern/Stage'
@@ -8,6 +8,7 @@ import { Pill, TagPill, Seg, Bar } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { useHidden } from '../lantern/art'
 import EmptyLibrary from '../components/EmptyLibrary'
+import LibrarySkeleton, { rememberShape } from '../components/LibrarySkeleton'
 import TagFilters from '../components/TagFilters'
 import Shelf from '../components/Shelf'
 import SortMenu from '../components/SortMenu'
@@ -201,6 +202,9 @@ export default function Library() {
   const failedShown = failed.filter((job) => !dismissed.includes(job.id))
   const updates = all.filter((g) => g.update)
   const home = !q && !tag && filter === 'all'
+  useEffect(() => {
+    if (games) rememberShape(upNext.length > 0)
+  }, [games, upNext.length])
 
   // The stage game: the one the person is looking at in the Up next shelf, else the first.
   const [stageId, setStageId] = useState<string | null>(null)
@@ -213,17 +217,7 @@ export default function Library() {
         {String(error)}
       </Empty>
     )
-  if (isLoading)
-    return (
-      <div className="stack" style={{ gap: 32 }}>
-        <div className="skel" style={{ height: 300, borderRadius: 18 }} />
-        <div className="grid">
-          {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="skel" style={{ aspectRatio: '2/3' }} />
-          ))}
-        </div>
-      </div>
-    )
+  if (isLoading) return <LibrarySkeleton />
   if (!all.length) return <EmptyLibrary recipes={catalog?.games ?? []} />
 
   return (

@@ -2575,6 +2575,38 @@ select.input option {
   position: relative;
   overflow: hidden;
 }
+.skel-line {
+  height: 14px;
+  border-radius: 6px;
+}
+.card .ct.skel-line {
+  height: 17px;
+  margin-top: 9px;
+}
+.card .cm.skel-line {
+  height: 14px;
+  margin-top: 7px;
+}
+@media (max-width: 719px) {
+  .card .cm.skel-line {
+    margin-top: 3px;
+  }
+}
+/* The loaded stage's text block and actions: the Library skeleton takes their sizes. */
+.stage .tb.skel-tb {
+  min-height: 77px;
+}
+.stage .acts.skel-acts {
+  min-height: 120px;
+}
+@media (min-width: 720px) {
+  .stage .tb.skel-tb {
+    min-height: 122px;
+  }
+  .stage .acts.skel-acts {
+    min-height: 54px;
+  }
+}
 .skel::after {
   content: "";
   position: absolute;

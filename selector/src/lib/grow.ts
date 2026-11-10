@@ -10,6 +10,11 @@ function columnsOf(grid: HTMLElement): number {
   return Math.max(1, getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length)
 }
 
+/** The layout's own column count (`--cols`), which the grids' tracks come from, before any grid is measured. */
+export function layoutColumns(): number {
+  return Math.max(1, Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cols'), 10) || 3)
+}
+
 /**
  * A grid that grows as you scroll to its end, in whole rows: the batch is the grid's column count times
  * a few rows, so no row is half full except the last of the list. The rows loaded are kept in the data
@@ -24,7 +29,7 @@ export function useGrowingGrid(key: string, total: number) {
   const queryKey = ['rows', key]
   const { data: rows = FIRST_ROWS } = useQuery({ queryKey, queryFn: () => qc.getQueryData<number>(queryKey) ?? FIRST_ROWS, staleTime: Infinity, gcTime: 30 * 60_000 })
   // Until the grid is measured, the layout's own column count, which the grid's tracks come from.
-  const [cols, setCols] = useState(() => Math.max(1, Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cols'), 10) || 3))
+  const [cols, setCols] = useState(layoutColumns)
   const [grid, grid$] = useState<HTMLElement | null>(null)
   const [end, end$] = useState<HTMLElement | null>(null)
   const shown = Math.min(total, rows * cols)
