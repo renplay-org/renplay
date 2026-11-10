@@ -227,8 +227,10 @@ async function flight(browser, base, errors, options, label) {
   // A tile that is off screen once the list has restored its place gets no flight back.
   await page.goto(base + '/')
   await page.waitForSelector('.grid[data-row] .card')
-  await page.locator('.grid[data-row] .card').nth(5).scrollIntoViewIfNeeded()
-  await page.locator('.grid[data-row] .card').nth(5).click()
+  // The last tile of the first batch: off screen at the top of the list on every screen size (a wide
+  // screen shows its first rows).
+  await page.locator('.grid[data-row] .card').last().scrollIntoViewIfNeeded()
+  await page.locator('.grid[data-row] .card').last().click()
   await page.waitForSelector('.stage')
   await page.waitForTimeout(800)
   await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith('renplay:scroll:')).forEach((k) => sessionStorage.setItem(k, '0')))
@@ -401,7 +403,15 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
     check((await carouselState(page)).current === 1, `${label}: it holds while a finger is on it`)
     if (swipe) {
       const cdp = await ctx.newCDPSession(page)
-      await cdp.send('Input.synthesizeScrollGesture', { x: 300, y: 300, xDistance: -260, yDistance: 0, gestureSourceType: 'touch', speed: 900 })
+      // A finger drawn across it with touch events (a synthesized scroll gesture is ignored by a headless runner).
+      const at = await page.evaluate(() => { const r = document.querySelector('.carousel').getBoundingClientRect(); return { y: Math.round(r.top + r.height / 2) } })
+      const touch = (type, x) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y: at.y }] })
+      await touch('touchStart', 330)
+      for (let x = 310; x >= 70; x -= 20) {
+        await touch('touchMove', x)
+        await page.waitForTimeout(16)
+      }
+      await touch('touchEnd', 70)
       // A slow machine (CI) finishes the gesture and the snap later: wait for the carousel to rest on a slide past the first.
       await page.waitForFunction(() => {
         const c = document.querySelector('.carousel')
