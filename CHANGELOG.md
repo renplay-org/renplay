@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-11-10
+
 ### Added
 
 - Renplay sends an anonymous usage report once a day: counts of its setup, size and use, and how catalog games install and play, by their catalog id. It never holds people, the titles of your own games, files or saves. An admin turns it off in Settings under About, or you set `RENPLAY_TELEMETRY=off`. The Telemetry page of the docs says what it holds.
@@ -679,7 +681,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.7.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.8.0...dev
+[4.8.0]: https://github.com/renplay-org/renplay/compare/v4.7.0...v4.8.0
 [4.7.0]: https://github.com/renplay-org/renplay/compare/v4.6.3...v4.7.0
 [4.6.3]: https://github.com/renplay-org/renplay/compare/v4.6.2...v4.6.3
 [4.6.2]: https://github.com/renplay-org/renplay/compare/v4.6.1...v4.6.2
