@@ -1,0 +1,18 @@
+# The collector for Renplay's daily usage report. deploy.sh deploys it (see README.md).
+name = "renplay-telemetry"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = false
+
+routes = [{ pattern = "telemetry.renplay.org", custom_domain = true }]
+
+# deploy.sh puts the real id of the database in a copy of this file. The id below only lets the
+# tests and the dry run build.
+[[d1_databases]]
+binding = "DB"
+database_name = "renplay-telemetry"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# Every day at 03:17 UTC: delete what is older than 400 days.
+[triggers]
+crons = ["17 3 * * *"]
