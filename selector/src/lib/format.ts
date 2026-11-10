@@ -58,13 +58,13 @@ export function slotName(file: string): string {
   return file.replace(/-LT\d+\.save$/, '').replace(/\.save$/, '')
 }
 
+/** What a job is about: the game's title, and the file name only when no game is known. */
 export function jobTitle(j: Job, games: Game[]): string {
-  const game = games.find((g) => g.id === j.game)
-  const name = j.params?.source?.path?.split('/').pop() ?? j.params?.path?.split('/').pop() ?? game?.source.archive?.split('/').pop() ?? game?.title ?? j.game
+  const name = j.title ?? (j.params?.source?.path ?? j.params?.path)?.split('/').pop() ?? (j.game || undefined)
   switch (j.type) {
     case 'import':
       if (j.status === 'done') return `Installed ${name || 'game'}`
-      return game && game.status === 'installed' ? `Updating ${name}` : `Installing ${name || 'game'}`
+      return games.find((g) => g.id === j.game)?.status === 'installed' ? `Updating ${name}` : `Installing ${name || 'game'}`
     case 'apply-mods':
       return `${j.status === 'done' ? 'Applied' : 'Applying'} mods to ${name}`
     case 'hash-archive':
@@ -72,4 +72,9 @@ export function jobTitle(j: Job, games: Game[]): string {
     default:
       return j.type
   }
+}
+
+/** A job's state or its stage: the line under an install's name. */
+export function jobStage(j: { status: string; stage: string }, fallback: string): string {
+  return j.status === 'queued' ? 'Queued' : j.status === 'paused' ? 'Paused' : j.stage || fallback
 }

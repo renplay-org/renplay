@@ -20,7 +20,7 @@ import { api, del, post } from '../lib/api'
 import type { Game } from '@shared/api'
 import type { ArtKind } from '@shared/recipe'
 import ArtPicker from '../components/ArtPicker'
-import { ago, capitalize, duration, pct, playedTime, timeZone } from '../lib/format'
+import { ago, capitalize, duration, jobStage, pct, playedTime, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
 import { recipeLinks, playLink } from '../lib/links'
 import { isRenpy } from '@shared/family'
@@ -113,7 +113,7 @@ export default function GamePage() {
   const actions = game.job ? (
     <div className="panel" style={{ maxWidth: 440, width: '100%' }}>
       <div className="row between small" style={{ marginBottom: 8 }}>
-        <span className="muted-2">{game.job.status === 'queued' ? 'Queued' : game.job.stage || 'Working'}</span>
+        <span className="muted-2">{jobStage(game.job, 'Working')}</span>
         <span className="tnum muted">{game.job.status === 'running' ? pct(game.job.progress) : ''}</span>
       </div>
       <Bar value={game.job.progress} indeterminate={game.job.status === 'queued'} />

@@ -1,9 +1,9 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Clock, Loader2, RotateCw, ScrollText, Square, Trash2, XCircle, CircleSlash } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Clock, CircleSlash, ChevronsUp, Loader2, Pause, Play, RotateCw, ScrollText, Square, Trash2, XCircle } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import DocsLink from '../components/DocsLink'
 import { Empty, Spinner, errorText, useToast } from '../lantern/ui'
-import { TagPill, Bar, Pill } from '../lantern/controls'
+import { TagPill, Bar, IconBtn, Pill } from '../lantern/controls'
 import { useRoom } from '../lantern/Room'
 import { api, del, post } from '../lib/api'
 import { jobTitle } from '../lib/format'
@@ -16,6 +16,7 @@ import BackLink from '../components/BackLink'
 
 const icon = {
   queued: <Clock />,
+  paused: <Pause />,
   running: <Loader2 className="animate-spin" />,
   done: <Check />,
   failed: <XCircle />,
@@ -24,6 +25,7 @@ const icon = {
 }
 const iconClass: Record<Job['status'], string> = {
   queued: '',
+  paused: '',
   running: 'run',
   done: 'ok',
   failed: 'bad',
@@ -32,7 +34,8 @@ const iconClass: Record<Job['status'], string> = {
 }
 
 function dayGroup(job: Job): string {
-  if (job.status === 'running' || job.status === 'queued') return 'Running'
+  if (job.status === 'running') return 'Running'
+  if (job.status === 'queued' || job.status === 'paused') return 'Waiting'
   const date = new Date(job.finishedAt ?? job.createdAt)
   const today = new Date()
   if (date.toDateString() === today.toDateString()) return 'Earlier today'
@@ -43,6 +46,7 @@ function dayGroup(job: Job): string {
 
 const STATUS_LABEL: Record<Job['status'], string> = {
   queued: 'Waiting',
+  paused: 'Paused',
   running: 'Running',
   done: 'Done',
   failed: 'Failed',
@@ -77,17 +81,9 @@ export default function Activity() {
   const [logFor, setLogFor] = useState<Job | null>(null)
   useRoom({ game: null, quiet: true })
   if (isLoading) return <Spinner />
-  const attempts = new Map<string, { job: Job; count: number }>()
-  const seen = new Set<string>()
-  for (const job of data?.pages.flatMap((p) => p.jobs) ?? []) {
-    if (seen.has(job.id)) continue
-    seen.add(job.id)
-    const key = JSON.stringify([job.type, job.game, job.params])
-    const previous = attempts.get(key)
-    if (previous) previous.count++
-    else attempts.set(key, { job, count: 1 })
-  }
-  const jobs = [...attempts.values()]
+  const jobs = data?.pages.flatMap((p) => p.jobs).filter((job, i, all) => all.findIndex((other) => other.id === job.id) === i) ?? []
+  // The jobs waiting, in the order they run: where a job can still move.
+  const waiting = jobs.filter((j) => j.status === 'queued' || j.status === 'paused')
   const act = async (fn: () => Promise<unknown>) => {
     try {
       await fn()
@@ -102,7 +98,7 @@ export default function Activity() {
       <div className="row between wrap" style={{ gap: 12 }}>
         <div>
           <h1 className="h1">Activity</h1>
-          <p className="lead" style={{ marginTop: 6 }}>Installs, updates and optimizations. One job runs at a time.</p>
+          <p className="lead" style={{ marginTop: 6 }}>Installs, updates and mod builds. One job runs at a time.</p>
         </div>
         <Pill size="sm" variant="q" icon={<Trash2 />} onClick={() => act(() => del('/api/jobs'))}>
           Clear finished
@@ -110,23 +106,25 @@ export default function Activity() {
       </div>
       {!jobs.length ? (
         <div style={{ marginTop: 18 }}>
-          <Empty title="Nothing happening">Installs, updates and optimizations show up here.</Empty>
+          <Empty title="Nothing happening">Installs, updates and mod builds show up here.</Empty>
         </div>
       ) : (
-        jobs.map(({ job: j, count }, index) => {
-          const active = j.status === 'running' || j.status === 'queued'
+        jobs.map((j, index) => {
+          const active = j.status === 'running' || j.status === 'queued' || j.status === 'paused'
+          const place = waiting.indexOf(j)
           const res = resultText(j)
           return (
             <Fragment key={j.id}>
-              {(index === 0 || dayGroup(jobs[index - 1]!.job) !== dayGroup(j)) && <div className="day">{dayGroup(j)}</div>}
+              {(index === 0 || dayGroup(jobs[index - 1]!) !== dayGroup(j)) && <div className="day">{dayGroup(j)}</div>}
               <div className="rows">
                 <div className="r stack-ph">
                   <div className={`ic ${iconClass[j.status]}`}>{icon[j.status]}</div>
                   <div className="grow">
                     <div className="row wrap" style={{ gap: 8 }}>
                       <span className="t">{jobTitle(j, games ?? [])}</span>
-                      {(count > 1 || j.status === 'failed' || j.status === 'interrupted') && <TagPill>{count} attempt{count === 1 ? '' : 's'}</TagPill>}
-                      {j.status === 'queued' && <TagPill>Queued</TagPill>}
+                      {j.attempts > 1 && <TagPill>{j.attempts} attempts</TagPill>}
+                      {j.status === 'queued' && <TagPill>{j === waiting.find((w) => w.status === 'queued') ? 'Runs next' : 'Queued'}</TagPill>}
+                      {j.status === 'paused' && <TagPill tone="amber">Paused</TagPill>}
                     </div>
                     <div className="m">
                       {j.status === 'running' ? (
@@ -134,6 +132,8 @@ export default function Activity() {
                           {j.stage}
                           {j.message ? ` · ${j.message}` : ''}
                         </>
+                      ) : j.status === 'paused' ? (
+                        <>{j.stage === 'Paused' ? (j.type === 'import' ? 'Resuming starts again from the archive' : 'Resuming starts it again') : 'Skipped until you resume it'}</>
                       ) : j.status === 'failed' || j.status === 'interrupted' ? (
                         <span className="red">{j.error} <DocsLink path="troubleshooting/">Troubleshooting</DocsLink></span>
                       ) : (
@@ -150,6 +150,30 @@ export default function Activity() {
                     <Pill size="sm" variant="q" icon={<ScrollText />} onClick={() => setLogFor(j)}>
                       Log
                     </Pill>
+                    {place >= 0 && (
+                      <>
+                        <IconBtn label={`Move ${jobTitle(j, games ?? [])} up`} disabled={place === 0} onClick={() => act(() => post(`/api/jobs/${j.id}/move`, { to: 'up' }))}>
+                          <ArrowUp />
+                        </IconBtn>
+                        <IconBtn label={`Move ${jobTitle(j, games ?? [])} down`} disabled={place === waiting.length - 1} onClick={() => act(() => post(`/api/jobs/${j.id}/move`, { to: 'down' }))}>
+                          <ArrowDown />
+                        </IconBtn>
+                        <Pill size="sm" variant="q" icon={<ChevronsUp />} disabled={place === 0} onClick={() => act(() => post(`/api/jobs/${j.id}/move`, { to: 'first' }))}>
+                          Do next
+                        </Pill>
+                      </>
+                    )}
+                    {j.status === 'paused' ? (
+                      <Pill size="sm" icon={<Play />} onClick={() => act(() => post(`/api/jobs/${j.id}/resume`))}>
+                        Resume
+                      </Pill>
+                    ) : (
+                      (j.status === 'running' || j.status === 'queued') && (
+                        <Pill size="sm" variant="q" icon={<Pause />} onClick={() => act(() => post(`/api/jobs/${j.id}/pause`))}>
+                          Pause
+                        </Pill>
+                      )
+                    )}
                     {active && (
                       <Pill size="sm" variant="q" icon={<Square />} onClick={() => act(() => post(`/api/jobs/${j.id}/cancel`))}>
                         Cancel
