@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 
-/** A shelf: tiles scrolling sideways with snap, one row. Wide tiles for Up next. Empty shelves are not shown. */
-export default function Shelf({ title, count, href, wide, children }: { title: string; count: number; href?: string; wide?: boolean; children: ReactNode }) {
+/** A shelf: tiles scrolling sideways with snap, one row. Empty shelves are not shown. */
+export default function Shelf({ title, count, href, children }: { title: string; count: number; href?: string; children: ReactNode }) {
   if (!count) return null
   return (
     <section className="sec">
@@ -13,7 +13,7 @@ export default function Shelf({ title, count, href, wide, children }: { title: s
         </h2>
         {href && <Link to={href}>See all</Link>}
       </div>
-      <div className={`shelf ${wide ? 'wide' : ''}`} data-row>
+      <div className="shelf" data-row>
         {children}
       </div>
     </section>

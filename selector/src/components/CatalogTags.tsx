@@ -87,7 +87,7 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange, exclud
         on={state === 'include'}
         ex={state === 'exclude'}
         n={n}
-        aria-label={`${label(id)}, ${state === 'include' ? 'included' : state === 'exclude' ? 'left out' : 'any'}`}
+        aria-label={`${label(id)}${n === undefined ? '' : ` ${n}`}, ${state === 'include' ? 'included' : state === 'exclude' ? 'left out' : 'any'}`}
         onClick={() => onChange(withState(prefs, id, next(id)))}
       >
         {label(id)}

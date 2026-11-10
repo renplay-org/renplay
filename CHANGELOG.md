@@ -12,11 +12,25 @@ release notes say what).
 - The website has a page for each safe-for-work game in the catalog, with its cover, where to get it and how to play it in Renplay.
 - The whole catalog, adult games included, is at adult.renplay.org, behind a question about your age, with adult covers blurred until you show them. The catalog at renplay.org lists only safe-for-work games.
 - The catalog on the website scrolls on as you near the end, and takes you back to the same place when you return from a game.
+- A game's cover now flies back to its tile when you go back from a game page, with the back button, the browser's back or a swipe. The flight works on phones too, and is skipped when the tile is off screen.
+- The Library and the Catalog grow as you scroll, in whole rows, so no row is half full in the middle of the list. Coming back from a game puts you at the same place with the same games loaded.
+- The Catalog's search, filter and tags are in the address, and a game opened in the Catalog is a page in your history: the back button closes it.
 
 ### Changed
 
 - The demo has adult games turned off, and its banner says so.
 - The docs and the website no longer shift while they load, and their buttons and links are at least 40 px tall on a phone. A check in CI keeps it so.
+- Every tile is the game's vertical cover, including the Up next shelf, and the picture that flies from a tile to the game page always keeps that shape. When the catalog has a vertical picture for a game, it is used even if its default is another shape.
+- Pages fade in instead of rising a few pixels, and the Library shows a loading page in the shape of the real one, so nothing jumps when the games arrive.
+- The game page does not draw the title a third time: when the cover or the banner already shows it, the logo stays out.
+- The phone tab bar is solid with a hairline on top, the loading line of the player is on a darkened strip, and the tip about the home screen shows once, after the game has started.
+- The catalog tiles no longer say Free, since nearly every game is. The Free filter stays.
+
+### Fixed
+
+- Links, chips, switches and the buttons of the game page are at least 40 pixels tall on a phone, and the page can be pinch zoomed.
+- Screen readers hear the visible text first in the name of the tag chips, the sort button and the search button, and the sign-in page has a main region.
+- A page opened in a tab that already had another page no longer takes that page's remembered place.
 
 ## [4.8.0] - 2026-11-10
 

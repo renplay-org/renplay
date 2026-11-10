@@ -1,15 +1,27 @@
+import type { ArtSet } from '@shared/art'
+import { hashUrl } from './art'
+
 /**
  * The same picture travels between the tile, the stage and the player door
  * instead of fading out and in. One FLIP ghost carries it: the clicked tile's
  * picture is lifted out and animated to where the same picture lands on the
- * next screen. Native view transitions are not used: the FLIP fallback is the
+ * next screen, and back to its tile when the person leaves the game page. The
+ * picture is always the game's vertical (2:3 grid) art, so it keeps its shape
+ * on the way. Native view transitions are not used: the FLIP fallback is the
  * one code path that works the same in every browser. Reduced motion skips it.
  */
+
+interface Box {
+  x: number
+  y: number
+  w: number
+  h: number
+}
 
 interface Travel {
   id: string
   src: string | null
-  rect: { x: number; y: number; w: number; h: number }
+  rect: Box
 }
 
 let pending: Travel | null = null
@@ -30,19 +42,40 @@ export function takeTravel(id: string): Travel | null {
   return t
 }
 
-/** Lift the picture at `rect` and fly it to `target`, then remove it. Calls `done` at the end (also on cancel). */
-export function flyGhost(t: Travel, target: { x: number; y: number; w: number; h: number }, done: () => void): void {
+/** The picture a game's tile and cover fly with: the vertical art, or its hash while that is hidden. */
+export function travelSource(art: ArtSet | undefined, hidden: boolean): string | null {
+  const grid = art?.grid
+  return (!hidden && grid?.url1x) || hashUrl(grid?.thumbhash)
+}
+
+/**
+ * Lift the picture at `t.rect` and fly it to `target`, then remove it. Calls `done` at the end (also on
+ * cancel). The same shape on both ends (a tile and a cover, both 2:3) moves by transform alone, which
+ * the compositor does without layout on every frame, so it stays smooth on a phone. The door is another
+ * shape, and animates the box.
+ */
+export function flyGhost(t: Travel, target: Box, done: () => void, ms = 480): void {
   const el = document.createElement('div')
   el.className = 'ghost'
-  el.style.left = `${t.rect.x}px`
-  el.style.top = `${t.rect.y}px`
-  el.style.width = `${t.rect.w}px`
-  el.style.height = `${t.rect.h}px`
   if (t.src) {
     const img = document.createElement('img')
     img.src = t.src
     img.alt = ''
     el.append(img)
+  }
+  const from = t.rect
+  const sameShape = Math.abs(from.w / from.h - target.w / target.h) <= (from.w / from.h) * 0.02
+  let frames: Keyframe[]
+  if (sameShape) {
+    // Sized as the larger end and scaled down at the other, so the picture is never scaled up and blurred.
+    const big = from.w >= target.w ? from : target
+    const radius = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--r-tile')) || 10
+    const at = (b: Box) => ({ transform: `translate(${b.x}px, ${b.y}px) scale(${b.w / big.w})`, borderRadius: `${radius / (b.w / big.w)}px` })
+    el.style.cssText = `left:0;top:0;width:${big.w}px;height:${big.h}px;`
+    frames = [at(from), at(target)]
+  } else {
+    el.style.cssText = `left:${from.x}px;top:${from.y}px;width:${from.w}px;height:${from.h}px;`
+    frames = [from, target].map((b) => ({ left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px` }))
   }
   document.body.append(el)
   const finish = () => {
@@ -50,13 +83,7 @@ export function flyGhost(t: Travel, target: { x: number; y: number; w: number; h
     done()
   }
   try {
-    const anim = el.animate(
-      [
-        { left: `${t.rect.x}px`, top: `${t.rect.y}px`, width: `${t.rect.w}px`, height: `${t.rect.h}px` },
-        { left: `${target.x}px`, top: `${target.y}px`, width: `${target.w}px`, height: `${target.h}px` },
-      ],
-      { duration: 480, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' },
-    )
+    const anim = el.animate(frames, { duration: ms, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' })
     anim.onfinish = finish
     anim.oncancel = finish
   } catch {

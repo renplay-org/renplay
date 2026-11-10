@@ -296,6 +296,21 @@ describe('the art cache', () => {
     expect(grid(5)).toBe('https://art.example/a.png')
   })
 
+  it('prefers the catalog\'s vertical art over a default of another shape, so a tile is never letterboxed', async () => {
+    const pictures = await catalog([
+      { kind: 'grid', url: 'https://art.example/cover.png', source: 'itch', default: true, data: await png(630, 500, '#aa0000') },
+      { kind: 'grid', url: 'https://art.example/poster.png', source: 'sgdb', by: 'B', data: await png(600, 900, '#00aa00') },
+    ])
+    const art = store()
+    const subject = { game: 'g', adult: false, pictures }
+    expect(art.chosen(subject, 5).grid!.url).toBe('https://art.example/poster.png')
+    expect(art.plans(subject, 5).grid?.mode).toBe('resize')
+    // A person's own choice still wins, and with no vertical art the default is made as before.
+    art.choose('g', 'grid', pictures[0]!.id, 5)
+    expect(art.chosen(subject, 5).grid!.url).toBe('https://art.example/cover.png')
+    expect(art.chosen({ ...subject, pictures: [pictures[0]!] }, 6).grid!.url).toBe('https://art.example/cover.png')
+  })
+
   it('accepts an upload of another size with a warning and places it with the focal point crop', async () => {
     const art = store()
     const { id, warning } = await art.upload('g', 'grid', await png(1000, 1000), [0.2, 0.5], 7)

@@ -22,7 +22,7 @@ export default function AccountMenu() {
       <Menu
         trigger={(toggle) => (
           <button aria-haspopup="true" aria-label={`Your account, ${data.user.name}`} onClick={toggle} className="avatar">
-            <Avatar name={data.user.name} avatar={data.user.avatar} bare />
+            <span aria-hidden="true"><Avatar name={data.user.name} avatar={data.user.avatar} bare /></span>
           </button>
         )}
       >

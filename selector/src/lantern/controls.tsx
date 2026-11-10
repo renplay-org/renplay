@@ -83,6 +83,7 @@ export function Chip({ on, ex, n, children, ...rest }: ButtonHTMLAttributes<HTML
   return (
     <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''}`} {...rest}>
       {children}
+      {n != null && ' '}
       {n != null && <span className="n">{n}</span>}
     </button>
   )
