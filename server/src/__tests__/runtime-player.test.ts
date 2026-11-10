@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
@@ -62,5 +62,34 @@ describe('the runtime both kinds of game share', () => {
     } finally {
       app.close()
     }
+  })
+
+  it('measures the frame rate once, half a minute after the game is ready, for the usage report', () => {
+    const source = readFileSync(new URL('../../../runtime/renplay-player.js', import.meta.url), 'utf-8')
+    /** A page whose browser draws a frame every `every` milliseconds. */
+    const measure = (every: number, visibility: () => string = () => 'visible') => {
+      const p = page()
+      const timers: Array<{ at: number; run: () => void }> = []
+      const frames: Array<(now: number) => void> = []
+      let now = 0
+      Object.assign(p.window, {
+        document: { get visibilityState() { return visibility() } },
+        setTimeout: (run: () => void, ms: number) => timers.push({ at: now + ms, run }),
+        requestAnimationFrame: (run: (t: number) => void) => frames.push(run),
+      })
+      runInNewContext(`(function () { ${source}\n post('ready'); post('ready') })()`, p.window)
+      // Nothing is measured before the half minute is over.
+      for (const t of timers.splice(0).filter((t) => t.at <= 30_000)) t.run()
+      while (frames.length && now < 40_000) {
+        const frame = frames.shift()!
+        now += every
+        frame(now)
+      }
+      return p.sent.filter((m) => m['type'] === 'renplay:perf')
+    }
+    expect(measure(1000 / 60)).toEqual([{ type: 'renplay:perf', fps: 60, game: undefined, userId: undefined }])
+    expect(measure(1000 / 24)).toEqual([{ type: 'renplay:perf', fps: 24, game: undefined, userId: undefined }])
+    // A page nobody sees is not measured.
+    expect(measure(1000 / 60, () => 'hidden')).toEqual([])
   })
 })
