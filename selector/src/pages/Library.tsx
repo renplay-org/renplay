@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Heart, Play, Sparkles } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import Card from '../lantern/Tile'
 import Stage, { travelToDoor } from '../lantern/Stage'
 import { Pill, TagPill, Seg, Bar } from '../lantern/controls'
@@ -12,7 +12,9 @@ import TagFilters from '../components/TagFilters'
 import Shelf from '../components/Shelf'
 import SortMenu from '../components/SortMenu'
 import { Empty, errorText, useToast } from '../lantern/ui'
+import { useAddress, useTypedField } from '../lib/address'
 import { del, post } from '../lib/api'
+import { useGrowingGrid } from '../lib/grow'
 import type { Game } from '@shared/api'
 import { ago, capitalize, pct, playedTime } from '../lib/format'
 import { playLink } from '../lib/links'
@@ -54,9 +56,9 @@ function tileExtra(g: Game) {
   return parts.length ? <>{parts}</> : undefined
 }
 
-function GameTile({ game, kind = 'grid', on, onFocus, onMouseEnter }: { game: Game; kind?: 'grid' | 'wide'; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
+function GameTile({ game, on, onFocus, onMouseEnter }: { game: Game; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
   const installed = game.status === 'installed'
-  return <Card game={game} kind={kind} href={`/game/${game.id}`} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} onFocus={onFocus} onMouseEnter={onMouseEnter} />
+  return <Card game={game} href={`/game/${game.id}`} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} onFocus={onFocus} onMouseEnter={onMouseEnter} />
 }
 
 /** The stage's line about where you are: one line on a wide screen, two short lines on a phone. */
@@ -144,19 +146,13 @@ export default function Library() {
   const { data: catalog } = useCatalog()
   const { data: jobs } = useJobs()
   const vocabulary = catalog?.vocabulary ?? {}
-  const [params, setParams] = useSearchParams()
+  const [params, setAddress] = useAddress()
   const q = params.get('q') ?? ''
   const filter = params.get('filter') ?? 'all'
   const tag = params.get('tag')
   const sort = params.get('sort') ?? 'recent'
-  const update = (key: string, value: string | null) => {
-    const next = new URLSearchParams(window.location.search)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    setParams(next)
-  }
-  const [limit, setLimit] = useState(60)
-  useEffect(() => setLimit(60), [q, filter, tag, sort])
+  const update = (key: string, value: string | null) => setAddress({ [key]: value })
+  const [typed, setTyped] = useTypedField(q, (text) => update('q', text || null))
   const all = games ?? []
   const failed = (jobs?.jobs ?? [])
     .filter((job) => job.type === 'import' && ['failed', 'interrupted'].includes(job.status) && jobs?.jobs.find((other) => other.type === 'import' && other.game === job.game)?.id === job.id && !all.find((game) => game.id === job.game)?.job)
@@ -177,6 +173,7 @@ export default function Library() {
       const time = (g: typeof a) => (sort === 'recent' ? Math.max(Date.parse(g.lastPlayedAt ?? '') || 0, Date.parse(g.createdAt)) : Date.parse(g.lastPlayedAt ?? '') || 0)
       return time(b) - time(a) || a.title.localeCompare(b.title)
     })
+  const rows = useGrowingGrid(`library:${q}|${filter}|${tag}|${sort}`, shown.length)
   // Up next: games in play. Stalled, Dropped and Finished retire a game, Not now hides it until it is played again.
   const upNext = all
     .filter((g) => g.status === 'installed' && !g.job && g.lastPlayedAt && !g.finishedAt && !['stalled', 'dropped', 'finished'].includes(g.playStatus ?? '') && !(g.notNowAt && g.notNowAt > g.lastPlayedAt))
@@ -244,9 +241,9 @@ export default function Library() {
             </>
           )}
           {!!upNext.length && (
-            <Shelf title="Up next" count={upNext.length} wide>
+            <Shelf title="Up next" count={upNext.length}>
               {upNext.map((g) => (
-                <GameTile key={g.id} game={g} kind="wide" on={stageGame?.id === g.id} onFocus={() => setStageId(g.id)} onMouseEnter={() => setStageId(g.id)} />
+                <GameTile key={g.id} game={g} on={stageGame?.id === g.id} onFocus={() => setStageId(g.id)} onMouseEnter={() => setStageId(g.id)} />
               ))}
             </Shelf>
           )}
@@ -320,26 +317,22 @@ export default function Library() {
         <div className="toolbar">
           <Seg scroll value={filter} onChange={(value) => update('filter', value === 'all' ? null : value)} options={[{ value: 'all', label: 'All' }, { value: 'installed', label: 'Installed' }, { value: 'not_installed', label: 'Not installed' }]} />
           <SortMenu value={sort} onChange={(value) => update('sort', value === 'recent' ? null : value)} />
-          <input aria-label="Search your games" placeholder="Search your games" value={q} onChange={(e) => update('q', e.target.value || null)} className="input" />
+          <input aria-label="Search your games" placeholder="Search your games" value={typed} onChange={(e) => setTyped(e.target.value)} className="input" />
         </div>
         <TagFilters tags={tagChips(all, vocabulary)} selected={tag} onSelect={(id) => update('tag', id)} />
         {!shown.length ? (
-          <Empty title="No games match" action={<Pill onClick={() => setParams({})}>Clear filters</Pill>}>
+          <Empty title="No games match" action={<Pill onClick={() => setAddress({ q: null, filter: null, tag: null, sort: null })}>Clear filters</Pill>}>
             Nothing in your library has every included tag without an excluded one.
           </Empty>
         ) : (
-          <div className="grid" data-row>
-            {shown.slice(0, limit).map((g) => (
-              <GameTile key={g.id} game={g} />
-            ))}
-          </div>
-        )}
-        {shown.length > limit && (
-          <div className="center" style={{ marginTop: 20 }}>
-            <Pill onClick={() => setLimit(limit + 48)}>
-              Show more
-            </Pill>
-          </div>
+          <>
+            <div className="grid" data-row ref={rows.grid}>
+              {shown.slice(0, rows.shown).map((g) => (
+                <GameTile key={g.id} game={g} />
+              ))}
+            </div>
+            {rows.more && <div ref={rows.end} aria-hidden="true" />}
+          </>
         )}
       </section>
     </div>

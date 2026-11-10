@@ -5,13 +5,14 @@ import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-rou
 import { api } from '../lib/api'
 import { jobTitle } from '../lib/format'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useAuth } from '../lib/auth'
 import AccountMenu from './AccountMenu'
 import SearchPalette from './SearchPalette'
 import { useGames, useJobs } from '../lib/queries'
 import { RoomProvider } from '../lantern/Room'
 import { useArrowFocus } from '../lantern/focus'
+import { useFlightBack } from '../lantern/flight'
 import type { Health } from '@shared/api'
 import { Pill } from '../lantern/controls'
 
@@ -71,29 +72,39 @@ function Footer() {
 function useScrollMemory() {
   const location = useLocation()
   const type = useNavigationType()
+  const page = useRef(location.pathname)
   useLayoutEffect(() => {
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
   }, [])
   useLayoutEffect(() => {
-    const key = `renplay:scroll:${location.key}`
+    // The first page of a tab always has the key "default": the address keeps one page's place from another's.
+    const key = `renplay:scroll:${location.key}:${location.pathname}${location.search}`
+    // A change of the same page's address (a search, a filter, an open game) keeps the scroll where it is.
+    const same = type !== 'POP' && page.current === location.pathname
+    page.current = location.pathname
     const saved = type === 'POP' ? Number(sessionStorage.getItem(key)) : 0
+    let y = same ? window.scrollY : saved || 0
     // Instant: the page's smooth scrolling is for scrolls a person asks for.
-    window.scrollTo({ top: saved || 0, behavior: 'instant' })
+    if (!same) window.scrollTo({ top: y, behavior: 'instant' })
     // A page that fills in a moment later is scrolled again once it is tall enough.
     const again = saved ? requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' })) : 0
+    const save = () => {
+      try {
+        sessionStorage.setItem(key, String(Math.round(y)))
+      } catch {}
+    }
     let t = 0
     const onScroll = () => {
+      y = window.scrollY
       clearTimeout(t)
-      t = window.setTimeout(() => {
-        try {
-          sessionStorage.setItem(key, String(Math.round(window.scrollY)))
-        } catch {}
-      }, 120)
+      t = window.setTimeout(save, 120)
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       cancelAnimationFrame(again)
       clearTimeout(t)
+      // Leaving within the pause still keeps where the page was.
+      save()
       window.removeEventListener('scroll', onScroll)
     }
   }, [location.key, type])
@@ -101,6 +112,7 @@ function useScrollMemory() {
 
 function Shell() {
   useScrollMemory()
+  useFlightBack()
   const { data } = useAuth()
   const admin = data?.user.role === 'admin'
   useArrowFocus()

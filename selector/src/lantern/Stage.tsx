@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { formatFor, Frame, hashUrl, TitleArt, tintOf, useHidden, type ArtGame } from './art'
+import { cameFromList, useGoBack } from './flight'
 import { flyGhost, startTravel, takeTravel } from './travel'
 
 /** Pressing Resume: the stage's art grows to the whole screen and becomes the door. */
@@ -55,15 +56,7 @@ function StageCover({ game, hidden }: { game: ArtGame & { id: string }; hidden: 
     setSettling(true)
     requestAnimationFrame(() => {
       const target = el.getBoundingClientRect()
-      // Where the cover ends up: the page is still rising in (each of main's children moves on its
-      // own), so that offset comes off.
-      let page: Element | null = el
-      while (page && page.parentElement?.tagName !== 'MAIN') page = page.parentElement
-      const moved = page ? getComputedStyle(page).transform : 'none'
-      const rise = moved && moved !== 'none' ? new DOMMatrixReadOnly(moved) : null
-      const dx = rise?.m41 ?? 0
-      const dy = rise?.m42 ?? 0
-      flyGhost(t, { x: target.x - dx, y: target.y - dy, w: target.width, h: target.height }, () => setSettling(false))
+      flyGhost(t, { x: target.x, y: target.y, w: target.width, h: target.height }, () => setSettling(false))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.id])
@@ -100,14 +93,25 @@ export default function Stage({
   actsRef?: React.RefObject<HTMLDivElement | null>
 }) {
   const hidden = useHidden(game)
+  const goBack = useGoBack()
+  // From a list, the button goes back, so the cover flies to its tile and the list is where it was.
+  const returns = !!back && cameFromList()
   return (
     <section className="stage" data-id={game.id} style={{ ['--tint' as string]: tintOf(game.art) }}>
       <StageArt game={game} kind="hero" hidden={hidden} />
       <StageArt game={game} kind="wide" hidden={hidden} />
       {back && (
-        <Link to={back.to} className="back">
+        <Link
+          to={back.to}
+          className="back"
+          onClick={(e) => {
+            if (!returns) return
+            e.preventDefault()
+            goBack()
+          }}
+        >
           <ArrowLeft />
-          {back.label}
+          {returns ? 'Back' : back.label}
         </Link>
       )}
       <div className="in">
