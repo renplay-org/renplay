@@ -10,6 +10,8 @@
 //     search is in the address, and an open game is a history entry that back closes
 //   - the flight: the flying picture keeps a 2:3 shape on every frame, forward and back, on a desktop and a phone
 //   - the Library's loading state has the loaded page's shape: its grid starts where the loaded grid does
+//   - on a phone, every link, button and field is at least 40 x 40 px, every aria-label starts with the control's visible
+//     text, and the page can be zoomed
 //   - layout shift under 0.02 on the Library, the Catalog and a game page (Chromium only: WebKit does not report it)
 // --webkit adds the flight and the rows in WebKit. Needs the browsers once: npx playwright install chromium webkit
 import { createServer } from 'node:http'
@@ -17,6 +19,7 @@ import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices, webkit } from 'playwright'
+import { GAMES, mock, RECIPES } from './app-mock.mjs'
 
 const args = process.argv.slice(2)
 const withWebkit = args.includes('--webkit')
@@ -35,72 +38,6 @@ async function serveDist() {
   })
   await new Promise((done) => server.listen(0, '127.0.0.1', done))
   return { url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() }
-}
-
-// ---- the made-up API ----------------------------------------------------------------------------
-
-const GAMES = 130
-const RECIPES = 120
-const id = (prefix, n) => `${prefix}-${String(n).padStart(3, '0')}`
-const art = (slug) => ({
-  grid: { url1x: `/api/art/${slug}-grid.svg`, url2x: null, width: 600, height: 900, thumbhash: null, tint: '#6a7ad0', made: null },
-  wide: { url1x: `/api/art/${slug}-wide.svg`, url2x: null, width: 920, height: 430, thumbhash: null, tint: '#6a7ad0', made: null },
-  hero: { url1x: `/api/art/${slug}-hero.svg`, url2x: null, width: 1920, height: 620, thumbhash: null, tint: '#6a7ad0', made: null },
-  icon: { url1x: `/api/art/${slug}-icon.svg`, url2x: null, width: 512, height: 512, thumbhash: null, tint: '#6a7ad0', made: 'crop' },
-})
-const games = Array.from({ length: GAMES }, (_, i) => ({
-  id: id('game', i), title: `Game ${i}`, developer: 'Studio', tags: ['romance'], tagIds: ['romance'], content: [], state: 'completed', summary: 'A short story.',
-  art: art(id('game', i)), nsfw: false, walkthroughs: [], status: 'installed', build: 'b1', playUrl: `/g/${id('game', i)}/b1/`, family: 'renpy', engineLabel: null,
-  version: '1.0', detectedVersion: '1.0', favoriteAt: null, finishedAt: null, playTime: 0, playStatus: null, rating: null, notNowAt: null, phone: null, latestSave: null,
-  free: true, renpyVersion: '8.3.7', engine: '8.5.3', sizeBytes: 1e8, fileCount: 4, screen: [1280, 720], saveDir: `save-${i}`, source: { archive: null, size: null },
-  canReinstall: false, recipe: null, update: null, createdAt: '2026-01-01T00:00:00.000Z', installedAt: '2026-01-01T00:00:00.000Z',
-  lastPlayedAt: i < 4 ? `2026-11-0${9 - i}T10:00:00.000Z` : null, saves: { count: 0, latest: 0 }, mods: { files: 0, hash: '', applied: false }, job: null,
-}))
-const recipes = Array.from({ length: RECIPES }, (_, i) => ({
-  id: id('game', i), title: `Recipe ${i}`, developer: 'Studio', tags: ['romance', i % 2 ? 'fantasy' : 'drama'], tagIds: ['romance', i % 2 ? 'fantasy' : 'drama'], content: [], state: 'completed', summary: 'A short story.',
-  nsfw: false, free: true, art: art(id('recipe', i)), links: {}, saveDir: `r${i}`, match: [], runtime: '8.5.3', releases: [], engine: 'renpy',
-  local: i < 4 ? { id: id('game', i), status: 'installed', version: '1.0', detectedVersion: '1.0' } : null,
-}))
-const vocabulary = { romance: { label: 'Romance', group: 'story' }, fantasy: { label: 'Fantasy', group: 'story' }, drama: { label: 'Drama', group: 'story' } }
-const catalog = { status: { fetchedAt: Date.now(), urls: [], errors: [], count: RECIPES, sources: [] }, vocabulary, games: recipes }
-const me = { user: { id: 1, username: 'owner', name: 'Owner', role: 'admin', disabled: 0, created_at: '2026-01-01T00:00:00.000Z', prefs: '{}', avatar: '', avatar_uploaded: 0, admin_source: 'manual', admin_provider: '', admin_subject: '', adult_ceiling: 'off', adult_choice: 'off', adult_access: 0, hasPin: false }, auth: false, demo: false, unclaimed: false, hasPassword: false }
-
-const answers = (url) => {
-  const path = url.pathname
-  if (path === '/api/games') return { games }
-  const one = path.match(/^\/api\/games\/([^/]+)$/)
-  if (one) return { game: games.find((g) => g.id === one[1]) }
-  if (path === '/api/catalog') return catalog
-  if (path === '/api/me') return me
-  if (path === '/api/me/tags') return { include: [], exclude: [], source: 'default' }
-  if (path === '/api/me/adult') return { installation: { level: 'off', fixed: true, chosen: true }, ceiling: { level: 'off', managed: null }, choice: 'off', effective: 'off' }
-  if (path === '/api/content') return { installation: { level: 'off', fixed: true, chosen: true, variable: 'RENPLAY_ADULT_GAMES' }, starting: { level: 'off', variable: 'RENPLAY_ADULT_DEFAULT' }, groups: { oidc: null, ldap: null } }
-  if (path === '/api/auth/providers') return { enabled: false, setup: false, local: true, oidc: null, ldap: false, demo: false }
-  if (path === '/api/jobs') return { jobs: [], busy: false, total: 0 }
-  if (path === '/api/health') return { ok: true, uptime: 1, version: '0.0.0' }
-  if (path === '/api/defaults') return { tagsExclude: [], lighterBackground: null, textSize: null, rollback: null, skip: null }
-  if (path.startsWith('/api/saves/')) return { saveDir: 'x', slots: [], other: [], conflicts: [], sync: false }
-  if (path === '/api/history') return { totals: { seconds: 0, sessions: 0, games: 0, since: null }, days: [], games: [], next: null }
-  return {}
-}
-
-/** A picture in the shape its name says, in a colour from the game's name. */
-function picture(url) {
-  const [, name, kind] = url.pathname.match(/\/api\/art\/(.+)-(grid|wide|hero|icon)\.svg$/) ?? []
-  const [w, h] = { grid: [600, 900], wide: [920, 430], hero: [1920, 620], icon: [512, 512] }[kind ?? 'grid']
-  const hue = [...(name ?? '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7)
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="hsl(${hue} 55% 45%)"/><circle cx="${w / 2}" cy="${h / 2}" r="${Math.min(w, h) / 3}" fill="hsl(${hue} 60% 70%)"/></svg>`
-}
-
-async function mock(page, errors, label) {
-  page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`))
-  await page.route('**/api/**', (route) => {
-    const request = route.request()
-    const url = new URL(request.url())
-    if (url.pathname.startsWith('/api/art/')) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: picture(url) })
-    if (request.method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(answers(url)) })
-  })
 }
 
 // ---- helpers ------------------------------------------------------------------------------------
@@ -335,6 +272,41 @@ async function skeleton(browser, base, errors, options, label) {
   await ctx.close()
 }
 
+async function touch(browser, base, errors) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, 'touch')
+  for (const [name, path] of [['the Library', '/'], ['the Catalog', '/catalog'], ['a game page', '/game/game-001'], ['Add games', '/add']]) {
+    await page.goto(base + path)
+    await page.waitForSelector('main')
+    await page.waitForTimeout(800)
+    const found = await page.evaluate(() => {
+      const shown = (e) => {
+        const r = e.getBoundingClientRect()
+        const style = getComputedStyle(e)
+        return r.width > 0 && r.height > 0 && style.visibility !== 'hidden' && style.display !== 'none' && !e.classList.contains('sr-only')
+      }
+      const small = []
+      const labels = []
+      const squash = (text) => text.toLowerCase().replace(/\s+/g, '')
+      for (const e of document.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, [role=switch]')) {
+        if (!shown(e)) continue
+        const r = e.getBoundingClientRect()
+        const text = e.tagName === 'SELECT' ? '' : (e.textContent ?? '').trim()
+        if (r.width < 40 || r.height < 40) small.push(`${text || e.getAttribute('aria-label') || e.tagName} ${Math.round(r.width)}x${Math.round(r.height)}`)
+        const label = e.getAttribute('aria-label')
+        if (label && text && !squash(label).startsWith(squash(text))) labels.push(`"${label}" for "${text}"`)
+      }
+      return { small, labels }
+    })
+    check(!found.small.length, `phone: every control on ${name} is at least 40 x 40 px${found.small.length ? `: ${found.small.slice(0, 4).join(', ')}` : ''}`)
+    check(!found.labels.length, `phone: every aria-label on ${name} starts with its visible text${found.labels.length ? `: ${found.labels.slice(0, 3).join(', ')}` : ''}`)
+  }
+  const viewport = await page.evaluate(() => document.querySelector('meta[name=viewport]').content)
+  check(!/maximum-scale|user-scalable/.test(viewport), 'the page can be pinch-zoomed (the viewport has no maximum-scale)')
+  await ctx.close()
+}
+
 // ---- run ----------------------------------------------------------------------------------------
 
 const errors = []
@@ -344,13 +316,19 @@ const desktop = { viewport: { width: 1440, height: 900 } }
 const phoneChromium = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }
 
 const chrome = await chromium.launch()
-await rowsAt(chrome, served.url, errors)
-await memory(chrome, served.url, errors, desktop, 'desktop')
-await flight(chrome, served.url, errors, desktop, 'desktop')
-await flight(chrome, served.url, errors, phoneChromium, 'phone')
-await skeleton(chrome, served.url, errors, desktop, 'desktop')
-await skeleton(chrome, served.url, errors, phoneChromium, 'phone')
-await shift(chrome, served.url, errors)
+// The rows take the longest and need no timing, so they run beside the rest, which does.
+await Promise.all([
+  rowsAt(chrome, served.url, errors),
+  (async () => {
+    await memory(chrome, served.url, errors, desktop, 'desktop')
+    await flight(chrome, served.url, errors, desktop, 'desktop')
+    await flight(chrome, served.url, errors, phoneChromium, 'phone')
+    await touch(chrome, served.url, errors)
+    await skeleton(chrome, served.url, errors, desktop, 'desktop')
+    await skeleton(chrome, served.url, errors, phoneChromium, 'phone')
+    await shift(chrome, served.url, errors)
+  })(),
+])
 await chrome.close()
 
 if (withWebkit) {

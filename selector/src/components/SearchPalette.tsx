@@ -27,10 +27,10 @@ export default function SearchPalette() {
   }, [])
   return (
     <>
-      <button aria-label="Search" onClick={() => setOpen(true)} className="search">
+      <button aria-keyshortcuts={isApple() ? 'Meta+K' : 'Control+K'} onClick={() => setOpen(true)} className="search">
         <Search />
         <span className="lbl">Search</span>
-        <kbd>{isApple() ? '⌘K' : 'Ctrl K'}</kbd>
+        <kbd aria-hidden="true">{isApple() ? '⌘K' : 'Ctrl K'}</kbd>
       </button>
       <IconBtn label="Search" onClick={() => setOpen(true)} className="hide-desk">
         <Search />

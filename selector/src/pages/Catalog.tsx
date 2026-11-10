@@ -20,7 +20,7 @@ import { matchesSearch, stateLabel } from '../lib/tags'
 
 const REQUEST_URL = 'https://renplay.org/catalog/request'
 
-/** One catalog entry: the grid tile with In your library and Free pills, opening the recipe sheet. */
+/** One catalog entry: the grid tile with an In your library pill, opening the recipe sheet. */
 function RecipeTile({ recipe: r, href, onOpen }: { recipe: CatalogGame; href: string; onOpen: () => void }) {
   const extra = r.local ? (
     <span className="corner">
@@ -28,10 +28,6 @@ function RecipeTile({ recipe: r, href, onOpen }: { recipe: CatalogGame; href: st
         <Check />
         <span className="lbl">In your library</span>
       </TagPill>
-    </span>
-  ) : r.free === true ? (
-    <span className="corner">
-      <TagPill tone="dark">Free</TagPill>
     </span>
   ) : undefined
   return (

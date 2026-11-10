@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { formatFor, Frame, hashUrl, TitleArt, tintOf, useHidden, type ArtGame } from './art'
+import { artCarriesTitle, formatFor, Frame, hashUrl, TitleArt, tintOf, useHidden, type ArtGame } from './art'
 import { cameFromList, useGoBack } from './flight'
 import { flyGhost, startTravel, takeTravel } from './travel'
 
@@ -121,7 +121,8 @@ export default function Stage({
         <div className="tb">
           <div className="in-t" key={game.id}>
             {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-            <TitleArt game={game} hidden={hidden} />
+            {/* The poster or the banner already shows the title: the logo would draw it a third time, so only a screen reader gets it. */}
+            {!hidden && artCarriesTitle(game.art) ? <h1 className="sr-only">{game.title}</h1> : <TitleArt game={game} hidden={hidden} />}
             {meta && <div className="meta">{meta}</div>}
           </div>
         </div>
