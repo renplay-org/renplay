@@ -8,3 +8,4 @@
 *.log
 *.tsbuildinfo
 __pycache__/
+/ui-test-results/

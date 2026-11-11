@@ -6,31 +6,18 @@
 //   --webkit                       the phone checks in WebKit as well (needs `npx playwright install webkit`)
 //   --only a,b                     just the checks with these names (the name is the one in the file's list of tasks)
 //   --jobs 6                       how many checks run at once (4 by default)
+//   --trace /tmp/app-traces         traces and scroll calls, including when a task stops
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { createServer } from 'node:http'
-import { readFile } from 'node:fs/promises'
-import { extname, join, normalize, resolve } from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices, webkit } from 'playwright'
 
-const dist = fileURLToPath(new URL('../../../selector/dist', import.meta.url))
+import { serveDist } from './serve.mjs'
 
 export const desktop = { viewport: { width: 1440, height: 900 } }
 export const phoneChromium = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }
-
-// ---- what the app is served ---------------------------------------------------------------------
-
-async function serveDist() {
-  const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.png': 'image/png' }
-  const server = createServer(async (req, res) => {
-    const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '')
-    const file = await readFile(join(dist, path)).then((b) => ({ b, type: types[extname(path)] ?? 'application/octet-stream' })).catch(() => null)
-    const sent = file ?? { b: await readFile(join(dist, 'index.html')), type: 'text/html' }
-    res.writeHead(200, { 'content-type': sent.type }).end(sent.b)
-  })
-  await new Promise((done) => server.listen(0, '127.0.0.1', done))
-  return { url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() }
-}
 
 // ---- reporting ----------------------------------------------------------------------------------
 
@@ -165,10 +152,6 @@ export const parked = async (page) => {
   await quiet(page, 350)
 }
 export const titlesOf = (page) => page.evaluate(() => [...document.querySelectorAll('.grid[data-row] .card .ct')].map((e) => e.textContent))
-export const pressShortcut = async (page, key) => {
-  const apple = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))
-  await page.keyboard.press(`${apple ? 'Meta' : 'Control'}+${key}`)
-}
 
 // ---- running ------------------------------------------------------------------------------------
 
@@ -187,6 +170,44 @@ export async function main(modules) {
   const served = option('--base') ? { url: option('--base'), close() {} } : await serveDist()
   const chrome = await chromium.launch()
   const safari = args.includes('--webkit') ? await webkit.launch() : null
+  const traceDir = option('--trace')
+  if (traceDir) {
+    await mkdir(traceDir, { recursive: true })
+    let serial = 0
+    for (const browser of [chrome, safari].filter(Boolean)) {
+      const create = browser.newContext.bind(browser)
+      browser.newContext = async (...args) => {
+        const ctx = await create(...args)
+        const name = `context-${++serial}`
+        await ctx.tracing.start({ snapshots: true, sources: true, screenshots: true })
+        const close = ctx.close.bind(ctx)
+        let closed = false
+        ctx.close = async () => {
+          if (closed) return
+          closed = true
+          for (const [i, page] of ctx.pages().entries()) {
+            const scrolls = await page.evaluate(() => window.__scrolls ?? []).catch(() => [])
+            await writeFile(join(traceDir, `${name}-${i}-scrolls.json`), JSON.stringify(scrolls))
+          }
+          await ctx.tracing.stop({ path: join(traceDir, `${name}.zip`) })
+          await close()
+        }
+        running.getStore()?.contexts.push(ctx)
+        await ctx.addInitScript(() => {
+          window.__scrolls = []
+          for (const key of ['scrollTo', 'scrollBy']) {
+            const original = window[key].bind(window)
+            window[key] = (...args) => {
+              const before = scrollY
+              original(...args)
+              window.__scrolls.push({ key, args, before, after: scrollY, at: performance.now(), stack: new Error().stack })
+            }
+          }
+        })
+        return ctx
+      }
+    }
+  }
   const env = { chrome, safari, base: served.url, errors, desktop, phone: phoneChromium, iphone: devices['iPhone 15 Pro'] }
   const all = modules.flatMap((m) => m.tasks(env)).filter(Boolean)
   const only = option('--only')?.split(',')
@@ -198,12 +219,13 @@ export async function main(modules) {
   const work = async () => {
     for (let task = queue.shift(); task; task = queue.shift()) {
       const name = `${task.name}${task.label ? ` (${task.label})` : ''}`
-      const store = { lines: [] }
+      const store = { lines: [], contexts: [] }
       const at = Date.now()
       await running.run(store, () => task.run()).catch((e) => {
         failures.push(`${name} stopped: ${e.message}`)
         store.lines.push(`FAIL ${name} stopped: ${e.stack ?? e.message}`)
       })
+      for (const ctx of store.contexts) await ctx.close()
       const seconds = (Date.now() - at) / 1000
       durations.push([name, seconds])
       console.log(`--- ${name}, ${seconds.toFixed(1)} s\n${store.lines.join('\n')}`)

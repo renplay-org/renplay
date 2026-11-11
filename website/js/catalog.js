@@ -60,7 +60,13 @@ function more() {
   $games.insertAdjacentHTML('beforeend', shown.slice(have, n).map((g, i) => draw(g, have + i)).join(''))
   watch()
 }
-const end = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) more() }, { rootMargin: '1400px 0px' })
+/** Fill past the next screen before it is painted, even if a slow frame skipped several batches. */
+function fillAhead() {
+  while (shownCount() < view().length && $('end').getBoundingClientRect().top < innerHeight + 1400) more()
+}
+// IntersectionObserver may deliver after a frame has already shown the footer. Scroll runs before paint.
+addEventListener('scroll', fillAhead, { passive: true })
+const end = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) fillAhead() }, { rootMargin: '1400px 0px' })
 /** Look again at the end of the list: the observer only speaks when it changes, and a batch can leave it in view. */
 function watch() { end.unobserve($('end')); end.observe($('end')) }
 
