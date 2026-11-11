@@ -100,13 +100,39 @@ export function useSearchScroll(searching: boolean, layout: unknown): void {
 
 /**
  * The search and the controls beside it, stuck under the header while the results scroll beneath. It is a
- * search landmark; the results below it are not part of it. The anchor in front marks where it rests.
+ * search landmark; the results below it are not part of it. The anchor in front marks where it rests. While it
+ * is stuck a backdrop of the page's colour (the veil) covers the screen from the top down to its bottom, so
+ * nothing of the page reads through the header or between the controls.
  */
 export function Toolbar({ label, wrap, style, children }: { label: string; wrap?: boolean; style?: CSSProperties; children: ReactNode }) {
+  const bar = useRef<HTMLDivElement>(null)
+  const veil = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const toolbar = bar.current
+    const cover = veil.current
+    if (!toolbar || !cover) return
+    const settle = () => {
+      const top = toolbar.getBoundingClientRect().top
+      const at = stickAt(toolbar)
+      cover.style.setProperty('--veil-h', `${at + toolbar.offsetHeight}px`)
+      // Stuck is exactly at its place under the header: a toolbar above it was carried off by the end of its section.
+      cover.toggleAttribute('data-stuck', Math.abs(top - at) <= 0.5)
+    }
+    settle()
+    const watcher = new ResizeObserver(settle)
+    watcher.observe(toolbar)
+    watcher.observe(document.body)
+    window.addEventListener('scroll', settle, { passive: true })
+    return () => {
+      watcher.disconnect()
+      window.removeEventListener('scroll', settle)
+    }
+  }, [])
   return (
     <>
       <div className="toolbar-top" aria-hidden="true" />
-      <div role="search" aria-label={label} className={`toolbar ${wrap ? 'wrap' : ''}`.trim()} style={style}>
+      <div className="toolbar-veil" aria-hidden="true" ref={veil} />
+      <div role="search" aria-label={label} className={`toolbar ${wrap ? 'wrap' : ''}`.trim()} style={style} ref={bar}>
         {children}
       </div>
     </>

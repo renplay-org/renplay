@@ -100,6 +100,26 @@
 .toolbar-top {
   height: 0;
 }
+/* While the toolbar is stuck under the header, a backdrop of the page's colour covers the top of the screen down to the
+   bottom of the toolbar and then fades out over 8 px, so the page reads through neither the header nor the gaps between
+   the controls, and tiles fade out as they pass under it. It is fixed to the screen, which is where a stuck toolbar is.
+   --veil-h (the toolbar's bottom on the screen) and the stuck state are set by the Toolbar. */
+.toolbar-veil {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--veil-h, 0px) + 8px);
+  z-index: 19;
+  pointer-events: none;
+  background: linear-gradient(180deg, var(--ink) calc(100% - 8px), transparent);
+  opacity: 0;
+  transition: opacity var(--t-focus) var(--out);
+}
+.toolbar-veil[data-stuck] {
+  opacity: 1;
+}
+
 /* The count: one line of one height, so what is under it never moves when the words change. */
 .count-line {
   display: flex;
