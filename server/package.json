@@ -23,13 +23,14 @@
     "yazl": "^3.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/express": "^5.0.3",
     "@types/multer": "^1.4.12",
     "@types/node": "^24.19.2",
     "@types/supertest": "^7.2.1",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
-    "playwright": "^1.64.1",
+    "playwright": "1.64.1",
     "supertest": "^7.3.1",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"

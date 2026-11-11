@@ -324,8 +324,11 @@ async function carouselLoop(browser, base, errors, options, label, { swipe = fal
     const next = page.locator('.car-arrow.next')
     const prev = page.locator('.car-arrow.prev')
     check(await next.isVisible() && await prev.isVisible() && await next.isEnabled() && await prev.isEnabled(), `${label}: both arrows show at every slide`)
-    await wrap('the next arrow at the last slide', last, 0, 1, () => next.click())
-    await wrap('the previous arrow at the first slide', 0, last, -1, () => prev.click())
+    // Native scrollend arrow wraps are in specs/carousel.spec.mjs. Keep the fallback here.
+    if (noScrollEnd) {
+      await wrap('the next arrow at the last slide', last, 0, 1, () => next.click())
+      await wrap('the previous arrow at the first slide', 0, last, -1, () => prev.click())
+    }
     await page.mouse.move(700, 880)
     await wrap('the Right key at the last slide', last, 0, 1, async () => {
       await page.locator('.carousel').focus()

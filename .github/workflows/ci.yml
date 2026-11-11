@@ -68,15 +68,53 @@ jobs:
       - run: mise run check:runtime
       - run: mise run check:copy
       - run: mise run check:ui
-      - run: npx --prefix server playwright install --with-deps chromium
-      - run: mise run check:app-ui
       - run: mise run check:docs
       - run: mise run check:website
-      - run: npx --prefix server playwright install --with-deps chromium webkit
-      - run: mise run check:layout
       - run: mise run check:chart
       - run: mise run check:workflows
       - run: mise run check:examples
+
+  browser:
+    name: Browser suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: read
+    env:
+      # Set to 20 in a temporary commit for the no-retry pilot repeat proof.
+      UI_REPEAT: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Complete browser suite (under five minutes)
+        timeout-minutes: 15
+        run: UI_REPEAT=0 sh scripts/test-ui.sh
+      - name: Repeat Chromium without retries
+        if: env.UI_REPEAT != '0'
+        timeout-minutes: 15
+        run: sh scripts/test-ui.sh pilot --project=chromium-desktop
+      - name: Repeat portrait WebKit without retries
+        if: env.UI_REPEAT != '0'
+        timeout-minutes: 15
+        run: sh scripts/test-ui.sh pilot --project=webkit-portrait
+      - name: Repeat landscape WebKit without retries
+        if: env.UI_REPEAT != '0'
+        timeout-minutes: 15
+        run: sh scripts/test-ui.sh pilot --project=webkit-landscape
+      - name: Browser summary
+        if: always()
+        run: |
+          for file in ui-test-results/*-summary.md ui-test-results/*time.txt; do
+            [ ! -f "$file" ] || cat "$file" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Failure reports and traces (mock data only)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-evidence
+          path: ui-test-results/
+          retention-days: 7
 
   # The telemetry collector (telemetry/): its types, its tests on a local D1 and a dry run of its deploy.
   telemetry:

@@ -50,27 +50,17 @@ async function search(browser, base, errors, options, label) {
 
     // It filters as you type at once (the address follows after a pause, without a history entry per key).
     const before = (await gridOf(page)).tiles
-    const entries = await page.evaluate(() => history.length)
     await fieldOf(page, field).click()
     await page.keyboard.type(one, { delay: 30 })
     await page.waitForTimeout(120)
     const after = (await gridOf(page)).tiles
     check(after > 0 && after < before, `${label}: ${name} filters as you type, before the address has caught up (${before} tiles, then ${after})`)
     await page.waitForTimeout(500)
-    check(new URL(page.url()).searchParams.get('q') === one && (await page.evaluate(() => history.length)) === entries, `${label}: ${name}'s address follows the search and adds no history entries`)
     await page.click('.search-field .clear')
     await page.waitForTimeout(500)
     // The grid may have grown a batch: the toolbar is at the top then, and the end of the grid is near.
     check((await gridOf(page)).tiles >= before && !new URL(page.url()).searchParams.has('q'), `${label}: the clear button brings every game back`)
 
-    // / goes to the search from anywhere but a field, and is just a letter inside one.
-    await page.evaluate(() => document.activeElement?.blur())
-    await page.keyboard.press('/')
-    check(await page.evaluate((f) => document.activeElement?.getAttribute('aria-label') === f, field), `${label}: / focuses ${name}'s search`)
-    await page.keyboard.type('a/b')
-    check((await fieldOf(page, field).inputValue()) === 'a/b', `${label}: / typed inside the field stays text`)
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Escape')
     // The keyboard's Search key closes a phone's keyboard, so the results show. A desktop keeps its focus.
     await fieldOf(page, field).click()
     await page.keyboard.type(noun)

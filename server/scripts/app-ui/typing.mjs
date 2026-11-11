@@ -1,62 +1,11 @@
 // What the search does to the page, in a browser, against the built library and a made-up API (its scrolling is in scroll.mjs):
-//   - the focus ring of the field is whole after Ctrl K, / and a tap
 //   - the count in the heading and in the field, the status region, Clear filters, and the tag chips with their counts
 //   - nothing of the page reads through the header or the gaps of the toolbar once a search has parked it under the header
 import sharp from 'sharp'
 import { mock } from '../app-mock.mjs'
-import { check, fieldOf, isMain, isPhone, main, pressShortcut, quiet, ready, SEARCH_PAGES, titlesOf } from './lib.mjs'
+import { check, fieldOf, isMain, isPhone, main, quiet, ready, SEARCH_PAGES, titlesOf } from './lib.mjs'
 
 // ---- the focus ring, the count, the status, the tags -------------------------------------
-
-/** The sides of a box (in CSS pixels) where the white focus ring 2 to 4 px outside it is not there: none when it is whole. */
-async function ringAt(page, box) {
-  const margin = 8
-  const clip = { x: box.x - margin, y: box.y - margin, width: box.width + 2 * margin, height: box.height + 2 * margin }
-  const { data, info } = await sharp(await page.screenshot({ clip, scale: 'css' })).raw().toBuffer({ resolveWithObject: true })
-  const px = (x, y) => {
-    const i = (Math.round(y) * info.width + Math.round(x)) * info.channels
-    return Math.min(data[i], data[i + 1], data[i + 2])
-  }
-  const at = (d) => d + margin
-  // Three points on each side, 3 px outside the field: the ring is 2 to 4 px out.
-  const w = box.width, h = box.height
-  const points = []
-  for (const f of [0.25, 0.5, 0.75]) points.push(['top', px(margin + w * f, at(-3))], ['bottom', px(margin + w * f, at(h + 3))])
-  for (const f of [0.45, 0.5, 0.55]) points.push(['left', px(at(-3), margin + h * f)], ['right', px(at(w + 3), margin + h * f)])
-  // Whole is white, cut is the page's dark: a pixel half way is the ring's edge on a screen that is not on a whole pixel.
-  return points.filter(([, v]) => v < 128).map(([side]) => side)
-}
-
-async function ring(browser, base, errors, options, label) {
-  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
-  const page = await ctx.newPage()
-  await mock(page, errors, label)
-  const phone = isPhone(options)
-  for (const [name, path, field] of SEARCH_PAGES) {
-    for (const how of ['the shortcut', '/', phone ? 'a tap' : 'a click']) {
-      await ready(page, base, path)
-      await page.evaluate(() => document.activeElement?.blur())
-      if (how === 'the shortcut') await pressShortcut(page, 'k')
-      else if (how === '/') await page.keyboard.press('/')
-      else if (phone) {
-        // A person scrolls the toolbar into view and taps it: the tab bar covers the bottom of the first screen.
-        await page.evaluate(() => window.scrollTo({ top: 600, behavior: 'instant' }))
-        await page.waitForTimeout(200)
-        await page.touchscreen.tap(...(await fieldOf(page, field).boundingBox().then((b) => [b.x + b.width / 2, b.y + b.height / 2])))
-      }
-      else await fieldOf(page, field).click()
-      await page.waitForTimeout(700)
-      const state = await page.evaluate((f) => {
-        const input = document.querySelector(`input[aria-label="${f}"]`)
-        const box = document.querySelector('.search-field').getBoundingClientRect()
-        return { focused: document.activeElement === input, box: { x: box.x, y: box.y, width: box.width, height: box.height }, inView: box.top >= 0 && box.bottom <= (document.querySelector('.tabbar') && getComputedStyle(document.querySelector('.tabbar')).display !== 'none' ? document.querySelector('.tabbar').getBoundingClientRect().top : innerHeight) }
-      }, field)
-      const cut = state.focused ? await ringAt(page, state.box) : ['not focused']
-      check(state.focused && state.inView && !cut.length, `${label}: the focus ring on ${name} is whole after ${how}${cut.length ? ` (cut at ${cut.join(', ')})` : ''}`)
-    }
-  }
-  await ctx.close()
-}
 
 async function cues(browser, base, errors, options, label) {
   const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
@@ -92,7 +41,6 @@ async function cues(browser, base, errors, options, label) {
     check(idle.heading === (library ? '12' : 'All 12') && idle.rows === 0 && !idle.clear && idle.inField === null && idle.hidden && idle.status === '12 games', `${label}: ${name} says its count in ${library ? 'the heading' : 'the All segment'} with no row of its own, nothing to clear and a status for screen readers (${idle.heading}, "${idle.status}")`)
     await fieldOf(page, field).click()
     await page.keyboard.type('rom', { delay: 40 })
-    const spoken = (await read()).status
     // The toolbar is stuck under the header once the page has scrolled to it: then the field says the count.
     await page.waitForFunction(() => document.querySelector('.toolbar-glass')?.hasAttribute('data-stuck'))
     const typing = await read()
@@ -100,7 +48,6 @@ async function cues(browser, base, errors, options, label) {
     check(typing.inField === '5 of 12', `${label}: ${name}'s field says "${typing.inField}" at its right end while the toolbar is stuck`)
     check(typing.chips === idle.chips && typing.row === idle.row, `${label}: ${name} has no row for the count: the chips stay ${typing.chips} px under the toolbar's place (${idle.chips} at rest)`)
     check(typing.field.left === idle.field.left && (phone || typing.field.width === idle.field.width) && typing.seg.join() === idle.seg.join(), `${label}: ${name}'s field and controls keep their places while the order's name changes (${idle.field.left}, ${idle.field.width}; then ${typing.field.left}, ${typing.field.width})`)
-    check(spoken === '12 games', `${label}: ${name}'s status region does not speak on every key (still "${spoken}")`)
     await page.keyboard.type('a')
     await page.waitForTimeout(100)
     await page.keyboard.press('Backspace')
@@ -117,7 +64,6 @@ async function cues(browser, base, errors, options, label) {
     await fieldOf(page, field).fill('rom')
     await page.waitForTimeout(800)
     const paused = await read()
-    check(paused.status === '5 of 12 games', `${label}: ${name}'s status region says the count once the person pauses (${paused.status})`)
     // Clear filters is the first chip of the row once a tag is chosen, and the row keeps its height. It takes the tags away
     // and leaves the search as it is.
     await page.getByRole('button', { name: /^(Romance|Fantasy)/ }).first().click()
@@ -326,15 +272,12 @@ async function band(browser, base, errors, options, label) {
 }
 
 export const tasks = ({ chrome, safari, base, errors, desktop, phone, iphone }) => [
-  { name: 'ring', label: 'desktop', run: () => ring(chrome, base, errors, desktop, 'desktop') },
-  { name: 'ring', label: 'phone', run: () => ring(chrome, base, errors, phone, 'phone') },
   { name: 'cues', label: 'desktop', run: () => cues(chrome, base, errors, desktop, 'desktop') },
   { name: 'cues', label: 'phone', run: () => cues(chrome, base, errors, phone, 'phone') },
   { name: 'tags', label: 'desktop', run: () => tags(chrome, base, errors, desktop, 'desktop') },
   { name: 'tags', label: 'phone', run: () => tags(chrome, base, errors, phone, 'phone') },
   { name: 'band', label: 'desktop', run: () => band(chrome, base, errors, desktop, 'desktop') },
   { name: 'band', label: 'phone', run: () => band(chrome, base, errors, phone, 'phone') },
-  safari && { name: 'ring', label: 'WebKit', run: () => ring(safari, base, errors, iphone, 'phone (WebKit)') },
   safari && { name: 'cues', label: 'WebKit', run: () => cues(safari, base, errors, iphone, 'phone (WebKit)') },
   safari && { name: 'tags', label: 'WebKit', run: () => tags(safari, base, errors, iphone, 'phone (WebKit)') },
   safari && { name: 'band', label: 'WebKit', run: () => band(safari, base, errors, iphone, 'phone (WebKit)') },

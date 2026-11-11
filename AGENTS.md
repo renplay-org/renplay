@@ -100,7 +100,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
                      progressive.ts (what streams), pack.ts (asset packs), assemble.ts (game.zip),
                      import.ts (the whole install), applymods.ts (mod builds), detect.ts
   scripts/           screenshots.mjs (Playwright, phone and desktop)
-selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. No tests; type-checked.
+selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. Browser tests in server/scripts/app-ui/.
   src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
   src/lantern/       The design system, the only UI kit: Tile, Stage, the room, Sheet, controls (Pill,
                      IconBtn, Bar, Seg, switches), ui.tsx (Spinner, Empty, Confirm, Menu, toasts),
@@ -240,6 +240,7 @@ mise run check                      # everything CI checks, or one part: check:s
                                     # check:docs, check:website, check:layout (layout shift of the website and docs),
                                     # check:chart, check:copy, check:workflows, check:examples
 mise run test                       # server tests only
+mise run test:ui                    # all browser checks in the pinned Linux container (Docker)
 mise run image && mise run contract # the image as renplay:dev, its install contract, deploy/compose.yaml
 mise run screenshots http://localhost:5199 /tmp/shots --sfw   # phone and desktop, read-only
 mise run release 4.4.0              # a release branch's versions and changelog (release skill)
@@ -255,8 +256,16 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
 2. The UI type-checks and builds.
 3. UI changes are looked at on a phone size (WebKit, iPhone) and a desktop size, using
    `npm run screenshots` or Playwright directly. No page errors.
-4. User-visible changes have a line in `CHANGELOG.md` under `Unreleased`, written for users.
-5. README or the docs (`docs/site`) updated when setup, configuration or behavior described there changed. A new
+4. Browser acceptance is `mise run test:ui`, the pinned official Playwright Linux image with Node 24.
+   Native Mac browsers are for quick tries only. The pilot uses one worker, desktop Chromium, and touch
+   WebKit in portrait and landscape. To repeat without retries: `UI_REPEAT=20 sh scripts/test-ui.sh pilot
+   --project=webkit-portrait` (repeat for `chromium-desktop` and `webkit-landscape`). Results and failure
+   traces are in `ui-test-results/`. A retry-only pass warns locally and fails CI. No PR screenshots.
+   Never loosen a test without stopping to report it and getting Jan's OK: no removed assertions,
+   wider tolerances, added or longer fixed waits, skips, quarantine or changes only to make it pass.
+   Moving an assertion needs equivalent or stronger coverage in the new runner, not less coverage.
+5. User-visible changes have a line in `CHANGELOG.md` under `Unreleased`, written for users.
+6. README or the docs (`docs/site`) updated when setup, configuration or behavior described there changed. A new
    environment variable goes in `server/src/envvars.ts`, then `npm run gen` in `docs/site`.
 
 ## Workflow

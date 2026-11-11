@@ -298,7 +298,7 @@ export default function SearchField({ value, onChange, label, count }: { value: 
   useEffect(() => {
     const timer = window.setTimeout(() => setHeard(text), 600)
     return () => window.clearTimeout(timer)
-  }, [text])
+  }, [text, value])
   useEffect(() => {
     field = input.current
     if (wanted) {

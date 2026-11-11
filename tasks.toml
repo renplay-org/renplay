@@ -35,6 +35,10 @@ description = "The server's tests"
 dir = "server"
 run = "npx vitest run"
 
+["test:ui"]
+description = "The complete browser suite in the pinned Linux container (Docker required)"
+run = "sh scripts/test-ui.sh"
+
 [screenshots]
 description = "Phone and desktop screenshots of a running Renplay: mise run screenshots <url> <dir> [--sfw]"
 dir = "server"
@@ -44,7 +48,7 @@ run = "npm run screenshots --"
 
 [check]
 description = "Everything CI checks, except the image"
-depends = ["check:server", "check:structure", "check:runtime", "check:copy", "check:ui", "check:app-ui", "check:docs", "check:website", "check:layout", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
+depends = ["check:server", "check:structure", "check:runtime", "check:copy", "check:ui", "test:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
 
 ["check:server"]
 description = "Server type check, the tests' type check, and the tests"
@@ -79,7 +83,7 @@ run = ["npx tsc -b --noEmit", "npm run build", "node ../scripts/check-dist.mjs"]
 
 ["check:app-ui"]
 description = "The library in a browser, files in server/scripts/app-ui (run a few at a time, each also on its own): whole rows, scroll memory, the artwork's flight, layout shift, the Up next carousel, the search and its scrolling, the flight to a game's page"
-run = ["cd selector && npm run build", "cd server && npx playwright install chromium && node scripts/check-app-ui.mjs"]
+run = "sh scripts/test-ui.sh legacy"
 
 ["check:docs"]
 description = "Docs build, with the configuration page and every link checked"
@@ -92,8 +96,7 @@ run = ["sh website/build.sh", "node scripts/check-website.mjs"]
 
 ["check:layout"]
 description = "No page of the website or the docs shifts by more than 0.02 while it loads and scrolls (Cumulative Layout Shift, at 390 px in WebKit and 1440 px in Chromium)"
-depends = ["check:website", "check:docs"]
-run = ["npx --prefix server playwright install chromium webkit", "node scripts/check-layout-shift.mjs"]
+run = "sh scripts/test-ui.sh layout"
 
 ["check:chart"]
 description = "Chart lint and tests, and its values reference up to date"
