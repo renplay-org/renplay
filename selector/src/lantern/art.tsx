@@ -7,14 +7,19 @@ import { useAdultView } from '../lib/adult'
 /** A game (or recipe) as the art system needs it. */
 export type ArtGame = { title: string; art?: ArtSet; nsfw?: boolean }
 
-/** A ThumbHash as an image address: the picture's colours and shapes in a few bytes. */
+const placeholders = new Map<string, string | null>()
+
+/** A ThumbHash as an image address: the picture's colours and shapes in a few bytes. Made once per hash. */
 export function hashUrl(hash: string | null | undefined): string | null {
   if (!hash) return null
+  const known = placeholders.get(hash)
+  if (known !== undefined) return known
+  let url: string | null = null
   try {
-    return thumbHashToDataURL(Uint8Array.from(atob(hash), (c) => c.charCodeAt(0)))
-  } catch {
-    return null
-  }
+    url = thumbHashToDataURL(Uint8Array.from(atob(hash), (c) => c.charCodeAt(0)))
+  } catch {}
+  placeholders.set(hash, url)
+  return url
 }
 
 export function hue(s: string): number {
@@ -38,28 +43,39 @@ export function formatFor(art: ArtSet | undefined, kind: ArtKind): ArtFormat | n
   return art.logo ?? null
 }
 
+/** The pictures this page has loaded. A tile that comes back (a search brings it in again) shows its picture at once. */
+const loadedPictures = new Set<string>()
+
 /**
- * One format in its frame: the ThumbHash shows at once, the picture fades in
- * over 320 ms. Below Shown an adult game's format carries no address, so no
- * picture is ever requested.
+ * One format in its frame: the ThumbHash shows at once, and a picture that is not in yet fades in over 320 ms.
+ * A picture that was loaded before shows with no fade at all. Below Shown an adult game's format carries no
+ * address, so no picture is ever requested.
  */
 export function ArtPicture({ format, hidden, className = 'art' }: { format: ArtFormat; hidden?: boolean; className?: string }) {
   const [loaded, setLoaded] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const hash = hashUrl(format.thumbhash)
   const src = !hidden && format.url1x && format.url1x !== failed ? format.url1x : null
+  const done = (url: string) => {
+    loadedPictures.add(url)
+    setLoaded(url)
+  }
   return (
     <>
       {hash && <img className="ph" src={hash} alt="" aria-hidden="true" />}
       {src && (
         <img
-          className={`${className} ${loaded === src ? '' : 'loading'}`}
+          className={`${className} ${loaded === src || loadedPictures.has(src) ? '' : 'loading'}`}
           src={src}
           srcSet={format.url2x && format.url2x !== src ? `${src} 1x, ${format.url2x} 2x` : undefined}
           alt=""
           loading="lazy"
           decoding="async"
-          onLoad={() => setLoaded(src)}
+          // The browser may have the picture already when the element is made: its load event comes a moment later.
+          ref={(img) => {
+            if (img?.complete && img.naturalWidth > 0 && loaded !== src) done(src)
+          }}
+          onLoad={() => done(src)}
           onError={() => setFailed(src)}
         />
       )}

@@ -385,8 +385,9 @@ describe('the levels on every route', () => {
       expect(response.status, `${method} ${path}`).not.toBe(404)
     }
     // Destructive verbs on the second adult game, once the retried install has finished
-    // (a download cannot be deleted while a job runs, whatever the level).
-    await expect.poll(() => app.jobs.isBusy()).toBe(false)
+    // (a download cannot be deleted while a job runs, whatever the level). A job resumed above waits in the queue
+    // until the one before it ends, so the queue must be empty as well as idle.
+    await expect.poll(() => !app.jobs.isBusy() && !app.db.waitingJobs().some((j) => j.status === 'queued')).toBe(true)
     await request(app.app).delete('/api/games/adult-two/download').expect(200)
     await request(app.app).delete('/api/games/adult-two').expect(200)
     expect(app.db.getGame('adult-two')).toMatchObject({ status: 'not_installed' })

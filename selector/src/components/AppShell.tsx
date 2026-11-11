@@ -16,6 +16,7 @@ import type { Health } from '@shared/api'
 import { Pill } from '../lantern/controls'
 import { focusSearch, wantSearch } from '../lantern/Search'
 import { isApple } from '../lib/platform'
+import './AppShell.css'
 
 // Links go through renplay.org (redirects on the website), so moving GitHub or Ko-fi needs no release.
 const REPO_URL = 'https://renplay.org/github'
@@ -77,9 +78,12 @@ function useScrollMemory() {
   useLayoutEffect(() => {
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
   }, [])
+  // A search, a filter or an open game changes the address without leaving the page: the place is kept
+  // under the history entry (its number, which a replaced address keeps), not under every address it had.
+  const entry: unknown = window.history.state?.idx ?? location.key
   useLayoutEffect(() => {
-    // The first page of a tab always has the key "default": the address keeps one page's place from another's.
-    const key = `renplay:scroll:${location.key}:${location.pathname}${location.search}`
+    // The first page of a tab always has the key "default": the entry's number keeps one page's place from another's.
+    const key = `renplay:scroll:${entry}:${location.pathname}`
     // A change of the same page's address (a search, a filter, an open game) keeps the scroll where it is.
     const same = type !== 'POP' && page.current === location.pathname
     page.current = location.pathname
@@ -108,15 +112,19 @@ function useScrollMemory() {
       save()
       window.removeEventListener('scroll', onScroll)
     }
-  }, [location.key, type])
+  }, [entry, type])
 }
 
-/** Ctrl K or ⌘K goes to the search above the list, opening the Library first from a page that has none. */
+/** Where typing goes to a field of its own: a key that is a shortcut elsewhere is not one here. */
+const typesInto = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+
+/** Ctrl K, ⌘K or / (outside a field) goes to the search above the list, opening the Library first from a page that has none. */
 function useSearchShortcut() {
   const navigate = useNavigate()
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'k' || !(isApple() ? e.metaKey : e.ctrlKey)) return
+      const slash = e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey && !typesInto(e.target)
+      if (!slash && (e.key.toLowerCase() !== 'k' || !(isApple() ? e.metaKey : e.ctrlKey))) return
       e.preventDefault()
       if (focusSearch()) return
       wantSearch()

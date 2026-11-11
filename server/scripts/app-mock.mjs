@@ -6,6 +6,8 @@
 export const GAMES = 130
 export const RECIPES = 120
 const id = (prefix, n) => `${prefix}-${String(n).padStart(3, '0')}`
+// A real catalog ThumbHash, for the checks that ask for placeholders under the pictures (`thumbhash` below).
+const THUMBHASH = 'BvgFBQCoZ4Z4CIWJeJp1WMOHgPpV'
 const art = (slug) => ({
   grid: { url1x: `/api/art/${slug}-grid.svg`, url2x: null, width: 600, height: 900, thumbhash: null, tint: '#6a7ad0', made: null },
   wide: { url1x: `/api/art/${slug}-wide.svg`, url2x: null, width: 920, height: 430, thumbhash: null, tint: '#6a7ad0', made: null },
@@ -27,14 +29,41 @@ const recipes = Array.from({ length: RECIPES }, (_, i) => ({
 }))
 const vocabulary = { romance: { label: 'Romance', group: 'story' }, fantasy: { label: 'Fantasy', group: 'story' }, drama: { label: 'Drama', group: 'story' } }
 const catalog = { status: { fetchedAt: Date.now(), urls: [], errors: [], count: RECIPES, sources: [] }, vocabulary, games: recipes }
+
+// A short list of safe-for-work titles with developers and tags, for what a search finds and in what order.
+// Titles are catalog titles, the developers and tags are made up apart from Brianna Lei's.
+const TITLED = [
+  ['Butterfly Soup', 'Brianna Lei', ['romance', 'comedy']],
+  ['Starry Flowers', 'Moonlit Games', ['romance', 'fantasy']],
+  ['A Date with Death', 'Ghostly Studio', ['comedy', 'slice-of-life']],
+  ['Ripples', 'Rowan Games', ['drama', 'mystery']],
+  ['Dawn of the Monsters', 'Night Owl', ['fantasy', 'adventure']],
+  ['Café Enchanté', 'Dandelion Studio', ['romance', 'slice-of-life']],
+  ['Rooftop Sunset', 'Sunset Works', ['drama', 'slice-of-life']],
+  ['Heroes of Rome', 'Romano Press', ['adventure', 'drama']],
+  ['Moonlight Library', 'Night Owl', ['mystery', 'fantasy']],
+  ['Paper Lanterns', 'Moonlit Games', ['romance', 'drama']],
+  ['Tea for Two', 'Dandelion Studio', ['comedy', 'slice-of-life']],
+  ['The Last Lighthouse', 'Ghostly Studio', ['mystery', 'adventure']],
+]
+const titledVocabulary = {
+  ...vocabulary,
+  comedy: { label: 'Comedy', group: 'story' },
+  mystery: { label: 'Mystery', group: 'story' },
+  adventure: { label: 'Adventure', group: 'story' },
+  'slice-of-life': { label: 'Slice of life', group: 'story' },
+}
+const titledGames = TITLED.map(([title, developer, tags], i) => ({ ...games[i], title, developer, tags, tagIds: tags, lastPlayedAt: i < 3 ? games[i].lastPlayedAt : null }))
+const titledRecipes = TITLED.map(([title, developer, tags], i) => ({ ...recipes[i], title, developer, tags, tagIds: tags }))
+const titledCatalog = { ...catalog, vocabulary: titledVocabulary, games: titledRecipes, status: { ...catalog.status, count: TITLED.length } }
 const me = { user: { id: 1, username: 'owner', name: 'Owner', role: 'admin', disabled: 0, created_at: '2026-01-01T00:00:00.000Z', prefs: '{}', avatar: '', avatar_uploaded: 0, admin_source: 'manual', admin_provider: '', admin_subject: '', adult_ceiling: 'off', adult_choice: 'off', adult_access: 0, hasPin: false }, auth: false, demo: false, unclaimed: false, hasPassword: false }
 
-const answers = (url) => {
+const answers = (url, titled) => {
   const path = url.pathname
-  if (path === '/api/games') return { games }
+  if (path === '/api/games') return { games: titled ? titledGames : games }
   const one = path.match(/^\/api\/games\/([^/]+)$/)
   if (one) return { game: games.find((g) => g.id === one[1]) }
-  if (path === '/api/catalog') return catalog
+  if (path === '/api/catalog') return titled ? titledCatalog : catalog
   if (path === '/api/me') return me
   if (path === '/api/me/tags') return { include: [], exclude: [], source: 'default' }
   if (path === '/api/me/adult') return { installation: { level: 'off', fixed: true, chosen: true }, ceiling: { level: 'off', managed: null }, choice: 'off', effective: 'off' }
@@ -56,14 +85,27 @@ function picture(url) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="hsl(${hue} 55% 45%)"/><circle cx="${w / 2}" cy="${h / 2}" r="${Math.min(w, h) / 3}" fill="hsl(${hue} 60% 70%)"/></svg>`
 }
 
-export async function mock(page, errors, label) {
+/**
+ * `titled` answers with the short list of real titles (TITLED) instead of the 130 and 120 made-up ones. `delay` makes
+ * each picture take that many milliseconds the first time it is asked for, as a network does and a cache does not.
+ * `thumbhash` gives every picture its blurred placeholder, as a library has.
+ */
+export async function mock(page, errors, label, { titled = false, delay = 0, thumbhash = false } = {}) {
   page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`))
-  await page.route('**/api/**', (route) => {
+  const asked = new Set()
+  await page.route('**/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
-    if (url.pathname.startsWith('/api/art/')) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: picture(url) })
+    if (url.pathname.startsWith('/api/art/')) {
+      if (delay && !asked.has(url.pathname)) {
+        asked.add(url.pathname)
+        await new Promise((done) => setTimeout(done, delay))
+      }
+      return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: picture(url) })
+    }
     if (request.method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(answers(url)) })
+    const body = JSON.stringify(answers(url, titled))
+    return route.fulfill({ status: 200, contentType: 'application/json', body: thumbhash ? body.replaceAll('"thumbhash":null', `"thumbhash":"${THUMBHASH}"`) : body })
   })
 }
 

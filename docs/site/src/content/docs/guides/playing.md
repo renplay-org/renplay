@@ -6,10 +6,24 @@ description: Play on phones and computers, offline and with a controller, instal
 ## Find a game
 
 The Library and the Catalog each have one search above their list. Type a title, a developer or a
-tag and the list narrows as you type. On a computer, press **⌘K** on Apple devices and **Ctrl+K**
-elsewhere to go to it. A search that finds nothing in your library offers the same words in the
-Catalog, where each game shows where to get it. Only admins see Add games, Activity and Users.
-Search follows your adult games level, as the library does.
+tag and the list narrows as you type. The Library's heading and the Catalog's **All** button say how
+many games it shows, and so does the search itself once it is stuck under the header. Words can come
+in any order, accents do not matter, and one wrong, missing, extra or swapped letter is forgiven in a
+word of four letters or more. While you type, the best match comes first, and the letters that
+matched are marked in the titles. A tag only matches a whole word, or the first three letters or more
+of one, so "ro" does not bring every Romance game. Clearing the search puts the list back in the
+order you chose. **Clear filters**, the first chip of the row of tags while a tag or a list is on,
+takes away the tags and the list and leaves the search, which has its own clear button. When you
+start a search the page scrolls smoothly so the search sits under the header with the results below
+it, and it does so again if you scroll away and type another letter.
+
+On a computer, press **⌘K** on Apple devices or **Ctrl+K** elsewhere, or **/** when you are not
+typing in a field, to go to the search. The tag chips under it say how many of the games shown have
+each tag, and **All tags** at the right end of the row opens every tag. In the Library you can choose
+more than one tag, and a game must have all of them.
+A search that finds nothing in your library offers the same words in the Catalog, where each game
+shows where to get it. Only admins see Add games, Activity and Users. Search follows your adult
+games level, as the library does.
 
 ## On a computer
 
