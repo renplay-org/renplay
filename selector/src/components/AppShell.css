@@ -1,0 +1,5 @@
+/* A footer link is at least as wide as it is tall to touch, whatever its word. */
+.foot a {
+  justify-content: center;
+  min-width: var(--hit);
+}

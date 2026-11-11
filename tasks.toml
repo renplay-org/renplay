@@ -78,7 +78,7 @@ dir = "selector"
 run = ["npx tsc -b --noEmit", "npm run build", "node ../scripts/check-dist.mjs"]
 
 ["check:app-ui"]
-description = "The library's lists and the artwork's flight in a browser: whole rows, scroll memory, the flight's shape, layout shift"
+description = "The library in a browser, files in server/scripts/app-ui (run a few at a time, each also on its own): whole rows, scroll memory, the artwork's flight, layout shift, the Up next carousel, the search and its scrolling, the flight to a game's page"
 run = ["cd selector && npm run build", "cd server && npx playwright install chromium && node scripts/check-app-ui.mjs"]
 
 ["check:docs"]

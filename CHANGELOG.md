@@ -7,6 +7,29 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- The Library's heading says how many games you see, "All games 84" or "All games 12 of 84" while you search or filter. While the search is stuck under the header, and the heading is out of sight, the search says it at its right end. Screen readers hear the count when you pause, not on every key.
+- **Clear filters** is the first chip of the row of tags while a tag or a list is on. It takes away the tags and the list and leaves your search, which has its own clear button.
+- Press **/** outside a field to go to the search, as with Ctrl+K or ⌘K. On a phone, the keyboard's Search key closes the keyboard so the results show.
+- The tag chips say how many of the games shown have each tag, and a tag with none is dim. The chips keep their order while you type, with the chosen ones first. In the Library you can choose more than one tag, and a game must have all of them.
+
+### Changed
+
+- Search finds more and puts the best first. While you type, the list is in best match order (the order control says so, and you can still pick another), and clearing the search brings back the order you chose. Words can come in any order, accents do not matter, and one wrong, missing, extra or swapped letter is forgiven in words of four letters or more. The letters that matched are marked in the titles. A tag matches only as a whole word or from its first three letters, so "ro" no longer brings every Romance game. The search says what it searches: title, developer or tag.
+- Typing in the search no longer makes the page jump. The Library's shelves leave and return above the view while the search stays where it is, the page scrolls smoothly to put the search under the header when you start, and takes you back there when you have scrolled away and type another letter or change a tag or a list (at once with reduced motion), the list changes at the first key instead of after a pause, and an empty result keeps the page's height. Tiles stay calm while you type: the ones that stay on screen do not blink, a tile that comes back shows its picture at once, and the tile under a resting pointer does not lift as the list moves. While the search stays under the header it shares a see-through bar with the header, and the rows above it are out of sight, so nothing from the page reads through the header or between its controls.
+- The flight from a tile to a game's page lands without a flicker.
+- In the Library, **All tags** opens every tag with its count, as it does in the Catalog, instead of unfolding the row of chips.
+- Ctrl+K and ⌘K no longer scroll the page smoothly past the search and back.
+- The Up next carousel goes round. After the last game it shows the first, and before the first it shows the last, moving the same way as any other turn, whether it turns by itself or you use the arrows, the keys or a swipe. The dots still go straight to their game.
+
+### Fixed
+
+- The focus ring of the search was cut off on its left side in the Library on a computer and on its right side in the Catalog on a phone.
+- The Catalog's tag chips no longer vanish while you search, and its All segment keeps its width.
+- A search no longer adds a scroll position to the browser's memory for every word you try.
+- The Library's heading keeps its height on phones with a wide font. The count that a search adds no longer wraps the heading onto a second line, and the link beside it is cut short instead. The footer's links are at least 40 px wide to touch.
+
 ## [4.9.0] - 2026-11-10
 
 ### Added

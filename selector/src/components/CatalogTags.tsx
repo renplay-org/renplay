@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Chip, Pill } from '../lantern/controls'
 import Sheet from '../lantern/Sheet'
@@ -61,24 +62,39 @@ function withState(prefs: TagPrefs, id: string, state: State): TagPrefs {
   return { include, exclude }
 }
 
+/** What a tap on a tag does: includes it, then leaves it out, then clears it (both), or only one of the two. */
+type Mode = 'both' | 'include' | 'exclude'
+
 /**
- * Tag chips for the catalog: a tap includes a tag, the next leaves it out, the next clears it.
- * All tags opens every tag by group, with how many of the games shown have it.
+ * Tag chips for the catalog and the library: a tap includes a tag, the next leaves it out, the next clears it
+ * (the library only includes, and a game must have every tag included). Each chip counts the `games` shown now
+ * that have the tag, and a chip nothing would show is dim. The row keeps the order of the most common tags over
+ * `all` the games (the chosen ones first), so it does not rearrange while a search is typed. All tags opens every
+ * tag by group. `onClear`, given while a tag or a filter is on, puts Clear filters first in the row, in the place
+ * of the last two common tags, so a row that fits still fits.
  */
-export default function CatalogTags({ games, vocabulary, prefs, onChange, excludeOnly = false }: { games: Tagged[]; vocabulary: Vocabulary; prefs: TagPrefs; onChange: (next: TagPrefs) => void; excludeOnly?: boolean }) {
-  const [all, setAll] = useState(false)
-  const counts = new Map<string, { id: string; label: string; group: string; count: number }>()
-  for (const g of games) for (const t of gameTags(g, vocabulary)) {
-    const e = counts.get(t.id) ?? { id: t.id, label: t.label, group: t.group, count: 0 }
-    e.count++
+export default function CatalogTags({ games, all = games, vocabulary, prefs, onChange, onClear, mode = 'both' }: { games: Tagged[]; all?: Tagged[]; vocabulary: Vocabulary; prefs: TagPrefs; onChange: (next: TagPrefs) => void; onClear?: () => void; mode?: Mode }) {
+  const [sheet, setSheet] = useState(false)
+  // A chosen tag moves to the front of the row: the row goes back to its start, where it is.
+  const row = useRef<HTMLDivElement>(null)
+  // Every tag of every game, most common first, each with how many of the games shown have it.
+  const counts = new Map<string, { id: string; label: string; group: string; count: number; total: number }>()
+  for (const g of all) for (const t of gameTags(g, vocabulary)) {
+    const e = counts.get(t.id) ?? { id: t.id, label: t.label, group: t.group, count: 0, total: 0 }
+    e.total++
     counts.set(t.id, e)
   }
+  if (games !== all) for (const g of games) for (const t of gameTags(g, vocabulary)) counts.get(t.id)!.count++
+  else for (const e of counts.values()) e.count = e.total
   const chosen = [...prefs.include, ...prefs.exclude]
+  useEffect(() => {
+    row.current?.scrollTo({ left: 0, behavior: 'instant' })
+  }, [chosen.join()])
   // The row: chosen tags first, then the most common play and story tags.
-  const common = [...counts.values()].filter((t) => (t.group === 'play' || t.group === 'story') && t.count >= 2 && !chosen.includes(t.id)).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+  const common = [...counts.values()].filter((t) => (t.group === 'play' || t.group === 'story') && t.total >= 2 && !chosen.includes(t.id)).sort((a, b) => b.total - a.total || a.label.localeCompare(b.label))
   const label = (id: string) => counts.get(id)?.label ?? vocabulary[id]?.label ?? id
-  // Leaving out only (the defaults for everyone): off and left out.
-  const next = (id: string): State => (excludeOnly ? (stateOf(prefs, id) === 'exclude' ? 'off' : 'exclude') : ({ off: 'include', include: 'exclude', exclude: 'off' } as const)[stateOf(prefs, id)])
+  // One of the two only (the library includes, the defaults for everyone leave out): off and that.
+  const next = (id: string): State => (mode === 'both' ? ({ off: 'include', include: 'exclude', exclude: 'off' } as const)[stateOf(prefs, id)] : stateOf(prefs, id) === mode ? 'off' : mode)
   const chip = (id: string, n?: number) => {
     const state = stateOf(prefs, id)
     return (
@@ -87,6 +103,7 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange, exclud
         on={state === 'include'}
         ex={state === 'exclude'}
         n={n}
+        dim={n === 0}
         aria-label={`${label(id)}${n === undefined ? '' : ` ${n}`}, ${state === 'include' ? 'included' : state === 'exclude' ? 'left out' : 'any'}`}
         onClick={() => onChange(withState(prefs, id, next(id)))}
       >
@@ -97,21 +114,29 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange, exclud
   return (
     <>
       <div className="chip-bar" style={{ marginBottom: 16 }}>
-        <div className="chips wrap">
+        <div className="chips wrap" ref={row}>
+          {onClear && (
+            <Chip onClick={onClear}>
+              Clear filters
+              <X aria-hidden="true" />
+            </Chip>
+          )}
           {chosen.map((id) => chip(id, counts.get(id)?.count ?? 0))}
-          {common.slice(0, Math.max(0, 8 - chosen.length)).map((t) => chip(t.id, t.count))}
+          {common.slice(0, Math.max(0, 8 - chosen.length - (onClear ? 2 : 0))).map((t) => chip(t.id, t.count))}
         </div>
         <div className="chips">
-          {chosen.length > 0 && <Chip onClick={() => onChange({ include: [], exclude: [] })}>Clear tags</Chip>}
-          <Chip onClick={() => setAll(true)}>All tags</Chip>
+          {mode === 'exclude' && chosen.length > 0 && <Chip onClick={() => onChange({ include: [], exclude: [] })}>Clear tags</Chip>}
+          <Chip onClick={() => setSheet(true)}>All tags</Chip>
         </div>
       </div>
-      {all && (
-        <Sheet open onClose={() => setAll(false)} title="Tags" wide fullPhone>
+      {sheet && (
+        <Sheet open onClose={() => setSheet(false)} title="Tags" wide fullPhone>
           <p className="small muted" style={{ marginBottom: 16 }}>
-            {excludeOnly
+            {mode === 'exclude'
               ? 'Games with a tag left out here are hidden in the catalog for everyone who has not chosen their own tags.'
-              : 'Include a tag to see only games that have it. Leave one out to hide games that have it. Your choices are kept for next time, on every device.'}
+              : mode === 'include'
+                ? 'Include a tag to see only games that have it. A game must have every tag you include.'
+                : 'Include a tag to see only games that have it. Leave one out to hide games that have it. Your choices are kept for next time, on every device.'}
           </p>
           <div className="stack" style={{ gap: 20 }}>
             {GROUPS.map(([group, title]) => {
@@ -129,12 +154,12 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange, exclud
                             {t.label} <span className="muted tnum">{t.count}</span>
                           </span>
                           <span className="row" style={{ gap: 6 }}>
-                            {!excludeOnly && <Pill variant={state === 'include' ? 'p' : 'q'} size="sm" aria-pressed={state === 'include'} onClick={() => onChange(withState(prefs, t.id, state === 'include' ? 'off' : 'include'))}>
+                            {mode !== 'exclude' && <Pill variant={state === 'include' ? 'p' : 'q'} size="sm" aria-pressed={state === 'include'} onClick={() => onChange(withState(prefs, t.id, state === 'include' ? 'off' : 'include'))}>
                               Include
                             </Pill>}
-                            <Pill variant={state === 'exclude' ? 'd' : 'q'} size="sm" aria-pressed={state === 'exclude'} onClick={() => onChange(withState(prefs, t.id, state === 'exclude' ? 'off' : 'exclude'))}>
+                            {mode !== 'include' && <Pill variant={state === 'exclude' ? 'd' : 'q'} size="sm" aria-pressed={state === 'exclude'} onClick={() => onChange(withState(prefs, t.id, state === 'exclude' ? 'off' : 'exclude'))}>
                               Leave out
-                            </Pill>
+                            </Pill>}
                           </span>
                         </div>
                       )

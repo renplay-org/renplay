@@ -68,7 +68,7 @@ function note(): void {
 
 function land(l: Leaving): void {
   // The cover of the carousel's slide first (the Library's top), then the game's tiles.
-  const places = [...document.querySelectorAll<HTMLElement>('main .carousel .stage[data-id], main .card[data-id]')].filter((t) => t.dataset['id'] === l.id)
+  const places = [...document.querySelectorAll<HTMLElement>('main .carousel .slide:not(.copy) .stage[data-id], main .card[data-id]')].filter((t) => t.dataset['id'] === l.id)
   for (const place of places) {
     const frame = place.querySelector<HTMLElement>(place.matches('.stage') ? '.cover .frame' : '.frame')
     const rect = frame?.getBoundingClientRect()

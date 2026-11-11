@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom'
 import type { ArtSet } from '@shared/art'
 import { hashUrl } from './art'
 
@@ -48,13 +49,20 @@ export function travelSource(art: ArtSet | undefined, hidden: boolean): string |
   return (!hidden && grid?.url1x) || hashUrl(grid?.thumbhash)
 }
 
+/** The longest the ghost waits at its end for what lands under it to be ready. */
+const READY_MS = 400
+
 /**
- * Lift the picture at `t.rect` and fly it to `target`, then remove it. Calls `done` at the end (also on
- * cancel). The same shape on both ends (a tile and a cover, both 2:3) moves by transform alone, which
- * the compositor does without layout on every frame, so it stays smooth on a phone. The door is another
- * shape, and animates the box.
+ * Lift the picture at `t.rect` and fly it to `target`, then remove it. The same shape on both ends (a tile and a
+ * cover, both 2:3) moves by transform alone, which the compositor does without layout on every frame, so it
+ * stays smooth on a phone. The door is another shape, and animates the box.
+ *
+ * `done` reveals what lands under the ghost, and is called (also on cancel) in the same task that removes the
+ * ghost, so no frame shows neither: a change of React state in it is made at once. `ready`, if given, is awaited
+ * first, with the ghost holding its last frame: the landing picture is decoded by then, and does not show its
+ * placeholder for a frame when it appears.
  */
-export function flyGhost(t: Travel, target: Box, done: () => void, ms = 480): void {
+export function flyGhost(t: Travel, target: Box, done: () => void, ms = 480, ready?: () => Promise<unknown>): void {
   const el = document.createElement('div')
   el.className = 'ghost'
   if (t.src) {
@@ -79,12 +87,15 @@ export function flyGhost(t: Travel, target: Box, done: () => void, ms = 480): vo
   }
   document.body.append(el)
   const finish = () => {
+    flushSync(done)
     el.remove()
-    done()
   }
   try {
     const anim = el.animate(frames, { duration: ms, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' })
-    anim.onfinish = finish
+    anim.onfinish = () => {
+      if (!ready) return finish()
+      void Promise.race([ready().catch(() => {}), new Promise((wait) => window.setTimeout(wait, READY_MS))]).then(finish)
+    }
     anim.oncancel = finish
   } catch {
     finish()

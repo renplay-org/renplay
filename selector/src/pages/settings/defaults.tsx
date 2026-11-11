@@ -38,7 +38,7 @@ export function DefaultsForEveryone() {
           <p className="small muted" style={{ marginTop: 2 }}>Games with these tags are hidden in the catalog for people who have not chosen their own tags. A tap leaves a tag out, the next brings it back.</p>
         </div>
         {catalog && (
-          <CatalogTags games={catalog.games} vocabulary={catalog.vocabulary} prefs={{ include: [], exclude: d.tagsExclude }} onChange={(next) => void save({ tagsExclude: next.exclude })} excludeOnly />
+          <CatalogTags games={catalog.games} vocabulary={catalog.vocabulary} prefs={{ include: [], exclude: d.tagsExclude }} onChange={(next) => void save({ tagsExclude: next.exclude })} mode="exclude" />
         )}
       </div>
       <Setting title="Lighter background" hint="For browsers where nobody chose. Each device follows its own reduced motion and data saver settings unless this says otherwise.">
