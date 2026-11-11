@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- The Up next carousel goes round. After the last game it shows the first, and before the first it shows the last, moving the same way as any other turn, whether it turns by itself or you use the arrows, the keys or a swipe. The dots still go straight to their game.
+
 ## [4.9.0] - 2026-11-10
 
 ### Added

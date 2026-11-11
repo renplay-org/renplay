@@ -200,8 +200,8 @@ async function flight(browser, base, errors, options, label) {
     return r && { x: r.x, y: r.y, width: r.width, height: r.height }
   }, selector)
   // The Up next carousel's cover and a grid tile: each flies to the game page's cover and back.
-  const homeOf = { '.carousel .slide .cover a': (id) => `.carousel .stage[data-id="${id}"] .cover .frame`, '.grid[data-row] .card': (id) => `.grid[data-row] .card[data-id="${id}"] .frame` }
-  for (const [where, selector, n] of [['the Up next cover', '.carousel .slide .cover a', 0], ['a grid tile', '.grid[data-row] .card', 5]]) {
+  const homeOf = { '.carousel .slide:not(.copy) .cover a': (id) => `.carousel .stage[data-id="${id}"] .cover .frame`, '.grid[data-row] .card': (id) => `.grid[data-row] .card[data-id="${id}"] .frame` }
+  for (const [where, selector, n] of [['the Up next cover', '.carousel .slide:not(.copy) .cover a', 0], ['a grid tile', '.grid[data-row] .card', 5]]) {
     await page.goto(base + '/')
     await page.waitForSelector(selector)
     const tile = page.locator(selector).nth(n)
@@ -336,8 +336,11 @@ async function touch(browser, base, errors) {
 const carouselState = (page) =>
   page.evaluate(() => {
     const box = document.querySelector('.carousel')
-    return { x: Math.round(box.scrollLeft), w: box.clientWidth, current: [...document.querySelectorAll('.dots .dot')].findIndex((d) => d.getAttribute('aria-current') === 'true') }
+    // The place in slides' widths from the first slide: the copy in front takes one off.
+    return { x: Math.round(box.scrollLeft - box.clientWidth), w: box.clientWidth, current: [...document.querySelectorAll('.dots .dot')].findIndex((d) => d.getAttribute('aria-current') === 'true') }
   })
+/** Puts the carousel on a slide at once, as if it had been there. */
+const atSlide = (page, i) => page.evaluate((i) => { const c = document.querySelector('.carousel'); c.scrollTo({ left: (i + 1) * c.clientWidth, behavior: 'instant' }) }, i)
 /** Waits until a smooth scroll has stopped. */
 const stillScroll = async (page) => {
   let last = -1
@@ -369,7 +372,7 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
   await mock(page, errors, label)
   await openFrozen(page, base)
   const phone = (options.viewport?.width ?? 1440) < 720 || !!options.isMobile
-  const counts = await page.evaluate(() => ({ slides: document.querySelectorAll('.carousel .slide').length, dots: document.querySelectorAll('.dots .dot').length, small: [...document.querySelectorAll('.dots .dot')].filter((d) => d.offsetWidth < 40 || d.offsetHeight < 40).length }))
+  const counts = await page.evaluate(() => ({ slides: document.querySelectorAll('.carousel .slide:not(.copy)').length, dots: document.querySelectorAll('.dots .dot').length, small: [...document.querySelectorAll('.dots .dot')].filter((d) => d.offsetWidth < 40 || d.offsetHeight < 40).length }))
   check(counts.slides >= 6 && counts.slides <= 8 && counts.dots === counts.slides, `${label}: Up next is 6 to 8 slides with a dot for each (${counts.slides} slides, ${counts.dots} dots)`)
   check(counts.small === 0, `${label}: every dot is at least 40 x 40 px`)
   check((await carouselState(page)).current === 0, `${label}: the first dot is the current one`)
@@ -377,7 +380,7 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
   if (phone) {
     // Fills the screen: a slide is as wide as the page, and no edge of the next one shows.
     const fit = await page.evaluate(() => {
-      const [a, b] = [...document.querySelectorAll('.carousel .slide')].map((e) => e.getBoundingClientRect())
+      const [a, b] = [...document.querySelectorAll('.carousel .slide:not(.copy)')].map((e) => e.getBoundingClientRect())
       return { left: Math.round(a.left), right: Math.round(a.right), next: Math.round(b.left), width: innerWidth, snap: getComputedStyle(document.querySelector('.carousel')).scrollSnapType }
     })
     check(fit.left === 0 && fit.right === fit.width && fit.next >= fit.width, `${label}: a slide fills the ${fit.width} px screen and the next one's edge is out of sight (slide ${fit.left} to ${fit.right}, next from ${fit.next})`)
@@ -394,7 +397,7 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
   await pass(page, 4000)
   check((await carouselState(page)).current === 2, `${label}: and turns again 7 seconds after the last turn`)
   // Back to the second slide, for the holds below.
-  await page.evaluate(() => document.querySelector('.carousel').scrollTo({ left: document.querySelector('.carousel').clientWidth, behavior: 'instant' }))
+  await atSlide(page, 1)
   await page.waitForTimeout(300)
 
   if (phone) {
@@ -416,7 +419,7 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
       // A slow machine (CI) finishes the gesture and the snap later: wait for the carousel to rest on a slide past the first.
       await page.waitForFunction(() => {
         const c = document.querySelector('.carousel')
-        return c.scrollLeft > c.clientWidth * 1.5 && c.scrollLeft % c.clientWidth === 0
+        return c.scrollLeft > c.clientWidth * 2.5 && c.scrollLeft % c.clientWidth === 0
       }, null, { timeout: 4000, polling: 100 }).catch(() => {})
       await page.waitForTimeout(300)
     } else {
@@ -435,7 +438,7 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
     check((await carouselState(page)).current === 1, `${label}: it holds while the mouse is over it`)
     await page.mouse.move(700, 880)
     // Focus in it holds it too.
-    await page.locator('.carousel .slide').nth(1).locator('a:has-text("Game page")').focus()
+    await page.locator('.carousel .slide:not(.copy)').nth(1).locator('a:has-text("Game page")').focus()
     await pass(page, 30000)
     check((await carouselState(page)).current === 1, `${label}: it holds while keyboard focus is in it`)
     await page.evaluate(() => document.activeElement?.blur())
@@ -460,14 +463,193 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
     await page.locator('.car-arrow.next').click()
     await page.waitForTimeout(900)
     check((await carouselState(page)).current === 6, `${label}: the next arrow moves it on`)
-    check(await page.locator('.car-arrow.next').isDisabled(), `${label}: at the last slide the next arrow is off`)
+    check(!(await page.locator('.car-arrow.next').isDisabled()) && !(await page.locator('.car-arrow.prev').isDisabled()), `${label}: both arrows stay on, at the last slide too`)
     await page.locator('.car-arrow.prev').click()
     await page.waitForTimeout(900)
     check((await carouselState(page)).current === 5, `${label}: the previous arrow moves it back`)
   }
   // Only the slide in view has anything to tab to.
-  const tabbable = await page.evaluate(() => [...document.querySelectorAll('.carousel .slide')].map((s) => s.inert))
+  const tabbable = await page.evaluate(() => [...document.querySelectorAll('.carousel .slide:not(.copy)')].map((s) => s.inert))
   check(tabbable.filter((x) => !x).length === 1, `${label}: only the slide in view can be focused`)
+  await ctx.close()
+}
+
+/** The place of the carousel in slides' widths from the first slide, on every frame it scrolls. */
+const watch = (page) =>
+  page.evaluate(() => {
+    const c = document.querySelector('.carousel')
+    window.__xs = []
+    window.__watch = () => window.__xs.push(+((c.scrollLeft - c.clientWidth) / c.clientWidth).toFixed(3))
+    c.addEventListener('scroll', window.__watch)
+  })
+const unwatch = async (page) => {
+  // The scroll event of a jump comes a frame after it.
+  await page.waitForTimeout(100)
+  return page.evaluate(() => {
+    document.querySelector('.carousel').removeEventListener('scroll', window.__watch)
+    return window.__xs
+  })
+}
+/**
+ * Whether a move went one way only: no frame goes back, except the one silent jump from a copy to the slide that
+ * looks the same (about `n` slides' widths). `jumps` counts those.
+ */
+const oneWay = (xs, n, dir) => {
+  let jumps = 0
+  let back = 0
+  for (let i = 1; i < xs.length; i++) {
+    const d = (xs[i] - xs[i - 1]) * dir
+    if (d < -n / 2) jumps++
+    else if (d < -0.01) back++
+  }
+  return { jumps, back }
+}
+/**
+ * Waits until the carousel rests on a real slide. Where `scrollend` is missing the jump off a copy waits on a timer of the
+ * page's clock, which is run once the scrolling has really stopped.
+ */
+async function restOnSlide(page, n) {
+  const place = () => page.evaluate(() => { const c = document.querySelector('.carousel'); return [c.scrollLeft, c.clientWidth] })
+  for (let still = 0, last = -1, i = 0; still < 4 && i < 60; i++) {
+    await page.waitForTimeout(100)
+    const [x] = await place()
+    still = x === last ? still + 1 : 0
+    last = x
+  }
+  await page.clock.runFor(300)
+  for (let i = 0; i < 20; i++) {
+    const [x, w] = await place()
+    if (Number.isInteger(x / w) && x / w >= 1 && x / w <= n) return
+    await page.waitForTimeout(100)
+  }
+}
+/** A finger drawn across the carousel, `dir` 1 to the left (the next slide). */
+async function swipeAcross(page, cdp, dir) {
+  const y = await page.evaluate(() => { const r = document.querySelector('.carousel').getBoundingClientRect(); return Math.round(r.top + r.height / 2) })
+  const touch = (type, x) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] })
+  const [from, to] = dir > 0 ? [330, 70] : [70, 330]
+  await touch('touchStart', from)
+  for (let x = from - dir * 20; dir > 0 ? x >= to : x <= to; x -= dir * 20) {
+    await touch('touchMove', x)
+    await page.waitForTimeout(16)
+  }
+  await touch('touchEnd', to)
+}
+
+/** The carousel goes round: the end is another turn, in the same direction, and the copies at the ends are only to look at. */
+async function carouselLoop(browser, base, errors, options, label, { swipe = false, noScrollEnd = false } = {}) {
+  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label)
+  // Without `scrollend` the quiet after the last scroll event stands in for it: Safari before 26.2.
+  if (noScrollEnd) {
+    await page.addInitScript(() => {
+      for (const o of [window, Window.prototype]) {
+        try {
+          delete o.onscrollend
+        } catch {}
+      }
+      window.addEventListener('scrollend', (e) => e.stopImmediatePropagation(), true)
+    })
+  }
+  await openFrozen(page, base)
+  const phone = (options.viewport?.width ?? 1440) < 720 || !!options.isMobile
+  const n = await page.evaluate(() => document.querySelectorAll('.carousel .slide:not(.copy)').length)
+  const last = n - 1
+  if (noScrollEnd) check(!(await page.evaluate(() => 'onscrollend' in window)), `${label}: the browser has no scrollend (the fallback is what runs)`)
+
+  // The copies: one of the last slide in front, one of the first behind, hidden from screen readers and from focus.
+  const copies = await page.evaluate(() => {
+    const box = document.querySelector('.carousel')
+    const all = [...box.children]
+    const hidden = (c) => c.classList.contains('copy') && c.getAttribute('aria-hidden') === 'true' && c.inert
+    const reachable = [...box.querySelectorAll('.copy a, .copy button')].filter((el) => {
+      el.focus()
+      return document.activeElement === el
+    })
+    return { front: hidden(all[0]), back: hidden(all.at(-1)), total: box.querySelectorAll('.copy').length, reachable: reachable.length, frontTitle: all[0].querySelector('.stage')?.dataset.id, lastTitle: all.at(-2).querySelector('.stage')?.dataset.id }
+  })
+  check(copies.total === 2 && copies.front && copies.back, `${label}: the two copies are aria-hidden and inert`)
+  check(copies.reachable === 0, `${label}: nothing in a copy can take focus`)
+  check(copies.frontTitle === copies.lastTitle, `${label}: the copy in front is the last slide's`)
+  check((await carouselState(page)).x === 0, `${label}: it starts on the first slide, not on the copy`)
+
+  // The automatic turn after the last slide goes on to the first, forward, never back across the others.
+  await atSlide(page, last)
+  await page.waitForTimeout(200)
+  await watch(page)
+  await pass(page, 7500)
+  await restOnSlide(page, n)
+  let moved = oneWay(await unwatch(page), n, 1)
+  let state = await carouselState(page)
+  check(state.current === 0 && state.x === 0, `${label}: the automatic turn after the last slide shows the first (dot ${state.current + 1}, at ${state.x} px)`)
+  check(moved.back === 0 && moved.jumps === 1, `${label}: it moved on to the copy and jumped silently (${moved.back} frames went back, ${moved.jumps} silent jump)`)
+  await pass(page, 7000)
+  await restOnSlide(page, n)
+  check((await carouselState(page)).current === 1, `${label}: the jump did not stop the automatic turns (the next turn came)`)
+
+  /** Moves to the last slide, does `move`, and checks it landed on `to`, going `dir` all the way. */
+  const wrap = async (what, from, to, dir, move) => {
+    await atSlide(page, from)
+    await page.waitForTimeout(200)
+    await watch(page)
+    await move()
+    await restOnSlide(page, n)
+    const frames = await unwatch(page)
+    const moved = oneWay(frames, n, dir)
+    const now = await carouselState(page)
+    const real = await page.evaluate(() => [...document.querySelectorAll('.carousel .slide:not(.copy)')].filter((s) => !s.inert).map((s) => s.getAttribute('aria-label')))
+    check(now.current === to && now.x === to * now.w, `${label}: ${what} shows slide ${to + 1} (dot ${now.current + 1}, at ${now.x} of ${to * now.w} px)`)
+    check(moved.back === 0 && moved.jumps === 1, `${label}: ${what} moves ${dir > 0 ? 'forward' : 'back'} all the way, with one silent jump (${moved.back} frames went the other way, ${moved.jumps} jumps${moved.back === 0 && moved.jumps === 1 ? '' : `, frames ${frames.slice(-6).join(' ')}`})`)
+    check(real.length === 1 && real[0] === `${to + 1} of ${n}`, `${label}: ${what}: the slide in view says ${to + 1} of ${n} (${real.join(', ')})`)
+  }
+
+  if (phone) {
+    // A finger holds it, and a move under it is the person's. Chromium swipes with touch events; WebKit scrolls under synthetic ones.
+    const cdp = swipe ? await ctx.newCDPSession(page) : null
+    const pushed = async (dir) => {
+      if (cdp) {
+        await swipeAcross(page, cdp, dir)
+      } else {
+        await page.evaluate(() => document.querySelector('.carousel').dispatchEvent(new Event('touchstart', { bubbles: true })))
+        await page.evaluate((dir) => document.querySelector('.carousel').scrollBy({ left: 370 * dir, behavior: 'instant' }), dir)
+        await page.waitForTimeout(700)
+        await page.evaluate(() => document.querySelector('.carousel').dispatchEvent(new Event('touchend', { bubbles: true })))
+      }
+    }
+    await wrap('a swipe left past the last slide', last, 0, 1, () => pushed(1))
+    await wrap('a swipe right past the first slide', 0, last, -1, () => pushed(-1))
+    // Keep going one way: every swipe is one slide, round the end and on.
+    await atSlide(page, last - 1)
+    await page.waitForTimeout(200)
+    const seen = []
+    for (let i = 0; i < n + 2; i++) {
+      await pushed(1)
+      await restOnSlide(page, n)
+      seen.push((await carouselState(page)).current)
+    }
+    const want = Array.from({ length: n + 2 }, (_, i) => (last - 1 + i + 1) % n)
+    check(seen.join() === want.join(), `${label}: swiping one way for ${n + 2} turns goes round and on (${seen.join(' ')})`)
+  } else {
+    const next = page.locator('.car-arrow.next')
+    const prev = page.locator('.car-arrow.prev')
+    check(await next.isVisible() && await prev.isVisible() && await next.isEnabled() && await prev.isEnabled(), `${label}: both arrows show at every slide`)
+    await wrap('the next arrow at the last slide', last, 0, 1, () => next.click())
+    await wrap('the previous arrow at the first slide', 0, last, -1, () => prev.click())
+    await page.mouse.move(700, 880)
+    await wrap('the Right key at the last slide', last, 0, 1, async () => {
+      await page.locator('.carousel').focus()
+      await page.keyboard.press('ArrowRight')
+    })
+    await wrap('the Left key at the first slide', 0, last, -1, () => page.keyboard.press('ArrowLeft'))
+    // A dot goes straight to its slide.
+    await atSlide(page, last)
+    await page.waitForTimeout(200)
+    await page.locator('.dots .dot').nth(2).click()
+    await restOnSlide(page, n)
+    state = await carouselState(page)
+    check(state.current === 2 && state.x === 2 * state.w, `${label}: a dot goes to its slide from the last one (dot ${state.current + 1}, at ${state.x} px)`)
+  }
   await ctx.close()
 }
 
@@ -492,7 +674,7 @@ async function resumeFlight(browser, base, errors, options, label) {
   await page.locator('.dots .dot').nth(2).click()
   await page.waitForTimeout(1200)
   const cover = await page.evaluate(() => {
-    const r = document.querySelectorAll('.carousel .slide')[2].querySelector('.cover .frame').getBoundingClientRect()
+    const r = document.querySelectorAll('.carousel .slide:not(.copy)')[2].querySelector('.cover .frame').getBoundingClientRect()
     return { x: r.x, y: r.y, w: r.width }
   })
   await page.evaluate(() => {
@@ -507,7 +689,7 @@ async function resumeFlight(browser, base, errors, options, label) {
     }
     requestAnimationFrame(tick)
   })
-  await page.locator('.carousel .slide').nth(2).locator('a.btn.p').click()
+  await page.locator('.carousel .slide:not(.copy)').nth(2).locator('a.btn.p').click()
   await page.waitForTimeout(500)
   const first = await page.evaluate(() => window.__first)
   check(!!first && Math.abs(first.x - cover.x) < 40 && Math.abs(first.y - cover.y) < 40, `${label}: Resume on the third slide flies from that slide's cover (cover at ${Math.round(cover.x)}, ${Math.round(cover.y)}, flight starts at ${first ? `${Math.round(first.x)}, ${Math.round(first.y)}` : 'nowhere'})`)
@@ -583,7 +765,11 @@ await Promise.all([
     await touch(chrome, served.url, errors)
     await carousel(chrome, served.url, errors, desktop, 'desktop')
     await carouselStill(chrome, served.url, errors, desktop, 'desktop')
+    await carouselLoop(chrome, served.url, errors, desktop, 'desktop')
+    await carouselLoop(chrome, served.url, errors, desktop, 'desktop without scrollend', { noScrollEnd: true })
     await carousel(chrome, served.url, errors, phoneChromium, 'phone', { swipe: true })
+    await carouselLoop(chrome, served.url, errors, phoneChromium, 'phone', { swipe: true })
+    await carouselLoop(chrome, served.url, errors, phoneChromium, 'phone without scrollend', { swipe: true, noScrollEnd: true })
     await resumeFlight(chrome, served.url, errors, desktop, 'desktop')
     await search(chrome, served.url, errors, desktop, 'desktop')
     await search(chrome, served.url, errors, phoneChromium, 'phone')
@@ -600,6 +786,8 @@ if (withWebkit) {
   await memory(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
   await carousel(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
   await carouselStill(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
+  await carouselLoop(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
+  await carouselLoop(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit) without scrollend', { noScrollEnd: true })
   await search(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
   await safari.close()
 }
