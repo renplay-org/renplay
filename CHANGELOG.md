@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.10.0] - 2026-11-11
+
 ### Added
 
 - The Library's heading says how many games you see, "All games 84" or "All games 12 of 84" while you search or filter. While the search is stuck under the header, and the heading is out of sight, the search says it at its right end. Screen readers hear the count when you pause, not on every key.
@@ -740,7 +742,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.9.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.10.0...dev
+[4.10.0]: https://github.com/renplay-org/renplay/compare/v4.9.0...v4.10.0
 [4.9.0]: https://github.com/renplay-org/renplay/compare/v4.8.0...v4.9.0
 [4.8.0]: https://github.com/renplay-org/renplay/compare/v4.7.0...v4.8.0
 [4.7.0]: https://github.com/renplay-org/renplay/compare/v4.6.3...v4.7.0
