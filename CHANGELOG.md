@@ -7,9 +7,24 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- A line under the Library's and the Catalog's search says how many games you see, "84 games" or "12 of 84 games" while you search or filter, with **Clear all** to take away the search, the tags and the list at once. Screen readers hear the count when you pause, not on every key.
+- Press **/** outside a field to go to the search, as with Ctrl+K or ⌘K. On a phone, the keyboard's Search key closes the keyboard so the results show.
+- The tag chips say how many of the games shown have each tag, and a tag with none is dim. The chips keep their order while you type, with the chosen ones first. In the Library you can choose more than one tag.
+
 ### Changed
 
+- Search finds more and puts the best first. While you type, the list is in best match order (the order control says so, and you can still pick another), and clearing the search brings back the order you chose. Words can come in any order, accents do not matter, and one wrong, missing, extra or swapped letter is forgiven in words of four letters or more. The letters that matched are marked in the titles. A tag matches only as a whole word or from its first three letters, so "ro" no longer brings every Romance game. The search says what it searches: title, developer or tag.
+- Typing in the search no longer makes the page jump. The Library's shelves leave and return above the view while the search stays where it is, the first letter puts the search under the header once, the list changes at the first key instead of after a pause, and an empty result keeps the page's height. New tiles fade in, unless you ask your device for less motion.
+- Ctrl+K and ⌘K no longer scroll the page smoothly past the search and back.
 - The Up next carousel goes round. After the last game it shows the first, and before the first it shows the last, moving the same way as any other turn, whether it turns by itself or you use the arrows, the keys or a swipe. The dots still go straight to their game.
+
+### Fixed
+
+- The focus ring of the search was cut off on its left side in the Library on a computer and on its right side in the Catalog on a phone.
+- The Catalog's tag chips no longer vanish while you search, and its All segment keeps its width.
+- A search no longer adds a scroll position to the browser's memory for every word you try.
 
 ## [4.9.0] - 2026-11-10
 

@@ -1,28 +1,30 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, ExternalLink, RefreshCw } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Card from '../lantern/Tile'
 import { Pill, Seg, TagPill } from '../lantern/controls'
-import SearchField from '../lantern/Search'
+import SearchField, { CountLine, Marked, Toolbar, useSearchScroll } from '../lantern/Search'
 import { useRoom } from '../lantern/Room'
 import Sheet from '../lantern/Sheet'
 import RecipeCard from '../components/RecipeCard'
 import CatalogTags, { matchesTags, useTagPrefs } from '../components/CatalogTags'
 import { Empty, Spinner, errorText } from '../lantern/ui'
 import type { CatalogGame } from '@shared/api'
+import type { Vocabulary } from '@shared/recipe'
 import { ago } from '../lib/format'
 import { useAddress, useTypedField, withParams } from '../lib/address'
 import { post } from '../lib/api'
 import { useGrowingGrid } from '../lib/grow'
 import { useCatalog } from '../lib/queries'
 import { useAuth } from '../lib/auth'
-import { matchesSearch, stateLabel } from '../lib/tags'
+import { createSearch, type Hit } from '../lib/search'
+import { gameTags, stateLabel } from '../lib/tags'
 
 const REQUEST_URL = 'https://renplay.org/catalog/request'
 
 /** One catalog entry: the grid tile with an In your library pill, opening the recipe sheet. */
-function RecipeTile({ recipe: r, href, onOpen }: { recipe: CatalogGame; href: string; onOpen: () => void }) {
+function RecipeTile({ recipe: r, hit, fade, href, onOpen }: { recipe: CatalogGame; hit?: Hit; fade: boolean; href: string; onOpen: () => void }) {
   const extra = r.local ? (
     <span className="corner">
       <TagPill tone="dark">
@@ -35,6 +37,8 @@ function RecipeTile({ recipe: r, href, onOpen }: { recipe: CatalogGame; href: st
     <Card
       game={r}
       gameId={r.local?.id}
+      title={hit?.marks.length ? <Marked text={r.title} marks={hit.marks} /> : undefined}
+      fade={fade}
       href={r.local ? `/game/${r.local.id}` : href}
       meta={
         <span className="truncate">
@@ -51,6 +55,8 @@ function RecipeTile({ recipe: r, href, onOpen }: { recipe: CatalogGame; href: st
 
 /** The tags in the address, `with` and `without`: a comma separated list each. */
 const tagList = (value: string | null) => (value ? value.split(',').filter(Boolean) : [])
+const NO_GAMES: CatalogGame[] = []
+const NO_VOCABULARY: Vocabulary = {}
 
 export default function Catalog() {
   const { data, isLoading, error, refetch } = useCatalog()
@@ -69,6 +75,12 @@ export default function Catalog() {
     setAddress({ with: next.include.join(',') || null, without: next.exclude.join(',') || null })
   }
   const [typed, setTyped] = useTypedField(search, (text) => setAddress({ q: text || null }))
+  // The list follows what is typed a moment after the field itself (see the Library).
+  const query = useDeferredValue(typed)
+  const searching = query.trim() !== ''
+  // Tiles that arrive after the person has started changing the list fade in. Those at the first load do not.
+  const [live, setLive] = useState(false)
+  useSearchScroll(searching, null)
   const [refreshing, setRefreshing] = useState(false)
   const opened = useRef(false)
   const admin = useAuth().data?.user.role === 'admin'
@@ -76,12 +88,24 @@ export default function Catalog() {
   useEffect(() => {
     if (!gameId) opened.current = false
   }, [gameId])
-  const all = data?.games ?? []
-  const vocabulary = data?.vocabulary ?? {}
-  // Search and the segment first, so the tag counts say how many of these games have each tag.
-  const shown = all.filter((g) => matchesSearch(g, search, vocabulary) && (filter === 'all' || (filter === 'free' ? g.free === true || (g.free === undefined && g.nsfw === false) : g.state === 'completed')))
-  const filtered = shown.filter((g) => matchesTags(g, tagPrefs, vocabulary))
-  const rows = useGrowingGrid(`catalog:${search}|${filter}|${tagPrefs.include}|${tagPrefs.exclude}`, filtered.length)
+  const all = data?.games ?? NO_GAMES
+  const vocabulary = data?.vocabulary ?? NO_VOCABULARY
+  const finder = useMemo(() => createSearch(all, (g) => gameTags(g, vocabulary).map((t) => t.label)), [all, vocabulary])
+  const hits = useMemo(() => finder.find(query), [finder, query])
+  // Best match first while text is typed, and games of the same rank stay in the catalog's order.
+  const found = hits ? all.filter((g) => hits.has(g)).sort((a, b) => hits.get(a)!.tier - hits.get(b)!.tier) : all
+  // The tags, and then the segment: the All segment counts what the search and the tags leave.
+  const tagged = found.filter((g) => matchesTags(g, tagPrefs, vocabulary))
+  const filtered = tagged.filter((g) => filter === 'all' || (filter === 'free' ? g.free === true || (g.free === undefined && g.nsfw === false) : g.state === 'completed'))
+  const active = searching || filter !== 'all' || tagPrefs.include.length > 0 || tagPrefs.exclude.length > 0
+  // The list's growth belongs to the list, not to the words typed: it is kept while they change.
+  const rows = useGrowingGrid(`catalog:${filter}|${tagPrefs.include}|${tagPrefs.exclude}`, filtered.length)
+  const clearAll = () => {
+    setLive(true)
+    setTyped('')
+    setAccountTags({ include: [], exclude: [] })
+    setAddress({ q: null, filter: null, with: null, without: null })
+  }
   if (isLoading) return <Spinner />
   if (error || !data)
     return (
@@ -146,47 +170,46 @@ export default function Catalog() {
           </>
         )
       })()}
-      <div className="toolbar wrap" style={{ marginTop: 14 }}>
-        <SearchField label="Search the catalog" value={typed} onChange={setTyped} />
+      <Toolbar label="Search the catalog" wrap style={{ marginTop: 14 }}>
+        <SearchField label="Search the catalog" placeholder="Title, developer or tag" value={typed} onChange={(text) => { setLive(true); setTyped(text) }} />
         <Seg
           small
           value={filter}
-          onChange={(value) => setAddress({ filter: value === 'all' ? null : value })}
+          onChange={(value) => { setLive(true); setAddress({ filter: value === 'all' ? null : value }) }}
           options={[
-            { value: 'all', label: `All ${filtered.length}` },
+            { value: 'all', label: <span className="tnum">All {tagged.length}</span>, className: 'all' },
             { value: 'free', label: 'Free' },
             { value: 'completed', label: 'Completed' },
           ]}
         />
+      </Toolbar>
+      <CountLine shown={filtered.length} total={all.length} active={active} onClear={clearAll} />
+      <div role="search" aria-label="Filter the catalog by tag">
+        <CatalogTags games={filtered} all={all} vocabulary={vocabulary} prefs={tagPrefs} onChange={(next) => { setLive(true); setTagPrefs(next) }} />
       </div>
-      <CatalogTags
-        games={shown}
-        vocabulary={vocabulary}
-        prefs={tagPrefs}
-        onChange={setTagPrefs}
-      />
-      {!filtered.length ? (
-        <Empty title="No games match" action={<Pill onClick={() => { setAccountTags({ include: [], exclude: [] }); setAddress({ q: null, filter: null, with: null, without: null }) }}>Clear filters</Pill>}>
-          Nothing in the catalog matches. Try a different search or tag.
-        </Empty>
-      ) : (
-        <>
-          <div className="grid" data-row ref={rows.grid}>
-            {filtered.slice(0, rows.shown).map((r) => (
-              <RecipeTile
-                key={r.id}
-                recipe={r}
-                href={addressOf({ game: r.id })}
-                onOpen={() => {
-                  opened.current = true
-                  navigate(addressOf({ game: r.id }))
-                }}
-              />
-            ))}
-          </div>
-          {rows.more && <div ref={rows.end} aria-hidden="true" />}
-        </>
-      )}
+      <div className={`results ${active ? 'held' : ''}`.trim()}>
+        <div className="grid" data-row ref={rows.grid}>
+          {filtered.slice(0, rows.shown).map((r) => (
+            <RecipeTile
+              key={r.id}
+              recipe={r}
+              hit={hits?.get(r)}
+              fade={live}
+              href={addressOf({ game: r.id })}
+              onOpen={() => {
+                opened.current = true
+                navigate(addressOf({ game: r.id }))
+              }}
+            />
+          ))}
+        </div>
+        {rows.more && <div ref={rows.end} aria-hidden="true" />}
+        {!filtered.length && (
+          <Empty title="No games match" action={<Pill onClick={clearAll}>Clear filters</Pill>}>
+            Nothing in the catalog matches. Try a different search or tag.
+          </Empty>
+        )}
+      </div>
       <p className="small muted" style={{ marginTop: 18 }}>
         Showing {rows.shown} of {filtered.length}
         {data.status.fetchedAt ? ` · Updated ${ago(data.status.fetchedAt, true)}` : ''}

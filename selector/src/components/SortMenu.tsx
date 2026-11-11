@@ -11,8 +11,10 @@ const options = [
   { value: 'time', label: 'Time played' },
 ]
 
-export default function SortMenu({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const label = options.find((option) => option.value === value)?.label ?? 'Recent'
+/** The order of the list. While a search is typed it offers Best match first, which a search starts in. */
+export default function SortMenu({ value, onChange, searching = false }: { value: string; onChange: (value: string) => void; searching?: boolean }) {
+  const all = searching ? [{ value: 'match', label: 'Best match' }, ...options] : options
+  const label = all.find((option) => option.value === value)?.label ?? 'Recent'
   return (
     <ActionMenu
       trigger={(open) => (
@@ -22,7 +24,7 @@ export default function SortMenu({ value, onChange }: { value: string; onChange:
       )}
     >
       {(close) =>
-        options.map((option) => (
+        all.map((option) => (
           <MenuItem key={option.value} icon={value === option.value ? <Check /> : undefined} onClick={() => { onChange(option.value); close() }}>
             {option.label}
           </MenuItem>

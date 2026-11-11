@@ -1,12 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Heart, Play, Sparkles, X } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '../lantern/Tile'
 import Stage, { travelToDoor, travelToPage } from '../lantern/Stage'
 import { Chip, Pill, TagPill, Bar } from '../lantern/controls'
 import Carousel from '../lantern/Carousel'
-import SearchField from '../lantern/Search'
+import SearchField, { CountLine, Marked, Toolbar, holdPlace, useSearchScroll } from '../lantern/Search'
 import { useRoom } from '../lantern/Room'
 import { useHidden } from '../lantern/art'
 import EmptyLibrary from '../components/EmptyLibrary'
@@ -16,13 +16,15 @@ import Shelf from '../components/Shelf'
 import SortMenu from '../components/SortMenu'
 import { Empty, errorText, useToast } from '../lantern/ui'
 import { useAddress, useTypedField, withParams } from '../lib/address'
+import { createSearch, type Hit } from '../lib/search'
 import { del, post } from '../lib/api'
 import { useGrowingGrid } from '../lib/grow'
 import type { Game } from '@shared/api'
+import type { Vocabulary } from '@shared/recipe'
 import { ago, capitalize, jobStage, jobSubject, pct, playedTime } from '../lib/format'
 import { playLink } from '../lib/links'
 import { useCatalog, useGames, useJobs } from '../lib/queries'
-import { gameTags, matchesSearch, tagChips } from '../lib/tags'
+import { gameTags, tagChips } from '../lib/tags'
 import { isRenpy } from '@shared/family'
 
 /** The most games Up next shows. */
@@ -65,9 +67,27 @@ function tileExtra(g: Game) {
   return parts.length ? <>{parts}</> : undefined
 }
 
-function GameTile({ game, on, onFocus, onMouseEnter }: { game: Game; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
+function GameTile({ game, hit, fade, on, onFocus, onMouseEnter }: { game: Game; hit?: Hit; fade?: boolean; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
   const installed = game.status === 'installed'
-  return <Card game={game} href={`/game/${game.id}`} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} onFocus={onFocus} onMouseEnter={onMouseEnter} />
+  const title = hit?.marks.length ? <Marked text={game.title} marks={hit.marks} /> : undefined
+  return <Card game={game} href={`/game/${game.id}`} title={title} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} fade={fade} onFocus={onFocus} onMouseEnter={onMouseEnter} />
+}
+
+/** The tags in the address, a comma separated list: a game must have every one. */
+const tagList = (value: string | null) => (value ? value.split(',').filter(Boolean) : [])
+const NO_VOCABULARY: Vocabulary = {}
+const NO_GAMES: Game[] = []
+
+/** The order a list is in: `by` is one of the sort menu's values. */
+function order(by: string): (a: Game, b: Game) => number {
+  return (a, b) => {
+    if (by === 'title') return a.title.localeCompare(b.title)
+    if (by === 'added') return Date.parse(b.createdAt) - Date.parse(a.createdAt) || a.title.localeCompare(b.title)
+    if (by === 'rating') return (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title)
+    if (by === 'time') return b.playTime - a.playTime || a.title.localeCompare(b.title)
+    const time = (g: Game) => (by === 'recent' ? Math.max(Date.parse(g.lastPlayedAt ?? '') || 0, Date.parse(g.createdAt)) : Date.parse(g.lastPlayedAt ?? '') || 0)
+    return time(b) - time(a) || a.title.localeCompare(b.title)
+  }
 }
 
 /** The stage's line about where you are: one line on a wide screen, two short lines on a phone. */
@@ -137,37 +157,44 @@ export default function Library() {
   const { data: games, isLoading, error, refetch } = useGames()
   const { data: catalog } = useCatalog()
   const { data: jobs } = useJobs()
-  const vocabulary = catalog?.vocabulary ?? {}
+  const vocabulary = catalog?.vocabulary ?? NO_VOCABULARY
   const [params, setAddress] = useAddress()
   const q = params.get('q') ?? ''
   const asked = params.get('filter') ?? ''
   // Only the shelves' own lists: an old link to Installed or Not installed shows everything.
   const filter = asked in FILTERS ? asked : 'all'
-  const tag = params.get('tag')
+  const tags = tagList(params.get('tag'))
   const sort = params.get('sort') ?? 'recent'
   const update = (key: string, value: string | null) => setAddress({ [key]: value })
   const [typed, setTyped] = useTypedField(q, (text) => update('q', text || null))
-  const all = games ?? []
+  // The list follows what is typed at once, a moment after the field itself (some browsers scroll to the caret
+  // after the keystroke, and would scroll to where it was). Only the address waits for the person to pause.
+  const query = useDeferredValue(typed)
+  const searching = query.trim() !== ''
+  // While a search is typed it is in best match order, unless the person picks another order for it.
+  const [searchSort, setSearchSort] = useState<string | null>(null)
+  const by = searching ? (searchSort ?? 'match') : sort
+  // Tiles that arrive after the person has started changing the list fade in. Those at the first load do not.
+  const [live, setLive] = useState(false)
+  const all = games ?? NO_GAMES
   const failed = (jobs?.jobs ?? [])
     .filter((job) => job.type === 'import' && ['failed', 'interrupted'].includes(job.status) && jobs?.jobs.find((other) => other.type === 'import' && other.game === job.game)?.id === job.id && !all.find((game) => game.id === job.game)?.job)
     .filter((job, index, rows) => rows.findIndex((other) => other.game === job.game) === index)
+  const search = useMemo(() => createSearch(all, (g) => gameTags(g, vocabulary).map((t) => t.label)), [all, vocabulary])
+  const hits = useMemo(() => search.find(query), [search, query])
   const shown = all
     .filter(
       (g) =>
-        matchesSearch(g, q, vocabulary) &&
+        (!hits || hits.has(g)) &&
         (filter === 'all' ||
           (filter === 'favorites' ? !!g.favoriteAt : filter === 'added' ? !g.lastPlayedAt && g.status === 'installed' && !g.job && Date.now() - Date.parse(g.createdAt) < 7 * 86400000 : failed.some((job) => job.game === g.id))) &&
-        (!tag || gameTags(g, vocabulary).some((t) => t.id === tag)),
+        (!tags.length || tags.every((id) => gameTags(g, vocabulary).some((t) => t.id === id))),
     )
-    .sort((a, b) => {
-      if (sort === 'title') return a.title.localeCompare(b.title)
-      if (sort === 'added') return Date.parse(b.createdAt) - Date.parse(a.createdAt) || a.title.localeCompare(b.title)
-      if (sort === 'rating') return (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title)
-      if (sort === 'time') return b.playTime - a.playTime || a.title.localeCompare(b.title)
-      const time = (g: typeof a) => (sort === 'recent' ? Math.max(Date.parse(g.lastPlayedAt ?? '') || 0, Date.parse(g.createdAt)) : Date.parse(g.lastPlayedAt ?? '') || 0)
-      return time(b) - time(a) || a.title.localeCompare(b.title)
-    })
-  const rows = useGrowingGrid(`library:${q}|${filter}|${tag}|${sort}`, shown.length)
+    // Games of the same rank stay in the order the person chose.
+    .sort(order(by === 'match' ? sort : by))
+  if (by === 'match' && hits) shown.sort((a, b) => hits.get(a)!.tier - hits.get(b)!.tier)
+  // The list's growth belongs to the list, not to the words typed: it is kept while they change.
+  const rows = useGrowingGrid(`library:${filter}|${tags}|${sort}|${searchSort}`, shown.length)
   // Up next: games in play. Stalled, Dropped and Finished retire a game, Not now hides it until it is played again.
   const upNext = all
     .filter((g) => g.status === 'installed' && !g.job && g.lastPlayedAt && !g.finishedAt && !['stalled', 'dropped', 'finished'].includes(g.playStatus ?? '') && !(g.notNowAt && g.notNowAt > g.lastPlayedAt))
@@ -195,15 +222,43 @@ export default function Library() {
   }
   const failedShown = failed.filter((job) => !dismissed.includes(job.id))
   const updates = all.filter((g) => g.update)
-  const home = !q && !tag && filter === 'all'
+  const active = searching || tags.length > 0 || filter !== 'all'
+  // The shelves are only for the plain library. While a search, a tag or a list is on they are gone, and the
+  // page keeps the toolbar where it is on the screen (see useSearchScroll).
+  const home = !active
+  useSearchScroll(searching, home)
   useEffect(() => {
     if (games) rememberShape(upNext.length > 0)
   }, [games, upNext.length])
 
   // The stage game: the one the person is looking at in the Up next shelf, else the first.
   const [stageId, setStageId] = useState<string | null>(null)
-  const stageGame = home ? (upNext.find((g) => g.id === stageId) ?? upNext[0]) : undefined
+  // The page's backdrop is the stage game's, and stays while the shelves are away for a search.
+  const stageGame = upNext.find((g) => g.id === stageId) ?? upNext[0]
   useRoom({ game: stageGame ?? null, quiet: !stageGame })
+
+  // A change of the list is made by the person: its tiles fade in from here on, and the page keeps its place.
+  const change = (apply: () => void) => {
+    holdPlace()
+    setLive(true)
+    apply()
+  }
+  const clearAll = () =>
+    change(() => {
+      setTyped('')
+      setSearchSort(null)
+      setAddress({ q: null, filter: null, tag: null })
+    })
+  const typeSearch = (text: string) => {
+    setLive(true)
+    if (!text.trim()) setSearchSort(null)
+    setTyped(text)
+  }
+  // Tag chips: the most common tags over all games set the order, and each counts the games shown now.
+  const chips = tagChips(all, vocabulary).map(({ id, label }) => ({ id, label }))
+  for (const id of tags) if (!chips.some((chip) => chip.id === id)) chips.push({ id, label: vocabulary[id]?.label ?? capitalize(id) })
+  const counts = new Map<string, number>()
+  for (const g of shown) for (const t of gameTags(g, vocabulary)) counts.set(t.id, (counts.get(t.id) ?? 0) + 1)
 
   if (error)
     return (
@@ -281,46 +336,54 @@ export default function Library() {
       )}
       <section className="sec">
         <div className="sec-h">
-          <h2 className="h2">
-            All games<span className="n">{all.length}</span>
-          </h2>
+          <h2 className="h2">All games</h2>
           <Link to="/catalog">Find more in the catalog</Link>
         </div>
-        <div className="toolbar">
-          <SearchField label="Search your games" value={typed} onChange={setTyped} />
-          <SortMenu value={sort} onChange={(value) => update('sort', value === 'recent' ? null : value)} />
-        </div>
+        <Toolbar label="Search your games">
+          <SearchField label="Search your games" placeholder="Title, developer or tag" value={typed} onChange={typeSearch} />
+          <SortMenu
+            value={by}
+            searching={searching}
+            onChange={(value) => {
+              setLive(true)
+              if (searching) setSearchSort(value === 'match' ? null : value)
+              else update('sort', value === 'recent' ? null : value)
+            }}
+          />
+        </Toolbar>
+        <CountLine shown={shown.length} total={all.length} active={active} onClear={clearAll} />
         {filter in FILTERS && (
           <div className="chip-bar" style={{ marginBottom: 10 }}>
-            <Chip on onClick={() => update('filter', null)} aria-label={`${FILTERS[filter]}, show all games`}>
+            <Chip on onClick={() => change(() => update('filter', null))} aria-label={`${FILTERS[filter]}, show all games`}>
               {FILTERS[filter]}
               <X aria-hidden="true" />
             </Chip>
           </div>
         )}
-        <TagFilters tags={tagChips(all, vocabulary)} selected={tag} onSelect={(id) => update('tag', id)} />
-        {!shown.length ? (
-          <Empty
-            title="No games match"
-            action={
-              <>
-                <Pill onClick={() => setAddress({ q: null, filter: null, tag: null, sort: null })}>Clear filters</Pill>
-                {!!q && <Pill variant="q" to={`/catalog?${withParams('', { q })}`}>Search the catalog</Pill>}
-              </>
-            }
-          >
-            Nothing in your library matches. Try another search or tag.
-          </Empty>
-        ) : (
-          <>
-            <div className="grid" data-row ref={rows.grid}>
-              {shown.slice(0, rows.shown).map((g) => (
-                <GameTile key={g.id} game={g} />
-              ))}
-            </div>
-            {rows.more && <div ref={rows.end} aria-hidden="true" />}
-          </>
-        )}
+        <div role="search" aria-label="Filter your games by tag">
+          <TagFilters tags={chips} counts={counts} selected={tags} onChange={(next) => change(() => update('tag', next.join(',') || null))} />
+        </div>
+        <div className={`results ${active ? 'held' : ''}`.trim()}>
+          <div className="grid" data-row ref={rows.grid}>
+            {shown.slice(0, rows.shown).map((g) => (
+              <GameTile key={g.id} game={g} hit={hits?.get(g)} fade={live} />
+            ))}
+          </div>
+          {rows.more && <div ref={rows.end} aria-hidden="true" />}
+          {!shown.length && (
+            <Empty
+              title="No games match"
+              action={
+                <>
+                  <Pill onClick={clearAll}>Clear filters</Pill>
+                  {searching && <Pill variant="q" to={`/catalog?${withParams('', { q: query.trim() })}`}>Search the catalog</Pill>}
+                </>
+              }
+            >
+              Nothing in your library matches. Try another search or tag.
+            </Empty>
+          )}
+        </div>
       </section>
     </div>
   )

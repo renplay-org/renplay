@@ -23,6 +23,3 @@ export function tagChips(games: Tagged[], vocabulary: Vocabulary) {
   }
   return [...counts.values()].filter((t) => t.count >= 2).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
 }
-export function matchesSearch(game: Tagged & { title: string; developer?: string | null }, search: string, vocabulary: Vocabulary) {
-  return [game.title, game.developer ?? '', ...gameTags(game, vocabulary).map((t) => t.label)].join(' ').toLowerCase().includes(search.trim().toLowerCase())
-}

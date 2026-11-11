@@ -184,10 +184,13 @@ The same release determines playability status and available updates.
 
 ## Library preferences and activity
 
-Library search, installation filter, tag and sort live in URL query parameters (`q`, `filter`,
-`tag`, `sort`), so returning from a game page restores the view. Recently added sorts by the
+Library search, installation filter, tags and sort live in URL query parameters (`q`, `filter`,
+`tag` as a comma separated list, `sort`), so returning from a game page restores the view. The list
+follows the typed text at once and the address follows after a pause, replacing the entry rather than
+adding one. Matching and ranking are in `selector/src/lib/search.ts`: uFuzzy finds the words and our
+tiers order them, so a title beats a developer and a developer beats a tag. Recently added sorts by the
 library entry's `createdAt`, not the installation date. Library pages reveal 60 games initially,
-then 48 at a time. Catalog pages reveal 30 at a time. Tag chips count games, include only play
+then 48 at a time. Catalog pages reveal 30 at a time. Tag chips count the games shown now, keep the order of the most common tags over all games, include only play
 and story tags shared by at least two games, and use the catalog vocabulary for labels.
 
 Each person's progress (favourite, status, rating, play time, last played) lives in `user_games`,

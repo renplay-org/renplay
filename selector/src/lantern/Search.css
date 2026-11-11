@@ -31,6 +31,14 @@
 }
 .search-field input::placeholder {
   color: var(--fg-3);
+  text-overflow: ellipsis;
+}
+/* The words typed stay 16 px (a smaller field makes iPhone Safari zoom), the hint is a little smaller so
+   "Title, developer or tag" fits beside the order on a 360 px phone. */
+@media (max-width: 719px) {
+  .search-field input::placeholder {
+    font-size: 14px;
+  }
 }
 .search-field:focus-within {
   box-shadow:
@@ -82,4 +90,62 @@
 .toolbar .seg {
   background: linear-gradient(rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.07)), rgba(10, 10, 15, 0.92);
   backdrop-filter: blur(18px);
+}
+/* The search's toolbar neither scrolls nor fades its end: both would cut off the field's focus ring. */
+.toolbar[role="search"] {
+  overflow: visible;
+  mask-image: none;
+}
+/* Where the toolbar rests before it sticks: the page measures from here. */
+.toolbar-top {
+  height: 0;
+}
+/* The count: one line of one height, so what is under it never moves when the words change. */
+.count-line {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 36px;
+  padding: 0 2px;
+  font-size: 13.5px;
+  color: var(--fg-3);
+  white-space: nowrap;
+}
+.count-line .link {
+  font-size: 13.5px;
+}
+/* Matched letters in a title: brighter and underlined in the tile's own colour, not a block of yellow. */
+.card .ct mark {
+  background: none;
+  color: #fff;
+  text-decoration: underline;
+  text-decoration-color: var(--pink-3);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+/* The results of a search, a screen tall at least: a short list or none keeps the footer where it was, and the
+   page never gets shorter than the toolbar stuck under the header with the screen below it. */
+.results.held {
+  min-height: calc(100svh - var(--top-h));
+}
+.results .empty-filter {
+  margin-top: 0;
+}
+/* The order's name is always as wide as Best match, which it says while searching: the field beside it keeps its width. */
+.toolbar .sort {
+  min-width: 124px;
+  justify-content: space-between;
+}
+/* Tag chips: the counts are tabular and keep room for two digits, so a chip's width barely changes. */
+.chip .n {
+  display: inline-block;
+  min-width: 2ch;
+  font-variant-numeric: tabular-nums;
+}
+.chip.dim:not(.on):not(.ex) {
+  opacity: 0.45;
+}
+/* The catalog's All N: wide enough for four digits, so Free and Completed stay put. */
+.toolbar .seg > button.all {
+  min-width: 80px;
 }

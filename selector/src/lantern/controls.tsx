@@ -78,10 +78,10 @@ export function IconBtn(props: IconBtnProps) {
   )
 }
 
-/** Filter chips: 40 px, selected white on ink, excluded red with a strike. */
-export function Chip({ on, ex, n, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number }) {
+/** Filter chips: 40 px, selected white on ink, excluded red with a strike, dim when nothing would show. */
+export function Chip({ on, ex, n, dim, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number; dim?: boolean }) {
   return (
-    <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''}`} {...rest}>
+    <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''} ${dim ? 'dim' : ''}`} {...rest}>
       {children}
       {n != null && ' '}
       {n != null && <span className="n">{n}</span>}
@@ -102,7 +102,7 @@ export function Seg<T extends string>({
 }: {
   value: T
   onChange?: (value: T) => void
-  options: Array<{ value: T; label: ReactNode; disabled?: boolean; na?: boolean }>
+  options: Array<{ value: T; label: ReactNode; disabled?: boolean; na?: boolean; className?: string }>
   label?: string
   small?: boolean
   scroll?: boolean
@@ -117,7 +117,7 @@ export function Seg<T extends string>({
           type="button"
           aria-pressed={o.value === value}
           disabled={disabled || o.disabled}
-          className={`${o.value === value ? 'on' : ''} ${o.na ? 'na' : ''}`}
+          className={`${o.value === value ? 'on' : ''} ${o.na ? 'na' : ''} ${o.className ?? ''}`}
           onClick={() => onChange?.(o.value)}
         >
           {o.label}

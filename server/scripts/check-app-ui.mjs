@@ -23,11 +23,14 @@ import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices, webkit } from 'playwright'
+import sharp from 'sharp'
 import { GAMES, mock, RECIPES } from './app-mock.mjs'
 
 const args = process.argv.slice(2)
 const withWebkit = args.includes('--webkit')
 const baseArg = args.includes('--base') ? args[args.indexOf('--base') + 1] : null
+// While working on one part: --only search,finds,steady,ring,cues,tags,fade runs just those, on the search checks' own pages.
+const only = args.includes('--only') ? args[args.indexOf('--only') + 1].split(',') : null
 const dist = fileURLToPath(new URL('../../selector/dist', import.meta.url))
 
 // ---- what the app is served ---------------------------------------------------------------------
@@ -696,43 +699,99 @@ async function resumeFlight(browser, base, errors, options, label) {
   await ctx.close()
 }
 
+const PLACEHOLDER = 'Title, developer or tag'
+// The page, its path, the field's label, the words its made-up titles start with, a letter in them, one title in full.
+const SEARCH_PAGES = [
+  ['the Library', '/', 'Search your games', 'Game', 'g', 'Game 125'],
+  ['the Catalog', '/catalog', 'Search the catalog', 'Recipe', 'r', 'Recipe 119'],
+]
+const fieldOf = (page, label) => page.locator(`input[aria-label="${label}"]`)
+/** Waits for the grid, and for the page's first fade to be over. */
+const ready = async (page, base, path) => {
+  await page.goto(base + path)
+  await page.waitForSelector('.grid[data-row] .card')
+  await page.waitForTimeout(900)
+}
+const titlesOf = (page) => page.evaluate(() => [...document.querySelectorAll('.grid[data-row] .card .ct')].map((e) => e.textContent))
+const pressShortcut = async (page, key) => {
+  const apple = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))
+  await page.keyboard.press(`${apple ? 'Meta' : 'Control'}+${key}`)
+}
+
 async function search(browser, base, errors, options, label) {
   const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
   const page = await ctx.newPage()
   await mock(page, errors, label)
   const phone = (options.viewport?.width ?? 1440) < 720 || !!options.isMobile
-  for (const [name, path, field, ready] of [['the Library', '/', 'Search your games', '.grid[data-row] .card'], ['the Catalog', '/catalog', 'Search the catalog', '.grid[data-row] .card']]) {
-    await page.goto(base + path)
-    await page.waitForSelector(ready)
+  for (const [name, path, field, noun, , one] of SEARCH_PAGES) {
+    await ready(page, base, path)
     const found = await page.evaluate((field) => {
       const inputs = [...document.querySelectorAll('input[type=text], input[type=search], input:not([type])')].filter((i) => i.getBoundingClientRect().width > 0)
+      const input = document.querySelector(`input[aria-label="${field}"]`)
       const box = document.querySelector('.search-field')?.getBoundingClientRect()
       const pill = document.querySelector('.toolbar .sort, .toolbar .seg')?.getBoundingClientRect()
       const hint = document.querySelector('.search-field .shortcut')
+      // The placeholder, as wide as it is drawn, against the room the field leaves it.
+      const style = getComputedStyle(input, '::placeholder')
+      const ctx2 = document.createElement('canvas').getContext('2d')
+      ctx2.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+      const room = input.clientWidth - Number.parseFloat(getComputedStyle(input).paddingLeft) - Number.parseFloat(getComputedStyle(input).paddingRight)
+      const landmarks = [...document.querySelectorAll('[role="search"], search')]
       return {
         inputs: inputs.length,
         labelled: document.querySelectorAll(`input[aria-label="${field}"]`).length,
-        placeholder: document.querySelector(`input[aria-label="${field}"]`)?.placeholder,
+        placeholder: input.placeholder,
+        fits: ctx2.measureText(input.placeholder).width <= room,
+        room: Math.round(room),
         header: document.querySelectorAll('header .search, header button[aria-keyshortcuts]').length,
         height: box && Math.round(box.height),
         beside: pill && Math.round(pill.height),
         radius: getComputedStyle(document.querySelector('.search-field')).borderRadius,
         hint: !!hint && getComputedStyle(hint).display !== 'none',
+        inLandmark: landmarks.some((l) => l.contains(input)),
+        chipsInLandmark: landmarks.some((l) => l.querySelector('.chip-bar')),
+        gridInLandmark: landmarks.some((l) => l.contains(document.querySelector('.grid[data-row]'))),
+        shortcuts: input.getAttribute('aria-keyshortcuts'),
       }
     }, field)
     check(found.inputs === 1 && found.labelled === 1 && found.header === 0, `${label}: ${name} has one search and the header has none (${found.inputs} fields)`)
-    check(found.placeholder === field, `${label}: ${name}'s search says what it searches ("${found.placeholder}")`)
+    check(found.placeholder === PLACEHOLDER && found.fits, `${label}: ${name}'s search says what it searches and the words fit (${found.room} px for "${found.placeholder}")`)
     check(found.height === found.beside && found.radius === '999px', `${label}: ${name}'s search is as high as the control beside it and a pill (${found.height} and ${found.beside} px, radius ${found.radius})`)
     check(found.hint === !phone, `${label}: ${name}'s shortcut hint is ${phone ? 'not shown on a phone' : 'shown on a desktop'}`)
-    // It filters as you type, and the address keeps the search.
+    check(found.inLandmark && found.chipsInLandmark && !found.gridInLandmark, `${label}: ${name}'s field and tag chips are in a search landmark and the results are not`)
+    check(/\//.test(found.shortcuts), `${label}: ${name}'s field names / as a shortcut (${found.shortcuts})`)
+
+    // It filters as you type at once (the address follows after a pause, without a history entry per key).
     const before = (await gridOf(page)).tiles
-    await page.fill(`input[aria-label="${field}"]`, path === '/' ? 'Game 12' : 'Recipe 12')
-    await page.waitForTimeout(600)
+    const entries = await page.evaluate(() => history.length)
+    await fieldOf(page, field).click()
+    await page.keyboard.type(one, { delay: 30 })
+    await page.waitForTimeout(120)
     const after = (await gridOf(page)).tiles
-    check(after > 0 && after < before && new URL(page.url()).searchParams.has('q'), `${label}: ${name} filters as you type (${before} tiles, then ${after})`)
+    check(after > 0 && after < before, `${label}: ${name} filters as you type, before the address has caught up (${before} tiles, then ${after})`)
+    await page.waitForTimeout(500)
+    check(new URL(page.url()).searchParams.get('q') === one && (await page.evaluate(() => history.length)) === entries, `${label}: ${name}'s address follows the search and adds no history entries`)
     await page.click('.search-field .clear')
-    await page.waitForTimeout(600)
-    check((await gridOf(page)).tiles === before, `${label}: the clear button brings every game back`)
+    await page.waitForTimeout(500)
+    // The grid may have grown a batch: the toolbar is at the top then, and the end of the grid is near.
+    check((await gridOf(page)).tiles >= before && !new URL(page.url()).searchParams.has('q'), `${label}: the clear button brings every game back`)
+
+    // / goes to the search from anywhere but a field, and is just a letter inside one.
+    await page.evaluate(() => document.activeElement?.blur())
+    await page.keyboard.press('/')
+    check(await page.evaluate((f) => document.activeElement?.getAttribute('aria-label') === f, field), `${label}: / focuses ${name}'s search`)
+    await page.keyboard.type('a/b')
+    check((await fieldOf(page, field).inputValue()) === 'a/b', `${label}: / typed inside the field stays text`)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    // The keyboard's Search key closes a phone's keyboard, so the results show. A desktop keeps its focus.
+    await fieldOf(page, field).click()
+    await page.keyboard.type(noun)
+    await page.keyboard.press('Enter')
+    const focused = await page.evaluate((f) => document.activeElement?.getAttribute('aria-label') === f, field)
+    check(focused === !phone, `${label}: Enter in ${name}'s search ${phone ? 'closes the keyboard' : 'keeps the focus'}`)
+    await fieldOf(page, field).fill('')
+    await page.waitForTimeout(400)
   }
   // The Catalog's own filters are still there, and the Library has no All, Installed and Not installed picker.
   await page.goto(base + '/catalog')
@@ -746,6 +805,358 @@ async function search(browser, base, errors, options, label) {
   await ctx.close()
 }
 
+// ---- what a search finds, and in what order -------------------------------------------------------
+
+/** The queries, and the titles each finds: best first, a group of titles of the same rank in any order. */
+const FINDS = [
+  ['ro', [['Rooftop Sunset'], ['Heroes of Rome'], ['Ripples']], 'a word start in a title, then the developer, and no Romance tag'],
+  ['rom', [['Heroes of Rome'], ['Butterfly Soup', 'Starry Flowers', 'Café Enchanté', 'Paper Lanterns']], 'a title first, then the tag from three letters'],
+  ['romance', [['Butterfly Soup', 'Starry Flowers', 'Café Enchanté', 'Paper Lanterns']], 'the tag as a whole word'],
+  ['butterfy', [['Butterfly Soup']], 'one letter missing'],
+  ['stary', [['Starry Flowers']], 'one letter missing, in the middle'],
+  ['soup butterfly', [['Butterfly Soup']], 'words in any order'],
+  ['brianna', [['Butterfly Soup']], 'a developer'],
+  ['cafe enchante', [['Café Enchanté']], 'accents on both sides'],
+  ['café', [['Café Enchanté']], 'an accent typed'],
+  ['pokemon', [], 'nothing, like any word that is not there'],
+  ['a', [['A Date with Death']], 'one letter starts a word only'],
+  ['monsters', [['Dawn of the Monsters']], 'a word in the middle of a title'],
+  ['zzzq', [], 'nothing'],
+]
+
+/** Whether `titles` is `groups`: the groups in order, each in any order. */
+const inGroups = (titles, groups) => {
+  if (titles.length !== groups.flat().length) return false
+  let at = 0
+  return groups.every((group) => {
+    const part = titles.slice(at, (at += group.length))
+    return part.length === group.length && group.every((t) => part.includes(t))
+  })
+}
+
+async function finds(browser, base, errors, options, label) {
+  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label, { titled: true })
+  const seen = []
+  for (const [name, path, field] of SEARCH_PAGES) {
+    await ready(page, base, path)
+    const input = fieldOf(page, field)
+    for (const [query, groups, why] of FINDS) {
+      await input.fill(query)
+      await page.waitForTimeout(150)
+      const titles = await titlesOf(page)
+      const empty = await page.evaluate(() => !!document.querySelector('.results .empty-filter'))
+      const ok = inGroups(titles, groups) && empty === !groups.length
+      check(ok, `${label}: ${name} finds "${query}" (${why}): ${titles.slice(0, 3).join(', ') || 'nothing'}${titles.length > 3 ? ` and ${titles.length - 3} more` : ''}`)
+      seen.push(`${name} "${query}": ${titles.slice(0, 3).join(', ') || 'nothing'}`)
+      if (name === 'the Library' && query === 'butterfy') {
+        const marked = await page.evaluate(() => [...document.querySelectorAll('.card .ct mark')].map((m) => m.textContent))
+        check(marked.join('') === 'Butterfl', `${label}: the matched letters of a title are marked (${marked.join(' | ')})`)
+      }
+      if (name === 'the Library' && query === 'soup butterfly') {
+        const marked = await page.evaluate(() => [...document.querySelectorAll('.card .ct mark')].map((m) => m.textContent))
+        check(marked.join(' ') === 'Butterfly Soup', `${label}: every word typed is marked in the title (${marked.join(' | ')})`)
+      }
+    }
+    await input.fill('')
+  }
+  if (process.env.SHOW_FINDS) console.log(seen.join('\n'))
+
+  // The order: best match while there is text, the sort control says so, and clearing returns to the chosen order.
+  await ready(page, base, '/?sort=title')
+  const chosen = await titlesOf(page)
+  await fieldOf(page, 'Search your games').fill('ro')
+  await page.waitForTimeout(150)
+  const sortLabel = await page.evaluate(() => document.querySelector('.toolbar .sort')?.textContent.trim())
+  check(sortLabel === 'Best match', `${label}: the sort control says Best match while there is text (${sortLabel})`)
+  await fieldOf(page, 'Search your games').fill('')
+  await page.waitForTimeout(150)
+  const sortBack = await page.evaluate(() => document.querySelector('.toolbar .sort')?.textContent.trim())
+  check(sortBack === 'Title' && (await titlesOf(page)).join() === chosen.join(), `${label}: clearing the field returns to the order chosen before (${sortBack})`)
+  // Another order can still be picked for a search, and clearing forgets it.
+  await fieldOf(page, 'Search your games').fill('o')
+  await page.waitForTimeout(150)
+  await page.click('.toolbar .sort')
+  await page.getByRole('button', { name: 'Recently added', exact: true }).click()
+  await page.waitForTimeout(150)
+  check((await page.evaluate(() => document.querySelector('.toolbar .sort')?.textContent.trim())) === 'Recently added' && new URL(page.url()).searchParams.get('sort') === 'title', `${label}: another order can be picked for one search without changing the chosen one`)
+  await fieldOf(page, 'Search your games').fill('')
+  await page.waitForTimeout(150)
+  check((await page.evaluate(() => document.querySelector('.toolbar .sort')?.textContent.trim())) === 'Title', `${label}: the order picked for a search ends with it`)
+  await ctx.close()
+}
+
+// ---- steady while typing -------------------------------------------------------------------------
+
+/** Samples the page on every frame: where things are, how tall it is, the shifts the browser reports (Chromium only). */
+const startSampling = (page) =>
+  page.evaluate(() => {
+    window.__frames = []
+    window.__shifts = []
+    try {
+      // A container that grows upward is reported with the same visible box before and after: nothing moved on screen.
+      const moved = (e) => e.sources.some((s) => JSON.stringify(s.previousRect) !== JSON.stringify(s.currentRect))
+      new PerformanceObserver((list) => list.getEntries().forEach((e) => window.__shifts.push(moved(e) ? e.value : 0))).observe({ type: 'layout-shift', buffered: false })
+    } catch {}
+    const top = (sel) => document.querySelector(sel)?.getBoundingClientRect().top ?? null
+    const tick = () => {
+      window.__frames.push({
+        y: scrollY,
+        header: top('header.top'),
+        toolbar: top('.toolbar[role="search"]'),
+        chips: top('.chip-bar'),
+        tile: top('.grid[data-row] .card'),
+        count: document.querySelector('.count-line')?.getBoundingClientRect().height ?? null,
+        doc: document.documentElement.scrollHeight,
+        vh: innerHeight,
+      })
+      window.__loop = requestAnimationFrame(tick)
+    }
+    tick()
+  })
+/** The frames since the last call. */
+const takeFrames = (page) =>
+  page.evaluate(() => {
+    const out = { frames: window.__frames, shifts: window.__shifts }
+    window.__frames = []
+    window.__shifts = []
+    return out
+  })
+const spread = (frames, key) => {
+  const values = frames.map((f) => f[key]).filter((v) => v != null)
+  return values.length ? Math.max(...values) - Math.min(...values) : 0
+}
+
+/**
+ * Types one letter and deletes it, from the top of the page and from scrolled down, and fails on any movement
+ * but the one scroll when a search starts: the header, the toolbar, the tag chips and the first tile stay on the
+ * screen, the document never gets shorter under the scroll, and nothing is scrolled on the later keys.
+ */
+async function steady(browser, base, errors, options, label) {
+  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label)
+  const tolerance = 1
+  for (const [name, path, field, , letter] of SEARCH_PAGES) {
+    for (const from of ['the top', 'scrolled down']) {
+      const where = `${label}: ${name} from ${from}`
+      await ready(page, base, path)
+      if (from !== 'the top') {
+        await page.evaluate(() => window.scrollTo({ top: 1500, behavior: 'instant' }))
+        await page.waitForTimeout(300)
+      }
+      const keysBefore = await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith('renplay:scroll:')).length)
+      const animations = await page.evaluate(() => document.querySelector('main')?.firstElementChild?.getAnimations().length)
+      const root = await page.evaluate(() => { window.__root = document.querySelector('main')?.firstElementChild; return !!window.__root })
+      const room = await page.evaluate(() => document.querySelector('.bd')?.outerHTML)
+      await page.evaluate((f) => document.querySelector(`input[aria-label="${f}"]`).focus({ preventScroll: true }), field)
+      await startSampling(page)
+      await page.waitForTimeout(100)
+      await takeFrames(page)
+      // The first key of a search: one scroll, at once, that puts the toolbar under the header.
+      await page.keyboard.type(letter)
+      await page.waitForTimeout(500)
+      const first = await takeFrames(page)
+      const ys = [...new Set(first.frames.map((f) => Math.round(f.y)))]
+      const bars = [...new Set(first.frames.map((f) => Math.round(f.toolbar)))]
+      const stuck = first.frames.at(-1).toolbar
+      check(ys.length <= 2 && bars.length <= 2 && first.frames.every((f) => f.header === 0), `${where}: the first letter scrolls once, at once (scroll positions ${ys.join(', ')}, toolbar at ${bars.join(', ')})`)
+      check(Math.abs(stuck - first.frames.at(-1).header - (await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.toolbar[role="search"]')).top)))) <= tolerance, `${where}: the toolbar ends stuck under the header (${Math.round(stuck)} px from the top)`)
+      check(first.frames.every((f) => f.doc >= f.y + f.vh - 1), `${where}: the page is never shorter than the scroll under the first letter`)
+      // The second letter moves nothing, not even the scroll.
+      await page.keyboard.type(letter === 'g' ? 'a' : 'e')
+      await page.waitForTimeout(400)
+      const second = await takeFrames(page)
+      check(spread(second.frames, 'y') === 0 && spread(second.frames, 'toolbar') <= tolerance && spread(second.frames, 'chips') <= tolerance && spread(second.frames, 'count') === 0, `${where}: the second letter moves nothing (scroll ${spread(second.frames, 'y')}, toolbar ${spread(second.frames, 'toolbar').toFixed(2)}, chips ${spread(second.frames, 'chips').toFixed(2)})`)
+      // Deleting both: the shelves come back above the view, and the toolbar, the chips and the tiles keep their places.
+      await page.keyboard.press('Backspace')
+      await page.waitForTimeout(400)
+      const back = await takeFrames(page)
+      check(spread(back.frames, 'y') === 0 && spread(back.frames, 'toolbar') <= tolerance && spread(back.frames, 'chips') <= tolerance, `${where}: deleting a letter moves nothing`)
+      await page.keyboard.press('Backspace')
+      await page.waitForTimeout(500)
+      const cleared = await takeFrames(page)
+      const ysC = [...new Set(cleared.frames.map((f) => Math.round(f.y)))]
+      const moved = ['toolbar', 'chips', 'tile', 'count'].map((k) => [k, spread(cleared.frames, k)]).filter(([, v]) => v > tolerance)
+      check(!moved.length && ysC.length <= 2 && cleared.frames.every((f) => f.doc >= f.y + f.vh - 1), `${where}: deleting the last letter keeps the toolbar, the chips and the tiles in place${moved.length ? ` (moved ${moved.map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')})` : ''}`)
+      const all = await takeFrames(page)
+      const shifts = [...first.shifts, ...second.shifts, ...back.shifts, ...cleared.shifts, ...all.shifts]
+      // Layout shift entries (Chromium): the first letter's scroll is the one allowed to move things.
+      const later = [...second.shifts, ...back.shifts, ...cleared.shifts].reduce((a, b) => a + b, 0)
+      check(later < 0.01, `${where}: no layout shift after the first letter (${later.toFixed(4)}${options.isMobile && !shifts.length ? ', none reported by this browser' : ''})`)
+      const keysAfter = await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith('renplay:scroll:')).length)
+      check(keysAfter <= keysBefore + 1, `${where}: a search adds no scroll memory of its own (${keysBefore} then ${keysAfter})`)
+      const still = await page.evaluate((r) => ({ same: document.querySelector('main')?.firstElementChild === window.__root, animations: document.querySelector('main')?.firstElementChild?.getAnimations().length, room: document.querySelector('.bd')?.outerHTML === r }), room)
+      check(still.same && still.animations === animations && still.room, `${where}: the page does not fade in again and the backdrop does not change`)
+      await page.evaluate(() => cancelAnimationFrame(window.__loop))
+    }
+  }
+  await ctx.close()
+}
+
+// ---- the focus ring, the count, the status, the fade, the tags -------------------------------------
+
+/** The sides of a box (in CSS pixels) where the white focus ring 2 to 4 px outside it is not there: none when it is whole. */
+async function ringAt(page, box) {
+  const margin = 8
+  const clip = { x: box.x - margin, y: box.y - margin, width: box.width + 2 * margin, height: box.height + 2 * margin }
+  const { data, info } = await sharp(await page.screenshot({ clip, scale: 'css' })).raw().toBuffer({ resolveWithObject: true })
+  const px = (x, y) => {
+    const i = (Math.round(y) * info.width + Math.round(x)) * info.channels
+    return Math.min(data[i], data[i + 1], data[i + 2])
+  }
+  const at = (d) => d + margin
+  // Three points on each side, 3 px outside the field: the ring is 2 to 4 px out.
+  const w = box.width, h = box.height
+  const points = []
+  for (const f of [0.25, 0.5, 0.75]) points.push(['top', px(margin + w * f, at(-3))], ['bottom', px(margin + w * f, at(h + 3))])
+  for (const f of [0.45, 0.5, 0.55]) points.push(['left', px(at(-3), margin + h * f)], ['right', px(at(w + 3), margin + h * f)])
+  // Whole is white, cut is the page's dark: a pixel half way is the ring's edge on a screen that is not on a whole pixel.
+  return points.filter(([, v]) => v < 128).map(([side]) => side)
+}
+
+async function ring(browser, base, errors, options, label) {
+  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label)
+  const phone = (options.viewport?.width ?? 1440) < 720 || !!options.isMobile
+  for (const [name, path, field] of SEARCH_PAGES) {
+    for (const how of ['the shortcut', '/', phone ? 'a tap' : 'a click']) {
+      await ready(page, base, path)
+      await page.evaluate(() => document.activeElement?.blur())
+      if (how === 'the shortcut') await pressShortcut(page, 'k')
+      else if (how === '/') await page.keyboard.press('/')
+      else if (phone) {
+        // A person scrolls the toolbar into view and taps it: the tab bar covers the bottom of the first screen.
+        await page.evaluate(() => window.scrollTo({ top: 600, behavior: 'instant' }))
+        await page.waitForTimeout(200)
+        await page.touchscreen.tap(...(await fieldOf(page, field).boundingBox().then((b) => [b.x + b.width / 2, b.y + b.height / 2])))
+      }
+      else await fieldOf(page, field).click()
+      await page.waitForTimeout(700)
+      const state = await page.evaluate((f) => {
+        const input = document.querySelector(`input[aria-label="${f}"]`)
+        const box = document.querySelector('.search-field').getBoundingClientRect()
+        return { focused: document.activeElement === input, box: { x: box.x, y: box.y, width: box.width, height: box.height }, inView: box.top >= 0 && box.bottom <= (document.querySelector('.tabbar') && getComputedStyle(document.querySelector('.tabbar')).display !== 'none' ? document.querySelector('.tabbar').getBoundingClientRect().top : innerHeight) }
+      }, field)
+      const cut = state.focused ? await ringAt(page, state.box) : ['not focused']
+      check(state.focused && state.inView && !cut.length, `${label}: the focus ring on ${name} is whole after ${how}${cut.length ? ` (cut at ${cut.join(', ')})` : ''}`)
+    }
+  }
+  await ctx.close()
+}
+
+async function cues(browser, base, errors, options, label) {
+  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label, { titled: true })
+  for (const [name, path, field] of SEARCH_PAGES) {
+    await ready(page, base, path)
+    const read = () => page.evaluate(() => ({ line: document.querySelector('.count-line .count')?.textContent, status: document.querySelector('.count-line [role="status"]')?.textContent, clear: !!document.querySelector('.count-line .link'), height: document.querySelector('.count-line')?.getBoundingClientRect().height, seg: [...document.querySelectorAll('.toolbar .seg button, .toolbar .sort')].map((b) => Math.round(b.getBoundingClientRect().left * 10) / 10), chips: document.querySelector('.chip-bar')?.getBoundingClientRect().top }))
+    const idle = await read()
+    check(idle.line === '12 games' && !idle.clear, `${label}: ${name} counts its games with nothing typed (${idle.line})`)
+    await fieldOf(page, field).click()
+    await page.keyboard.type('rom', { delay: 40 })
+    await page.waitForTimeout(150)
+    const typing = await read()
+    check(typing.line === '5 of 12 games' && typing.clear && typing.height === idle.height, `${label}: ${name} says "${typing.line}" with Clear all while searching, on a line of the same height`)
+    check(typing.seg.join() === idle.seg.join(), `${label}: ${name}'s controls beside the search keep their places while the count changes (${idle.seg.join(', ')})`)
+    check(typing.status === '12 games', `${label}: ${name}'s status region does not speak on every key (still "${typing.status}")`)
+    await page.waitForTimeout(800)
+    check((await read()).status === '5 of 12 games', `${label}: ${name}'s status region says the count once the person pauses`)
+    // Clear all takes the search and the tags away at once.
+    await page.getByRole('button', { name: /^(Romance|Fantasy)/ }).first().click()
+    await page.waitForTimeout(150)
+    await page.getByRole('button', { name: 'Clear all' }).click()
+    await page.waitForTimeout(500)
+    const cleared = await read()
+    check(cleared.line === '12 games' && !cleared.clear && (await fieldOf(page, field).inputValue()) === '' && !new URL(page.url()).searchParams.has('q') && !new URL(page.url()).searchParams.has('tag') && !new URL(page.url()).searchParams.has('with'), `${label}: Clear all clears the search and the tags together (${cleared.line})`)
+  }
+  await ctx.close()
+}
+
+async function tags(browser, base, errors, options, label) {
+  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label, { titled: true })
+  const chips = () => page.evaluate(() => [...document.querySelectorAll('.chip-bar .chips.wrap .chip')].map((c) => ({ label: c.childNodes[0].textContent.trim(), n: Number(c.querySelector('.n')?.textContent), dim: c.classList.contains('dim'), on: c.getAttribute('aria-pressed') === 'true', width: c.getBoundingClientRect().width })))
+  const order = (list) => list.map((c) => c.label).join(', ')
+  for (const [name, path, field] of SEARCH_PAGES) {
+    await ready(page, base, path)
+    const before = await chips()
+    check(before.length >= 6 && before.every((c) => Number.isInteger(c.n)), `${label}: ${name}'s tag chips show counts (${before.slice(0, 4).map((c) => `${c.label} ${c.n}`).join(', ')})`)
+    // A search leaves the chips where they are and counts what it finds. A chip nothing would show is dim.
+    await fieldOf(page, field).click()
+    await page.keyboard.type('moon')
+    await page.waitForTimeout(200)
+    const during = await chips()
+    check(order(during) === order(before), `${label}: ${name}'s chips keep their order while a search is typed`)
+    const total = during.reduce((n, c) => n + c.n, 0)
+    check(during.some((c) => c.n < before.find((b) => b.label === c.label).n) && during.some((c) => c.n === 0 && c.dim) && during.every((c) => c.dim === (c.n === 0)), `${label}: ${name}'s chips count what the search finds (${during.map((c) => `${c.label} ${c.n}`).join(', ')}) and dim the empty ones`)
+    check(total > 0 && Math.max(...during.map((c, i) => Math.abs(c.width - before[i].width))) <= 12, `${label}: ${name}'s chips hardly change width while the counts do (${Math.max(...during.map((c, i) => Math.abs(c.width - before[i].width))).toFixed(1)} px)`)
+    await fieldOf(page, field).fill('')
+    await page.waitForTimeout(200)
+    // Selected chips come first, and the Library takes more than one tag: a game must have all.
+    await page.getByRole('button', { name: /^Drama/ }).first().click()
+    await page.getByRole('button', { name: /^Mystery/ }).first().click()
+    await page.waitForTimeout(400)
+    const picked = await chips()
+    const selected = picked.filter((c) => c.on)
+    check(selected.length >= 1 && picked.slice(0, selected.length).every((c) => c.on), `${label}: ${name}'s selected chips come first (${order(picked.slice(0, 3))})`)
+    // A row that scrolls sideways on a phone goes back to its start, where the chosen chips now are.
+    check(await page.evaluate(() => document.querySelector('.chip-bar .chips.wrap').scrollLeft === 0), `${label}: ${name}'s chip row shows its start, with the chosen chips, after a tag is chosen`)
+    if (name === 'the Library') {
+      const tagsInAddress = new URL(page.url()).searchParams.get('tag')?.split(',') ?? []
+      const titles = await titlesOf(page)
+      check(tagsInAddress.length === 2 && titles.length >= 1 && titles.length < 4, `${label}: the Library takes two tags and keeps them in the address (${tagsInAddress.join(', ')}: ${titles.join(', ')})`)
+    }
+    await page.getByRole('button', { name: 'Clear all' }).click()
+    await page.waitForTimeout(300)
+  }
+  await ctx.close()
+}
+
+async function fade(browser, base, errors, options, label, { reduced = false } = {}) {
+  const ctx = await browser.newContext({ ...options, reducedMotion: reduced ? 'reduce' : 'no-preference', serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label, { titled: true })
+  for (const [name, path, field] of SEARCH_PAGES) {
+    await ready(page, base, path)
+    await page.evaluate(() => document.querySelectorAll('.grid[data-row] .card').forEach((c) => (c.__old = true)))
+    await fieldOf(page, field).click()
+    await page.keyboard.type('o')
+    await page.waitForTimeout(400)
+    const kept = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.grid[data-row] .card')]
+      return { cards: cards.length, old: cards.filter((c) => c.__old).length, animating: cards.filter((c) => c.getAnimations().length).length }
+    })
+    check(kept.old === kept.cards && kept.animating === 0, `${label}: ${name}: tiles that stay are the same tiles and do not blink (${kept.old} of ${kept.cards} kept, ${kept.animating} fading)`)
+    await page.keyboard.press('Backspace')
+    // The tiles that come back fade in, over about 150 ms, and the others are left alone.
+    const seen = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          const cards = () => [...document.querySelectorAll('.grid[data-row] .card')]
+          let max = 0, stays = 0, length = 0
+          const t0 = performance.now()
+          const tick = () => {
+            const fading = cards().filter((c) => c.getAnimations().length)
+            max = Math.max(max, fading.length)
+            stays += fading.filter((c) => c.__old).length
+            for (const c of fading) for (const a of c.getAnimations()) length = Math.max(length, a.effect.getComputedTiming().duration)
+            if (performance.now() - t0 < 500) requestAnimationFrame(tick)
+            else done({ max, stays, length, cards: cards().length })
+          }
+          tick()
+        }),
+    )
+    if (reduced) check(seen.max === 0, `${label}: ${name}: no fade with reduced motion`)
+    else check(seen.max > 0 && seen.stays === 0 && seen.length >= 100 && seen.length <= 200, `${label}: ${name}: tiles that come back fade in over ${seen.length} ms and the ones already there do not (${seen.max} of ${seen.cards} fading)`)
+  }
+  await ctx.close()
+}
+
 // ---- run ----------------------------------------------------------------------------------------
 
 const errors = []
@@ -755,40 +1166,58 @@ const desktop = { viewport: { width: 1440, height: 900 } }
 const phoneChromium = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }
 
 const chrome = await chromium.launch()
-// The rows take the longest and need no timing, so they run beside the rest, which does.
-await Promise.all([
-  rowsAt(chrome, served.url, errors),
-  (async () => {
-    await memory(chrome, served.url, errors, desktop, 'desktop')
-    await flight(chrome, served.url, errors, desktop, 'desktop')
-    await flight(chrome, served.url, errors, phoneChromium, 'phone')
-    await touch(chrome, served.url, errors)
-    await carousel(chrome, served.url, errors, desktop, 'desktop')
-    await carouselStill(chrome, served.url, errors, desktop, 'desktop')
-    await carouselLoop(chrome, served.url, errors, desktop, 'desktop')
-    await carouselLoop(chrome, served.url, errors, desktop, 'desktop without scrollend', { noScrollEnd: true })
-    await carousel(chrome, served.url, errors, phoneChromium, 'phone', { swipe: true })
-    await carouselLoop(chrome, served.url, errors, phoneChromium, 'phone', { swipe: true })
-    await carouselLoop(chrome, served.url, errors, phoneChromium, 'phone without scrollend', { swipe: true, noScrollEnd: true })
-    await resumeFlight(chrome, served.url, errors, desktop, 'desktop')
-    await search(chrome, served.url, errors, desktop, 'desktop')
-    await search(chrome, served.url, errors, phoneChromium, 'phone')
-    await skeleton(chrome, served.url, errors, desktop, 'desktop')
-    await skeleton(chrome, served.url, errors, phoneChromium, 'phone')
-    await shift(chrome, served.url, errors)
-  })(),
-])
+const searches = { search, finds, steady, ring, cues, tags, fade }
+/** The checks of the search, on one browser and screen. */
+async function searching(browser, options, label) {
+  for (const [name, run] of Object.entries(searches)) {
+    if (only && !only.includes(name)) continue
+    await run(browser, served.url, errors, options, label)
+    if (name === 'fade') await run(browser, served.url, errors, options, `${label}, reduced motion`, { reduced: true })
+  }
+}
+
+if (only) {
+  await searching(chrome, desktop, 'desktop')
+  await searching(chrome, phoneChromium, 'phone')
+} else {
+  // The rows take the longest and need no timing, so they run beside the rest, which does.
+  await Promise.all([
+    rowsAt(chrome, served.url, errors),
+    (async () => {
+      await memory(chrome, served.url, errors, desktop, 'desktop')
+      await flight(chrome, served.url, errors, desktop, 'desktop')
+      await flight(chrome, served.url, errors, phoneChromium, 'phone')
+      await touch(chrome, served.url, errors)
+      await carousel(chrome, served.url, errors, desktop, 'desktop')
+      await carouselStill(chrome, served.url, errors, desktop, 'desktop')
+      await carouselLoop(chrome, served.url, errors, desktop, 'desktop')
+      await carouselLoop(chrome, served.url, errors, desktop, 'desktop without scrollend', { noScrollEnd: true })
+      await carousel(chrome, served.url, errors, phoneChromium, 'phone', { swipe: true })
+      await carouselLoop(chrome, served.url, errors, phoneChromium, 'phone', { swipe: true })
+      await carouselLoop(chrome, served.url, errors, phoneChromium, 'phone without scrollend', { swipe: true, noScrollEnd: true })
+      await resumeFlight(chrome, served.url, errors, desktop, 'desktop')
+      await searching(chrome, desktop, 'desktop')
+      await searching(chrome, phoneChromium, 'phone')
+      await skeleton(chrome, served.url, errors, desktop, 'desktop')
+      await skeleton(chrome, served.url, errors, phoneChromium, 'phone')
+      await shift(chrome, served.url, errors)
+    })(),
+  ])
+}
 await chrome.close()
 
 if (withWebkit) {
   const safari = await webkit.launch()
-  await flight(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
-  await memory(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
-  await carousel(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
-  await carouselStill(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
-  await carouselLoop(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
-  await carouselLoop(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit) without scrollend', { noScrollEnd: true })
-  await search(safari, served.url, errors, devices['iPhone 15 Pro'], 'phone (WebKit)')
+  const iphone = devices['iPhone 15 Pro']
+  if (!only) {
+    await flight(safari, served.url, errors, iphone, 'phone (WebKit)')
+    await memory(safari, served.url, errors, iphone, 'phone (WebKit)')
+    await carousel(safari, served.url, errors, iphone, 'phone (WebKit)')
+    await carouselStill(safari, served.url, errors, iphone, 'phone (WebKit)')
+    await carouselLoop(safari, served.url, errors, iphone, 'phone (WebKit)')
+    await carouselLoop(safari, served.url, errors, iphone, 'phone (WebKit) without scrollend', { noScrollEnd: true })
+  }
+  await searching(safari, iphone, 'phone (WebKit)')
   await safari.close()
 }
 served.close()

@@ -63,19 +63,29 @@ function withState(prefs: TagPrefs, id: string, state: State): TagPrefs {
 
 /**
  * Tag chips for the catalog: a tap includes a tag, the next leaves it out, the next clears it.
- * All tags opens every tag by group, with how many of the games shown have it.
+ * Each chip counts the `games` shown now that have the tag, and a chip nothing would show is dim. The row
+ * keeps the order of the most common tags over `all` the games (the chosen ones first), so it does not
+ * rearrange while a search is typed. All tags opens every tag by group.
  */
-export default function CatalogTags({ games, vocabulary, prefs, onChange, excludeOnly = false }: { games: Tagged[]; vocabulary: Vocabulary; prefs: TagPrefs; onChange: (next: TagPrefs) => void; excludeOnly?: boolean }) {
-  const [all, setAll] = useState(false)
-  const counts = new Map<string, { id: string; label: string; group: string; count: number }>()
-  for (const g of games) for (const t of gameTags(g, vocabulary)) {
-    const e = counts.get(t.id) ?? { id: t.id, label: t.label, group: t.group, count: 0 }
-    e.count++
+export default function CatalogTags({ games, all = games, vocabulary, prefs, onChange, excludeOnly = false }: { games: Tagged[]; all?: Tagged[]; vocabulary: Vocabulary; prefs: TagPrefs; onChange: (next: TagPrefs) => void; excludeOnly?: boolean }) {
+  const [sheet, setSheet] = useState(false)
+  // A chosen tag moves to the front of the row: the row goes back to its start, where it is.
+  const row = useRef<HTMLDivElement>(null)
+  // Every tag of every game, most common first, each with how many of the games shown have it.
+  const counts = new Map<string, { id: string; label: string; group: string; count: number; total: number }>()
+  for (const g of all) for (const t of gameTags(g, vocabulary)) {
+    const e = counts.get(t.id) ?? { id: t.id, label: t.label, group: t.group, count: 0, total: 0 }
+    e.total++
     counts.set(t.id, e)
   }
+  if (games !== all) for (const g of games) for (const t of gameTags(g, vocabulary)) counts.get(t.id)!.count++
+  else for (const e of counts.values()) e.count = e.total
   const chosen = [...prefs.include, ...prefs.exclude]
+  useEffect(() => {
+    row.current?.scrollTo({ left: 0, behavior: 'instant' })
+  }, [chosen.join()])
   // The row: chosen tags first, then the most common play and story tags.
-  const common = [...counts.values()].filter((t) => (t.group === 'play' || t.group === 'story') && t.count >= 2 && !chosen.includes(t.id)).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+  const common = [...counts.values()].filter((t) => (t.group === 'play' || t.group === 'story') && t.total >= 2 && !chosen.includes(t.id)).sort((a, b) => b.total - a.total || a.label.localeCompare(b.label))
   const label = (id: string) => counts.get(id)?.label ?? vocabulary[id]?.label ?? id
   // Leaving out only (the defaults for everyone): off and left out.
   const next = (id: string): State => (excludeOnly ? (stateOf(prefs, id) === 'exclude' ? 'off' : 'exclude') : ({ off: 'include', include: 'exclude', exclude: 'off' } as const)[stateOf(prefs, id)])
@@ -87,6 +97,7 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange, exclud
         on={state === 'include'}
         ex={state === 'exclude'}
         n={n}
+        dim={n === 0}
         aria-label={`${label(id)}${n === undefined ? '' : ` ${n}`}, ${state === 'include' ? 'included' : state === 'exclude' ? 'left out' : 'any'}`}
         onClick={() => onChange(withState(prefs, id, next(id)))}
       >
@@ -97,17 +108,17 @@ export default function CatalogTags({ games, vocabulary, prefs, onChange, exclud
   return (
     <>
       <div className="chip-bar" style={{ marginBottom: 16 }}>
-        <div className="chips wrap">
+        <div className="chips wrap" ref={row}>
           {chosen.map((id) => chip(id, counts.get(id)?.count ?? 0))}
           {common.slice(0, Math.max(0, 8 - chosen.length)).map((t) => chip(t.id, t.count))}
         </div>
         <div className="chips">
-          {chosen.length > 0 && <Chip onClick={() => onChange({ include: [], exclude: [] })}>Clear tags</Chip>}
-          <Chip onClick={() => setAll(true)}>All tags</Chip>
+          {excludeOnly && chosen.length > 0 && <Chip onClick={() => onChange({ include: [], exclude: [] })}>Clear tags</Chip>}
+          <Chip onClick={() => setSheet(true)}>All tags</Chip>
         </div>
       </div>
-      {all && (
-        <Sheet open onClose={() => setAll(false)} title="Tags" wide fullPhone>
+      {sheet && (
+        <Sheet open onClose={() => setSheet(false)} title="Tags" wide fullPhone>
           <p className="small muted" style={{ marginBottom: 16 }}>
             {excludeOnly
               ? 'Games with a tag left out here are hidden in the catalog for everyone who has not chosen their own tags.'
