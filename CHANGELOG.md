@@ -25,6 +25,7 @@ release notes say what).
 
 ### Fixed
 
+- The daily usage report is no longer refused when a catalog game's release name has a space or a bracket, or is empty. The collector now drops a release it cannot read and keeps the rest of the report. No upgrade is needed.
 - Screen readers wait until you pause typing before announcing the search count, even when the latest letter finds the same number of games.
 - The website's catalog fills the next rows before they come into view on a slow phone, so the request section and footer do not jump down while you scroll.
 - The focus ring of the search was cut off on its left side in the Library on a computer and on its right side in the Catalog on a phone.
