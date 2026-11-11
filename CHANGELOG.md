@@ -28,6 +28,7 @@ release notes say what).
 - The focus ring of the search was cut off on its left side in the Library on a computer and on its right side in the Catalog on a phone.
 - The Catalog's tag chips no longer vanish while you search, and its All segment keeps its width.
 - A search no longer adds a scroll position to the browser's memory for every word you try.
+- The Library's heading keeps its height on phones with a wide font. The count that a search adds no longer wraps the heading onto a second line, and the link beside it is cut short instead. The footer's links are at least 40 px wide to touch.
 
 ## [4.9.0] - 2026-11-10
 

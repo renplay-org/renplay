@@ -67,40 +67,50 @@ export async function growBy(page, batches) {
 }
 
 /**
- * The flying picture on every frame, and where its animation ends (the last keyframe, since the last frame seen
- * may be a few hundredths of a second short of it): its shape and place.
+ * The flying picture as the page shows it, and where its animation ends (the last keyframe, since the last frame seen
+ * may be a few hundredths of a second short of it): its shape and place. It is noted the moment it is added to the page,
+ * so a flight is seen on a machine too slow to draw a frame during it, and on every frame after that.
  */
 export const recordGhost = (page) =>
   page.evaluate(() => {
     window.__ghost = []
     window.__end = null
+    const note = (el) => {
+      const r = el.getBoundingClientRect()
+      window.__ghost.push({ w: r.width, h: r.height, x: r.x, y: r.y })
+      if (!window.__end) {
+        const last = el.getAnimations()[0]?.effect.getKeyframes().at(-1)
+        const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([-\d.]+)\)/.exec(last?.transform ?? '')
+        if (m) window.__end = { x: +m[1], y: +m[2], width: el.offsetWidth * +m[3] }
+      }
+    }
+    window.__added = new MutationObserver((list) => {
+      for (const m of list) for (const el of m.addedNodes) if (el.classList?.contains('ghost')) note(el)
+    })
+    window.__added.observe(document.body, { childList: true })
     const tick = () => {
       const el = document.querySelector('.ghost')
-      if (el) {
-        const r = el.getBoundingClientRect()
-        window.__ghost.push({ w: r.width, h: r.height, x: r.x, y: r.y })
-        if (!window.__end) {
-          const last = el.getAnimations()[0]?.effect.getKeyframes().at(-1)
-          const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([-\d.]+)\)/.exec(last?.transform ?? '')
-          if (m) window.__end = { x: +m[1], y: +m[2], width: el.offsetWidth * +m[3] }
-        }
-      }
+      if (el) note(el)
       window.__recording = requestAnimationFrame(tick)
     }
     window.__recording = requestAnimationFrame(tick)
   })
-/** The frames recorded, once the flying picture has landed. */
+/** The frames recorded, once the flying picture has been seen (the page makes it a frame or more after the page shows) and has landed. */
 export const takeGhost = async (page) => {
-  await page.waitForTimeout(300)
+  await page.waitForFunction(() => window.__ghost.length > 0, null, { timeout: 10000 }).catch(() => {})
   await page.waitForFunction(() => !document.querySelector('.ghost'), null, { timeout: 5000 })
   return page.evaluate(() => {
     cancelAnimationFrame(window.__recording)
+    window.__added.disconnect()
     return { frames: window.__ghost, end: window.__end }
   })
 }
 
-// Every frame sampled keeps 2:3. A slow machine (CI) samples only a few frames of a short flight: two are enough.
-export const shapeOk = (frames) => frames.length >= 2 && frames.every((f) => Math.abs(f.h / f.w - 1.5) < 0.02)
+// Every picture seen keeps 2:3, and one was seen: how many frames a slow machine draws during a short flight is not for a check.
+export const shapeOk = (frames) => frames.length >= 1 && frames.every((f) => Math.abs(f.h / f.w - 1.5) < 0.02)
+
+/** Waits until the game page is on screen and the list it came from is gone: the stage of the Library's carousel is not the game's. */
+export const onGamePage = (page) => page.waitForFunction(() => location.pathname.startsWith('/game/') && !document.querySelector('.grid[data-row]') && document.querySelector('main .stage'))
 
 /** Whether the screen is a phone's. */
 export const isPhone = (options) => (options.viewport?.width ?? 1440) < 720 || !!options.isMobile
@@ -140,6 +150,20 @@ export const quiet = (page, ms = 250) =>
       }),
     ms,
   )
+/** Waits for the page to have scrolled to the toolbar under the header and to be still there. */
+export const parked = async (page) => {
+  await page.waitForFunction(
+    () => {
+      const toolbar = document.querySelector('.toolbar[role="search"]')
+      const style = getComputedStyle(toolbar)
+      // The place the toolbar rests, on the screen, is where it sticks less its own margin.
+      return Math.abs(document.querySelector('.toolbar-top').getBoundingClientRect().top - (parseFloat(style.top) - parseFloat(style.marginTop))) <= 1
+    },
+    null,
+    { timeout: 8000 },
+  )
+  await quiet(page, 350)
+}
 export const titlesOf = (page) => page.evaluate(() => [...document.querySelectorAll('.grid[data-row] .card .ct')].map((e) => e.textContent))
 export const pressShortcut = async (page, key) => {
   const apple = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))

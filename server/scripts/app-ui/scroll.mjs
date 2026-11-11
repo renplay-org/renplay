@@ -6,8 +6,10 @@
 //   - a key on the way to it takes it to the same place, with no stutter
 //   - deleting the search moves nothing (the Library's shelves return above the view)
 //   - with reduced motion the same scrolls are one jump
+//   - at a font 50% wider than the page's own (some phones have a wide one), the count a search adds to the Library's heading
+//     changes nothing: not its height, and not the line the heading is on
 import { mock } from '../app-mock.mjs'
-import { check, isMain, main, quiet, ready, SEARCH_PAGES } from './lib.mjs'
+import { check, isMain, main, parked, quiet, ready, SEARCH_PAGES } from './lib.mjs'
 
 /** Samples the page on every frame: where things are, how tall it is, the shifts the browser reports (Chromium only). */
 const startSampling = (page) =>
@@ -44,20 +46,6 @@ const takeFrames = (page) =>
     window.__shifts = []
     return out
   })
-/** Waits for the page to have scrolled to the toolbar under the header and to be still there. */
-const parked = async (page) => {
-  await page.waitForFunction(
-    () => {
-      const toolbar = document.querySelector('.toolbar[role="search"]')
-      const style = getComputedStyle(toolbar)
-      // The place the toolbar rests, on the screen, is where it sticks less its own margin.
-      return Math.abs(document.querySelector('.toolbar-top').getBoundingClientRect().top - (parseFloat(style.top) - parseFloat(style.marginTop))) <= 1
-    },
-    null,
-    { timeout: 8000 },
-  )
-  await quiet(page, 350)
-}
 const spread = (frames, key) => {
   const values = frames.map((f) => f[key]).filter((v) => v != null)
   return values.length ? Math.max(...values) - Math.min(...values) : 0
@@ -213,11 +201,54 @@ async function reduced(browser, base, errors, options, label) {
   await ctx.close()
 }
 
+/** The Library's heading keeps its height when its count grows from "130" to "130 of 130" and back, at a wide font. */
+async function heading(browser, base, errors, options, label) {
+  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
+  const page = await ctx.newPage()
+  await mock(page, errors, label)
+  await ready(page, base, '/')
+  const measure = () =>
+    page.evaluate(() => {
+      const h = document.querySelector('.sec-h')
+      // The width of the word "All games" on its own, with the page's font and the title's size.
+      const probe = Object.assign(document.createElement('span'), { textContent: 'All games' })
+      probe.style.cssText = 'position:absolute;white-space:nowrap;font:700 20px var(--sans)'
+      document.body.append(probe)
+      const width = probe.getBoundingClientRect().width
+      probe.remove()
+      return { sech: h.getBoundingClientRect().height, h2: h.querySelector('.h2').getBoundingClientRect().height, width, text: h.querySelector('.n').textContent }
+    })
+  // A font made of an installed one, in place of the page's: the same on every machine, at its own width and 50% wider.
+  const font = (adjust) =>
+    page.addStyleTag({
+      content: `@font-face { font-family: Wide${adjust}; src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo"), local("DejaVu Sans"); size-adjust: ${adjust}%; } :root { --font-sans: Wide${adjust}, sans-serif; --font-display: Wide${adjust}, sans-serif; }`,
+    })
+  await font(100)
+  await page.evaluate(() => document.fonts.ready)
+  const normal = await measure()
+  await font(150)
+  await page.evaluate(() => document.fonts.ready)
+  const before = await measure()
+  check(before.width > normal.width * 1.3, `${label}: the wide font is in use ("All games" is ${Math.round(normal.width)} px wide, then ${Math.round(before.width)} px)`)
+  const field = page.locator('input[aria-label="Search your games"]')
+  await field.focus()
+  await page.keyboard.type('g')
+  await page.waitForFunction(() => /of/.test(document.querySelector('.sec-h .n').textContent))
+  const narrowed = await measure()
+  await field.fill('')
+  await page.waitForFunction(() => !/of/.test(document.querySelector('.sec-h .n').textContent))
+  const cleared = await measure()
+  check(narrowed.sech === before.sech && cleared.sech === before.sech, `${label}: the heading keeps its height with the count "${narrowed.text}" (${before.sech} px, then ${narrowed.sech} px, then ${cleared.sech} px)`)
+  check(narrowed.h2 === before.h2 && cleared.h2 === before.h2, `${label}: the heading's title and count stay on one line (${before.h2} px, then ${narrowed.h2} px, then ${cleared.h2} px)`)
+  await ctx.close()
+}
+
 export const tasks = ({ chrome, safari, base, errors, desktop, phone, iphone }) => [
   { name: 'steady', label: 'desktop', run: () => steady(chrome, base, errors, desktop, 'desktop') },
   { name: 'steady', label: 'phone', run: () => steady(chrome, base, errors, phone, 'phone') },
   { name: 'reduced', label: 'desktop', run: () => reduced(chrome, base, errors, desktop, 'desktop') },
   { name: 'reduced', label: 'phone', run: () => reduced(chrome, base, errors, phone, 'phone') },
+  { name: 'heading', label: 'phone', run: () => heading(chrome, base, errors, phone, 'phone') },
   safari && { name: 'steady', label: 'WebKit', run: () => steady(safari, base, errors, iphone, 'phone (WebKit)') },
   safari && { name: 'reduced', label: 'WebKit', run: () => reduced(safari, base, errors, iphone, 'phone (WebKit)') },
 ]

@@ -10,7 +10,7 @@
 //     text, and the page can be zoomed
 //   - layout shift under 0.02 on the Library, the Catalog and a game page (Chromium only: WebKit does not report it)
 import { GAMES, mock, RECIPES } from '../app-mock.mjs'
-import { check, gridOf, growBy, isMain, main, quiet, recordGhost, shapeOk, takeGhost } from './lib.mjs'
+import { check, gridOf, growBy, isMain, main, onGamePage, parked, recordGhost, shapeOk, takeGhost } from './lib.mjs'
 
 async function rowsAt(browser, base, errors) {
   const widths = Array.from({ length: 29 }, (_, i) => 360 + i * 40)
@@ -51,7 +51,7 @@ async function memory(browser, base, errors, options, label) {
     return t?.dataset.id
   })
   await page.locator(`.grid[data-row] .card[data-id="${target}"]`).click()
-  await page.waitForSelector('.stage')
+  await onGamePage(page)
   await page.waitForTimeout(700)
   await page.goBack()
   await page.waitForSelector('.grid[data-row] .card')
@@ -64,30 +64,31 @@ async function memory(browser, base, errors, options, label) {
   await page.waitForSelector('.grid[data-row] .card')
   await page.fill('input[aria-label="Search the catalog"]', 'recipe')
   // The page scrolls to the toolbar under the header: the check's own scrolls come after it has.
-  await quiet(page)
-  await page.waitForTimeout(300)
+  await parked(page)
   check(new URL(page.url()).searchParams.get('q') === 'recipe', `${label}: the Catalog's search is in the address`)
   const total = (await gridOf(page)).tiles
   await growBy(page, 4)
   const open = page.locator('.grid[data-row] a.card:not([href^="/game/"])').nth(70)
   await open.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }))
-  await page.waitForTimeout(400)
+  // The grid grows ahead of the place the page is at, a batch at a time: it is measured once it has stopped.
+  await settled(page)
   const c0 = await page.evaluate(() => ({ y: Math.round(scrollY), tiles: document.querySelectorAll('.grid[data-row] .card').length }))
   const lengthBefore = await page.evaluate(() => history.length)
   await open.click()
   await page.waitForSelector('[role="dialog"]')
   check((await page.evaluate(() => history.length)) === lengthBefore + 1 && new URL(page.url()).searchParams.has('game'), `${label}: an open game is a history entry`)
   await page.goBack()
-  await page.waitForTimeout(500)
+  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'))
+  await settled(page)
   const c1 = await page.evaluate(() => ({ y: Math.round(scrollY), tiles: document.querySelectorAll('.grid[data-row] .card').length, dialog: !!document.querySelector('[role="dialog"]'), q: new URL(location.href).searchParams.get('q') }))
   check(!c1.dialog && c1.q === 'recipe' && Math.abs(c1.y - c0.y) <= 2 && c1.tiles === c0.tiles, `${label}: back closes the sheet and leaves the list where it was (scroll ${c0.y} then ${c1.y}, tiles ${c0.tiles} then ${c1.tiles}, first batch ${total})`)
   // And out to a game and back, with the search kept.
   await page.evaluate(() => [...document.querySelectorAll('.grid[data-row] .card')].find((c) => c.getAttribute('href').startsWith('/game/'))?.click())
-  await page.waitForSelector('.stage')
+  await onGamePage(page)
   await page.waitForTimeout(600)
   await page.goBack()
   await page.waitForSelector('.grid[data-row] .card')
-  await page.waitForTimeout(500)
+  await settled(page)
   const c2 = await page.evaluate(() => ({ tiles: document.querySelectorAll('.grid[data-row] .card').length, q: new URL(location.href).searchParams.get('q') }))
   check(c2.q === 'recipe' && c2.tiles === c0.tiles, `${label}: back from a game keeps the Catalog's search and loaded rows`)
   await ctx.close()
@@ -115,18 +116,16 @@ async function flight(browser, base, errors, options, label) {
     const gameId = await tile.evaluate((el) => (el.closest('.stage') ?? el).dataset.id)
     await recordGhost(page)
     await tile.click()
-    await page.waitForSelector('.stage')
-    await page.waitForTimeout(900)
+    await onGamePage(page)
     const forward = await takeGhost(page)
-    check(shapeOk(forward.frames), `${label}: from ${where} the picture keeps a 2:3 shape on all ${forward.frames.length} frames`)
+    check(shapeOk(forward.frames), `${label}: from ${where} the picture keeps a 2:3 shape on every frame seen`)
     const cover = await rectOf('.stage .cover .frame')
     check(!!forward.end && near(forward.end, cover), `${label}: from ${where} it lands on the stage's cover${forward.end && !near(forward.end, cover) ? ` (ends at ${JSON.stringify(forward.end)}, cover ${JSON.stringify(cover)})` : ''}`)
     await recordGhost(page)
     await page.goBack()
     await page.waitForSelector('.grid[data-row] .card')
-    await page.waitForTimeout(900)
     const back = await takeGhost(page)
-    check(shapeOk(back.frames), `${label}: back to ${where} the picture keeps a 2:3 shape on all ${back.frames.length} frames`)
+    check(shapeOk(back.frames), `${label}: back to ${where} the picture keeps a 2:3 shape on every frame seen`)
     const home = await rectOf(homeOf[selector](gameId))
     check(!!back.end && near(back.end, home) && (await page.evaluate(() => document.querySelectorAll('.ghost').length)) === 0, `${label}: back to ${where} it lands on the tile and leaves no picture behind${back.end && !near(back.end, home) ? ` (ends at ${JSON.stringify(back.end)}, tile ${JSON.stringify(home)})` : ''}`)
   }
@@ -136,9 +135,11 @@ async function flight(browser, base, errors, options, label) {
   // The last tile of the first batch: off screen at the top of the list on every screen size (a wide
   // screen shows its first rows).
   await page.locator('.grid[data-row] .card').last().scrollIntoViewIfNeeded()
+  await recordGhost(page)
   await page.locator('.grid[data-row] .card').last().click()
-  await page.waitForSelector('.stage')
-  await page.waitForTimeout(800)
+  await onGamePage(page)
+  // The flight forward has landed: the ghost the check looks for is the one back.
+  await takeGhost(page)
   await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith('renplay:scroll:')).forEach((k) => sessionStorage.setItem(k, '0')))
   await recordGhost(page)
   await page.goBack()

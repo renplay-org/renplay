@@ -16,6 +16,7 @@ import type { Health } from '@shared/api'
 import { Pill } from '../lantern/controls'
 import { focusSearch, wantSearch } from '../lantern/Search'
 import { isApple } from '../lib/platform'
+import './AppShell.css'
 
 // Links go through renplay.org (redirects on the website), so moving GitHub or Ko-fi needs no release.
 const REPO_URL = 'https://renplay.org/github'

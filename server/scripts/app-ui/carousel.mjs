@@ -16,21 +16,25 @@ const carouselState = (page) =>
   })
 /** Puts the carousel on a slide at once, as if it had been there. */
 const atSlide = (page, i) => page.evaluate((i) => { const c = document.querySelector('.carousel'); c.scrollTo({ left: (i + 1) * c.clientWidth, behavior: 'instant' }) }, i)
-/** Waits until a smooth scroll has stopped. */
-const stillScroll = async (page) => {
-  let last = -1
-  for (let i = 0; i < 40; i++) {
-    const x = await page.evaluate(() => document.querySelector('.carousel').scrollLeft)
-    if (x === last) return
-    last = x
-    await page.waitForTimeout(150)
-  }
-}
 /** Runs the page's clock forward, then lets a smooth scroll finish (the browser's own time). */
 const pass = async (page, ms) => {
   await page.clock.runFor(ms)
   await page.waitForTimeout(900)
 }
+
+/** Waits until the carousel has turned to slide `i` and rests on it (as long as it takes, a few seconds at most), so the check reads where it came to. */
+const rest = (page, i) =>
+  page
+    .waitForFunction(
+      (i) => {
+        const c = document.querySelector('.carousel')
+        const current = [...document.querySelectorAll('.dots .dot')].findIndex((d) => d.getAttribute('aria-current') === 'true')
+        return current === i && Math.abs(c.scrollLeft - (i + 1) * c.clientWidth) < 1
+      },
+      i,
+      { timeout: 10000, polling: 100 },
+    )
+    .catch(() => {})
 
 /** The Library, loaded, and then its clock stops: the turning is timed by it, which only moves when a check says so. */
 async function openFrozen(page, base) {
@@ -38,7 +42,15 @@ async function openFrozen(page, base) {
   await page.goto(base + '/')
   await page.waitForSelector('.carousel .slide[role="group"]')
   await page.waitForTimeout(600)
-  await page.clock.pauseAt(new Date(Date.now() + 100))
+  // The clock is stopped a moment ahead of the page's own time. On a slow machine that moment can be over before the call arrives: ask again.
+  for (;;) {
+    const now = await page.evaluate(() => Date.now())
+    try {
+      return await page.clock.pauseAt(new Date(now + 100))
+    } catch (e) {
+      if (!/past/.test(e.message)) throw e
+    }
+  }
 }
 
 async function carousel(browser, base, errors, options, label, { swipe = false } = {}) {
@@ -65,11 +77,13 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
   // It turns by itself, about every seven seconds: the first turn comes within 7 seconds of the page loading,
   // and the next one 7 seconds after that.
   await pass(page, 7500)
+  await rest(page, 1)
   const turned = await carouselState(page)
   check(turned.current === 1 && turned.x === turned.w, `${label}: it turns by itself (dot ${turned.current + 1}, at ${turned.x} of ${turned.w} px)`)
   await pass(page, 3000)
   check((await carouselState(page)).current === 1, `${label}: it stays on a slide for longer than 3 seconds`)
   await pass(page, 4000)
+  await rest(page, 2)
   check((await carouselState(page)).current === 2, `${label}: and turns again 7 seconds after the last turn`)
   // Back to the second slide, for the holds below.
   await atSlide(page, 1)
@@ -118,29 +132,30 @@ async function carousel(browser, base, errors, options, label, { swipe = false }
     check((await carouselState(page)).current === 1, `${label}: it holds while keyboard focus is in it`)
     await page.evaluate(() => document.activeElement?.blur())
     await pass(page, 7500)
+    await rest(page, 2)
     check((await carouselState(page)).current === 2, `${label}: it turns again when the hold ends`)
     // The arrow keys move it while it has focus, and a person who moved it stops it for good.
     await page.locator('.carousel').focus()
     await page.keyboard.press('ArrowRight')
-    await page.waitForTimeout(900)
+    await rest(page, 3)
     check((await carouselState(page)).current === 3, `${label}: the arrow keys move it while it has focus`)
     await page.keyboard.press('ArrowLeft')
-    await page.waitForTimeout(900)
+    await rest(page, 2)
     check((await carouselState(page)).current === 2, `${label}: the left arrow key moves it back`)
     await page.evaluate(() => document.activeElement?.blur())
     await pass(page, 30000)
     check((await carouselState(page)).current === 2, `${label}: once a person has moved it by hand it stays where they put it`)
     // Dots and arrows.
     await page.locator('.dots .dot').nth(5).click()
-    await stillScroll(page)
+    await rest(page, 5)
     const dot = await carouselState(page)
     check(dot.current === 5 && dot.x === 5 * dot.w, `${label}: a dot selects its slide (dot ${dot.current + 1}, at ${dot.x} of ${5 * dot.w} px)`)
     await page.locator('.car-arrow.next').click()
-    await page.waitForTimeout(900)
+    await rest(page, 6)
     check((await carouselState(page)).current === 6, `${label}: the next arrow moves it on`)
     check(!(await page.locator('.car-arrow.next').isDisabled()) && !(await page.locator('.car-arrow.prev').isDisabled()), `${label}: both arrows stay on, at the last slide too`)
     await page.locator('.car-arrow.prev').click()
-    await page.waitForTimeout(900)
+    await rest(page, 5)
     check((await carouselState(page)).current === 5, `${label}: the previous arrow moves it back`)
   }
   // Only the slide in view has anything to tab to.

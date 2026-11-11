@@ -1,0 +1,12 @@
+/* The Library's heading: the title and its count never wrap, and the link beside them gives way (one line, cut short) instead. The
+   count that comes and goes with a search cannot change the heading's height, whatever the font. */
+.sec-h .h2 {
+  flex: none;
+  white-space: nowrap;
+}
+.sec-h a {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
