@@ -62,7 +62,8 @@ function StageCover({ game, hidden }: { game: ArtGame & { id: string }; hidden: 
     setSettling(true)
     requestAnimationFrame(() => {
       const target = el.getBoundingClientRect()
-      flyGhost(t, { x: target.x, y: target.y, w: target.width, h: target.height }, () => setSettling(false))
+      // The ghost stays until the cover's pictures are decoded: they come out of hiding in the frame it goes.
+      flyGhost(t, { x: target.x, y: target.y, w: target.width, h: target.height }, () => setSettling(false), 480, () => Promise.all([...el.querySelectorAll('img')].map((img) => img.decode())))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.id])

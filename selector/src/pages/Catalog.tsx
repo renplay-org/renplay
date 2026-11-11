@@ -4,7 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Card from '../lantern/Tile'
 import { Pill, Seg, TagPill } from '../lantern/controls'
-import SearchField, { CountLine, Marked, Toolbar, useSearchScroll } from '../lantern/Search'
+import SearchField, { Marked, Toolbar, parkResults, useSearchScroll } from '../lantern/Search'
 import { useRoom } from '../lantern/Room'
 import Sheet from '../lantern/Sheet'
 import RecipeCard from '../components/RecipeCard'
@@ -24,7 +24,7 @@ import { gameTags, stateLabel } from '../lib/tags'
 const REQUEST_URL = 'https://renplay.org/catalog/request'
 
 /** One catalog entry: the grid tile with an In your library pill, opening the recipe sheet. */
-function RecipeTile({ recipe: r, hit, fade, href, onOpen }: { recipe: CatalogGame; hit?: Hit; fade: boolean; href: string; onOpen: () => void }) {
+function RecipeTile({ recipe: r, hit, href, onOpen }: { recipe: CatalogGame; hit?: Hit; href: string; onOpen: () => void }) {
   const extra = r.local ? (
     <span className="corner">
       <TagPill tone="dark">
@@ -38,7 +38,6 @@ function RecipeTile({ recipe: r, hit, fade, href, onOpen }: { recipe: CatalogGam
       game={r}
       gameId={r.local?.id}
       title={hit?.marks.length ? <Marked text={r.title} marks={hit.marks} /> : undefined}
-      fade={fade}
       href={r.local ? `/game/${r.local.id}` : href}
       meta={
         <span className="truncate">
@@ -71,6 +70,7 @@ export default function Catalog() {
   // The tags a person set are kept with their account, and the address carries them for this list.
   const tagPrefs = params.has('with') || params.has('without') ? { include: tagList(params.get('with')), exclude: tagList(params.get('without')) } : accountTags
   const setTagPrefs = (next: typeof tagPrefs) => {
+    parkResults()
     setAccountTags(next)
     setAddress({ with: next.include.join(',') || null, without: next.exclude.join(',') || null })
   }
@@ -78,9 +78,7 @@ export default function Catalog() {
   // The list follows what is typed a moment after the field itself (see the Library).
   const query = useDeferredValue(typed)
   const searching = query.trim() !== ''
-  // Tiles that arrive after the person has started changing the list fade in. Those at the first load do not.
-  const [live, setLive] = useState(false)
-  useSearchScroll(searching, null)
+  useSearchScroll(typed.trim() !== '' || filter !== 'all' || tagPrefs.include.length > 0 || tagPrefs.exclude.length > 0)
   const [refreshing, setRefreshing] = useState(false)
   const opened = useRef(false)
   const admin = useAuth().data?.user.role === 'admin'
@@ -97,14 +95,15 @@ export default function Catalog() {
   // The tags, and then the segment: the All segment counts what the search and the tags leave.
   const tagged = found.filter((g) => matchesTags(g, tagPrefs, vocabulary))
   const filtered = tagged.filter((g) => filter === 'all' || (filter === 'free' ? g.free === true || (g.free === undefined && g.nsfw === false) : g.state === 'completed'))
-  const active = searching || filter !== 'all' || tagPrefs.include.length > 0 || tagPrefs.exclude.length > 0
+  // Tags and the segment are filters, which Clear filters takes away. The search is not: it has its own clear button.
+  const filters = filter !== 'all' || tagPrefs.include.length > 0 || tagPrefs.exclude.length > 0
+  const active = searching || filters
   // The list's growth belongs to the list, not to the words typed: it is kept while they change.
   const rows = useGrowingGrid(`catalog:${filter}|${tagPrefs.include}|${tagPrefs.exclude}`, filtered.length)
-  const clearAll = () => {
-    setLive(true)
-    setTyped('')
+  const clearFilters = () => {
+    parkResults()
     setAccountTags({ include: [], exclude: [] })
-    setAddress({ q: null, filter: null, with: null, without: null })
+    setAddress({ filter: null, with: null, without: null })
   }
   if (isLoading) return <Spinner />
   if (error || !data)
@@ -171,11 +170,11 @@ export default function Catalog() {
         )
       })()}
       <Toolbar label="Search the catalog" wrap style={{ marginTop: 14 }}>
-        <SearchField label="Search the catalog" placeholder="Title, developer or tag" value={typed} onChange={(text) => { setLive(true); setTyped(text) }} />
+        <SearchField label="Search the catalog" value={typed} onChange={setTyped} count={{ shown: filtered.length, total: all.length, narrowed: active }} />
         <Seg
           small
           value={filter}
-          onChange={(value) => { setLive(true); setAddress({ filter: value === 'all' ? null : value }) }}
+          onChange={(value) => { parkResults(); setAddress({ filter: value === 'all' ? null : value }) }}
           options={[
             { value: 'all', label: <span className="tnum">All {tagged.length}</span>, className: 'all' },
             { value: 'free', label: 'Free' },
@@ -183,9 +182,8 @@ export default function Catalog() {
           ]}
         />
       </Toolbar>
-      <CountLine shown={filtered.length} total={all.length} active={active} onClear={clearAll} />
       <div role="search" aria-label="Filter the catalog by tag">
-        <CatalogTags games={filtered} all={all} vocabulary={vocabulary} prefs={tagPrefs} onChange={(next) => { setLive(true); setTagPrefs(next) }} />
+        <CatalogTags games={filtered} all={all} vocabulary={vocabulary} prefs={tagPrefs} onChange={setTagPrefs} onClear={filters ? clearFilters : undefined} />
       </div>
       <div className={`results ${active ? 'held' : ''}`.trim()}>
         <div className="grid" data-row ref={rows.grid}>
@@ -194,7 +192,6 @@ export default function Catalog() {
               key={r.id}
               recipe={r}
               hit={hits?.get(r)}
-              fade={live}
               href={addressOf({ game: r.id })}
               onOpen={() => {
                 opened.current = true
@@ -205,7 +202,15 @@ export default function Catalog() {
         </div>
         {rows.more && <div ref={rows.end} aria-hidden="true" />}
         {!filtered.length && (
-          <Empty title="No games match" action={<Pill onClick={clearAll}>Clear filters</Pill>}>
+          <Empty
+            title="No games match"
+            action={
+              <>
+                {filters && <Pill onClick={clearFilters}>Clear filters</Pill>}
+                {searching && <Pill variant={filters ? 'q' : 's'} onClick={() => { parkResults(); setTyped('') }}>Clear the search</Pill>}
+              </>
+            }
+          >
             Nothing in the catalog matches. Try a different search or tag.
           </Empty>
         )}

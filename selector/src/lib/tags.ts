@@ -13,13 +13,3 @@ export function gameTags(game: Tagged, vocabulary: Vocabulary) {
     return { id, label: entry?.label ?? capitalize(id), group: entry?.group ?? (game.content?.includes(id) ? 'content' : game.tagIds?.length ? 'unknown' : 'story') }
   })
 }
-export function tagChips(games: Tagged[], vocabulary: Vocabulary) {
-  const counts = new Map<string, { id: string; label: string; count: number }>()
-  for (const game of games) for (const tag of gameTags(game, vocabulary)) {
-    if (tag.group !== 'play' && tag.group !== 'story') continue
-    const entry = counts.get(tag.id) ?? { id: tag.id, label: tag.label, count: 0 }
-    entry.count++
-    counts.set(tag.id, entry)
-  }
-  return [...counts.values()].filter((t) => t.count >= 2).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
-}

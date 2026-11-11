@@ -6,6 +6,8 @@
 export const GAMES = 130
 export const RECIPES = 120
 const id = (prefix, n) => `${prefix}-${String(n).padStart(3, '0')}`
+// A real catalog ThumbHash, for the checks that ask for placeholders under the pictures (`thumbhash` below).
+const THUMBHASH = 'BvgFBQCoZ4Z4CIWJeJp1WMOHgPpV'
 const art = (slug) => ({
   grid: { url1x: `/api/art/${slug}-grid.svg`, url2x: null, width: 600, height: 900, thumbhash: null, tint: '#6a7ad0', made: null },
   wide: { url1x: `/api/art/${slug}-wide.svg`, url2x: null, width: 920, height: 430, thumbhash: null, tint: '#6a7ad0', made: null },
@@ -83,15 +85,27 @@ function picture(url) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="hsl(${hue} 55% 45%)"/><circle cx="${w / 2}" cy="${h / 2}" r="${Math.min(w, h) / 3}" fill="hsl(${hue} 60% 70%)"/></svg>`
 }
 
-/** `titled` answers with the short list of real titles (TITLED) instead of the 130 and 120 made-up ones. */
-export async function mock(page, errors, label, { titled = false } = {}) {
+/**
+ * `titled` answers with the short list of real titles (TITLED) instead of the 130 and 120 made-up ones. `delay` makes
+ * each picture take that many milliseconds the first time it is asked for, as a network does and a cache does not.
+ * `thumbhash` gives every picture its blurred placeholder, as a library has.
+ */
+export async function mock(page, errors, label, { titled = false, delay = 0, thumbhash = false } = {}) {
   page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`))
-  await page.route('**/api/**', (route) => {
+  const asked = new Set()
+  await page.route('**/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
-    if (url.pathname.startsWith('/api/art/')) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: picture(url) })
+    if (url.pathname.startsWith('/api/art/')) {
+      if (delay && !asked.has(url.pathname)) {
+        asked.add(url.pathname)
+        await new Promise((done) => setTimeout(done, delay))
+      }
+      return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: picture(url) })
+    }
     if (request.method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(answers(url, titled)) })
+    const body = JSON.stringify(answers(url, titled))
+    return route.fulfill({ status: 200, contentType: 'application/json', body: thumbhash ? body.replaceAll('"thumbhash":null', `"thumbhash":"${THUMBHASH}"`) : body })
   })
 }
 

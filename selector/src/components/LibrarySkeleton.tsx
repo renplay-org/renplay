@@ -74,9 +74,6 @@ export default function LibrarySkeleton() {
           <div className="skel" style={{ flex: '1 1 200px', maxWidth: 360, height: 44, borderRadius: 999 }} />
           <div className="skel" style={{ width: 110, height: 44, borderRadius: 999, flex: 'none' }} />
         </div>
-        <div className="count-line">
-          <div className="skel skel-line" style={{ width: 70, height: 14 }} />
-        </div>
         <div className="chip-bar" style={{ marginBottom: 16, minHeight: 48 }}>
           <div className="skel" style={{ width: 150, height: 40, borderRadius: 999 }} />
         </div>

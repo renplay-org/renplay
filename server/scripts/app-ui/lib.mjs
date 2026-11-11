@@ -107,7 +107,6 @@ export const isPhone = (options) => (options.viewport?.width ?? 1440) < 720 || !
 
 // ---- the search pages ---------------------------------------------------------------------------
 
-export const PLACEHOLDER = 'Title, developer or tag'
 // The page, its path, the field's label, the words its made-up titles start with, a letter in them, one title in full.
 export const SEARCH_PAGES = [
   ['the Library', '/', 'Search your games', 'Game', 'g', 'Game 125'],
@@ -120,6 +119,27 @@ export const ready = async (page, base, path) => {
   await page.waitForSelector('.grid[data-row] .card')
   await page.waitForFunction(() => document.getAnimations().every((a) => a.playState === 'finished') && document.querySelectorAll('.bd .l').length <= 1)
 }
+/** Waits until the page has not scrolled for a moment, or for a few seconds at most. */
+export const quiet = (page, ms = 250) =>
+  page.evaluate(
+    (ms) =>
+      new Promise((done) => {
+        let timer = setTimeout(finish, ms)
+        const stop = setTimeout(finish, 5000)
+        const bump = () => {
+          clearTimeout(timer)
+          timer = setTimeout(finish, ms)
+        }
+        function finish() {
+          clearTimeout(timer)
+          clearTimeout(stop)
+          window.removeEventListener('scroll', bump)
+          done()
+        }
+        window.addEventListener('scroll', bump, { passive: true })
+      }),
+    ms,
+  )
 export const titlesOf = (page) => page.evaluate(() => [...document.querySelectorAll('.grid[data-row] .card .ct')].map((e) => e.textContent))
 export const pressShortcut = async (page, key) => {
   const apple = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))

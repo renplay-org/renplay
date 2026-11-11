@@ -3,7 +3,7 @@
 //   - it filters as you type, the address follows after a pause, / and Enter work as they should
 //   - what a search finds and in what order: typos, accents, words in any order, developer and tag, the best match first
 import { mock } from '../app-mock.mjs'
-import { check, fieldOf, gridOf, isMain, isPhone, main, PLACEHOLDER, ready, SEARCH_PAGES, titlesOf } from './lib.mjs'
+import { check, fieldOf, gridOf, isMain, isPhone, main, ready, SEARCH_PAGES, titlesOf } from './lib.mjs'
 
 async function search(browser, base, errors, options, label) {
   const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
@@ -42,7 +42,7 @@ async function search(browser, base, errors, options, label) {
       }
     }, field)
     check(found.inputs === 1 && found.labelled === 1 && found.header === 0, `${label}: ${name} has one search and the header has none (${found.inputs} fields)`)
-    check(found.placeholder === PLACEHOLDER && found.fits, `${label}: ${name}'s search says what it searches and the words fit (${found.room} px for "${found.placeholder}")`)
+    check(found.placeholder === field && found.fits, `${label}: ${name}'s search says what it searches and the words fit (${found.room} px for "${found.placeholder}")`)
     check(found.height === found.beside && found.radius === '999px', `${label}: ${name}'s search is as high as the control beside it and a pill (${found.height} and ${found.beside} px, radius ${found.radius})`)
     check(found.hint === !phone, `${label}: ${name}'s shortcut hint is ${phone ? 'not shown on a phone' : 'shown on a desktop'}`)
     check(found.inLandmark && found.chipsInLandmark && !found.gridInLandmark, `${label}: ${name}'s field and tag chips are in a search landmark and the results are not`)

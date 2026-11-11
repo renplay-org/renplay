@@ -10,7 +10,7 @@
 //     text, and the page can be zoomed
 //   - layout shift under 0.02 on the Library, the Catalog and a game page (Chromium only: WebKit does not report it)
 import { GAMES, mock, RECIPES } from '../app-mock.mjs'
-import { check, gridOf, growBy, isMain, main, recordGhost, shapeOk, takeGhost } from './lib.mjs'
+import { check, gridOf, growBy, isMain, main, quiet, recordGhost, shapeOk, takeGhost } from './lib.mjs'
 
 async function rowsAt(browser, base, errors) {
   const widths = Array.from({ length: 29 }, (_, i) => 360 + i * 40)
@@ -63,7 +63,9 @@ async function memory(browser, base, errors, options, label) {
   await page.goto(base + '/catalog')
   await page.waitForSelector('.grid[data-row] .card')
   await page.fill('input[aria-label="Search the catalog"]', 'recipe')
-  await page.waitForTimeout(500)
+  // The page scrolls to the toolbar under the header: the check's own scrolls come after it has.
+  await quiet(page)
+  await page.waitForTimeout(300)
   check(new URL(page.url()).searchParams.get('q') === 'recipe', `${label}: the Catalog's search is in the address`)
   const total = (await gridOf(page)).tiles
   await growBy(page, 4)
@@ -145,6 +147,24 @@ async function flight(browser, base, errors, options, label) {
   await ctx.close()
 }
 
+/** Waits until the grid has stopped growing: the same number of tiles on four frames in a row. */
+const settled = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((done) => {
+        let last = -1
+        let still = 0
+        const tick = () => {
+          const tiles = document.querySelectorAll('.grid[data-row] .card').length
+          still = tiles === last ? still + 1 : 0
+          last = tiles
+          if (still >= 4) done()
+          else requestAnimationFrame(tick)
+        }
+        tick()
+      }),
+  )
+
 async function shift(browser, base, errors) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' })
   const page = await ctx.newPage()
@@ -166,7 +186,8 @@ async function shift(browser, base, errors) {
         window.scrollBy({ top: innerHeight * 0.8, behavior: 'instant' })
         return scrollY + innerHeight < document.documentElement.scrollHeight - 2
       })
-      await page.waitForTimeout(80)
+      // The grid grows ahead of a person who scrolls: wait for it to have grown, as a quick machine does within the 80 ms.
+      await settled(page)
       if (!more) break
     }
     await page.waitForTimeout(400)

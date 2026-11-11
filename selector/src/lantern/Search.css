@@ -33,13 +33,6 @@
   color: var(--fg-3);
   text-overflow: ellipsis;
 }
-/* The words typed stay 16 px (a smaller field makes iPhone Safari zoom), the hint is a little smaller so
-   "Title, developer or tag" fits beside the order on a 360 px phone. */
-@media (max-width: 719px) {
-  .search-field input::placeholder {
-    font-size: 14px;
-  }
-}
 .search-field:focus-within {
   box-shadow:
     0 0 0 2px var(--ink),
@@ -91,48 +84,72 @@
   background: linear-gradient(rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.07)), rgba(10, 10, 15, 0.92);
   backdrop-filter: blur(18px);
 }
-/* The search's toolbar neither scrolls nor fades its end: both would cut off the field's focus ring. */
-.toolbar[role="search"] {
-  overflow: visible;
+/* The focus ring is 4 px outside the field. On a computer the field starts at the toolbar's own edge, so the toolbar
+   does not clip it. A toolbar that wraps on a phone does not fade its end, which would fade the ring there. */
+@media (min-width: 720px) {
+  .toolbar[role="search"] {
+    overflow: visible;
+  }
+}
+.toolbar.wrap[role="search"] {
   mask-image: none;
 }
 /* Where the toolbar rests before it sticks: the page measures from here. */
 .toolbar-top {
   height: 0;
 }
-/* While the toolbar is stuck under the header, a backdrop of the page's colour covers the top of the screen down to the
-   bottom of the toolbar and then fades out over 8 px, so the page reads through neither the header nor the gaps between
-   the controls, and tiles fade out as they pass under it. It is fixed to the screen, which is where a stuck toolbar is.
-   --veil-h (the toolbar's bottom on the screen) and the stuck state are set by the Toolbar. */
-.toolbar-veil {
+/* While the toolbar is stuck under the header, a bar of the header's own material runs from the top of the screen down
+   to the toolbar's bottom: the page's colour shows through it, what passes under it goes soft, and its lower edge fades
+   out. It is fixed to the screen, which is where a stuck toolbar is, so it is no part of the layout. --stuck-h (the
+   toolbar's bottom on the screen) and the stuck state are set by the Toolbar. */
+.toolbar-glass {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: calc(var(--veil-h, 0px) + 8px);
+  height: var(--stuck-h, 0px);
   z-index: 19;
   pointer-events: none;
-  background: linear-gradient(180deg, var(--ink) calc(100% - 8px), transparent);
+  background: linear-gradient(180deg, rgba(10, 10, 15, 0.95) var(--top-h), rgba(10, 10, 15, 0.9));
+  backdrop-filter: blur(24px) saturate(140%);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 16px), transparent);
   opacity: 0;
   transition: opacity var(--t-focus) var(--out);
 }
-.toolbar-veil[data-stuck] {
+.toolbar-glass[data-stuck] {
   opacity: 1;
 }
-
-/* The count: one line of one height, so what is under it never moves when the words change. */
-.count-line {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  height: 36px;
-  padding: 0 2px;
-  font-size: 13.5px;
-  color: var(--fg-3);
-  white-space: nowrap;
+/* The rows above the toolbar (the page's heading, the catalog's buttons) are out of sight while it is stuck: they
+   would read through the header. They keep their space, so nothing moves. */
+:has(~ .toolbar-top) {
+  transition:
+    opacity var(--t-focus) var(--out),
+    visibility 0s;
 }
-.count-line .link {
+[data-stuck] > :has(~ .toolbar-top) {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--t-focus) var(--out),
+    visibility 0s var(--t-focus);
+}
+
+/* The count in the field, for while the toolbar is stuck and the heading that says it is out of sight: at the right end,
+   in the field's grey, in a slot of one width (right aligned, tabular digits) so nothing moves when its words change. */
+.search-field .field-count {
+  display: none;
+  flex: none;
+  text-align: right;
   font-size: 13.5px;
+}
+[data-stuck] .search-field .field-count {
+  display: block;
+}
+/* While a search is typed the list moves under a pointer that rests on it: the tile under it does not lift (see useTypingCalm). */
+[data-typing] .card:hover:not(:focus-visible):not(.on) .frame {
+  transform: none;
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.8);
+  z-index: auto;
 }
 /* Matched letters in a title: brighter and underlined in the tile's own colour, not a block of yellow. */
 .card .ct mark {
@@ -151,15 +168,8 @@
 .results .empty-filter {
   margin-top: 0;
 }
-/* The order's name is always as wide as Best match, which it says while searching: the field beside it keeps its width. */
-.toolbar .sort {
-  min-width: 124px;
-  justify-content: space-between;
-}
-/* Tag chips: the counts are tabular and keep room for two digits, so a chip's width barely changes. */
+/* Tag chips: the counts are tabular, so a chip's width hardly changes with them. */
 .chip .n {
-  display: inline-block;
-  min-width: 2ch;
   font-variant-numeric: tabular-nums;
 }
 .chip.dim:not(.on):not(.ex) {

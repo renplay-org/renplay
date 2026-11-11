@@ -6,12 +6,12 @@ import Card from '../lantern/Tile'
 import Stage, { travelToDoor, travelToPage } from '../lantern/Stage'
 import { Chip, Pill, TagPill, Bar } from '../lantern/controls'
 import Carousel from '../lantern/Carousel'
-import SearchField, { CountLine, Marked, Toolbar, holdPlace, useSearchScroll } from '../lantern/Search'
+import SearchField, { Marked, Toolbar, countText, holdPlace, parkResults, useSearchScroll } from '../lantern/Search'
 import { useRoom } from '../lantern/Room'
 import { useHidden } from '../lantern/art'
 import EmptyLibrary from '../components/EmptyLibrary'
 import LibrarySkeleton, { rememberShape } from '../components/LibrarySkeleton'
-import TagFilters from '../components/TagFilters'
+import CatalogTags from '../components/CatalogTags'
 import Shelf from '../components/Shelf'
 import SortMenu from '../components/SortMenu'
 import { Empty, errorText, useToast } from '../lantern/ui'
@@ -24,7 +24,7 @@ import type { Vocabulary } from '@shared/recipe'
 import { ago, capitalize, jobStage, jobSubject, pct, playedTime } from '../lib/format'
 import { playLink } from '../lib/links'
 import { useCatalog, useGames, useJobs } from '../lib/queries'
-import { gameTags, tagChips } from '../lib/tags'
+import { gameTags } from '../lib/tags'
 import { isRenpy } from '@shared/family'
 
 /** The most games Up next shows. */
@@ -67,10 +67,10 @@ function tileExtra(g: Game) {
   return parts.length ? <>{parts}</> : undefined
 }
 
-function GameTile({ game, hit, fade, on, onFocus, onMouseEnter }: { game: Game; hit?: Hit; fade?: boolean; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
+function GameTile({ game, hit, on, onFocus, onMouseEnter }: { game: Game; hit?: Hit; on?: boolean; onFocus?: () => void; onMouseEnter?: () => void }) {
   const installed = game.status === 'installed'
   const title = hit?.marks.length ? <Marked text={game.title} marks={hit.marks} /> : undefined
-  return <Card game={game} href={`/game/${game.id}`} title={title} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} fade={fade} onFocus={onFocus} onMouseEnter={onMouseEnter} />
+  return <Card game={game} href={`/game/${game.id}`} title={title} meta={tileMeta(game)} extra={tileExtra(game)} dim={!installed && !game.job} on={on} onFocus={onFocus} onMouseEnter={onMouseEnter} />
 }
 
 /** The tags in the address, a comma separated list: a game must have every one. */
@@ -174,8 +174,6 @@ export default function Library() {
   // While a search is typed it is in best match order, unless the person picks another order for it.
   const [searchSort, setSearchSort] = useState<string | null>(null)
   const by = searching ? (searchSort ?? 'match') : sort
-  // Tiles that arrive after the person has started changing the list fade in. Those at the first load do not.
-  const [live, setLive] = useState(false)
   const all = games ?? NO_GAMES
   const failed = (jobs?.jobs ?? [])
     .filter((job) => job.type === 'import' && ['failed', 'interrupted'].includes(job.status) && jobs?.jobs.find((other) => other.type === 'import' && other.game === job.game)?.id === job.id && !all.find((game) => game.id === job.game)?.job)
@@ -222,11 +220,12 @@ export default function Library() {
   }
   const failedShown = failed.filter((job) => !dismissed.includes(job.id))
   const updates = all.filter((g) => g.update)
-  const active = searching || tags.length > 0 || filter !== 'all'
-  // The shelves are only for the plain library. While a search, a tag or a list is on they are gone, and the
-  // page keeps the toolbar where it is on the screen (see useSearchScroll).
-  const home = !active
-  useSearchScroll(searching, home)
+  // A tag or a shelf's list is a filter, which Clear filters takes away. The search is not: it has its own clear button.
+  const filtered = tags.length > 0 || filter !== 'all'
+  const active = searching || filtered
+  // The shelves are only for the plain library. While a search, a tag or a list is on they go, once the page has
+  // scrolled them out of view, and the page keeps the toolbar where it is on the screen (see useSearchScroll).
+  const home = !useSearchScroll(typed.trim() !== '' || filtered)
   useEffect(() => {
     if (games) rememberShape(upNext.length > 0)
   }, [games, upNext.length])
@@ -237,28 +236,22 @@ export default function Library() {
   const stageGame = upNext.find((g) => g.id === stageId) ?? upNext[0]
   useRoom({ game: stageGame ?? null, quiet: !stageGame })
 
-  // A change of the list is made by the person: its tiles fade in from here on, and the page keeps its place.
+  // A change of the list is made by the person, and the page keeps its place.
   const change = (apply: () => void) => {
     holdPlace()
-    setLive(true)
     apply()
+    parkResults()
   }
-  const clearAll = () =>
-    change(() => {
-      setTyped('')
-      setSearchSort(null)
-      setAddress({ q: null, filter: null, tag: null })
-    })
+  const clearFilters = () => change(() => setAddress({ filter: null, tag: null }))
   const typeSearch = (text: string) => {
-    setLive(true)
     if (!text.trim()) setSearchSort(null)
     setTyped(text)
   }
-  // Tag chips: the most common tags over all games set the order, and each counts the games shown now.
-  const chips = tagChips(all, vocabulary).map(({ id, label }) => ({ id, label }))
-  for (const id of tags) if (!chips.some((chip) => chip.id === id)) chips.push({ id, label: vocabulary[id]?.label ?? capitalize(id) })
-  const counts = new Map<string, number>()
-  for (const g of shown) for (const t of gameTags(g, vocabulary)) counts.set(t.id, (counts.get(t.id) ?? 0) + 1)
+  const clearSearch = () => {
+    holdPlace()
+    typeSearch('')
+    parkResults()
+  }
 
   if (error)
     return (
@@ -336,22 +329,22 @@ export default function Library() {
       )}
       <section className="sec">
         <div className="sec-h">
-          <h2 className="h2">All games</h2>
+          <h2 className="h2">
+            All games<span className="n tnum">{countText(shown.length, all.length, active)}</span>
+          </h2>
           <Link to="/catalog">Find more in the catalog</Link>
         </div>
         <Toolbar label="Search your games">
-          <SearchField label="Search your games" placeholder="Title, developer or tag" value={typed} onChange={typeSearch} />
+          <SearchField label="Search your games" value={typed} onChange={typeSearch} count={{ shown: shown.length, total: all.length, narrowed: active }} />
           <SortMenu
             value={by}
             searching={searching}
             onChange={(value) => {
-              setLive(true)
               if (searching) setSearchSort(value === 'match' ? null : value)
               else update('sort', value === 'recent' ? null : value)
             }}
           />
         </Toolbar>
-        <CountLine shown={shown.length} total={all.length} active={active} onClear={clearAll} />
         {filter in FILTERS && (
           <div className="chip-bar" style={{ marginBottom: 10 }}>
             <Chip on onClick={() => change(() => update('filter', null))} aria-label={`${FILTERS[filter]}, show all games`}>
@@ -361,12 +354,12 @@ export default function Library() {
           </div>
         )}
         <div role="search" aria-label="Filter your games by tag">
-          <TagFilters tags={chips} counts={counts} selected={tags} onChange={(next) => change(() => update('tag', next.join(',') || null))} />
+          <CatalogTags games={shown} all={all} vocabulary={vocabulary} prefs={{ include: tags, exclude: [] }} mode="include" onClear={filtered ? clearFilters : undefined} onChange={(next) => change(() => update('tag', next.include.join(',') || null))} />
         </div>
         <div className={`results ${active ? 'held' : ''}`.trim()}>
           <div className="grid" data-row ref={rows.grid}>
             {shown.slice(0, rows.shown).map((g) => (
-              <GameTile key={g.id} game={g} hit={hits?.get(g)} fade={live} />
+              <GameTile key={g.id} game={g} hit={hits?.get(g)} />
             ))}
           </div>
           {rows.more && <div ref={rows.end} aria-hidden="true" />}
@@ -375,7 +368,8 @@ export default function Library() {
               title="No games match"
               action={
                 <>
-                  <Pill onClick={clearAll}>Clear filters</Pill>
+                  {filtered && <Pill onClick={clearFilters}>Clear filters</Pill>}
+                  {searching && <Pill variant={filtered ? 'q' : 's'} onClick={clearSearch}>Clear the search</Pill>}
                   {searching && <Pill variant="q" to={`/catalog?${withParams('', { q: query.trim() })}`}>Search the catalog</Pill>}
                 </>
               }
