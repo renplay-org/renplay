@@ -8,7 +8,7 @@ export default class SummaryReporter {
     const failed = tests.filter((t) => t.outcome() === 'unexpected')
     const flaky = tests.filter((t) => t.outcome() === 'flaky')
     const lines = [
-      '## Browser pilot',
+      '## Browser tests',
       `${tests.length} tests, ${failed.length} failed, ${flaky.length} flaky, ${tests.filter((t) => t.outcome() === 'skipped').length} skipped.`,
       `Total wall time: ${(result.duration / 1000).toFixed(1)} s.`,
     ]

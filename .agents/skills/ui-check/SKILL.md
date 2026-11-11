@@ -12,17 +12,17 @@ checks in the pinned official Playwright Linux container with Node 24 and matchi
 versions. Only this run counts for acceptance. Native Mac browsers below are for quick tries
 and visual review, not acceptance.
 
-The pilot uses one worker, desktop Chromium at 1440 px, and touch WebKit at 390 by 844 px and
+The Playwright suite uses one worker, desktop Chromium at 1440 px, and touch WebKit at 390 by 844 px and
 844 by 390 px. JSON, timings and retained failure traces are in `ui-test-results/`. Read the text
 or JSON failure first, then the trace. A pass only on retry warns locally and fails CI. Never
 point the suite at a real library. No screenshots in pull requests.
 
-For a focused run: `sh scripts/test-ui.sh pilot --grep search`. For 20 repeats without retries,
-run `UI_REPEAT=20 sh scripts/test-ui.sh pilot --project=chromium-desktop`, then the same command
+For a focused run: `sh scripts/test-ui.sh playwright --grep search`. For 20 repeats without retries,
+run `UI_REPEAT=20 sh scripts/test-ui.sh playwright --project=chromium-desktop`, then the same command
 with `webkit-portrait` and `webkit-landscape`. Keep each container command under 15 minutes.
 The normal complete suite has a five minute budget, including the old checks.
 
-Never loosen a test without stopping to report it and getting Jan's OK. Do not remove assertions,
+Never loosen a test without stopping to report it and getting a maintainer's approval. Do not remove assertions,
 widen tolerances, add or lengthen fixed waits, skip, quarantine, or change a test only to make it
 pass. A migrated assertion must have equivalent or stronger coverage in the new runner.
 

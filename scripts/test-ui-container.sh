@@ -29,7 +29,7 @@ for dir in server selector docs/site; do
 done
 mode=${1:-all}
 if [ "$#" -gt 0 ]; then shift; fi
-case "$mode" in all|pilot|legacy|layout) ;; *) echo "Unknown browser suite: $mode"; exit 1 ;; esac
+case "$mode" in all|playwright|legacy|layout) ;; *) echo "Unknown browser suite: $mode"; exit 1 ;; esac
 for arg in "$@"; do
   if [ "$arg" = --base ]; then echo 'Acceptance never connects to another library.'; exit 1; fi
 done
@@ -59,12 +59,12 @@ if [ "$mode" = all ] || [ "$mode" = layout ]; then
   printf 'Layout: %s passed, %s failed.\n' "$passed" "$failed" > /out/layout-summary.md
   grep '^FAIL ' /out/layout.txt >> /out/layout-summary.md || true
 fi
-if [ "$mode" = all ] || [ "$mode" = pilot ]; then
+if [ "$mode" = all ] || [ "$mode" = playwright ]; then
   args=()
   if [ "${CI:-}" ]; then args+=(--fail-on-flaky-tests); fi
   if [ "${UI_REPEAT:-0}" -gt 0 ]; then args+=(--repeat-each="$UI_REPEAT" --retries=0); fi
   (cd server && npx playwright test --config scripts/app-ui/playwright.config.mjs "${args[@]}" "$@") || status=1
-  tag=pilot
+  tag=playwright
   for arg in "$@"; do case "$arg" in --project=*) tag=${arg#--project=} ;; esac; done
   cp /out/report.json "/out/$tag-report.json"
   cp /out/summary.md "/out/$tag-summary.md"

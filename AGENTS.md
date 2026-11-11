@@ -257,11 +257,11 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
 3. UI changes are looked at on a phone size (WebKit, iPhone) and a desktop size, using
    `npm run screenshots` or Playwright directly. No page errors.
 4. Browser acceptance is `mise run test:ui`, the pinned official Playwright Linux image with Node 24.
-   Native Mac browsers are for quick tries only. The pilot uses one worker, desktop Chromium, and touch
-   WebKit in portrait and landscape. To repeat without retries: `UI_REPEAT=20 sh scripts/test-ui.sh pilot
+   Native Mac browsers are for quick tries only. The Playwright suite uses one worker, desktop Chromium, and touch
+   WebKit in portrait and landscape. To repeat without retries: `UI_REPEAT=20 sh scripts/test-ui.sh playwright
    --project=webkit-portrait` (repeat for `chromium-desktop` and `webkit-landscape`). Results and failure
    traces are in `ui-test-results/`. A retry-only pass warns locally and fails CI. No PR screenshots.
-   Never loosen a test without stopping to report it and getting Jan's OK: no removed assertions,
+   Never loosen a test without stopping to report it and getting a maintainer's approval: no removed assertions,
    wider tolerances, added or longer fixed waits, skips, quarantine or changes only to make it pass.
    Moving an assertion needs equivalent or stronger coverage in the new runner, not less coverage.
 5. User-visible changes have a line in `CHANGELOG.md` under `Unreleased`, written for users.

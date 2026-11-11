@@ -81,7 +81,7 @@ jobs:
     permissions:
       contents: read
     env:
-      # Set to 20 in a temporary commit for the no-retry pilot repeat proof.
+      # Set to 20 in a temporary commit for a repeat run without retries.
       UI_REPEAT: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,15 +93,15 @@ jobs:
       - name: Repeat Chromium without retries
         if: env.UI_REPEAT != '0'
         timeout-minutes: 15
-        run: sh scripts/test-ui.sh pilot --project=chromium-desktop
+        run: sh scripts/test-ui.sh playwright --project=chromium-desktop
       - name: Repeat portrait WebKit without retries
         if: env.UI_REPEAT != '0'
         timeout-minutes: 15
-        run: sh scripts/test-ui.sh pilot --project=webkit-portrait
+        run: sh scripts/test-ui.sh playwright --project=webkit-portrait
       - name: Repeat landscape WebKit without retries
         if: env.UI_REPEAT != '0'
         timeout-minutes: 15
-        run: sh scripts/test-ui.sh pilot --project=webkit-landscape
+        run: sh scripts/test-ui.sh playwright --project=webkit-landscape
       - name: Browser summary
         if: always()
         run: |

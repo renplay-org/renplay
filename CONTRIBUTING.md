@@ -34,23 +34,23 @@ Put a game's PC zip into `/tmp/rp/games/_archives/` and install it from the libr
 ## Browser tests
 
 Run `mise run test:ui` with Docker. It runs the old library checks, website/docs layout checks and
-Playwright Test pilot in the same official Linux container as CI, pinned by digest with Node 24
+Playwright Test suite in the same official Linux container as CI, pinned by digest with Node 24
 and matching Playwright packages. Only this container run counts for acceptance. Native Mac browsers
 are useful for quick tries, not acceptance. The suite uses mock games and blocks external requests.
 Never point it at a real library.
 
-The pilot runs one worker: Chromium at 1440 px and touch WebKit at 390 px in portrait, then 844 by
+The Playwright suite runs one worker: Chromium at 1440 px and touch WebKit at 390 px in portrait, then 844 by
 390 px in landscape. It retains failure traces and writes JSON and a text summary into
 `ui-test-results/`. A pass only on retry warns locally and fails CI. The normal complete browser
 suite must finish in under five minutes. There are no screenshots in pull requests.
 
-For a focused pilot run, use `sh scripts/test-ui.sh pilot --grep search`. Repeat each project with
+For a focused run, use `sh scripts/test-ui.sh playwright --grep search`. Repeat each project with
 no retries, separately so each container stays under 15 minutes:
 
 ```sh
-UI_REPEAT=20 sh scripts/test-ui.sh pilot --project=chromium-desktop
-UI_REPEAT=20 sh scripts/test-ui.sh pilot --project=webkit-portrait
-UI_REPEAT=20 sh scripts/test-ui.sh pilot --project=webkit-landscape
+UI_REPEAT=20 sh scripts/test-ui.sh playwright --project=chromium-desktop
+UI_REPEAT=20 sh scripts/test-ui.sh playwright --project=webkit-portrait
+UI_REPEAT=20 sh scripts/test-ui.sh playwright --project=webkit-landscape
 ```
 
 `mise run check:app-ui` and `mise run check:layout` run their respective old checks in the container.
@@ -60,7 +60,7 @@ The container never writes the checkout. It caches Linux dependencies in Docker 
 `rp-server-nm`, `rp-selector-nm`, `rp-ui-docs-nm` and `rp-ui-tools`. Delete those volumes to reclaim
 space when no runner is using them. The Mac's `node_modules` are not used or modified.
 
-Do not loosen a test without stopping to report it and getting Jan's OK. This includes removing
+Do not loosen a test without stopping to report it and getting a maintainer's approval. This includes removing
 an assertion, widening a tolerance, adding or lengthening a fixed wait, skipping, quarantining,
 or changing a test only to make it pass. A migration must keep equivalent or stronger assertions.
 
