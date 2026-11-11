@@ -10,7 +10,9 @@ const MAX_COUNT = 10_000_000
 const ID = /^[a-z0-9-]{1,80}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/
-const RELEASE = /^[0-9A-Za-z._+-]{1,40}$/
+// A release name as the catalog writes it ("1.5.5", "Season 1", "Patreon(0.77)"). Anything else is dropped from the
+// entry, never the reason a report is refused: the rest of the report still counts.
+const RELEASE = /^[0-9A-Za-z][0-9A-Za-z ._+()[\]-]{0,39}$/
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 
 const ARCH = ['arm64', 'x64']
@@ -137,7 +139,7 @@ function validate(body: unknown, today: string): Report {
     const name = `catalog[${i}]`
     return {
       game: text(e.game, `${name}.game`, ID),
-      release: e.release === undefined || e.release === null ? '' : text(e.release, `${name}.release`, RELEASE),
+      release: typeof e.release === 'string' && RELEASE.test(e.release) ? e.release : '',
       installed: num(e.installed, `${name}.installed`),
       installsOk: num(installs.ok, `${name}.installs.ok`),
       installsFailed: num(installs.failed, `${name}.installs.failed`),

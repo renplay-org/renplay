@@ -101,6 +101,20 @@ describe('a good report', () => {
     expect((await all('instance_days')).length).toBe(2)
   })
 
+  it('keeps a report whose release names are empty or written like the catalog writes them', async () => {
+    const releases = ['', 'Season 1', 'Patreon(0.77)', '0.1 (Issue 1)', 'Ch. 3 [Final]']
+    await send(report(1, { catalog: releases.map((release, i) => ({ game: `g-${i}`, release, installed: 1 })) }))
+    const rows = await all('game_days')
+    expect(rows.map((r) => [r.game, r.release])).toEqual(expect.arrayContaining([['g-0', ''], ['g-1', 'Season 1'], ['g-2', 'Patreon(0.77)'], ['g-3', '0.1 (Issue 1)'], ['g-4', 'Ch. 3 [Final]']]))
+    expect((await all('instance_days')).length).toBe(1)
+  })
+
+  it('keeps the report and drops only a release that is not a release name', async () => {
+    await send(report(1, { catalog: [{ game: 'g', release: 'x'.repeat(200), installed: 1 }, { game: 'h', release: 'see https://my.server/x', installed: 1 }] }))
+    const rows = await all('game_days')
+    expect(rows.map((r) => [r.game, r.release]).sort()).toEqual([['g', ''], ['h', '']])
+  })
+
   it('sums two instances on the same day into one game row with no instance id', async () => {
     await send(report(1))
     await send(
