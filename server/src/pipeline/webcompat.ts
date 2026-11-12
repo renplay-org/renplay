@@ -18,10 +18,7 @@
  *   import. It is the same module under its old name.
  * - old import hooks: libraries games bundle (six in old requests) register
  *   finders with only find_module(), which Python 3.12 no longer calls.
- * - Python 2 syntax: games made for Ren'Py 7 (Python 2) can have print
- *   statements and 0-prefixed numbers in their Python, which Ren'Py 8
- *   compiles as Python 3. Code that fails for those reasons is fixed where the
- *   error points and compiled again.
+ * - Python 2 code and syntax are py2compat.ts's, which loads before the game.
  */
 export const WEB_COMPAT_PATH = 'renplay_web.rpy'
 
@@ -94,65 +91,6 @@ python early:
                 print("Renplay: threads do not run in the browser, skipped %r" % (owner,))
 
         threading.Thread.start = start_or_skip
-
-        import re
-
-        # Ren'Py retries such code with renpy.compat.fixes, which tokenizes it; Python 3.12's
-        # tokenizer refuses 0-prefixed numbers, so that retry fails. This one fixes what the
-        # error points at and tries again.
-        compile_py = renpy.python.py_compile
-        statement = re.compile(r"^([ \\t]*)print\\b(?![ \\t]*[(=.])[ \\t]*(.*?)[ \\t]*$", re.M)
-        number = re.compile(r"(?<![\\w.])0+([0-9]+)(?![\\w.])")
-
-        def call(m):
-            body = m.group(2)
-            if body.endswith(","):
-                return '%sprint(%s, end=" ")' % (m.group(1), body[:-1])
-            return "%sprint(%s)" % (m.group(1), body)
-
-        def fix(source, e, first):
-            msg = str(e.msg)
-            if "print" in msg:
-                return statement.sub(call, source)
-            if "leading zeros" in msg and e.lineno is not None and e.offset:
-                lines = source.split("\\n")
-                i = e.lineno - first
-                if 0 <= i < len(lines):
-                    line = lines[i]
-                    near = [n for n in number.finditer(line) if abs(n.start() - (e.offset - 1)) <= 2]
-                    m = near[0] if near else None
-                    if m:
-                        digits = m.group(1)
-                        # 010 was octal in Python 2.
-                        literal = "0o" + digits if re.match(r"^[0-7]+$", digits) else digits.lstrip("0") or "0"
-                        lines[i] = line[: m.start()] + literal + line[m.end() :]
-                        return "\\n".join(lines)
-            return None
-
-        def py_compile(source, mode, *args, **kwargs):
-            try:
-                return compile_py(source, mode, *args, **kwargs)
-            except SyntaxError as e:
-                if not isinstance(source, str):
-                    raise
-                error = e
-            first = getattr(source, "linenumber", None) or kwargs.get("lineno") or (args[1] if len(args) > 1 else 1)
-            fixed = source
-            for _ in range(50):
-                attempt = fix(str(fixed), error, first)
-                if attempt is None or attempt == str(fixed):
-                    raise error
-                try:
-                    fixed = type(source)(attempt, source.filename, source.linenumber)
-                except Exception:
-                    fixed = attempt
-                try:
-                    return compile_py(fixed, mode, *args, **kwargs)
-                except SyntaxError as e:
-                    error = e
-            raise error
-
-        renpy.python.py_compile = py_compile
 
         # Import hooks with only find_module() (six before 1.16, bundled with old requests and
         # urllib3) stopped working in Python 3.12, and Ren'Py 8.5 runs 3.12. This finder asks

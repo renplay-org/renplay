@@ -150,7 +150,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     const engine = await engines.pick(p.engine ?? settings.engine, gameRenpy ?? match?.release?.madeWith)
     ctx.log(`Game made with Ren'Py ${gameRenpy ?? 'unknown'}; building with engine ${engine}`)
     if (gameRenpy && Number(gameRenpy.split('.')[0]) < Number(engine.split('.')[0])) {
-      ctx.log(`Made with an older Ren'Py: most such games work on the newer engine, but Python 2 code in the game can fail while playing. Report problems to the catalog.`)
+      ctx.log(`Made with an older Ren'Py: its Python 2 code runs as it did under Python 2. Report problems to the catalog.`)
     }
     const engineDir = await engines.ensure(engine, ctx)
 
@@ -224,6 +224,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
       rules,
       placeholders: res.placeholders,
       extra,
+      python2: !gameRenpy || Number(gameRenpy.split('.')[0]) < 8,
       ctx,
     })
     await writeIndex(join(staging, 'assets.json'), assets.index)

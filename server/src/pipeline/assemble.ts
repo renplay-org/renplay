@@ -8,6 +8,7 @@ import yazl from 'yazl'
 import type { JobContext } from '../jobs/manager.js'
 import type { PackIndex } from './pack.js'
 import { classify, type Placeholder, type ProgressiveRule } from './progressive.js'
+import { PY2_COMPAT, PY2_COMPAT_PATH } from './py2compat.js'
 import { WEB_COMPAT, WEB_COMPAT_PATH } from './webcompat.js'
 
 /** Already-compressed formats are stored; the rest is deflated. */
@@ -26,6 +27,8 @@ export interface AssembleOptions {
   placeholders: Map<string, Placeholder>
   /** Files (relative to game/) supplied separately; they go into game.zip and never stream. */
   extra?: Map<string, Buffer>
+  /** Adds the Python 2 script: games made with Ren'Py 7 and older, or of no known version. */
+  python2?: boolean
   ctx: JobContext
 }
 
@@ -84,7 +87,9 @@ export async function assemble(o: AssembleOptions): Promise<AssembleResult> {
     zip.addBuffer(data, `game/${rel}`, { compress: !STORED.test(rel) })
     zipped++
   }
-  if (!o.zipPack.index.has(WEB_COMPAT_PATH) && !extra.has(WEB_COMPAT_PATH)) zip.addBuffer(Buffer.from(WEB_COMPAT, 'utf-8'), `game/${WEB_COMPAT_PATH}`)
+  for (const [path, text] of [...(o.python2 ? [[PY2_COMPAT_PATH, PY2_COMPAT] as const] : []), [WEB_COMPAT_PATH, WEB_COMPAT] as const]) {
+    if (!o.zipPack.index.has(path) && !extra.has(path)) zip.addBuffer(Buffer.from(text, 'utf-8'), `game/${path}`)
+  }
 
   // 4. Placeholders of streamed images and the list of streamed files.
   for (const [rel, t] of remote) if (t.startsWith('image')) zip.addBuffer(o.placeholders.get(rel)!.data, `_placeholders/${rel}`, { compress: false })

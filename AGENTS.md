@@ -231,13 +231,22 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
   still fail is Python 2 behaviour (xrange, iteritems, unicode). Once in a Lifetime (7.3.2)
   played through its opening, a fight minigame and more without errors. Harem Hotel (7.4.11)
   does not: it sorts numbers with text, which Python 3 refuses.
+- **Python 2 code is rewritten, only Python 2 code.** Ren'Py 8 marks Python loaded from an old
+  `.rpyc` with `PyExpr.py == 2`. `py2compat.ts` (`game/!renplay_py2.rpy`, named to load before any game
+  file, since Ren'Py compiles each file's Python as it loads it) wraps `renpy.python.py_compile`
+  (and the copy `renpy.pyanalysis` imported, which screens use) and `wrap_node`, and rewrites only
+  that code, and code that compiles only once its Python 2 syntax is fixed: integer `/`, list-returning `keys()`/`map()`/`zip()`, Python 2 ordering on a
+  `TypeError`, `__cmp__` and friends on classes. In game code `renpy` is `renpy.exports`: the engine's
+  modules come from `sys.modules`. Builds of games made with Ren'Py 8 do not get the script. A failed
+  compile alone proves nothing: Ren'Py compiles every statement as an expression too. A probe game
+  with 37 Python 2 idioms went from 8 to 37 working.
 - **Load the developer's .rpyc, not the .rpy.** A `.rpyc` stores its source's digest with a
   marker of the Ren'Py version that wrote it, so Ren'Py 8.5 sees every older game's `.rpyc` as
   stale and compiles the `.rpy` again, with a stricter parser and Python 3.12 (Harem Hotel's
   empty `screen`, Heros Harem Guild's `[:02]` and `xadjustment` failed that way). Builds keep
   sources out of `game.zip` when the `.rpyc` is there (`setSourcesAside`). Ren'Py's own Python 2
   fixer (`renpy.compat.fixes`) uses `tokenize`, which Python 3.12 makes fail on the very code it
-  should fix; `webcompat.ts` retries from the error's position instead.
+  should fix; `py2compat.ts` retries from the error's position instead.
 - **GitHub release downloads can fail for hours.** On 2026-11-08 they answered 504 all morning: no
   new install could fetch its engine, and CI steps that downloaded tools from releases failed. Engines
   are served from engines.renplay.org now (the engines repository checks every file there before
