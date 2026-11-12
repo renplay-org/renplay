@@ -11,6 +11,13 @@ release notes say what).
 
 - Renplay keeps a copy of its library database before changing it and alongside the daily save backup.
 
+### Fixed
+
+- Games made with Ren'Py 7.5 to 7.8 show their Ren'Py version and get the right engine.
+- Installing a game that kept the save folder of a Ren'Py sample project no longer replaces another game with that folder.
+- Games made on Windows that ask for a file in another case (data/Items.json for data/items.json) find it.
+- Games made with Ren'Py 6 that use its old themes show their frames and buttons.
+
 ## [4.10.0] - 2026-11-11
 
 ### Added

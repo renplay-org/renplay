@@ -129,6 +129,7 @@ async function readIndex(path: string): Promise<PackIndex> {
 /** Reads entries of a pack. Indexes are cached (a few builds at a time). */
 export class PackReader {
   private static cache = new Map<string, { mtimeMs: number; index: PackIndex }>()
+  private static lower = new WeakMap<PackIndex, PackIndex>()
 
   constructor(
     readonly packPath: string,
@@ -145,8 +146,21 @@ export class PackReader {
     return index
   }
 
+  /**
+   * An entry by its name, or by the name in another case: games made on Windows ask for
+   * data/Items.json when the file is data/items.json, which Windows does not tell apart.
+   */
   async entry(name: string): Promise<[number, number] | null> {
-    return (await this.index()).get(name) ?? null
+    const index = await this.index()
+    const exact = index.get(name)
+    if (exact) return exact
+    let lower = PackReader.lower.get(index)
+    if (!lower) {
+      lower = new Map()
+      for (const [k, v] of index) if (!lower.has(k.toLowerCase())) lower.set(k.toLowerCase(), v)
+      PackReader.lower.set(index, lower)
+    }
+    return lower.get(name.toLowerCase()) ?? null
   }
 
   /** A stream of an entry, or of bytes [from, to] (inclusive) within it. */

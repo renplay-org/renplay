@@ -83,6 +83,8 @@ describe('rpa header', () => {
 describe('Ren\'Py version', () => {
   it('reads Ren\'Py 8 and Ren\'Py 7 version files', () => {
     expect(renpyVersionFromVc("branch = 'fix'\nversion = '8.3.4.24120703'\n")).toBe('8.3.4.24120703')
+    // Ren'Py 7.5 to 7.8 write it as a Python 2 unicode literal.
+    expect(renpyVersionFromVc("branch = u'fix'\nversion = u'7.8.7.25031702'\n")).toBe('7.8.7.25031702')
     const init = 'vc_version = 0\nversion_tuple = (7, 3, 2, vc_version)\n'
     expect(renpyVersionFromVc('vc_version = 320', init)).toBe('7.3.2.320')
     expect(renpyVersionFromVc('vc_version = 320')).toBeUndefined()

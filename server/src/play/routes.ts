@@ -132,7 +132,8 @@ export function createPlayRouter(s: Services): Router {
     }
     if (/\.html?$/i.test(name)) {
       const game = db.getGame(id)
-      if (game && isWebGame(game) && game.entry === name && game.build && baseOf(game.build) === base) {
+      // The pack finds a page asked for in another case: it still gets the runtime.
+      if (game && isWebGame(game) && game.entry.toLowerCase() === name.toLowerCase() && game.build && baseOf(game.build) === base) {
         const page = (await reader.read(name)) ?? Buffer.alloc(0)
         res.setHeader('Cache-Control', 'no-store')
         res.type('html').send(await htmlPage(page.toString('utf-8'), game))

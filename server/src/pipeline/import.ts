@@ -12,7 +12,7 @@ import { ENGINE_FILES, type EngineStore } from '../engines.js'
 import type { JobContext, JobManager } from '../jobs/manager.js'
 import type { Overlays } from '../games/mods.js'
 import { dirSize, exists } from '../util/fsx.js'
-import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
+import { HttpError, cleanRelPath, isSlug, safeJoin, slugify } from '../util/paths.js'
 import { extractWithBsdtar, openDir, openZip, readAll, sniffArchive, type ArchiveSource, type SourceEntry } from './archive.js'
 import { assemble, RangeStream } from './assemble.js'
 import { nameVersionFromSource, pythonOf, renpyVersionFromVc, saveDirFromRpyc, saveDirFromSource, vcNeedsInit } from './detect.js'
@@ -53,18 +53,24 @@ export interface ImportDeps {
   content: ContentMode
 }
 
+/** Save folders of the projects the Ren'Py SDK ships, which games made from them can keep. */
+const SAMPLE_SAVE_DIR = /^(the_question|tutorial)(-\d+)?$/i
+
 /**
  * The library entry an install goes into: the one asked for, the one linked to the matched
  * recipe, or one with the same save folder. Seasons and spin-offs often share a save folder (that
  * is how a sequel reads the earlier saves), so a game already linked to another recipe is never
- * taken over through its save folder.
+ * taken over through its save folder. Games made from a Ren'Py sample can keep its save folder
+ * ("the_question-7"): there the title must match too, or one game replaces another.
  */
-export function existingGame(db: Db, game: string | undefined, recipeId: string | undefined, saveDir: string | undefined): GameRow | null {
+export function existingGame(db: Db, game: string | undefined, recipeId: string | undefined, saveDir: string | undefined, title?: string): GameRow | null {
   if (game) return db.getGame(game)
   const byRecipe = recipeId ? db.gameByRecipe(recipeId) : null
   if (byRecipe) return byRecipe
   if (!saveDir) return null
-  return db.gamesBySaveDir(saveDir).find((g) => !recipeId || !g.recipe_id || g.recipe_id === recipeId) ?? null
+  // Without both titles a sample's folder matches nothing: a second entry beats replacing a game.
+  const sameTitle = (g: GameRow) => !SAMPLE_SAVE_DIR.test(saveDir) || (!!title && !!g.title && slugify(g.title) === slugify(title))
+  return db.gamesBySaveDir(saveDir).find((g) => (!recipeId || !g.recipe_id || g.recipe_id === recipeId) && sameTitle(g)) ?? null
 }
 
 export async function runImport(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise<unknown> {
@@ -209,7 +215,7 @@ async function install(ctx: JobContext<ImportParams>, deps: ImportDeps): Promise
     const saveDir = match?.recipe.saveDir ?? meta.saveDir
 
     // 6. Game id: the existing game, the recipe, or the title.
-    const existing = existingGame(db, p.game, match?.recipe.id, saveDir)
+    const existing = existingGame(db, p.game, match?.recipe.id, saveDir, meta.title)
     if (p.game && !existing) throw new HttpError(404, `Game ${p.game} not found`)
     const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(match?.recipe.title || meta.title || basename(archivePath).replace(/\.[^.]+$/, '')))
     if (!isSlug(id)) throw new Error(`Invalid game id ${id}`)
@@ -359,7 +365,7 @@ async function installHtml(
   const version = match?.release?.version ?? versionFromName(o.archiveName)
   // Where the story keeps its saves: SugarCube uses its title's slug.
   const saveDir = match?.recipe.saveDir ?? storyId(engine.title ?? title)
-  const existing = existingGame(db, p.game, match?.recipe.id, saveDir)
+  const existing = existingGame(db, p.game, match?.recipe.id, saveDir, title)
   if (p.game && !existing) throw new HttpError(404, `Game ${p.game} not found`)
   const id = existing?.id ?? (match && !db.getGame(match.recipe.id) ? match.recipe.id : builds.uniqueId(title))
   if (!isSlug(id)) throw new Error(`Invalid game id ${id}`)
