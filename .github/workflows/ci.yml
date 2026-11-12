@@ -74,34 +74,26 @@ jobs:
       - run: mise run check:workflows
       - run: mise run check:examples
 
-  browser:
-    name: Browser suite
+  browser-checks:
+    name: Browser (${{ matrix.suite }})
+    needs: changes
+    if: needs.changes.outputs.browser-suites != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.changes.outputs.browser-suites) }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 15
     permissions:
       contents: read
-    env:
-      # Set to 20 in a temporary commit for a repeat run without retries.
-      UI_REPEAT: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Complete browser suite (under five minutes)
-        timeout-minutes: 15
-        run: UI_REPEAT=0 sh scripts/test-ui.sh
-      - name: Repeat Chromium without retries
-        if: env.UI_REPEAT != '0'
-        timeout-minutes: 15
-        run: sh scripts/test-ui.sh playwright --project=chromium-desktop
-      - name: Repeat portrait WebKit without retries
-        if: env.UI_REPEAT != '0'
-        timeout-minutes: 15
-        run: sh scripts/test-ui.sh playwright --project=webkit-portrait
-      - name: Repeat landscape WebKit without retries
-        if: env.UI_REPEAT != '0'
-        timeout-minutes: 15
-        run: sh scripts/test-ui.sh playwright --project=webkit-landscape
+      - name: Browser checks
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: sh scripts/test-ui.sh "$SUITE"
       - name: Browser summary
         if: always()
         run: |
@@ -112,9 +104,32 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: browser-evidence
+          name: browser-${{ matrix.suite }}-evidence
           path: ui-test-results/
           retention-days: 7
+
+  # Like Install contract, this name reports even when every browser job is skipped.
+  browser:
+    name: Browser suite
+    needs: [changes, browser-checks]
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          BROWSER: ${{ needs.browser-checks.result }}
+          SUITES: ${{ needs.changes.outputs.browser-suites }}
+        run: |
+          [ "$CHANGES" = success ] || { echo "Could not tell what changed: $CHANGES"; exit 1; }
+          if [ "$SUITES" = '[]' ] && [ "$BROWSER" = skipped ]; then
+            echo "No browser inputs changed." | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "$SUITES" != '[]' ] && [ "$BROWSER" = success ]; then
+            echo "All selected browser checks passed: $SUITES" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Browser checks failed: $BROWSER" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
   # The telemetry collector (telemetry/): its types, its tests on a local D1 and a dry run of its deploy.
   telemetry:
@@ -140,21 +155,31 @@ jobs:
 
       - run: mise run check:telemetry
 
-  # Whether the image or the chart can have changed. Docs, the website and the demo cannot.
+  # Select only jobs whose inputs changed. Shared browser tooling always selects all suites.
   changes:
     runs-on: ubuntu-24.04
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       image: ${{ steps.files.outputs.image }}
+      browser-suites: ${{ steps.files.outputs.browser-suites }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - id: files
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          if [ -z "$PR" ]; then echo "image=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' > files.txt
+          if [ -z "$PR" ]; then
+            echo "image=true" >> "$GITHUB_OUTPUT"
+            echo 'browser-suites=["legacy","playwright","layout"]' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' > files.txt
+          echo "browser-suites=$(node scripts/browser-suites.mjs < files.txt)" >> "$GITHUB_OUTPUT"
           if grep -qE '^(server/|selector/|runtime/|image/|charts/|tests/|deploy/compose\.yaml$|Dockerfile$|\.dockerignore$|mise\.toml$|tasks\.toml$|\.github/workflows/ci\.yml$)' files.txt; then
             echo "image=true" >> "$GITHUB_OUTPUT"
           else

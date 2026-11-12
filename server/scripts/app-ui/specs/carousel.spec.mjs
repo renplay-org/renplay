@@ -77,11 +77,13 @@ test('Carousel: automatic turn is scheduled at 7000 ms, not before', async ({ pa
   })
   await openClocked(page)
   expect(await page.evaluate(() => window.__rotateAt - window.__rotateFrom), 'Autoplay schedules a seven second deadline after initialization').toBe(7000)
+  // The deadline is read before the turn: once it turns, the carousel schedules the next turn and `__rotateAt` moves on.
+  const deadline = await page.evaluate(() => window.__rotateAt)
   const remaining = await page.evaluate(() => window.__rotateAt - Date.now())
   await page.clock.runFor(remaining - 1)
   expect(await page.evaluate(() => window.__turns), 'No automatic turn at 6999 ms').toEqual([])
   await page.clock.runFor(1)
   expect(await page.evaluate(() => window.__turns), 'One automatic request for the next slide at exactly 7000 ms').toEqual([
-    { left: 2 * (await state(page)).width, at: await page.evaluate(() => window.__rotateAt) },
+    { left: 2 * (await state(page)).width, at: deadline },
   ])
 })
