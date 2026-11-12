@@ -150,7 +150,7 @@ test('in full screen nothing is at the top centre, and the menu says Hold Esc to
 
 // Every control and every line of text in the menu, Saves and Options, measured as a person sees it.
 const MENU_VIEWS = [['the list', null], ['Saves', /^Saves/], ['Options', /^Options/]]
-test('every control in the menu, Saves and Options is tall enough and no text is under 13 px', async ({ page }, testInfo) => {
+test('every control in the menu, Saves and Options is tall enough and no text is under 13 px', async ({ page, context }, testInfo) => {
   await play(page, { slots: [slot(1, 5), slot(2, 30), { ...slot(3, 60), pinnedAt: '2026-11-10T10:00:00Z', title: 'Meeting Diya', note: 'Before the first lunch scene' }] })
   const landscape = testInfo.project.name === 'webkit-landscape'
   const row = landscape ? 40 : 44
@@ -180,10 +180,14 @@ test('every control in the menu, Saves and Options is tall enough and no text is
     expect(found.small, `Text under 13 px in ${name}`).toEqual([])
     expect(found.short.filter((c) => c.h < row), `Controls under ${row} px in ${name}`).toEqual([])
   }
-  // Nothing scrolls on the list at 844 x 390.
+  // Nothing scrolls on the list at 844 x 390, also with the line about saves that wait, which is two lines there.
   if (landscape) {
     await press(menu.getByRole('button', { name: 'Back', exact: true }))
+    await context.setOffline(true)
+    await expect(menu.getByText('Some saves have not reached the server yet.')).toBeVisible()
     expect(await menu.locator('.pm-body').evaluate((b) => b.scrollHeight - b.clientHeight)).toBeLessThanOrEqual(0)
     expect(await menu.evaluate((m) => m.getBoundingClientRect().bottom)).toBeLessThanOrEqual(390)
+    await page.screenshot({ path: testInfo.outputPath('menu-the-list-waiting.png') })
+    await context.setOffline(false)
   }
 })

@@ -514,7 +514,11 @@ export default function Player() {
           fsMode={fsMode}
           fullscreen={fullscreen}
           escLocked={escLocked}
-          onFullscreen={() => void toggleFullscreen()}
+          onFullscreen={() => {
+            // On an iPhone the row opens the help sheet, which sits under the menu.
+            if (fsMode === 'home-screen') closeMenu()
+            void toggleFullscreen()
+          }}
           waiting={waiting}
           keys={touch ? null : keys}
           pad={padConnected}

@@ -1,5 +1,5 @@
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Check, CloudOff, Expand, Play, Save, Settings2, Smartphone, Volume2, VolumeX } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import type { Game } from '@shared/api'
 import { Frame } from '../../lantern/art'
 import { Pill } from '../../lantern/controls'
@@ -95,7 +95,8 @@ export function PlayerMenu({
     opened.current = view
   }, [view])
   const link = game.recipe?.links.walkthrough
-  const sheet = portrait ? { paddingBottom: 12 + insets.bottom, paddingLeft: 12 + insets.left, paddingRight: 12 + insets.right } : { paddingTop: 8 + insets.top, paddingLeft: 12 + insets.left, paddingBottom: 12 + insets.bottom }
+  // The safe areas of the screen, which the sheet's padding adds to its own.
+  const sheet = { '--pi-top': `${insets.top}px`, '--pi-right': `${insets.right}px`, '--pi-bottom': `${insets.bottom}px`, '--pi-left': `${insets.left}px` } as CSSProperties
   return (
     <>
       <div className="pm-scrim" onClick={onClose} aria-hidden="true" />
@@ -166,7 +167,9 @@ export function PlayerMenu({
                 {fsMode === 'home-screen' ? (
                   <button type="button" className="pm-row" onClick={onFullscreen}>
                     <Smartphone />
-                    Full screen on iPhone
+                    <span>
+                      Full screen<span className="pm-wide"> on iPhone</span>
+                    </span>
                     <span className="pm-end">
                       <ChevronRight />
                     </span>

@@ -141,7 +141,7 @@
   width: min(380px, 92vw);
   display: flex;
   flex-direction: column;
-  padding: 8px 12px 12px;
+  padding: calc(8px + var(--pi-top, 0px)) 12px calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
   background: var(--glass-deep);
   backdrop-filter: blur(30px) saturate(140%);
   border-radius: 0 var(--r-sheet) var(--r-sheet) 0;
@@ -152,6 +152,7 @@
   right: 0;
   width: auto;
   max-height: 82dvh;
+  padding: 8px calc(12px + var(--pi-right, 0px)) calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   animation-name: pm-up;
 }
@@ -275,6 +276,13 @@
 .pm .seg {
   height: 48px;
 }
+.pm-rule {
+  flex: none;
+  width: auto;
+  margin: 4px 12px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
 .pm-field {
   display: flex;
   flex-direction: column;
@@ -380,10 +388,18 @@
 @media (max-height: 500px) {
   .pm {
     --pm-row: 40px;
-    padding: 8px;
+    padding: calc(6px + var(--pi-top, 0px)) 8px calc(6px + var(--pi-bottom, 0px)) calc(8px + var(--pi-left, 0px));
   }
   .pm-head {
-    height: 40px;
+    height: 32px;
+  }
+  .pm-foot {
+    gap: 4px;
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+  .pm-exit {
+    min-height: 44px;
   }
   .pm-icon,
   .pm-keys {
@@ -397,12 +413,14 @@
     gap: 4px;
   }
   .pm-switches .pm-row {
+    background: var(--plate);
     flex: 1 1 0;
     min-width: 0;
     padding: 0 8px;
     gap: 6px;
   }
-  .pm-switches .pm-row > svg {
+  .pm-switches .pm-row > svg,
+  .pm-wide {
     display: none;
   }
   .pm-save {
