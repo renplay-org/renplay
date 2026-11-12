@@ -15,25 +15,35 @@ if [ ! -x /tools/node/bin/node ]; then
 fi
 export PATH="/tools/node/bin:$PATH"
 [ "$(node --version)" = v24.19.0 ]
-mkdir -p /work
-cd /src
-tar --exclude=node_modules --exclude=dist --exclude=.git --exclude=ui-test-results -cf - . | (cd /work && tar xf -)
-ln -s /out /work/ui-test-results
+node /src/scripts/ui-workspace.mjs /src /work
+ln -sfn /out /work/ui-test-results
 cd /work
-for dir in server selector docs/site; do
-  key=$(sha256sum "$dir/package-lock.json" | cut -d ' ' -f 1)
-  if [ "$(head -1 "$dir/node_modules/.ui-lock" 2>/dev/null || true)" != "$key" ]; then
-    (cd "$dir" && npm ci --no-audit --no-fund)
-    echo "$key" > "$dir/node_modules/.ui-lock"
-  fi
-done
+git config --global --add safe.directory /work
 mode=${1:-all}
 if [ "$#" -gt 0 ]; then shift; fi
 case "$mode" in all|playwright|legacy|layout) ;; *) echo "Unknown browser suite: $mode"; exit 1 ;; esac
 for arg in "$@"; do
   if [ "$arg" = --base ]; then echo 'Acceptance never connects to another library.'; exit 1; fi
 done
-if [ "$mode" != layout ]; then (cd selector && npm run build); fi
+dirs=(server)
+if [ "$mode" != layout ]; then dirs+=(selector); fi
+if [ "$mode" = layout ] || [ "$mode" = all ]; then dirs+=(docs/site); fi
+for dir in "${dirs[@]}"; do
+  key=$(sha256sum "$dir/package-lock.json" | cut -d ' ' -f 1)
+  if [ "$(head -1 "$dir/node_modules/.ui-lock" 2>/dev/null || true)" != "$key" ]; then
+    (cd "$dir" && npm ci --no-audit --no-fund)
+    echo "$key" > "$dir/node_modules/.ui-lock"
+  fi
+done
+if [ "$mode" != layout ]; then
+  key=$(node -p "require('./.ui-workspace.json').library")
+  if [ ! -d selector/dist ] || [ "$(cat /tmp/ui-library-key 2>/dev/null || true)" != "$key" ]; then
+    (cd selector && npm run build)
+    echo "$key" > /tmp/ui-library-key
+  else
+    echo 'Library inputs unchanged, using the previous build.'
+  fi
+fi
 if [ "$mode" = layout ] || [ "$mode" = all ]; then
   sh website/build.sh
   (cd docs/site && npm run build)
@@ -43,12 +53,18 @@ start=$SECONDS
 if [ "$mode" = all ] || [ "$mode" = legacy ]; then
   repeats=1
   if [ "$mode" = legacy ] && [ "${UI_REPEAT:-0}" -gt 0 ]; then repeats=$UI_REPEAT; fi
+  rm -f /out/legacy-run-*.txt
+  printf '## Older browser checks\n' > /out/legacy-summary.md
   for ((i=1; i<=repeats; i++)); do
     echo "Legacy run $i of $repeats"
-    (cd server && node scripts/check-app-ui.mjs "$@") 2>&1 | tee /out/legacy.txt || { status=1; break; }
+    printf '\n### Run %s of %s\n' "$i" "$repeats" >> /out/legacy-summary.md
+    if ! (cd server && node scripts/check-app-ui.mjs "$@") 2>&1 | tee "/out/legacy-run-$i.txt"; then
+      status=1
+      printf 'Run failed. See legacy-run-%s.txt for the full log.\n' "$i" >> /out/legacy-summary.md
+    fi
+    grep -E '^FAIL|^(All passed|[0-9]+ failed):' "/out/legacy-run-$i.txt" >> /out/legacy-summary.md || true
   done
   echo "Legacy wall time: $((SECONDS-start)) s" | tee /out/legacy-time.txt
-  grep -E '^FAIL|^(All passed|[0-9]+ failed):' /out/legacy.txt > /out/legacy-summary.md || true
 fi
 if [ "$mode" = all ] || [ "$mode" = layout ]; then
   at=$SECONDS
@@ -63,11 +79,12 @@ if [ "$mode" = all ] || [ "$mode" = playwright ]; then
   args=()
   if [ "${CI:-}" ]; then args+=(--fail-on-flaky-tests); fi
   if [ "${UI_REPEAT:-0}" -gt 0 ]; then args+=(--repeat-each="$UI_REPEAT" --retries=0); fi
-  (cd server && npx playwright test --config scripts/app-ui/playwright.config.mjs "${args[@]}" "$@") || status=1
   tag=playwright
   for arg in "$@"; do case "$arg" in --project=*) tag=${arg#--project=} ;; esac; done
-  cp /out/report.json "/out/$tag-report.json"
-  cp /out/summary.md "/out/$tag-summary.md"
+  rm -f /out/report.json /out/summary.md "/out/$tag-report.json" "/out/$tag-summary.md"
+  (cd server && npx playwright test --config scripts/app-ui/playwright.config.mjs "${args[@]}" "$@") || status=1
+  if [ -f /out/report.json ]; then cp /out/report.json "/out/$tag-report.json"; fi
+  if [ -f /out/summary.md ]; then cp /out/summary.md "/out/$tag-summary.md"; fi
 fi
 if [ "$mode" = all ]; then
   echo "Whole browser suite wall time: $((SECONDS-start)) s (budget 300 s)." | tee /out/total-time.txt
