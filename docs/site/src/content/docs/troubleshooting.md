@@ -33,11 +33,12 @@ renplay` shows the server. When you report a problem, attach the job log.
 
 ### A Ren’Py 7 game stops with a Python error
 
-Games made with Ren’Py 7 or older run on the Ren’Py 8 engine, which uses Python 3. Code written for
-Python 2 can fail at run time with errors such as `xrange`, `iteritems`, `unicode` or sorting
-numbers together with text. Renplay patches many of these automatically, but not all. Such games
-stay broken until the developer updates them or a catalog patch exists. Tell the catalog which game
-and which error.
+Games made with Ren’Py 7 or older run on the Ren’Py 8 engine, which uses Python 3. Renplay runs
+their Python 2 code the way Python 2 did: whole-number division, lists from `keys()` and `map()`,
+sorting numbers together with text, `cmp`, `long`, `iteritems`, Python 2 classes and statements,
+and the game's own `.py` files. A game installed with an earlier Renplay needs **Reinstall** to get it. What
+can still fail is rarer: text and bytes mixed up (`"text".encode()` used as text), or libraries
+written in C. Tell the catalog which game and which error.
 
 ### A game is slow to start the first time
 

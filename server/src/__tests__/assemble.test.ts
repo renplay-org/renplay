@@ -58,6 +58,7 @@ describe('assemble', () => {
       rules,
       placeholders,
       extra: new Map([['zz_patch.rpy', Buffer.from('init: pass')]]),
+      python2: true,
       ctx,
     })
     expect(res.streamed.files).toBe(4)
@@ -68,6 +69,7 @@ describe('assemble', () => {
       [
         '_placeholders/images/bg copy.png',
         '_placeholders/images/bg.png',
+        'game/!renplay_py2.rpy',
         'game/gui/button.png',
         'game/images/menu.png',
         'game/renplay_web.rpy',

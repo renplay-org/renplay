@@ -21,10 +21,14 @@ installed. An engine is added only when its normal download plays as easily as a
 ## Ren'Py 7 games
 
 Renplay builds games made with Ren'Py 7 (and older) on the Ren'Py 8 engine, which loads their
-compiled scripts. A game that starts has no Python 2 syntax left to trip on. What can still fail
-is Python 2 behaviour, such as `xrange`, `iteritems` or `unicode`, or sorting numbers together
-with text. If such a game stops with a Python error, check the [catalog](/catalog/) for a note, and
-see [Troubleshooting](/troubleshooting/#a-renpy-7-game-stops-with-a-python-error).
+compiled scripts. Ren'Py 8 marks the Python in those scripts as Python 2, and Renplay rewrites that
+code as it compiles, so it behaves as it did: `7 / 2` is 3, `keys()`, `map()` and `zip()` give
+lists, sorting mixed values works, and `cmp`, `long`, `iteritems`, `string.letters`,
+`__cmp__` and `__nonzero__` are there. Python 2 statements (`print x`, `except E, e`, `exec`) are
+fixed where they fail to compile. The game's own `.py` files get the same treatment. Games made with
+Ren'Py 8 are left exactly as they are. If such a game still stops with a Python error, check the
+[catalog](/catalog/) for a note, and see
+[Troubleshooting](/troubleshooting/#a-renpy-7-game-stops-with-a-python-error).
 
 Renplay picks the engine for a game from its recipe, then `RENPLAY_ENGINE`, then the newest stable engine
 of the game's major version. A pre-release engine, which the engine index marks, is picked only for a

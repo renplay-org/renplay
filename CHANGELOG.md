@@ -10,6 +10,7 @@ release notes say what).
 ### Added
 
 - Renplay keeps a copy of its library database before changing it and alongside the daily save backup.
+- Games made with Ren'Py 7 and older work much more often. Their Python 2 code now runs the way Python 2 did on the Ren'Py 8 engine: whole-number division, lists from `keys()`, `map()` and `zip()`, sorting numbers with text, `cmp`, `long`, `iteritems`, `string.letters`, classes with `__cmp__` or `__nonzero__`, Python 2 statements, old-style screens, and the game's own `.py` files. Games made with Ren'Py 8 are not changed. Reinstall an older game to get this.
 
 ## [4.10.0] - 2026-11-11
 
