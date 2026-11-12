@@ -1002,7 +1002,6 @@ select.input option {
   background: #fff;
   transition: left var(--t-focus) var(--out);
 }
-/* The color only: the shorthand would reset the clip and make the lit switch larger than the unlit one. */
 .sw.on {
   background-color: var(--pink);
 }
