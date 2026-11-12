@@ -612,6 +612,32 @@ describe('adult access and signed game URLs', () => {
       expect((await request(a.app).get(url.replace('index.html', encodeURIComponent(name)))).status, name).toBeGreaterThanOrEqual(400)
     }
   })
+  it('serves an RPG Maker game the decrypted file for the plain name of an encrypted one', async () => {
+    const a = await start(), cookie = await login(a)
+    const key = Buffer.from('00112233445566778899aabbccddeeff', 'hex')
+    const png = Buffer.from('\x89PNG\r\n\x1a\n0000IHDR and the rest of the picture', 'latin1')
+    const encrypted = Buffer.concat([Buffer.from('5250474d560000000003010000000000', 'hex'), png.map((b, i) => (i < 16 ? b ^ key[i]! : b))])
+    const files: Array<[string, Buffer]> = [['index.html', Buffer.from('<html></html>')], ['data/System.json', Buffer.from(JSON.stringify({ encryptionKey: key.toString('hex') }))], ['img/pictures/pic_01.rpgmvp', encrypted]]
+    for (const [id, family] of [['rpgm', 'html'], ['vn', 'renpy']] as const) {
+      game(a, id, { family, entry: 'index.html' })
+      const root = join(a.accounts.cfg.gamesDir, id, 'b1'); mkdirSync(root, { recursive: true })
+      let at = 0
+      writeFileSync(join(root, 'assets.pack'), Buffer.concat(files.map(([, data]) => data)))
+      writeFileSync(join(root, 'assets.json'), JSON.stringify(Object.fromEntries(files.map(([name, data]) => [name, [(at += data.length) - data.length, data.length]]))))
+    }
+    const url = (await request(a.app).get('/api/games/rpgm').set('Cookie', cookie).expect(200)).body.game.playUrl as string
+    const plain = url.replace('index.html', 'img/pictures/pic_01.png')
+    const whole = await request(a.app).get(plain).buffer(true).parse((r, done) => { const c: Buffer[] = []; r.on('data', (d: Buffer) => c.push(d)); r.on('end', () => done(null, Buffer.concat(c))) }).expect(200)
+    expect(whole.body).toEqual(png)
+    expect(whole.headers['content-type']).toBe('image/png')
+    expect(whole.headers['content-security-policy']).toMatch(/^sandbox /)
+    expect((await request(a.app).get(plain).set('Range', 'bytes=1-3').expect(206)).headers['content-range']).toBe(`bytes 1-3/${png.length}`)
+    expect((await request(a.app).head(plain).expect(200)).headers['content-length']).toBe(String(png.length))
+    await request(a.app).get(url.replace('index.html', 'img/pictures/missing.png')).expect(404)
+    // A Ren'Py game's files are only ever its own: the encrypted file is there, its plain name is not.
+    await request(a.app).get('/g/vn/b1/game/img/pictures/pic_01.rpgmvp').set('Cookie', cookie).expect(200)
+    await request(a.app).get('/g/vn/b1/game/img/pictures/pic_01.png').set('Cookie', cookie).expect(404)
+  })
   it('binds sandboxed HTML URLs to user, game, build and live session and revokes them on sign-out', async () => {
     const a = await start(), admin = await login(a), id = await add(a, admin), player = await login(a, 'player', 'player password')
     game(a, 'html', { family: 'html', entry: 'index.html' })

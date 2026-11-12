@@ -110,8 +110,9 @@ function browser(userId: number, game: string, fetch: Fetch, framed: boolean) {
 }
 
 /** The HTML games' runtime for a person, with its messages to the player and helpers to flush and answer. */
-export function htmlRuntime(userId = 1) {
+export function htmlRuntime(userId = 1, setup?: (window: any) => void) {
   const page = browser(userId, 'game', vi.fn(async () => new Response('{}')), true)
+  setup?.(page.window)
   runInNewContext(runtimes.html, page.window)
   let flushId = 0
   const flush = async () => {

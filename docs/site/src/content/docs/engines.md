@@ -12,7 +12,7 @@ HTML games, that is fine.
 | Engine | Plays | Notes |
 |---|---|---|
 | Ren'Py 8, and 7 on the 8 engine | yes | Everything: saves on the server, streaming, phones, offline, controllers, mods |
-| HTML games: Twine (SugarCube, Harlowe), RPG Maker MV and MZ, TyranoScript, plain pages | Beta | Web pages already. Tested with Twine (SugarCube). RPG Maker MV and MZ and TyranoScript take the same path but are untested |
+| HTML games: Twine (SugarCube, Harlowe), RPG Maker MV and MZ, TyranoScript, plain pages | Beta | Web pages already. Tested with Twine (SugarCube) and with the PC downloads of RPG Maker MV and MZ games (music, windows, encrypted pictures and saves). TyranoScript takes the same path but is untested |
 | Everything else | no | Programs made for one system, such as RPG Maker XP, VX and VX Ace, Wolf RPG, Kirikiri, GameMaker, Unreal, and Unity or Godot PC builds, cannot run in a browser |
 
 Add games shows every download with the engine that made it, and the reason when it cannot be

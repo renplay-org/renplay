@@ -379,7 +379,9 @@ export default function Player() {
             key={attempt}
             src={sandboxed && !htmlSaves.ready ? undefined : game.playUrl}
             title={game.title}
-            allow="autoplay; fullscreen; gamepad; clipboard-read; clipboard-write"
+            // A sandboxed frame's origin is opaque: permissions granted to its address alone do not
+            // reach it (iPhone Safari then refuses getGamepads, which RPG Maker calls every frame).
+            allow={sandboxed ? 'autoplay *; fullscreen *; gamepad *' : 'autoplay; fullscreen; gamepad; clipboard-read; clipboard-write'}
             sandbox={sandboxed ? 'allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms' : undefined}
             className="absolute border-0 bg-black outline-none"
             style={{ width: rect.width || '100%', height: rect.height || '100%', left: rect.left, top: rect.top }}
