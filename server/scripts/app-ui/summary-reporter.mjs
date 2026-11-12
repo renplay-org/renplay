@@ -20,7 +20,7 @@ export default class SummaryReporter {
       for (const test of list) lines.push(`${kind}: ${test.titlePath().filter(Boolean).join(' > ')}`)
     }
     if (flaky.length) lines.push('WARNING: Tests passed only on retry. CI treats this as a failure.')
-    if (failed.length || flaky.length) lines.push('Download browser-evidence for the JSON report and retained failure traces. No PR screenshots are published.')
+    if (failed.length || flaky.length) lines.push('Download this job\'s artifact for the JSON report and retained failure traces. No PR screenshots are published.')
     const text = lines.join('\n') + '\n'
     console.log(text)
     writeFileSync(fileURLToPath(new URL('../../../ui-test-results/summary.md', import.meta.url)), text)
