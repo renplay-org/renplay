@@ -16,9 +16,9 @@
  *   caches (Unity's) are refused: the game fetches again instead of holding
  *   them in memory.
  *
- * It also tells the player when the game is ready and mutes media elements on
- * request. Messages, Web Audio muting and Esc come from renplay-player.js, which
- * the server puts in front of this script.
+ * It also tells the player when the game is ready. Its videos and sound are in
+ * renplay-html-media.js. Messages, Web Audio muting and Esc come from
+ * renplay-player.js. The server puts both in front of this script.
  */
 ;(function () {
   'use strict'
@@ -398,6 +398,7 @@
       get: srcDesc.get,
       set: function (value) {
         corsFirst(this, value)
+        playsInline(this)
         srcDesc.set.call(this, value)
       },
     })
@@ -406,7 +407,10 @@
   if (window.Element && window.Element.prototype.setAttribute) {
     var setAttribute = window.Element.prototype.setAttribute
     window.Element.prototype.setAttribute = function (name, value) {
-      if (String(name).toLowerCase() === 'src' && /^(IMG|VIDEO|AUDIO)$/.test(this.tagName || '')) corsFirst(this, value)
+      if (String(name).toLowerCase() === 'src' && /^(IMG|VIDEO|AUDIO)$/.test(this.tagName || '')) {
+        corsFirst(this, value)
+        playsInline(this)
+      }
       return setAttribute.call(this, name, value)
     }
   }
@@ -452,36 +456,6 @@
     }
     GameWorker.prototype = NativeWorker.prototype
     window.Worker = GameWorker
-  }
-
-  // ------------------------------------------------------------- mute
-
-  // Media elements follow the player's choice; the game's own muting is kept apart.
-  var own = new WeakMap()
-  var mutedDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'muted')
-  if (mutedDesc && mutedDesc.set) {
-    Object.defineProperty(HTMLMediaElement.prototype, 'muted', {
-      configurable: true,
-      get: function () {
-        return own.has(this) ? own.get(this) : mutedDesc.get.call(this)
-      },
-      set: function (v) {
-        own.set(this, !!v)
-        mutedDesc.set.call(this, !!v || isMuted())
-      },
-    })
-  }
-  function applyMedia(el) {
-    if (mutedDesc && mutedDesc.set) mutedDesc.set.call(el, isMuted() || (own.has(el) && own.get(el)))
-  }
-  var nativePlay = HTMLMediaElement.prototype.play
-  HTMLMediaElement.prototype.play = function () {
-    applyMedia(this)
-    return nativePlay.apply(this, arguments)
-  }
-  function setMuted(on) {
-    setAudioMuted(on)
-    Array.prototype.forEach.call(document.querySelectorAll('audio, video'), applyMedia)
   }
 
   // ------------------------------------------------------------- player
@@ -536,8 +510,38 @@
     } catch (e) {}
   }
 
+  // RPG Maker MV picks .m4a music and .mp4 movies on any phone, and PC downloads only have .ogg and
+  // .webm. Its choice is asked as a computer would ask it: a phone that cannot play those still
+  // gets .m4a and .mp4, and a plugin's own choice stays.
+  function asComputer(choose) {
+    var computer = function () {
+      var utils = window.Utils
+      var mobile = utils.isMobileDevice
+      utils.isMobileDevice = function () {
+        return false
+      }
+      try {
+        return choose.apply(this, arguments)
+      } finally {
+        utils.isMobileDevice = mobile
+      }
+    }
+    computer.asComputer = true
+    return computer
+  }
+  function rpgMakerPcFormats() {
+    if (!window.Utils || window.Utils.RPGMAKER_NAME !== 'MV' || typeof window.Utils.isMobileDevice !== 'function') return
+    var audio = window.AudioManager
+    if (audio && typeof audio.audioFileExt === 'function' && !audio.audioFileExt.asComputer) audio.audioFileExt = asComputer(audio.audioFileExt)
+    var interpreter = window.Game_Interpreter && window.Game_Interpreter.prototype
+    if (interpreter && typeof interpreter.videoFileExt === 'function' && !interpreter.videoFileExt.asComputer) {
+      interpreter.videoFileExt = asComputer(interpreter.videoFileExt)
+    }
+  }
+
   window.addEventListener('load', function () {
     post('ready')
+    rpgMakerPcFormats()
     rpgMakerFullHeight()
     // Engines set up their Graphics while they boot: try for a while.
     var looks = 0

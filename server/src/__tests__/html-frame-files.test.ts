@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { htmlRuntime } from './runtime-browser.js'
 
 // The game's frame has an opaque origin: its own files count as another origin's.
@@ -90,6 +90,105 @@ it('loads media for Web Audio, set as a property or with setAttribute', () => {
   expect([music.crossOrigin, video.crossOrigin, video.attrs['src']]).toEqual(['anonymous', 'anonymous', 'movies/opening.webm'])
 })
 
+it('plays a game\'s videos inside the game, never in the phone\'s own player', () => {
+  class HTMLMediaElement {
+    tagName = 'VIDEO'
+    playsInline = false
+    attrs: Record<string, string> = {}
+    private url = ''
+    get src() { return this.url }
+    set src(value: string) { this.url = value }
+    setAttribute(name: string, value: string) { this.attrs[name] = value }
+  }
+  const { window } = htmlRuntime(1, (w) => {
+    w.HTMLMediaElement = HTMLMediaElement
+    w.document.createElement = (tag: string) => (tag === 'video' ? new HTMLMediaElement() : { tagName: tag.toUpperCase() })
+  })
+  const made = window.document.createElement('video')
+  expect([made.playsInline, made.attrs['playsinline'], made.attrs['webkit-playsinline']]).toEqual([true, '', ''])
+  expect(window.document.createElement('div').playsInline).toBeUndefined()
+  // A video made another way gets it with its source.
+  const other = new window.HTMLMediaElement()
+  other.src = 'movies/scene.webm'
+  expect([other.playsInline, other.attrs['playsinline']]).toEqual([true, ''])
+})
+
+/** A video as an iPhone has it: sound needs a tap, a silent start may need one too (Low Power Mode). */
+function phoneVideo(rules: { taps: number, lowPower: boolean }) {
+  return class HTMLMediaElement {
+    tagName = 'VIDEO'
+    src = 'movies/scene.webm'
+    paused = true
+    ended = false
+    private silent = false
+    private stops: Array<() => void> = []
+    get muted() { return this.silent }
+    set muted(value: boolean) { this.silent = value }
+    // It takes a volume and still reads 1.
+    get volume() { return 1 }
+    set volume(_value: number) {}
+    addEventListener(type: string, listener: () => void) { if (type === 'pause') this.stops.push(listener) }
+    play() {
+      if (!rules.taps && (!this.silent || rules.lowPower)) return Promise.reject(new DOMException('needs a tap', 'NotAllowedError'))
+      this.paused = false
+      return Promise.resolve()
+    }
+    pause() { this.paused = true; this.stops.forEach((stop) => stop()) }
+  }
+}
+
+it('starts a video the phone refuses to play with sound muted, and gives the sound back at the next tap', async () => {
+  const rules = { taps: 0, lowPower: false }
+  const Video = phoneVideo(rules)
+  const nativeMuted = Object.getOwnPropertyDescriptor(Video.prototype, 'muted')!.get!
+  const page = htmlRuntime(1, (w) => { w.HTMLMediaElement = Video })
+  const scene = new page.window.HTMLMediaElement()
+  await scene.play()
+  expect([scene.paused, nativeMuted.call(scene)]).toEqual([false, true])
+  // The game unmuting it before a tap would make the phone stop it.
+  scene.muted = false
+  expect(nativeMuted.call(scene)).toBe(true)
+  rules.taps++
+  page.fire('touchend')
+  expect(nativeMuted.call(scene)).toBe(false)
+
+  // Not even muted: it starts at the next tap, unless the game paused it meanwhile.
+  rules.taps = 0
+  rules.lowPower = true
+  const waiting = new page.window.HTMLMediaElement()
+  const paused = new page.window.HTMLMediaElement()
+  await expect(waiting.play()).rejects.toThrow('needs a tap')
+  await expect(paused.play()).rejects.toThrow('needs a tap')
+  paused.pause()
+  rules.taps++
+  page.fire('touchend')
+  await vi.waitFor(() => expect(waiting.paused).toBe(false))
+  expect([nativeMuted.call(waiting), paused.paused]).toEqual([false, true])
+})
+
+it('mutes a video the game turns down to nothing, and a playing one outside the page when the player mutes', async () => {
+  const Video = phoneVideo({ taps: 1, lowPower: false })
+  const nativeMuted = Object.getOwnPropertyDescriptor(Video.prototype, 'muted')!.get!
+  const page = htmlRuntime(1, (w) => { w.HTMLMediaElement = Video })
+  const scene = new page.window.HTMLMediaElement()
+  const stopped = new page.window.HTMLMediaElement()
+  await scene.play()
+  await stopped.play()
+  stopped.pause()
+  scene.volume = 0
+  expect([scene.volume, nativeMuted.call(scene)]).toEqual([0, true])
+  scene.volume = 0.5
+  expect(nativeMuted.call(scene)).toBe(false)
+  page.message({ type: 'renplay:mute', value: true })
+  expect([nativeMuted.call(scene), nativeMuted.call(stopped)]).toEqual([true, false])
+  page.message({ type: 'renplay:mute', value: false })
+  expect(nativeMuted.call(scene)).toBe(false)
+  // The one that stopped gets the switch when it plays again.
+  page.message({ type: 'renplay:mute', value: true })
+  await stopped.play()
+  expect(nativeMuted.call(stopped)).toBe(true)
+})
+
 it('answers no gamepads when the browser refuses the frame, instead of stopping the game', () => {
   const pads = [{ id: 'pad' }]
   let refuse = true
@@ -118,4 +217,25 @@ it('lets RPG Maker on a phone use the frame\'s whole height', () => {
   page.fire('load')
   expect(page.window.Graphics._stretchHeight()).toBe(390)
   expect(updated).toEqual(['scale for 390', 'elements'])
+})
+
+it('gives RPG Maker MV on a phone the sound and movie files of the PC download it can play', () => {
+  const mv = (ogg: boolean, webm: boolean, plugin = false) => {
+    const page = htmlRuntime(1, (w) => {
+      w.document.getElementsByTagName = () => []
+      // RPG Maker MV's own choices: .m4a and .mp4 on any phone.
+      const Utils = { RPGMAKER_NAME: 'MV', isMobileDevice: () => true }
+      const AudioManager = { audioFileExt: () => (ogg && !Utils.isMobileDevice() ? '.ogg' : '.m4a') }
+      if (plugin) AudioManager.audioFileExt = () => '.m4a'
+      const Game_Interpreter = class { videoFileExt() { return webm && !Utils.isMobileDevice() ? '.webm' : '.mp4' } }
+      Object.assign(w, { Utils, AudioManager, Game_Interpreter })
+    })
+    page.fire('load')
+    page.fire('load')
+    return [page.window.AudioManager.audioFileExt(), new page.window.Game_Interpreter().videoFileExt(), page.window.Utils.isMobileDevice()]
+  }
+  expect(mv(true, true)).toEqual(['.ogg', '.webm', true])
+  expect(mv(false, false)).toEqual(['.m4a', '.mp4', true])
+  // A game whose plugin asks for .m4a ships it.
+  expect(mv(true, true, true)).toEqual(['.m4a', '.webm', true])
 })

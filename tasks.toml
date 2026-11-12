@@ -74,7 +74,7 @@ depends = ["check:types", "check:structure", "check:runtime", "check:copy"]
 
 ["check:runtime"]
 description = "The game runtimes parse"
-run = ["node --check runtime/renplay-player.js", "node --check runtime/renplay-runtime.js", "node --check runtime/renplay-html.js"]
+run = ["node --check runtime/renplay-player.js", "node --check runtime/renplay-runtime.js", "node --check runtime/renplay-html-media.js", "node --check runtime/renplay-html.js"]
 
 ["check:copy"]
 description = "The writing rule in the interface, server messages, changelog and docs"

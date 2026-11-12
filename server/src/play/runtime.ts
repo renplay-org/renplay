@@ -17,7 +17,8 @@ export interface Runtimes {
 
 /**
  * Builds the two in-game runtimes from runtime/: renplay-player.js, what both share, in front of
- * each one's own script. One function holds both, so nothing of the shared part is global.
+ * each one's own script (the HTML games' in two parts, their media first). One function holds
+ * both, so nothing of the shared part is global.
  */
 export function readRuntimes(): Runtimes {
   const read = (name: string) => readFileSync(join(RUNTIME_DIR, name), 'utf-8')
@@ -26,6 +27,6 @@ export function readRuntimes(): Runtimes {
     `;(function () {\n'use strict'\n// A page that loads the runtime twice keeps the first.\nif (window.__renplayPlayer) return\nwindow.__renplayPlayer = true\n${player}\n${own}\n})()\n`
   const renpy = wrap(read('renplay-runtime.js'))
   // Inside a script tag: a closing tag in the text would end it.
-  const html = `${read('vendor/fake-indexeddb.js')}\n;\n${wrap(read('renplay-html.js'))}`.replace(/<\/script/gi, '<\\/script')
+  const html = `${read('vendor/fake-indexeddb.js')}\n;\n${wrap(`${read('renplay-html-media.js')}\n${read('renplay-html.js')}`)}`.replace(/<\/script/gi, '<\\/script')
   return { renpy, html, version: createHash('sha1').update(renpy).digest('hex').slice(0, 10) }
 }
