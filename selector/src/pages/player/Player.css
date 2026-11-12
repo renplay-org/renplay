@@ -272,6 +272,9 @@
 .pm-group-title {
   padding: 4px 0 10px;
 }
+.pm .seg {
+  height: 48px;
+}
 .pm-field {
   display: flex;
   flex-direction: column;

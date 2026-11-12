@@ -1,5 +1,5 @@
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Check, CloudOff, Expand, Play, Save, Settings2, Smartphone, Volume2, VolumeX } from 'lucide-react'
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { Game } from '@shared/api'
 import { Frame } from '../../lantern/art'
 import { Pill } from '../../lantern/controls'
@@ -88,6 +88,12 @@ export function PlayerMenu({
   const ref = useRef<HTMLDivElement>(null)
   // Escape goes back to the list first and closes from the list. Not inert: the menu is part of the player's page.
   useModal(ref, true, view === 'top' ? onClose : () => onView('top'))
+  // A list opening in place takes focus with it: the Back row, which Enter, A and the arrows reach first.
+  const opened = useRef(view)
+  useEffect(() => {
+    if (opened.current !== view) ref.current?.querySelector<HTMLElement>('[data-initial]')?.focus()
+    opened.current = view
+  }, [view])
   const link = game.recipe?.links.walkthrough
   const sheet = portrait ? { paddingBottom: 12 + insets.bottom, paddingLeft: 12 + insets.left, paddingRight: 12 + insets.right } : { paddingTop: 8 + insets.top, paddingLeft: 12 + insets.left, paddingBottom: 12 + insets.bottom }
   return (

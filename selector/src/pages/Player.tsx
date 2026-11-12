@@ -23,7 +23,6 @@ import { setGameHasPad, useGamepadConnected } from '../lib/gamepad'
 import type { Me, SaveSlot } from '@shared/api'
 import { isRenpy } from '@shared/family'
 import { slotName } from '../lib/format'
-import { saveName } from '../lib/saves'
 import Door from './player/Door'
 import { SLOW_SYNC, useSlow } from './player/useSlow'
 import { HomeScreenHelp, SidePanel } from './player/panels'
@@ -399,7 +398,7 @@ export default function Player() {
   const loadPct = progress && progress.total ? progress.done / progress.total : 0
   // The door names the save it resumes, "Quick 1", not its slot "quick-1".
   const resumed_ = resume ? (saves.data?.slots.find((x) => slotName(x.file) === resume) ?? (game.latestSave && slotName(game.latestSave.file) === resume ? game.latestSave : null)) : null
-  const resumeName = resume ? (resumed_ ? saveName(resumed_ as SaveSlot) : resume.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())) : null
+  const resumeName = resume ? (resumed_ ? (resumed_ as SaveSlot).title || resumed_.label : resume.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())) : null
 
   return (
     <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white outline-none">
