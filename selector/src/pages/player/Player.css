@@ -47,27 +47,9 @@
   border-radius: 7px;
   background: linear-gradient(135deg, #d62a68, #7556f0);
 }
-/* The key, or the controller's Menu button, after the word. */
-.rp-pill kbd {
-  min-width: 22px;
-  padding: 4px 6px;
-  text-align: center;
-  font-size: 13px;
-  line-height: 1;
-}
-.rp-pill .glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
+/* The controller's Menu button, after the word, while one is connected. */
+.rp-pill .pad-menu {
   color: var(--fg-3);
-}
-.rp-pill .glyph svg {
-  width: 14px;
-  height: 14px;
 }
 /* Saves wait for the server: a cloud, no words. The menu says it. */
 .rp-cloud {
@@ -130,9 +112,10 @@
   inset: 0;
   z-index: 44;
 }
-/* The player's menu: one list in a sheet from the left, from the bottom on a portrait phone. */
+/* The player's menu: one list in a sheet from the left, from the bottom on a portrait phone. Opaque, so the game's text never shows through. */
 .pm {
   --pm-row: 48px;
+  --pm-lead: 40px;
   position: absolute;
   z-index: 45;
   top: 0;
@@ -142,8 +125,8 @@
   display: flex;
   flex-direction: column;
   padding: calc(8px + var(--pi-top, 0px)) 12px calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
-  background: var(--glass-deep);
-  backdrop-filter: blur(30px) saturate(140%);
+  background: var(--ink);
+  box-shadow: 1px 0 0 var(--line), 24px 0 60px -12px rgba(0, 0, 0, 0.6);
   border-radius: 0 var(--r-sheet) var(--r-sheet) 0;
   animation: pm-in var(--t-pane) var(--out) both;
 }
@@ -153,6 +136,7 @@
   width: auto;
   max-height: 82dvh;
   padding: 8px calc(12px + var(--pi-right, 0px)) calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
+  box-shadow: 0 -1px 0 var(--line), 0 -24px 60px -12px rgba(0, 0, 0, 0.6);
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   animation-name: pm-up;
 }
@@ -174,11 +158,12 @@
   align-items: center;
   gap: var(--s3);
   height: 56px;
+  margin-bottom: 4px;
   padding: 0 12px;
 }
 .pm-icon {
-  width: 40px;
-  height: 40px;
+  width: var(--pm-lead);
+  height: var(--pm-lead);
 }
 .pm-title {
   min-width: 0;
@@ -217,17 +202,30 @@
     background: var(--plate-2);
   }
 }
-.pm-row > svg {
+/* The ring of a row is drawn inside it: the list scrolls, and a ring outside would be cut off at its edges. */
+.pm-row:focus-visible,
+.pm-save:focus-visible {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+/* One grid: every row's icon sits in the same column as the game's picture above it, and its text where the title starts. */
+.pm-row > svg:first-child {
   width: 20px;
   height: 20px;
   flex: none;
+  margin: 0 calc((var(--pm-lead) - 20px) / 2);
   color: var(--fg-3);
+}
+.pm-row {
+  gap: var(--s3);
+  padding-left: 12px;
 }
 .pm-switches {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  margin-top: 6px;
 }
+/* The switch's track ends where the chevrons and keycaps end: the row's right padding. Its box is wider than the track. */
 .pm-row .sw {
   flex: none;
   margin: -5px -6px -5px auto;
@@ -246,6 +244,10 @@
   width: 20px;
   height: 20px;
 }
+/* A chevron's drawing stops 7 px inside its box: pull the box out so the drawing ends at the row's edge, like a switch. */
+.pm-end > svg {
+  margin-right: -7px;
+}
 .pm-end.done {
   color: var(--green);
   font-size: 13px;
@@ -253,13 +255,14 @@
 .pm-end.done svg {
   width: 16px;
   height: 16px;
+  margin-right: 0;
 }
 .pm-row.quiet {
   color: var(--fg-2);
   font-weight: 500;
 }
 .pm-note {
-  padding: 0 12px 4px 44px;
+  padding: 0 12px 4px calc(12px + var(--pm-lead) + var(--s3));
   color: var(--fg-3);
   font-size: 13px;
 }
@@ -309,7 +312,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 0 4px;
+  padding: 0 12px;
   color: var(--amber);
   font-size: 13px;
 }
@@ -324,13 +327,14 @@
   justify-content: center;
 }
 .pm-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   color: var(--fg-3);
   font-size: 13px;
   text-align: center;
-}
-.pm-keys kbd {
-  font-size: 13px;
-  padding: 2px 5px;
 }
 /* Saves: a 64 px row, a picture, the name and one muted line. */
 .pm-save {
@@ -411,6 +415,7 @@
   .pm-switches {
     flex-direction: row;
     gap: 4px;
+    margin-top: 0;
   }
   .pm-switches .pm-row {
     background: var(--plate);

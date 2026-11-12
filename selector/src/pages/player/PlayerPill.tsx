@@ -1,16 +1,17 @@
-import { CloudOff, Expand, Menu } from 'lucide-react'
+import { CloudOff, Expand } from 'lucide-react'
 import type { CSSProperties } from 'react'
+import { PadMenuGlyph } from '../../lantern/Keycap'
 import { cx } from '../../lantern/ui'
 
 /**
- * The pill over the game that opens the menu: it says Menu, shows the key on a keyboard or the Menu
- * button while a controller is connected, and is lit for the first five seconds. After the pill, the
- * full screen button, and an amber cloud, with no words, while saves wait for the server.
+ * The pill over the game that opens the menu: it says Menu, shows the controller's Menu button while one
+ * is connected, and is lit for the first five seconds. The key is in the menu, not here: at 44 px a keycap
+ * only crowds the word. After the pill, the full screen button, and an amber cloud, with no words, while
+ * saves wait for the server.
  */
 export default function PlayerPill({
   style,
   fresh,
-  keyLabel,
   pad,
   onMenu,
   onFullscreen,
@@ -19,8 +20,6 @@ export default function PlayerPill({
 }: {
   style: CSSProperties
   fresh: boolean
-  /** The key that opens the menu, or null on a touch screen. */
-  keyLabel: string | null
   pad: boolean
   onMenu: () => void
   /** Where the device can go full screen. */
@@ -31,16 +30,10 @@ export default function PlayerPill({
   return (
     // HTML games often put their own menu in the top left (SugarCube's sidebar toggle): their pills are at the right.
     <div className={cx('rp-pills', fresh && 'fresh')} style={style}>
-      <button type="button" className="rp-pill" onClick={onMenu} aria-label={keyLabel && !pad ? `Menu, key ${keyLabel}` : 'Menu'}>
+      <button type="button" className="rp-pill" onClick={onMenu} aria-label="Menu">
         <span className="mark" aria-hidden="true" />
         Menu
-        {pad ? (
-          <span className="glyph" aria-hidden="true">
-            <Menu />
-          </span>
-        ) : (
-          keyLabel && <kbd aria-hidden="true">{keyLabel}</kbd>
-        )}
+        {pad && <PadMenuGlyph />}
       </button>
       {onFullscreen && (
         <button type="button" className="rp-pill icon" onClick={onFullscreen} aria-label="Full screen">

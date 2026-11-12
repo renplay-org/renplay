@@ -3,8 +3,10 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import type { Game } from '@shared/api'
 import { Frame } from '../../lantern/art'
 import { Pill } from '../../lantern/controls'
+import { Keycap } from '../../lantern/Keycap'
 import { useModal } from '../../lantern/modal'
 import { cx } from '../../lantern/ui'
+import type { MenuLayout } from './menuLayout'
 
 export type MenuView = 'top' | 'saves' | 'options'
 
@@ -29,6 +31,7 @@ export function PlayerMenu({
   view,
   onView,
   onClose,
+  layout,
   portrait,
   insets,
   renpy,
@@ -56,6 +59,8 @@ export function PlayerMenu({
   view: MenuView
   onView: (view: MenuView) => void
   onClose: () => void
+  /** The prototype's layout: 1 is the sheet, 2 and 3 fill the left of the screen. */
+  layout: MenuLayout
   portrait: boolean
   insets: { top: number; right: number; bottom: number; left: number }
   renpy: boolean
@@ -100,7 +105,7 @@ export function PlayerMenu({
   return (
     <>
       <div className="pm-scrim" onClick={onClose} aria-hidden="true" />
-      <aside ref={ref} role="dialog" aria-modal="true" aria-label={`${game.title}, the player menu`} className={cx('pm', portrait && 'bottom')} style={sheet}>
+      <aside ref={ref} role="dialog" aria-modal="true" aria-label={`${game.title}, the player menu`} className={cx('pm', layout === 1 ? portrait && 'bottom' : 'full')} data-view={view} style={sheet}>
         <header className="pm-head">
           <Frame game={game} kind="sq" className="pm-icon" style={{ flex: 'none' }} />
           <div className="pm-title truncate">{game.title}</div>
@@ -119,6 +124,11 @@ export function PlayerMenu({
               <button type="button" className="pm-row first" onClick={onClose} data-initial>
                 <ArrowLeft />
                 Back to the game
+                {keys && !pad && (
+                  <span className="pm-end">
+                    <Keycap char={keys.menu} />
+                  </span>
+                )}
               </button>
               {renpy && ready && (
                 <button type="button" className="pm-row" onClick={onSaveNow} aria-disabled={saving}>
@@ -136,6 +146,11 @@ export function PlayerMenu({
                 <button type="button" className="pm-row" onClick={onGuide}>
                   <BookOpen />
                   Guide
+                  {keys && !pad && (
+                    <span className="pm-end">
+                      <Keycap char={keys.guide} />
+                    </span>
+                  )}
                 </button>
               ) : (
                 link && (
@@ -198,7 +213,7 @@ export function PlayerMenu({
             ) : (
               keys && (
                 <p className="pm-keys">
-                  <kbd>{keys.menu}</kbd> opens this menu{hasGuide ? <>, <kbd>{keys.guide}</kbd> the guide</> : null}
+                  <Keycap char={keys.menu} /> opens this menu{hasGuide ? <>, <Keycap char={keys.guide} /> the guide</> : null}
                 </p>
               )
             )}

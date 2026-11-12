@@ -1,4 +1,4 @@
-import { Accessibility, Camera, Download, FastForward, Terminal, Undo2 } from 'lucide-react'
+import { Accessibility, Camera, Download, FastForward, PanelTop, Terminal, Undo2 } from 'lucide-react'
 import { TEXT_SIZES } from '@shared/defaults'
 import { Seg, SourceLabel } from '../../lantern/controls'
 import type { DisplayPrefs } from '../../lib/display'
@@ -26,6 +26,7 @@ export default function OptionsView({
   hasCutout,
   onAccessibility,
   onDownloadLog,
+  keepButtons,
 }: {
   renpy: boolean
   options: GameOptionsState | null
@@ -35,6 +36,8 @@ export default function OptionsView({
   hasCutout: boolean
   onAccessibility: () => void
   onDownloadLog: () => void
+  /** Layout 3's choice to keep its buttons on the screen. */
+  keepButtons?: { value: boolean; onChange: (keep: boolean) => void }
 }) {
   const fromAdmin = options?.patchesFrom === 'admin'
   return (
@@ -50,6 +53,7 @@ export default function OptionsView({
         <span>Picture</span>
         <Seg label="Picture" value={prefs.fit} onChange={(fit) => setPrefs({ ...prefs, fit })} options={[{ value: 'fit', label: 'Fit' }, { value: 'fill', label: 'Fill' }]} />
       </div>
+      {keepButtons && <SwitchRow icon={<PanelTop />} label="Keep buttons on screen" checked={keepButtons.value} onChange={keepButtons.onChange} />}
       {hasCutout && <SwitchRow icon={<Camera />} label="Keep clear of the camera" checked={prefs.avoidNotch} onChange={(avoidNotch) => setPrefs({ ...prefs, avoidNotch })} />}
       {renpy && options && (
         <>

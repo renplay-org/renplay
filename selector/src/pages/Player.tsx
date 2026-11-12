@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, Smartphone } from 'lucide-react'
 import './player/Player.css'
+import './player/PlayerLayouts.css'
 import { GuideWindow } from '../components/GuideWindow'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -35,6 +36,8 @@ import { useElementSize, useSafeInsets, useWakeLock } from './player/useScreen'
 import OptionsView, { type GameOptionsState } from './player/OptionsView'
 import { PlayerMenu, type MenuView } from './player/PlayerMenu'
 import PlayerPill from './player/PlayerPill'
+import QuickButtons, { useQuickButtons } from './player/QuickButtons'
+import { LayoutSwitcher, useKeepButtons, useMenuLayout } from './player/menuLayout'
 import SavesView from './player/SavesView'
 import { useKeyLabels } from './player/keyboard'
 import { Bar, Pill } from '../lantern/controls'
@@ -42,7 +45,6 @@ import { useGoBack } from '../lantern/flight'
 import { useModal } from '../lantern/modal'
 
 type Panel = null | 'fullscreen'
-
 
 const HOME_TIP_KEY = 'renplay:home-screen-tip'
 
@@ -108,6 +110,10 @@ export default function Player() {
   const sandboxed = !!game && !isRenpy(game)
   const openMenu = () => setMenu('top')
   const keys = useKeyLabels()
+  // The prototype's three layouts: the quick buttons are layout 3's.
+  const [layout, setLayout] = useMenuLayout()
+  const [keepButtons, setKeepButtons] = useKeepButtons()
+  const quickBox = useRef<HTMLDivElement>(null)
   const padConnected = useGamepadConnected()
   const saves = useSaves(gameId)
 
@@ -126,6 +132,9 @@ export default function Player() {
   const [muted, toggleMute] = useMute(send)
   const saving = useSaving(send, ready, toast)
   const htmlSaves = useHtmlSaves(sandboxed, userId, gameId, attempt, send, () => setSignedOut(true), setFailed)
+  const quick = useQuickButtons(layout === 3, ready, !!menu, keepButtons, quickBox, send)
+  const quickRef = useRef(quick)
+  quickRef.current = quick
   const { fullscreen, coversNotch, escLocked, toggleFullscreen } = useFullscreen(shellRef, fsMode, touch, send, () => setPanel('fullscreen'))
   const stage = useElementSize(stageRef, `${game?.id}:${isLoading}`)
   const insets = useSafeInsets()
@@ -236,6 +245,12 @@ export default function Player() {
           // The controller's Menu button in the game.
           setMenu((view) => view ?? 'top')
           break
+        case 'renplay:activity': {
+          // Where the pointer is in the game, which the quick buttons need to come back.
+          const at = frameRef.current?.getBoundingClientRect()
+          if (at && typeof d.x === 'number' && typeof d.y === 'number') quickRef.current.wake(at.left + d.x, at.top + d.y, !!d.down)
+          break
+        }
         case 'renplay:key':
           if (d.key === 'menu') toggleMenu()
           else if (d.key === 'guide') toggleGuide()
@@ -247,7 +262,6 @@ export default function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, resume, sandboxed, game?.saveDir, muted])
 
-
   useEffect(() => {
     if (game?.screen && !screenSize) setScreenSize(game.screen)
   }, [game, screenSize])
@@ -257,12 +271,6 @@ export default function Player() {
     const t = window.setTimeout(() => setSlow(true), 90_000)
     return () => clearTimeout(t)
   }, [ready])
-
-
-
-
-
-
 
   const closeMenu = useCallback(() => {
     setMenu(null)
@@ -406,7 +414,7 @@ export default function Player() {
         try { const me = await api<Me>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
       }}>Continue</Pill>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
       {/* A click in the bars around the game gives the keyboard back to the game. */}
-      <div ref={stageRef} className={cx('rp-stage absolute inset-0', menu && 'dim')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
+      <div ref={stageRef} className={cx('rp-stage absolute inset-0', menu && 'dim', layout !== 1 && 'wide')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
         <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
           <iframe
             ref={frameRef}
@@ -445,11 +453,26 @@ export default function Player() {
       )}
 
       {/* One pill over the game opens the menu. An amber cloud sits beside it while saves wait for the server. */}
-      {ready && !menu && (
+      {ready && !menu && layout === 3 && (
+        <QuickButtons
+          boxRef={quickBox}
+          style={sandboxed ? { top: 10 + Math.max(insets.top, pad.top), right: 10 + insets.right } : { top: 10 + Math.max(insets.top, pad.top), left: 10 + insets.left }}
+          visible={quick.visible}
+          hold={quick.hold}
+          pad={padConnected}
+          onMenu={openMenu}
+          onSave={sandboxed ? undefined : saving.saveNow}
+          saved={saving.savedAs}
+          onGuide={game.walkthroughs.length > 0 ? openGuide : undefined}
+          guideHref={game.walkthroughs.length > 0 ? undefined : game.recipe?.links.walkthrough}
+          onFullscreen={fsMode !== 'none' && !fullscreen ? () => void toggleFullscreen() : undefined}
+          waiting={waiting}
+        />
+      )}
+      {ready && !menu && layout !== 3 && (
         <PlayerPill
           style={sandboxed ? { top: 10 + Math.max(insets.top, pad.top), right: 10 + insets.right } : { top: 10 + Math.max(insets.top, pad.top), left: 10 + insets.left }}
           fresh={freshPill}
-          keyLabel={touch ? null : keys.menu}
           pad={padConnected}
           onMenu={openMenu}
           onFullscreen={fsMode !== 'none' && !fullscreen ? () => void toggleFullscreen() : undefined}
@@ -497,6 +520,7 @@ export default function Player() {
         <PlayerMenu
           game={game}
           view={menu}
+          layout={layout}
           onView={setMenu}
           onClose={closeMenu}
           portrait={stage.h > stage.w}
@@ -546,10 +570,12 @@ export default function Player() {
                 send({ type: 'renplay:accessibility' })
               }}
               onDownloadLog={() => send({ type: 'renplay:download-log' })}
+              keepButtons={layout === 3 ? { value: keepButtons, onChange: setKeepButtons } : undefined}
             />
           }
         />
       )}
+      <LayoutSwitcher layout={layout} onChange={setLayout} up={stage.w < 700 && !!menu} />
       {guide && game.walkthroughs.length > 0 && (
         <GuideWindow game={game} file={guide} onFile={setGuide} onClose={closeGuide} portrait={stage.h > stage.w} insets={insets} />
       )}

@@ -1,0 +1,194 @@
+/* A prototype: layouts 2 and 3 of the player's menu, the quick buttons of layout 3 and the switcher. Removed once one is chosen. */
+
+/* Layouts 2 and 3: a pause menu flush to the left edge, the full height, the game dimmed on the right. */
+.pm.full {
+  --pm-row: 60px;
+  --pm-lead: 44px;
+  top: 0;
+  right: auto;
+  bottom: 0;
+  width: max(420px, 40vw);
+  max-height: none;
+  padding: calc(28px + var(--pi-top, 0px)) 32px calc(28px + var(--pi-bottom, 0px)) calc(32px + var(--pi-left, 0px));
+  border-radius: 0;
+  box-shadow: 1px 0 0 var(--line), 40px 0 80px -20px rgba(0, 0, 0, 0.7);
+  animation-name: pm-in;
+}
+.pm.full .pm-head {
+  height: 72px;
+  margin-bottom: 8px;
+}
+.pm.full .pm-title {
+  font-size: 22px;
+}
+.pm.full .pm-row {
+  border-radius: 14px;
+  font-size: 19px;
+}
+.pm.full .pm-row > svg:first-child {
+  width: 24px;
+  height: 24px;
+  margin: 0 calc((var(--pm-lead) - 24px) / 2);
+}
+.pm.full .pm-end {
+  font-size: 19px;
+}
+.pm.full .pm-end.done {
+  font-size: 14px;
+}
+.pm.full .pm-exit {
+  min-height: 56px;
+  font-size: 17px;
+}
+.pm.full .pm-keys,
+.pm.full .pm-wait,
+.pm.full .pm-note {
+  font-size: 14px;
+}
+/* The list is grouped in the middle, the title above it and Save and exit below it, so there is no empty gap in the sheet. */
+.pm.full[data-view='top'] .pm-body > :first-child {
+  margin-top: auto;
+}
+.pm.full[data-view='top'] .pm-body > :last-child {
+  margin-bottom: auto;
+}
+.pm.full[data-view='top'] .pm-switches {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.pm.full .seg {
+  height: 52px;
+}
+.pm.full .pm-save {
+  height: 72px;
+}
+.pm.full .pm-thumb {
+  width: 112px;
+}
+@media (max-width: 600px) {
+  .pm.full {
+    --pm-row: 56px;
+    width: 100%;
+    padding-right: calc(20px + var(--pi-right, 0px));
+    padding-left: calc(20px + var(--pi-left, 0px));
+  }
+}
+/* A phone held sideways: about 55 percent of the width, the compact rows of the sheet. */
+@media (max-height: 500px) {
+  .pm.full {
+    --pm-row: 40px;
+    --pm-lead: 40px;
+    width: 55vw;
+    padding: calc(6px + var(--pi-top, 0px)) 12px calc(6px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
+  }
+  .pm.full .pm-head {
+    height: 32px;
+    margin-bottom: 0;
+  }
+  .pm.full .pm-row,
+  .pm.full .pm-end {
+    font-size: 15px;
+  }
+  .pm.full .pm-row > svg:first-child {
+    width: 20px;
+    height: 20px;
+    margin: 0 10px;
+  }
+  .pm.full .pm-exit {
+    min-height: 44px;
+    font-size: 15px;
+  }
+  .pm.full .pm-save {
+    height: 64px;
+  }
+  .pm.full .pm-thumb {
+    width: 96px;
+  }
+  .pm.full .seg {
+    height: 48px;
+  }
+  .pm.full[data-view='top'] .pm-switches {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+.rp-stage.dim.wide {
+  transform: none;
+  filter: brightness(0.45);
+}
+
+/* Layout 3: Menu, Save now, Guide and Full screen over the game, gone after three seconds without input. */
+.rp-pills.qb {
+  transition: opacity 0.4s;
+}
+.rp-pills.qb.away {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.4s,
+    visibility 0s 0.4s;
+}
+.qb .rp-pill {
+  opacity: 1;
+}
+.qb .rp-pill svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--fg-3);
+}
+.qb .rp-pill.icon svg {
+  color: inherit;
+}
+@media (max-width: 520px) {
+  .qb .rp-pill:has(.lbl) {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+  .qb .rp-pill .lbl {
+    display: none;
+  }
+  .qb .rp-pill:first-child {
+    width: auto;
+    padding: 0 14px 0 10px;
+  }
+}
+
+/* The switcher: Layout 1, 2, 3 at the bottom right. */
+.lay-sw {
+  position: absolute;
+  z-index: 70;
+  right: calc(10px + env(safe-area-inset-right, 0px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 0 0 14px;
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 0 0 1px var(--line);
+  color: var(--fg-3);
+  font-size: 13px;
+  font-weight: 650;
+}
+.lay-sw.up {
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+}
+.lay-sw button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--fg-2);
+  font-size: 15px;
+  font-weight: 700;
+}
+.lay-sw button.on {
+  background: var(--plate-3);
+  color: var(--fg);
+}

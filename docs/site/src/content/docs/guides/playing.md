@@ -36,8 +36,8 @@ While the game loads, one bar shows how far it is, from the engine to the game's
 screen before it starts.
 
 The game paces itself to your display. A **Menu** pill sits over it at the top left, with **Full
-screen** beside it. The pill is lit for the first seconds of a game, shows the key that opens the
-menu on a computer, and shows the controller's Menu button while one is connected. Press it, press
+screen** beside it. The pill is lit for the first seconds of a game and shows the controller's Menu
+button while one is connected. The menu shows its keys as keycaps on a computer. Press the pill, press
 the **`** key (left of **1**), or swipe from the left edge on a phone to open the player menu:
 
 ![The player menu open over a game](../../../assets/desktop-player-drawer.webp)

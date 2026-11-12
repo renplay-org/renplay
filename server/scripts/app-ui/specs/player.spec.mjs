@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { mock } from '../../app-mock.mjs'
 import { test, expect } from './fixtures.mjs'
+import { ringShown } from '../focus-ring.mjs'
 
 // The in-game view with a made-up game page: the real shared runtime part (runtime/renplay-player.js, which
 // catches the keys) and a small stand-in for the engine that answers the player's messages. What it was sent
@@ -29,7 +30,10 @@ const gamePage = `<!doctype html><html><body tabindex="0" style="margin:0;backgr
 const slot = (n, minutes) => ({ file: `quick-${n}-LT1.save`, size: 1, mtime: 0, kind: 'quick', label: `Quick ${n}`, name: 'Diya', ctime: Date.parse('2026-11-11T12:00:00Z') - minutes * 60_000, screenshot: null, valid: true, title: null, note: null, pinnedAt: null })
 
 /** Opens the game with its saves, and what the made-up engine saw. */
-async function play(page, { slots = [slot(2, 30), slot(3, 60)] } = {}) {
+async function play(page, { slots = [slot(2, 30), slot(3, 60)], layout = 1, clock = false } = {}) {
+  // The prototype's layout, as ?menu= remembers it.
+  await page.addInitScript((n) => localStorage.setItem('renplay:menu-layout', String(n)), layout)
+  if (clock) await page.clock.install()
   await page.addInitScript(() => {
     // Chromium's Keyboard Lock and layout map, which the test browser does not grant.
     Object.defineProperty(Navigator.prototype, 'keyboard', { configurable: true, get: () => ({ lock: async () => {}, unlock() {}, getLayoutMap: async () => new Map([['Backquote', '`'], ['Backslash', '\\']]) }) })
@@ -150,8 +154,8 @@ test('in full screen nothing is at the top centre, and the menu says Hold Esc to
 
 // Every control and every line of text in the menu, Saves and Options, measured as a person sees it.
 const MENU_VIEWS = [['the list', null], ['Saves', /^Saves/], ['Options', /^Options/]]
-test('every control in the menu, Saves and Options is tall enough and no text is under 13 px', async ({ page, context }, testInfo) => {
-  await play(page, { slots: [slot(1, 5), slot(2, 30), { ...slot(3, 60), pinnedAt: '2026-11-10T10:00:00Z', title: 'Meeting Diya', note: 'Before the first lunch scene' }] })
+for (const layout of [1, 2, 3]) test(`every control in the menu, Saves and Options is tall enough and no text is under 13 px, layout ${layout}`, async ({ page, context }, testInfo) => {
+  await play(page, { layout, slots: [slot(1, 5), slot(2, 30), { ...slot(3, 60), pinnedAt: '2026-11-10T10:00:00Z', title: 'Meeting Diya', note: 'Before the first lunch scene' }] })
   const landscape = testInfo.project.name === 'webkit-landscape'
   const row = landscape ? 40 : 44
   const press = (locator) => (touch(testInfo) ? locator.tap() : locator.click())
@@ -165,7 +169,7 @@ test('every control in the menu, Saves and Options is tall enough and no text is
       await expect(menu.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
     }
     if (name === 'Options') await expect(menu.getByText('Text size')).toBeVisible()
-    await page.screenshot({ path: testInfo.outputPath(`menu-${name}.png`) })
+    await page.screenshot({ path: testInfo.outputPath(`menu-${layout}-${name}.png`) })
     const found = await menu.evaluate((el) => {
       const small = []
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
@@ -187,7 +191,106 @@ test('every control in the menu, Saves and Options is tall enough and no text is
     await expect(menu.getByText('Some saves have not reached the server yet.')).toBeVisible()
     expect(await menu.locator('.pm-body').evaluate((b) => b.scrollHeight - b.clientHeight)).toBeLessThanOrEqual(0)
     expect(await menu.evaluate((m) => m.getBoundingClientRect().bottom)).toBeLessThanOrEqual(390)
-    await page.screenshot({ path: testInfo.outputPath('menu-the-list-waiting.png') })
+    await page.screenshot({ path: testInfo.outputPath(`menu-${layout}-the-list-waiting.png`) })
     await context.setOffline(false)
   }
+})
+
+// The ring of every control in the menu, list, Saves and Options, is whole on all four sides, with the list scrolled
+// where it has to be: a row in a list that scrolls must not have its ring cut off by the list.
+for (const layout of [1, 2, 3]) test(`the focus ring of every control in the menu is whole, layout ${layout}`, async ({ page }) => {
+  // A screenshot for every control in three views: about a minute on a slow browser.
+  test.slow()
+  await play(page, { layout, slots: [slot(1, 5), slot(2, 30), slot(3, 60)] })
+  // By keyboard, as the ring is for the keyboard: a pointer opening the menu shows none.
+  const keyboard = async (locator) => {
+    await locator.focus()
+    await page.keyboard.press('Enter')
+  }
+  await keyboard(page.locator('.rp-pill').first())
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  for (const open of [null, /^Saves/, /^Options/]) {
+    if (open) {
+      // From a view back to the list, then into the next one.
+      const back = menu.getByRole('button', { name: 'Back', exact: true })
+      if (await back.count()) await keyboard(back)
+      await keyboard(menu.getByRole('button', { name: open }))
+      await expect(menu.getByRole('button', { name: 'Back', exact: true })).toBeFocused()
+    }
+    const count = await menu.locator('button, a, [role=switch]').count()
+    for (let i = 0; i < count; i++) {
+      const focused = () =>
+        page.evaluate(() => {
+          const el = document.activeElement
+          if (!el || !el.closest('[role=dialog]')) return null
+          el.scrollIntoView({ block: 'nearest' })
+          const r = el.getBoundingClientRect()
+          return { name: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30), x: r.x, y: r.y, width: r.width, height: r.height }
+        })
+      expect(await focused(), 'Focus stays in the menu').not.toBeNull()
+      // The box is read again on every try: the menu slides in, so it has not settled at first.
+      await expect.poll(async () => ringShown(page, await focused()), { message: `The ring of ${(await focused()).name} is whole` }).toEqual([])
+      await page.keyboard.press('Tab')
+    }
+  }
+})
+
+test('the keys are drawn as keycaps with the layout characters, and the pill has no key in it', async ({ page }, testInfo) => {
+  test.skip(touch(testInfo), 'A touch screen shows no keys')
+  await play(page)
+  // The pill says Menu and nothing else: no tiny tick in an empty box.
+  await expect(page.locator('.rp-pill').first().locator('.keycap, kbd')).toHaveCount(0)
+  await page.locator('.rp-pill').first().click()
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  const foot = menu.locator('.pm-foot')
+  // A keycap shows what Shift types over the character, as the key does: ~ over a backquote, | over a backslash.
+  await expect(foot.locator('.keycap').nth(0)).toHaveText('~`')
+  await expect(foot.locator('.keycap').nth(1)).toHaveText('|\\')
+  // The rows the keys belong to show them too.
+  await expect(menu.getByRole('button', { name: 'Back to the game' }).locator('.keycap')).toHaveText('~`')
+  await expect(menu.getByRole('button', { name: 'Guide' }).locator('.keycap')).toHaveText('|\\')
+  // Each cap is a key-sized box, not a tick.
+  const box = await foot.locator('.keycap').first().boundingBox()
+  expect(box.height).toBeGreaterThanOrEqual(30)
+  expect(box.width).toBeGreaterThanOrEqual(30)
+})
+
+test('layout 3: the quick buttons hide after three seconds, come back on the pointer or a tap at the top, the keys keep working, and Keep buttons on screen holds them', async ({ page }, testInfo) => {
+  await play(page, { layout: 3, clock: true })
+  const buttons = page.locator('.qb')
+  await expect(buttons).toBeVisible()
+  await expect(buttons.getByRole('button', { name: 'Save now' })).toBeVisible()
+  await expect(buttons.getByRole('button', { name: 'Guide' })).toBeVisible()
+  const hide = async () => {
+    await page.clock.fastForward(3500)
+    await expect(buttons).toBeHidden()
+  }
+  await hide()
+  // The keys work while they are hidden.
+  await page.keyboard.press('Backslash')
+  const guide = page.getByRole('region', { name: /^Walkthrough/ })
+  await expect(guide).toBeVisible()
+  await page.keyboard.press('Backslash')
+  await expect(guide).toBeHidden()
+  // Over the game, a pointer near them or a tap at the top brings them back: a mouse moves, a finger taps.
+  await hide()
+  if (touch(testInfo)) await page.touchscreen.tap(300, 30)
+  else await page.mouse.move(60, 30)
+  await expect(buttons).toBeVisible()
+  await hide()
+  // A tap in the middle of the game does not.
+  if (touch(testInfo)) await page.touchscreen.tap(200, 200)
+  else await page.mouse.move(600, 500)
+  await page.clock.fastForward(100)
+  await expect(buttons).toBeHidden()
+  // Keep buttons on screen holds them.
+  await page.keyboard.press('Backquote')
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  await menu.getByRole('button', { name: /^Options/ }).click()
+  await menu.getByRole('switch', { name: 'Keep buttons on screen' }).click()
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await page.clock.fastForward(10_000)
+  await expect(buttons).toBeVisible()
 })

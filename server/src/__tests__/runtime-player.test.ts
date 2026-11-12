@@ -76,6 +76,34 @@ describe('the runtime both kinds of game share', () => {
     }
   })
 
+  it('tells the player where the pointer is only while the quick buttons watch for it', () => {
+    const source = readFileSync(new URL('../../../runtime/renplay-player.js', import.meta.url), 'utf-8')
+    const p = page()
+    let now = 1000
+    p.window['Date'] = { now: () => now }
+    runInNewContext(`(function () { ${source} })()`, p.window)
+    const at = (type: string, x: number, y: number) => p.fire(type, { clientX: x, clientY: y })
+    // Nothing is sent until the player asks.
+    at('pointerdown', 10, 20)
+    expect(p.sent).toEqual([])
+    p.fire('message', { source: p.window.parent, data: { type: 'renplay:watch', on: true } })
+    at('pointerdown', 10, 20)
+    expect(p.sent).toEqual([{ type: 'renplay:activity', x: 10, y: 20, down: true, game: undefined, userId: undefined }])
+    p.sent.length = 0
+    // Moves are passed on at most ten a second, a tap always.
+    now += 150
+    at('pointermove', 30, 40)
+    now += 20
+    at('pointermove', 31, 41)
+    expect(p.sent).toHaveLength(1)
+    at('pointerdown', 50, 60)
+    expect(p.sent).toHaveLength(2)
+    p.fire('message', { source: p.window.parent, data: { type: 'renplay:watch', on: false } })
+    p.sent.length = 0
+    at('pointerdown', 1, 1)
+    expect(p.sent).toEqual([])
+  })
+
   it('measures the frame rate once, half a minute after the game is ready, for the usage report', () => {
     const source = readFileSync(new URL('../../../runtime/renplay-player.js', import.meta.url), 'utf-8')
     /** A page whose browser draws a frame every `every` milliseconds. */
