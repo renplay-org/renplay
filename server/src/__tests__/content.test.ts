@@ -71,7 +71,8 @@ describe('the three levels', () => {
     db.close()
     for (const [old, level] of [['allow', 'shown'], ['block', 'off']] as const) {
       db = Db.open(cfg.dataDir)
-      db.raw.exec("DELETE FROM settings WHERE key = 'adult_level'")
+      // A pre-19 library has no separate migration marker.
+      db.raw.exec("DELETE FROM settings WHERE key IN ('adult_level', 'schema_migration')")
       db.setSetting('adult_games', old)
       db.raw.exec('PRAGMA user_version = 18')
       db.close()

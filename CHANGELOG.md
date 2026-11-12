@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Renplay keeps a copy of its library database before changing it and alongside the daily save backup.
+
 ## [4.10.0] - 2026-11-11
 
 ### Added

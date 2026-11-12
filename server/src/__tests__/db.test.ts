@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
@@ -32,18 +32,18 @@ it('brings a 4.0 library up to date, keeping its people, progress and save notes
   const root = mkdtempSync(join(tmpdir(), 'renplay-db-'))
   const path = join(root, 'library.db')
   try {
-    // A 4.0 library: no PINs, no people per device, and the installation level still under its 3.x setting.
-    let db = new Db(path)
-    db.raw.exec(`ALTER TABLE users DROP COLUMN pin_hash; ALTER TABLE users DROP COLUMN pin_failures; ALTER TABLE users DROP COLUMN pin_locked_until;
-      DROP TABLE device_people; ALTER TABLE jobs DROP COLUMN retry_of; ALTER TABLE jobs DROP COLUMN position; PRAGMA user_version = 16`)
-    db.raw.exec("INSERT INTO jobs (id, type, game, status, created_at) VALUES ('old', 'import', 'story', 'queued', '2026-01-01')")
-    db.raw.prepare("INSERT INTO users (username, name, role, adult_ceiling, adult_choice, prefs, created_at) VALUES ('kim', 'Kim', 'player', 'shown', 'blurred', ?, '2026-01-01')").run(JSON.stringify({ adultPictures: 'hide-pictures', tags: { include: ['romance'] } }))
-    db.raw.prepare("INSERT INTO user_games (user_id, game, play_time, play_status, rating) VALUES (2, 'story', 3600, 'finished', 5)").run()
-    db.raw.prepare("INSERT INTO save_meta (user_id, save_dir, file, title) VALUES (2, 'Story-1', '1-1-LT1.save', 'Before the storm')").run()
-    db.raw.exec(`DELETE FROM settings WHERE key = 'adult_level'; INSERT INTO settings (key, value) VALUES ('adult_games', '"block"')`)
-    db.close()
+    // The real 4.0 schema, including its fresh-library migrations, not a damaged current schema.
+    const old = new DatabaseSync(path)
+    old.exec(readFileSync(new URL('./fixtures/library-4.0.sql', import.meta.url), 'utf8'))
+    old.exec("INSERT INTO users (id, username, name, role, created_at) VALUES (1, 'owner', 'Owner', 'admin', '2026-01-01')")
+    old.exec("INSERT INTO jobs (id, type, game, status, created_at) VALUES ('old', 'import', 'story', 'queued', '2026-01-01')")
+    old.prepare("INSERT INTO users (username, name, role, adult_ceiling, adult_choice, prefs, created_at) VALUES ('kim', 'Kim', 'player', 'shown', 'blurred', ?, '2026-01-01')").run(JSON.stringify({ adultPictures: 'hide-pictures', tags: { include: ['romance'] } }))
+    old.prepare("INSERT INTO user_games (user_id, game, play_time, play_status, rating) VALUES (2, 'story', 3600, 'finished', 5)").run()
+    old.prepare("INSERT INTO save_meta (user_id, save_dir, file, title) VALUES (2, 'Story-1', '1-1-LT1.save', 'Before the storm')").run()
+    old.exec(`DELETE FROM settings WHERE key = 'adult_level'; INSERT INTO settings (key, value) VALUES ('adult_games', '"block"')`)
+    old.close()
 
-    db = new Db(path)
+    const db = new Db(path)
     expect(db.raw.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 })
     const kim = db.raw.prepare("SELECT * FROM users WHERE username = 'kim'").get() as Record<string, unknown>
     expect(kim).toMatchObject({ adult_ceiling: 'shown', adult_choice: 'blurred', pin_hash: '', pin_failures: 0 })

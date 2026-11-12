@@ -45,6 +45,35 @@ Modules below the routes, like the install pipeline, take only the parts they us
 `/data` is what to back up. Everything in `/games` except `_archives` can be rebuilt (from the
 archives, while they are kept).
 
+## Database changes
+
+Renplay uses SQLite only, without an ORM. `server/src/db-schema.ts` holds the single declared schema.
+On every start it creates that schema in memory and compares tables, columns and indexes with the
+open library. It adds missing objects, preserving the declared column definitions. It never changes
+an existing definition or drops an unknown object. New columns must be nullable or have a default
+that SQLite can add to a populated table. Tests migrate the real 4.0 schema and compare it with a
+fresh library, including column types, nullability, defaults and indexes.
+
+`PRAGMA user_version` is the compatibility floor: the oldest schema a release must understand to
+open this library. Additive changes leave it alone, so the previous release still opens the library.
+The `schema_migration` settings row records numbered migration progress separately. Numbered
+migrations run transactionally, each after a successful `VACUUM INTO` copy in the backups folder.
+The daily backup uses the same safe copy operation while Renplay runs.
+
+A rename, type change or removal takes two releases. For example, to rename `games.engine_label`
+to `games.engine_description`:
+
+1. In release A, add `engine_description TEXT NOT NULL DEFAULT ''`, fill it from `engine_label`,
+   and keep both columns working. Continue writing both at the current floor, refreshing the new
+   form from the old one after a downgrade. Do not raise the library's compatibility floor.
+   Prepare A to accept the next floor too: at that floor, read and write the new form without
+   relying on the old column. The highest accepted floor (`VERSION`) is separate from the floor
+   required for a fresh library (`FRESH_FLOOR`).
+2. In a later release B, remove `engine_label` with a numbered migration and raise the floor to the
+   value A already accepts. A then uses the new form even if its additive reconciliation recreates
+   an empty legacy column. Test B to A to B with real data before shipping. A copy is required
+   before the migration, and the real old-library fixture must still reach the fresh schema.
+
 ## Installing a game
 
 `server/src/pipeline/import.ts` runs as a background job:
