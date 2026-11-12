@@ -276,7 +276,7 @@ describe('the levels on every route', () => {
     ['POST /jobs/:id/pause', 'tool'], ['POST /jobs/:id/resume', 'tool'], ['POST /jobs/:id/move', 'tool'], ['POST /jobs/:id/retry', 'tool'], ['DELETE /jobs', 'tool'], ['GET /content', 'none'], ['PUT /content', 'none'], ['GET /saves-export', 'list'],
     // The guided import: the index leaves out adult save folders at Off, the import writes this person's saves.
     ['GET /', 'list'], ['POST /', 'person'],
-    ['PUT /games/:id/status', 'game'], ['PUT /games/:id/rating', 'game'], ['POST /games/:id/not-now', 'game'], ['DELETE /games/:id/not-now', 'game'], ['GET /history', 'list'],
+    ['PUT /games/:id/status', 'game'], ['PUT /games/:id/rating', 'game'], ['POST /games/:id/not-now', 'game'], ['DELETE /games/:id/not-now', 'game'], ['POST /games/:id/update-not-now', 'game'], ['DELETE /games/:id/update-not-now', 'game'], ['GET /history', 'list'],
     ['GET /art/:file', 'game'], ['GET /games/:id/art', 'game'], ['PUT /games/:id/art', 'game'], ['DELETE /games/:id/art', 'game'], ['POST /games/:id/art/upload', 'game'],
     ['GET /games/:id/files', 'game'], ['GET /games/:id/files/raw', 'game'], ['PUT /games/:id/files/raw', 'game'], ['DELETE /games/:id/files/raw', 'game'],
     ['POST /games/:id/files/revert', 'game'], ['POST /games/:id/files/upload', 'game'], ['POST /games/:id/files/apply', 'game'], ['POST /games/:id/files/reset', 'game'],
@@ -468,7 +468,7 @@ describe('the levels on every route', () => {
       ['get', adultPic], ['get', '/api/walkthroughs/adult.pdf'],
       ['get', '/api/games/adult/art'], ['get', '/api/games/adult/art?kind=grid'], ['put', '/api/games/adult/art', { kind: 'grid', candidate: 'x' }],
       ['put', '/api/games/adult/status', { status: 'playing' }], ['put', '/api/games/adult/rating', { rating: 4 }],
-      ['post', '/api/games/adult/not-now'], ['delete', '/api/games/adult/not-now'],
+      ['post', '/api/games/adult/not-now'], ['delete', '/api/games/adult/not-now'], ['post', '/api/games/adult/update-not-now'], ['delete', '/api/games/adult/update-not-now'],
       ['delete', '/api/games/adult/art?kind=grid'], ['post', '/api/games/adult/art/upload?kind=grid'], ['delete', `/api/games/adult/art/uploads/${'a'.repeat(64)}?kind=grid`],
       ['get', '/api/jobs/j-adult-failed/log'], ['post', '/api/jobs/j-adult-failed/retry'], ['post', '/api/jobs/j-adult-queued/cancel'],
       ['post', '/api/jobs/j-adult-queued/pause'], ['post', '/api/jobs/j-adult-queued/resume'], ['post', '/api/jobs/j-adult-queued/move', { to: 'first' }],

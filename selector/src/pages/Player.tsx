@@ -1,16 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  CloudOff,
-  Expand,
-  Loader2,
-  RefreshCw,
-  Shrink,
-  Smartphone,
-} from 'lucide-react'
-import { GuideList, GuideWindow, PlayerDrawer, type DrawerTab } from '../components/PlayerDrawer'
+import { Loader2, Smartphone } from 'lucide-react'
+import './player/Player.css'
+import { GuideWindow } from '../components/GuideWindow'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Confirm, Spinner, Switch, cx, useToast } from '../lantern/ui'
+import { Confirm, Spinner, cx, useToast } from '../lantern/ui'
 import { useAuth } from '../lib/auth'
 import { api, userHeader } from '../lib/api'
 import {
@@ -22,24 +16,30 @@ import {
   type DisplayPrefs,
 } from '../lib/display'
 import { isTouchDevice } from '../lib/platform'
-import { useDefaults, useGame } from '../lib/queries'
+import { useDefaults, useGame, useSaves } from '../lib/queries'
 import type { Defaults } from '@shared/defaults'
 import { keptGame, useOnline } from '../lib/offline'
-import { setGameHasPad } from '../lib/gamepad'
-import type { Me } from '@shared/api'
+import { setGameHasPad, useGamepadConnected } from '../lib/gamepad'
+import type { Me, SaveSlot } from '@shared/api'
 import { isRenpy } from '@shared/family'
+import { slotName } from '../lib/format'
+import { saveName } from '../lib/saves'
 import Door from './player/Door'
-import EscapeHint from './player/EscapeHint'
 import { SLOW_SYNC, useSlow } from './player/useSlow'
-import { DisplayPanel, HomeScreenHelp, SavesPanel, SidePanel } from './player/panels'
+import { HomeScreenHelp, SidePanel } from './player/panels'
 import { useFullscreen } from './player/useFullscreen'
 import { useMute } from './player/useMute'
 import { useHtmlSaves, useSaving } from './player/useSaving'
 import { usePlayTime } from './player/usePlayTime'
 import { useTelemetry } from './player/useTelemetry'
 import { useElementSize, useSafeInsets, useWakeLock } from './player/useScreen'
-import GameOptions, { type GameOptionsState } from './player/GameOptions'
+import OptionsView, { type GameOptionsState } from './player/OptionsView'
+import { PlayerMenu, type MenuView } from './player/PlayerMenu'
+import PlayerPill from './player/PlayerPill'
+import SavesView from './player/SavesView'
+import { useKeyLabels } from './player/keyboard'
 import { Bar, Pill } from '../lantern/controls'
+import { useGoBack } from '../lantern/flight'
 import { useModal } from '../lantern/modal'
 
 type Panel = null | 'fullscreen'
@@ -78,7 +78,10 @@ export default function Player() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [sync, setSync] = useState({ pending: 0, online: true, lastSync: 0 })
   const slowSync = useSlow(sync.pending > 0, SLOW_SYNC)
-  const [drawer, setDrawer] = useState<DrawerTab | null>(null)
+  // Saves wait for the server: the pill row shows a cloud and the menu says it. The word Offline is for no network at all.
+  const waiting = (sync.pending > 0 && slowSync) || !sync.online
+  // The menu: closed, or open on its list, Saves or Options.
+  const [menu, setMenu] = useState<MenuView | null>(null)
   const [guide, setGuide] = useState<string | null>(null)
   const toast = useToast()
   const [panel, setPanel] = useState<Panel>(null)
@@ -88,7 +91,7 @@ export default function Player() {
   const [screenSize, setScreenSize] = useState<[number, number] | null>(null)
   const [exiting, setExiting] = useState(false)
   // Save and exit could not get every save to the server: where the person meant to go.
-  const [unsent, setUnsent] = useState<'library' | 'game' | null>(null)
+  const [unsent, setUnsent] = useState<'back' | 'saves' | null>(null)
   // Ren'Py games: the patches this person chose and the text size, as the game reports them.
   const [gameOptions, setGameOptions] = useState<GameOptionsState | null>(null)
   // Defaults for everyone, sent with every options message so a game uses them until the person chooses.
@@ -104,9 +107,10 @@ export default function Player() {
   // Other engines run their own JavaScript, so they play in a sandboxed frame
   // (opaque origin, no access to Renplay) and their storage comes through here.
   const sandboxed = !!game && !isRenpy(game)
-  // The drawer's first tab. Other engines' games have no saves of their own.
-  const firstTab: DrawerTab = sandboxed ? 'options' : 'saves'
-  const openDrawer = () => setDrawer(firstTab)
+  const openMenu = () => setMenu('top')
+  const keys = useKeyLabels()
+  const padConnected = useGamepadConnected()
+  const saves = useSaves(gameId)
 
   const setPrefs = (p: DisplayPrefs) => {
     setPrefsState(p)
@@ -123,7 +127,7 @@ export default function Player() {
   const [muted, toggleMute] = useMute(send)
   const saving = useSaving(send, ready, toast)
   const htmlSaves = useHtmlSaves(sandboxed, userId, gameId, attempt, send, () => setSignedOut(true), setFailed)
-  const { fullscreen, coversNotch, escLocked, escHint, escHeld, setEscHeld, toggleFullscreen } = useFullscreen(shellRef, fsMode, touch, send, () => setPanel('fullscreen'))
+  const { fullscreen, coversNotch, escLocked, toggleFullscreen } = useFullscreen(shellRef, fsMode, touch, send, () => setPanel('fullscreen'))
   const stage = useElementSize(stageRef, `${game?.id}:${isLoading}`)
   const insets = useSafeInsets()
   useWakeLock(ready)
@@ -194,17 +198,17 @@ export default function Player() {
           void htmlSaves.kept().finally(() => saving.flushed(d.id, d.ok !== false))
           break
         case 'renplay:saved-now':
-          saving.savedNow(d.id, !!d.saved, !!d.ok)
+          saving.savedNow(d.id, !!d.saved)
+          // The new quick save is the first row of the list at once.
+          void qc.invalidateQueries({ queryKey: ['saves', gameId] })
+          break
+        case 'renplay:loaded':
+          if (!d.ok) toast('Where you are could not be saved, so nothing was loaded.', 'error')
+          else if (d.saved) toast('Loaded. Where you were is saved too.', 'success')
+          void qc.invalidateQueries({ queryKey: ['saves', gameId] })
           break
         case 'renplay:save-conflict':
-          toast(
-            d.deleted
-              ? 'Another device saved this save after you deleted it here, so it is back.'
-              : d.kept === 'other'
-                ? 'Another device saved over this save more recently. Its copy is in the slot, and yours is kept in History.'
-                : 'Another device also saved this save. Yours is newer and is in the slot. The other copy is kept in History.',
-            'info',
-          )
+          toast(d.deleted ? 'Another device saved this save after you deleted it here, so it is back.' : 'This save was also changed on another device. Both copies are kept.', 'info')
           void qc.invalidateQueries({ queryKey: ['saves', game?.id] })
           break
         case 'renplay:download-log':
@@ -226,15 +230,16 @@ export default function Player() {
         case 'renplay:error':
           if (typeof d.message === 'string') setFailed(d.message)
           break
-        case 'renplay:escape':
-          setEscHeld(!!d.down)
-          break
         case 'renplay:perf':
           if (typeof d.fps === 'number') telemetry.fps(d.fps)
           break
         case 'renplay:menu':
           // The controller's Menu button in the game.
-          setDrawer((tab) => tab ?? firstTab)
+          setMenu((view) => view ?? 'top')
+          break
+        case 'renplay:key':
+          if (d.key === 'menu') toggleMenu()
+          else if (d.key === 'guide') toggleGuide()
           break
       }
     }
@@ -260,8 +265,8 @@ export default function Player() {
 
 
 
-  const closeDrawer = useCallback(() => {
-    setDrawer(null)
+  const closeMenu = useCallback(() => {
+    setMenu(null)
     send({ type: 'renplay:focus' })
   }, [send])
 
@@ -271,19 +276,21 @@ export default function Player() {
     return () => clearTimeout(t)
   }, [ready])
 
-  // The drawer has the controller while it is open, and its Menu button closes it again.
+  // The menu has the controller while it is open, and its Menu button closes it again.
   useEffect(() => {
-    if (ready && !sandboxed) send({ type: 'renplay:pads', toGame: !drawer })
-    setGameHasPad(ready && !sandboxed && !drawer)
-    if (!drawer) return () => setGameHasPad(false)
-    const onMenu = () => closeDrawer()
+    if (ready && !sandboxed) send({ type: 'renplay:pads', toGame: !menu })
+    setGameHasPad(ready && !sandboxed && !menu)
+    if (!menu) return () => setGameHasPad(false)
+    const onMenu = () => closeMenu()
     window.addEventListener('renplay:pad-menu', onMenu)
     return () => window.removeEventListener('renplay:pad-menu', onMenu)
-  }, [drawer, ready, sandboxed, send, closeDrawer])
+  }, [menu, ready, sandboxed, send, closeMenu])
 
   const { saveAndFlush } = saving
 
-  const exit = useCallback(async (to: 'library' | 'game' = 'game', anyway = false) => {
+  const goBack = useGoBack()
+  /** Save, wait for the server, and go back to where Play was pressed, or open the game page's Saves. */
+  const exit = useCallback(async (to: 'back' | 'saves' = 'back', anyway = false) => {
     setExiting(true)
     // Saves that did not reach the server stay on this device and go up the next time the game
     // opens here. The person decides whether to leave now.
@@ -296,8 +303,10 @@ export default function Player() {
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
     void qc.invalidateQueries({ queryKey: ['saves', gameId] })
     void qc.invalidateQueries({ queryKey: ['games'] })
-    navigate(to === 'library' ? '/' : `/game/${gameId}`)
-  }, [navigate, qc, send, gameId, saveAndFlush])
+    // Back is one step in the history when Play was pressed in the app, the game page otherwise.
+    if (to === 'back' && window.history.state?.idx > 0) goBack()
+    else navigate(`/game/${gameId}${to === 'saves' ? '#saves' : ''}`)
+  }, [navigate, qc, gameId, saveAndFlush, goBack])
 
   // Defaults that arrive after the game was ready still reach it.
   useEffect(() => {
@@ -305,27 +314,49 @@ export default function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, sandboxed, defaults.data])
 
-  /** Main menu: the game saves first (saves that cannot reach the server wait on this device), then starts again at its main menu. */
-  const mainMenu = async () => {
-    setDrawer(null)
-    await saveAndFlush()
-    setReady(false)
-    setProgress(null)
-    navigate(`/play/${gameId}`, { replace: true })
-    setAttempt((n) => n + 1)
+  // Renplay's keys on the player page: ` opens and closes the menu, \ the guide. In the game they come as messages.
+  const menuRef = useRef(menu)
+  menuRef.current = menu
+  const guideRef = useRef(guide)
+  guideRef.current = guide
+  const busy = useRef(false)
+  busy.current = exiting || unsent !== null || signedOut
+  const toggleMenu = () => {
+    if (busy.current) return
+    if (menuRef.current) closeMenu()
+    else openMenu()
   }
-
-  // Esc on the player itself (not in the game) opens and closes the drawer.
+  const toggleGuide = () => {
+    if (busy.current || !game?.walkthroughs.length) return
+    if (guideRef.current) closeGuide()
+    else openGuide()
+  }
+  const openGuide = () => {
+    setGuide(game?.walkthroughs[0]?.file ?? null)
+    setMenu(null)
+  }
+  const closeGuide = () => {
+    setGuide(null)
+    send({ type: 'renplay:focus' })
+  }
   useEffect(() => {
     if (!ready) return
     const key = (e: KeyboardEvent) => {
-      // A key the drawer already used (to close itself) does not open it again.
-      if (e.key !== 'Escape' || e.repeat || e.defaultPrevented || escLocked || drawer || guide) return
-      openDrawer()
+      const which = e.code === 'Backquote' ? 'menu' : e.code === 'Backslash' || e.code === 'IntlBackslash' ? 'guide' : null
+      if (!which || e.ctrlKey || e.metaKey || e.altKey) return
+      e.preventDefault()
+      if (e.repeat) return
+      if (which === 'menu') toggleMenu()
+      else toggleGuide()
     }
-    window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
-  }, [ready, escLocked, drawer, guide, sandboxed])
+    window.addEventListener('keydown', key, true)
+    return () => window.removeEventListener('keydown', key, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, game?.walkthroughs.length])
+  // The game's keys: it gives up the backslash when there is no guide.
+  useEffect(() => {
+    if (ready) send({ type: 'renplay:keys', guide: !!game?.walkthroughs.length })
+  }, [ready, game?.walkthroughs.length, send])
 
   // Space the game keeps clear of: a MacBook's notch in fullscreen, a phone's
   // camera cutout (the sides in landscape, the top in portrait). The home
@@ -349,7 +380,8 @@ export default function Player() {
         <Spinner />
       </div>
     )
-  if (!online && !keptGame(gameId))
+  // Only before the game is ready: once it runs, losing the network takes nothing away.
+  if (!online && !keptGame(gameId) && !ready)
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-black p-6 text-center text-zinc-300">
         <p>You are offline, and this game is not kept in this browser. Keep it offline from its page next time you have a network.</p>
@@ -365,6 +397,9 @@ export default function Player() {
     )
 
   const loadPct = progress && progress.total ? progress.done / progress.total : 0
+  // The door names the save it resumes, "Quick 1", not its slot "quick-1".
+  const resumed_ = resume ? (saves.data?.slots.find((x) => slotName(x.file) === resume) ?? (game.latestSave && slotName(game.latestSave.file) === resume ? game.latestSave : null)) : null
+  const resumeName = resume ? (resumed_ ? saveName(resumed_ as SaveSlot) : resume.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())) : null
 
   return (
     <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white outline-none">
@@ -372,7 +407,7 @@ export default function Player() {
         try { const me = await api<Me>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
       }}>Continue</Pill>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
       {/* A click in the bars around the game gives the keyboard back to the game. */}
-      <div ref={stageRef} className={cx('rp-stage absolute inset-0', drawer && 'dim')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
+      <div ref={stageRef} className={cx('rp-stage absolute inset-0', menu && 'dim')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
         <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
           <iframe
             ref={frameRef}
@@ -388,7 +423,7 @@ export default function Player() {
       </div>
 
       {/* The door: the stage's art grown to the viewport while the game loads. */}
-      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} muted={muted} onMute={toggleMute} fsMode={fsMode} fullscreen={fullscreen} onFullscreen={() => void toggleFullscreen()} onBack={() => (progress ? void exit('game') : navigate(`/game/${gameId}`))} insets={insets} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} />
+      <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume ? resumeName : null} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} muted={muted} onMute={toggleMute} fsMode={fsMode} fullscreen={fullscreen} onFullscreen={() => void toggleFullscreen()} onBack={() => (progress ? void exit() : navigate(`/game/${gameId}`))} insets={insets} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} />
 
       {exiting && (
         <div className="absolute inset-0 z-50 flex animate-fade-in flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm">
@@ -410,32 +445,21 @@ export default function Player() {
         </div>
       )}
 
-      {/* Two quiet things over the game: the Renplay pill (the drawer) and, while something waits, the sync pill. */}
-      {ready && !drawer && (
-        <div
-          className={cx('rp-pills', freshPill && 'fresh')}
-          // HTML games often put their own menu in the top left (SugarCube's sidebar toggle).
+      {/* One pill over the game opens the menu. An amber cloud sits beside it while saves wait for the server. */}
+      {ready && !menu && (
+        <PlayerPill
           style={sandboxed ? { top: 10 + Math.max(insets.top, pad.top), right: 10 + insets.right } : { top: 10 + Math.max(insets.top, pad.top), left: 10 + insets.left }}
-        >
-          <button type="button" className="rp-pill" onClick={openDrawer} aria-label="Open the player menu">
-            <span className="mark" aria-hidden="true" />
-            Renplay
-          </button>
-          {fsMode !== 'none' && !fullscreen && (
-            <button type="button" className="rp-pill icon" onClick={() => void toggleFullscreen()} aria-label="Full screen">
-              <Expand aria-hidden="true" />
-            </button>
-          )}
-        </div>
+          fresh={freshPill}
+          keyLabel={touch ? null : keys.menu}
+          pad={padConnected}
+          onMenu={openMenu}
+          onFullscreen={fsMode !== 'none' && !fullscreen ? () => void toggleFullscreen() : undefined}
+          waiting={waiting}
+          waitLabel={online ? 'Some saves have not reached the server yet' : 'Offline. Saves wait on this device'}
+        />
       )}
-      {ready && ((sync.pending > 0 && slowSync) || !sync.online) && (
-        <span className={cx('rp-sync', !sync.online && 'amber')} role="status" style={sandboxed ? { top: 14 + Math.max(insets.top, pad.top), left: 10 + insets.left } : { top: 14 + Math.max(insets.top, pad.top), right: 10 + insets.right }}>
-          {!sync.online ? <CloudOff /> : <RefreshCw className="animate-spin" />}
-          {!sync.online ? `Offline, ${sync.pending} ${sync.pending === 1 ? 'save' : 'saves'} waiting` : 'Syncing'}
-        </span>
-      )}
-      {/* A swipe from the left edge opens the drawer on touch screens. */}
-      {touch && ready && !drawer && (
+      {/* A swipe from the left edge opens the menu on touch screens. */}
+      {touch && ready && !menu && (
         <div
           className="absolute inset-y-0 left-0 z-20 w-4"
           onTouchStart={(e) => {
@@ -451,7 +475,7 @@ export default function Player() {
               const t = ev.changedTouches[0]
               const dx = (t?.clientX ?? x0) - x0
               const dy = Math.abs((t?.clientY ?? y0) - y0)
-              if (dx > 40 && dx > dy * 2) openDrawer()
+              if (dx > 40 && dx > dy * 2) openMenu()
               done()
             }
             window.addEventListener('touchend', end)
@@ -460,84 +484,71 @@ export default function Player() {
         />
       )}
 
-      {fullscreen && escLocked && (escHeld || escHint) && <EscapeHint held={escHeld} top={Math.max(insets.top, pad.top) + 60} />}
-
       <Confirm
         open={unsent !== null}
         onClose={() => setUnsent(null)}
-        onConfirm={() => void exit(unsent ?? 'library', true)}
+        onConfirm={() => void exit(unsent ?? 'back', true)}
         title="Some saves have not reached the server"
         confirmLabel="Leave anyway"
         cancelLabel="Stay"
       >
         They are kept on this device and go to the server the next time you open this game here. Stay and try Save and exit again, or leave now.
       </Confirm>
-      {drawer && (
-        <PlayerDrawer
+      {menu && (
+        <PlayerMenu
           game={game}
-          tab={drawer}
-          onTab={setDrawer}
-          onClose={closeDrawer}
+          view={menu}
+          onView={setMenu}
+          onClose={closeMenu}
           portrait={stage.h > stage.w}
           insets={insets}
           renpy={!sandboxed}
           ready={ready}
-          pending={sync.pending}
-          online={sync.online}
+          saveCount={saves.data ? saves.data.slots.filter((x) => x.kind !== 'internal' && x.valid).length : null}
+          savedAs={saving.savedAs}
           saving={saving.savingNow}
           onSaveNow={saving.saveNow}
-          onExit={(to) => void exit(to)}
-          onMainMenu={() => void mainMenu()}
+          hasGuide={game.walkthroughs.length > 0}
+          onGuide={openGuide}
           muted={muted}
           onMute={toggleMute}
+          fsMode={fsMode}
           fullscreen={fullscreen}
-          onFullscreen={fsMode !== 'none' ? () => void toggleFullscreen() : undefined}
+          escLocked={escLocked}
+          onFullscreen={() => void toggleFullscreen()}
+          waiting={waiting}
+          keys={touch ? null : keys}
+          pad={padConnected}
+          onExit={() => void exit()}
           saves={
-            <SavesPanel
-              gameId={gameId}
-              onLoad={(slot) => {
-                send({ type: 'renplay:load', slot })
-                setDrawer(null)
-              }}
-            />
-          }
-          guide={
-            <GuideList
+            <SavesView
               game={game}
-              onOpen={(file) => {
-                setGuide(file)
-                setDrawer(null)
+              onLoad={(slot) => {
+                send({ type: 'renplay:save-and-load', slot, id: Math.random().toString(36).slice(2) })
+                closeMenu()
               }}
+              onManage={() => void exit('saves')}
             />
           }
           options={
-            <div className="stack" style={{ gap: 16 }}>
-              <Switch checked={!muted} label="Sound" onChange={() => toggleMute()} />
-              {fsMode !== 'none' && (
-                <Pill size="sm" icon={fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />} onClick={() => void toggleFullscreen()}>
-                  {fullscreen ? 'Leave full screen' : 'Full screen'}
-                </Pill>
-              )}
-              {!sandboxed && <GameOptions options={gameOptions} onChange={sendOptions} onAccessibility={() => send({ type: 'renplay:accessibility' })} />}
-              <DisplayPanel
-                prefs={prefs}
-                setPrefs={setPrefs}
-                notch={notch}
-                hasCutout={hasCutout}
-                fullscreen={fullscreen}
-                coversNotch={coversNotch}
-                screenSize={screenSize}
-                area={area}
-                fsMode={fsMode}
-                onFullscreen={() => void toggleFullscreen()}
-                onDownloadLog={sandboxed ? undefined : () => send({ type: 'renplay:download-log' })}
-              />
-            </div>
+            <OptionsView
+              renpy={!sandboxed}
+              options={gameOptions}
+              onChange={sendOptions}
+              prefs={prefs}
+              setPrefs={setPrefs}
+              hasCutout={hasCutout}
+              onAccessibility={() => {
+                closeMenu()
+                send({ type: 'renplay:accessibility' })
+              }}
+              onDownloadLog={() => send({ type: 'renplay:download-log' })}
+            />
           }
         />
       )}
       {guide && game.walkthroughs.length > 0 && (
-        <GuideWindow game={game} file={guide} onFile={setGuide} onClose={() => { setGuide(null); send({ type: 'renplay:focus' }) }} portrait={stage.h > stage.w} insets={insets} />
+        <GuideWindow game={game} file={guide} onFile={setGuide} onClose={closeGuide} portrait={stage.h > stage.w} insets={insets} />
       )}
       {panel === 'fullscreen' && (
         <SidePanel

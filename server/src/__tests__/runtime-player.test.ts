@@ -32,7 +32,7 @@ function page(stored: Record<string, string> = {}) {
 }
 
 describe('the runtime both kinds of game share', () => {
-  it('is served with Ren\'Py\'s runtime in one function: nothing global, Esc only in fullscreen, muted from the stored choice', async () => {
+  it('is served with Ren\'Py\'s runtime in one function: nothing global, Renplay\'s keys caught first, muted from the stored choice', async () => {
     const root = mkdtempSync(join(tmpdir(), 'renplay-runtime-'))
     process.env['DATA_DIR'] = join(root, 'data')
     process.env['GAMES_DIR'] = join(root, 'games')
@@ -47,12 +47,24 @@ describe('the runtime both kinds of game share', () => {
       runInNewContext(res.text, p.window)
       expect(Object.keys(p.window).filter((k) => /^(post|cfg|muted|setAudioMuted|isMuted)$/.test(k))).toEqual([])
 
-      p.fire('keydown', { key: 'Escape', repeat: false })
-      expect(p.sent).toEqual([])
-      p.fire('message', { source: p.window.parent, data: { type: 'renplay:fullscreen-state', value: true } })
-      p.fire('keydown', { key: 'Escape', repeat: false })
+      // The menu key is caught before the game sees it, by its physical key, and reported once however long it is held.
+      const press = (code: string, extra: Record<string, unknown> = {}) => {
+        const caught = { prevented: false, stopped: false }
+        p.fire('keydown', { code, repeat: false, preventDefault: () => (caught.prevented = true), stopImmediatePropagation: () => (caught.stopped = true), ...extra })
+        return caught
+      }
+      expect(press('Backquote')).toEqual({ prevented: true, stopped: true })
+      press('Backquote', { repeat: true })
       // Loaded twice, it still reports once.
-      expect(p.sent).toEqual([{ type: 'renplay:escape', down: true, game: undefined, userId: undefined }])
+      expect(p.sent).toEqual([{ type: 'renplay:key', key: 'menu', game: undefined, userId: undefined }])
+      p.sent.length = 0
+      // The backslash is the game's own until the player says it has a guide. A key with Ctrl is never taken.
+      expect(press('Backslash')).toEqual({ prevented: false, stopped: false })
+      expect(press('Backquote', { ctrlKey: true })).toEqual({ prevented: false, stopped: false })
+      expect(p.sent).toEqual([])
+      p.fire('message', { source: p.window.parent, data: { type: 'renplay:keys', guide: true } })
+      expect(press('IntlBackslash')).toEqual({ prevented: true, stopped: true })
+      expect(p.sent).toEqual([{ type: 'renplay:key', key: 'guide', game: undefined, userId: undefined }])
 
       const source = new p.AudioNode(), out = new p.AudioDestinationNode()
       source.connect(out)

@@ -10,6 +10,7 @@ import type { Game, SaveSlot } from '@shared/api'
 import { ago, dateTime, duration, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
 import { useGames, useSaves } from '../lib/queries'
+import { groupSaves } from '../lib/saves'
 import { playLink } from '../lib/links'
 import { Seg, Pill, IconBtn } from '../lantern/controls'
 import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
@@ -92,6 +93,65 @@ export default function SaveGallery({ game }: { game: Game }) {
     setConflictsSeen(at)
   }
 
+  const { pinned, recent } = groupSaves(slots)
+  const card = (s: SaveSlot) => (
+    <div key={s.file} className={`save ${s.pinnedAt ? 'pinned' : ''}`.trim()}>
+      <button
+        className="relative block w-full"
+        onClick={() => game.playUrl && navigate(playLink(game.id, s.file))}
+        disabled={!game.playUrl}
+        title={game.playUrl ? 'Load this save' : 'Install the game to load saves'}
+        aria-label={game.playUrl ? `Load ${s.name || s.label}` : 'Install the game to load saves'}
+      >
+        <SceneCard game={game} save={s} play={!!game.playUrl} />
+      </button>
+      <div className="b row" style={{ gap: 8 }}>
+        <div className="grow">
+          <div className="n">
+            {s.pinnedAt && <Pin className="pin" aria-label="Pinned" />}
+            <span className="truncate">{s.title || s.name || <span className="muted">Untitled</span>}</span>
+          </div>
+          {s.note && <p className="note">{s.note}</p>}
+          <div className="m" title={dateTime(s.ctime)}>
+            {ago(s.ctime)}
+            {duration(s.runtime) ? ` · ${duration(s.runtime)} played` : ''}
+          </div>
+        </div>
+        <ActionMenu
+          trigger={(toggle) => (
+            <IconBtn label="Save actions" onClick={toggle} style={{ width: 36, height: 36, marginRight: -6 }}>
+              <MoreHorizontal />
+            </IconBtn>
+          )}
+        >
+          {(close) => (
+            <>
+              <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); navigate(playLink(game.id, s.file)) }}>Load</MenuItem>
+              <MenuItem icon={<Pin />} onClick={() => { close(); void saveMeta(s, { pinned: !s.pinnedAt }, s.pinnedAt ? 'Unpinned' : 'Pinned. Every previous version is kept.') }}>
+                {s.pinnedAt ? 'Unpin' : 'Pin'}
+              </MenuItem>
+              <MenuItem icon={<PencilLine />} onClick={() => { close(); setEditing({ slot: s, title: s.title ?? '', note: s.note ?? '' }) }}>
+                Name and note
+              </MenuItem>
+              <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.id}/download?file=${encodeURIComponent(s.file)}`))}>
+                Download
+              </MenuItem>
+              <MenuItem icon={<Copy />} onClick={() => (close(), setCopying(s))}>
+                Copy to another game
+              </MenuItem>
+              <MenuItem icon={<History />} onClick={() => (close(), setHistory(s))}>
+                Previous versions
+              </MenuItem>
+              <MenuItem icon={<Trash2 />} danger onClick={() => (close(), setConfirmDelete(s))}>
+                Delete
+              </MenuItem>
+            </>
+          )}
+        </ActionMenu>
+      </div>
+    </div>
+  )
+
   return (
     <div>
       {conflicts.length > 0 && (
@@ -153,65 +213,12 @@ export default function SaveGallery({ game }: { game: Game }) {
           Saves you make in the game are stored on the server as soon as you make them. You can also import saves from the desktop version (single <code>.save</code> files or a zip of the save folder).
         </Empty>
       ) : (
-        <div className="saves">
-          {slots.map((s) => (
-            <div key={s.file} className={`save ${s.pinnedAt ? 'pinned' : ''}`.trim()}>
-              <button
-                className="relative block w-full"
-                onClick={() => game.playUrl && navigate(playLink(game.id, s.file))}
-                disabled={!game.playUrl}
-                title={game.playUrl ? 'Load this save' : 'Install the game to load saves'}
-                aria-label={game.playUrl ? `Load ${s.name || s.label}` : 'Install the game to load saves'}
-              >
-                <SceneCard game={game} save={s} play={!!game.playUrl} />
-              </button>
-              <div className="b row" style={{ gap: 8 }}>
-                <div className="grow">
-                  <div className="n">
-                    {s.pinnedAt && <Pin className="pin" aria-label="Pinned" />}
-                    <span className="truncate">{s.title || s.name || <span className="muted">Untitled</span>}</span>
-                  </div>
-                  {s.note && <p className="note">{s.note}</p>}
-                  <div className="m" title={dateTime(s.ctime)}>
-                    {ago(s.ctime)}
-                    {duration(s.runtime) ? ` · ${duration(s.runtime)} played` : ''}
-                  </div>
-                </div>
-                <ActionMenu
-                  trigger={(toggle) => (
-                    <IconBtn label="Save actions" onClick={toggle} style={{ width: 36, height: 36, marginRight: -6 }}>
-                      <MoreHorizontal />
-                    </IconBtn>
-                  )}
-                >
-                  {(close) => (
-                    <>
-                      <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); navigate(playLink(game.id, s.file)) }}>Load</MenuItem>
-                      <MenuItem icon={<Pin />} onClick={() => { close(); void saveMeta(s, { pinned: !s.pinnedAt }, s.pinnedAt ? 'Unpinned' : 'Pinned. Every previous version is kept.') }}>
-                        {s.pinnedAt ? 'Unpin' : 'Pin'}
-                      </MenuItem>
-                      <MenuItem icon={<PencilLine />} onClick={() => { close(); setEditing({ slot: s, title: s.title ?? '', note: s.note ?? '' }) }}>
-                        Name and note
-                      </MenuItem>
-                      <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.id}/download?file=${encodeURIComponent(s.file)}`))}>
-                        Download
-                      </MenuItem>
-                      <MenuItem icon={<Copy />} onClick={() => (close(), setCopying(s))}>
-                        Copy to another game
-                      </MenuItem>
-                      <MenuItem icon={<History />} onClick={() => (close(), setHistory(s))}>
-                        Previous versions
-                      </MenuItem>
-                      <MenuItem icon={<Trash2 />} danger onClick={() => (close(), setConfirmDelete(s))}>
-                        Delete
-                      </MenuItem>
-                    </>
-                  )}
-                </ActionMenu>
-              </div>
-            </div>
-          ))}
-        </div>
+        <>
+          {pinned.length > 0 && <h3 className="pm-group-title">Pinned</h3>}
+          {pinned.length > 0 && <div className="saves">{pinned.map(card)}</div>}
+          {pinned.length > 0 && recent.length > 0 && <h3 className="pm-group-title">Recent</h3>}
+          {recent.length > 0 && <div className="saves">{recent.map(card)}</div>}
+        </>
       )}
 
       <p className="xs muted" style={{ marginTop: 20 }}>

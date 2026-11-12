@@ -11,6 +11,9 @@ const newId = () => Math.random().toString(36).slice(2)
  */
 export function useSaving(send: Send, ready: boolean, toast: (text: string, tone?: 'success' | 'error' | 'info') => void) {
   const [savingNow, setSavingNow] = useState(false)
+  // What Save now just did, said on its row for three seconds.
+  const [savedAs, setSavedAs] = useState<string | null>(null)
+  const savedTimer = useRef(0)
   const savingId = useRef<string | null>(null)
   const waiters = useRef(new Map<string, (ok: boolean) => void>())
 
@@ -50,14 +53,17 @@ export function useSaving(send: Send, ready: boolean, toast: (text: string, tone
     }, 20_000)
   }
   /** The game's answer to saveNow. */
-  const savedNow = (id: string, saved: boolean, ok: boolean) => {
+  const savedNow = (id: string, saved: boolean) => {
     if (id !== savingId.current) return
     savingId.current = null
     setSavingNow(false)
-    toast(saved ? (ok ? 'Saved' : 'Saved on this device. It syncs when the connection is back.') : 'Nothing to save in the main menu.', ok ? 'success' : 'info')
+    // Where it went is the whole explanation. A save that waits for the server says so in the menu's footer.
+    setSavedAs(saved ? 'Saved as Quick 1' : 'Nothing to save yet')
+    window.clearTimeout(savedTimer.current)
+    savedTimer.current = window.setTimeout(() => setSavedAs(null), 3000)
   }
 
-  return { savingNow, saveNow, savedNow, saveAndFlush, flushed }
+  return { savingNow, savedAs, saveNow, savedNow, saveAndFlush, flushed }
 }
 
 /**
