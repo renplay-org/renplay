@@ -68,7 +68,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/app.ts         The HTTP app, mounting each part's routes. src/index.ts starts it
   src/services.ts    The server's parts, made once at start and given to every router and job
   src/config.ts      Environment variables, read from the table in envvars.ts
-  src/db.ts          SQLite schema and migrations (PRAGMA user_version)
+  src/db.ts          SQLite access. db-schema.ts declares and reconciles the schema and runs migrations
   src/shared/        What the server and the library both use: the adult levels, the recipe format,
                      the art types, the defaults, sizes for people (format.ts), and every answer of
                      the API (api.ts), which the server builds with `satisfies`. The library
@@ -158,6 +158,23 @@ The code was untangled so that a change lands in one place. `scripts/check-struc
   way it is used (requests, messages, the built runtime), never by cutting its source text apart.
 - **Write things once.** A device check goes in `selector/src/lib/platform.ts`, a size for people is
   `bytes` in `shared/format.ts`, a control comes from `lantern/`. Look for the existing one first.
+
+## Database changes
+
+SQLite only, no external database and no ORM. `server/src/db-schema.ts` declares the schema once.
+Startup adds missing tables, columns and indexes without changing existing definitions or removing
+unknown objects. Added columns must be nullable or have a default that SQLite can add to a populated
+table. The real 4.0 SQL fixture must still migrate to match a fresh library, so unsafe additions fail
+in tests before reaching a person's library.
+
+`PRAGMA user_version` is the compatibility floor, not the latest additive schema. Additions never
+raise it. Numbered migration progress lives separately in the `schema_migration` settings row. Every
+numbered migration first makes a database copy and stops if that fails.
+
+Breaking changes take two releases. First add and fill the new form while keeping the old form working,
+without raising the floor. Only a later release removes the old form with a numbered migration that
+raises the floor. Keep the previous release able to open the library. See the worked example in
+`docs/site/src/content/docs/developers/architecture.md`.
 
 ## How it fits together
 
