@@ -58,6 +58,11 @@ export function GuideWindow({ game, file, onFile, onClose, mode, insets, after, 
   const away = popout.out !== null
   useModal(windowRef, !away, onClose, { trap: false })
 
+  // In a window of its own the guide has no focus here: the controller is the game's again.
+  useEffect(() => {
+    if (away) onActive(false)
+  }, [away, onActive])
+
   // Asked for, so focus goes in. The reader is what takes the keys.
   useEffect(() => {
     if (focusToken && !away) (windowRef.current?.querySelector<HTMLElement>('[data-reader]') ?? windowRef.current)?.focus({ preventScroll: true })
@@ -85,6 +90,8 @@ export function GuideWindow({ game, file, onFile, onClose, mode, insets, after, 
 
   if (!current) return null
   const label = `Walkthrough, ${current.title}`
+  // The tabs name the files when there are several, so the title is the game's.
+  const heading = files.length > 1 ? game.title : current.title
   const focusEvents = {
     onFocus: () => onActive(true),
     onBlur: (e: { currentTarget: HTMLElement; relatedTarget: EventTarget | null }) => {
@@ -130,7 +137,7 @@ export function GuideWindow({ game, file, onFile, onClose, mode, insets, after, 
         <div className="gw-bar">
           <span className="gw-pills" aria-hidden="true" />
           <span className="truncate grow" style={{ fontWeight: 650, fontSize: 13.5 }}>
-            {current.title}
+            {heading}
           </span>
           {back}
         </div>
@@ -147,7 +154,7 @@ export function GuideWindow({ game, file, onFile, onClose, mode, insets, after, 
   const bar = (
     <div className="gw-bar" onPointerDown={popped ? undefined : drag('move')}>
       <span className="truncate grow" style={{ fontWeight: 650, fontSize: 13.5 }}>
-        {current.title}
+        {heading}
       </span>
       {!popped && (
         <IconBtn label="See-through" aria-pressed={seeThrough} onClick={toggleSeeThrough}>

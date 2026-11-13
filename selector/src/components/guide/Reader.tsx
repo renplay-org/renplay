@@ -204,14 +204,18 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
     </div>
   ) : w.kind === 'text' ? (
     text === null ? (
-      <Spinner />
+      <div className="gr-note">
+        <Spinner />
+      </div>
     ) : (
       <div ref={view} className="gr-view gr-text" tabIndex={0} aria-label={w.title}>
         <pre>{text}</pre>
       </div>
     )
   ) : !sizes ? (
-    <Spinner />
+    <div className="gr-note">
+      <Spinner />
+    </div>
   ) : (
     <div ref={view} className="gr-view" tabIndex={0} aria-label={w.title} onScroll={onScroll} onPointerDown={() => (touched.current = true)} onWheel={() => (touched.current = true)}>
       <div ref={content} className="gr-content" style={{ gap: PAD, padding: PAD }}>

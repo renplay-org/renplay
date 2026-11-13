@@ -109,6 +109,13 @@ test('on a phone held sideways the guide fills the screen, and the Guide pill br
   expect(await cover.boundingBox()).toEqual({ x: 0, y: 0, width, height })
   await expect.poll(() => ink(pageCanvas(cover, 1))).toBeGreaterThan(50)
   await page.screenshot({ path: testInfo.outputPath('cover.png') })
+  // The Menu pill stays over it too, and its menu opens above the guide, which stays under it.
+  await page.locator('.rp-pills').getByRole('button', { name: 'Menu' }).tap()
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  await expect(menu).toBeVisible()
+  await menu.getByRole('button', { name: 'Back to the game' }).tap()
+  await expect(menu).toBeHidden()
+  await expect(cover).toBeVisible()
   // The pill stays over the guide: one tap and the game is back, one more and the guide is.
   await expect(pill).toBeVisible()
   await pill.tap()
@@ -319,10 +326,12 @@ test('the controller scrolls, turns pages, switches files and toggles see-throug
 
 test('pop out moves the reader to a Picture-in-Picture window, Bring back and closing that window return it', async ({ page, context }, testInfo) => {
   desktopOnly(testInfo)
-  await play(page, { walkthroughs: [PDF] })
+  const engine = await play(page, { walkthroughs: [PDF] })
+  const lastPads = async () => (await engine.sent('renplay:pads')).at(-1)
   await openGuide(page, testInfo)
   const guide = guideOf(page)
   await expect(guide).toBeVisible()
+  await expect.poll(async () => (await lastPads())?.toGame, { message: 'The guide holds the pad' }).toBe(false)
   await expect.poll(() => ink(pageCanvas(guide, 1))).toBeGreaterThan(50)
   const inPage = await inkShare(pageCanvas(guide, 1))
   const [pip] = await Promise.all([context.waitForEvent('page'), guide.getByRole('button', { name: 'Pop out' }).click()])
@@ -331,8 +340,9 @@ test('pop out moves the reader to a Picture-in-Picture window, Bring back and cl
   await expect.poll(() => ink(pageCanvas(small, 1)), { message: 'The page is drawn in the small window' }).toBeGreaterThan(50)
   // With its own fonts: the text is as dense as in the page, not boxes where the glyphs should be.
   expect(Math.abs((await inkShare(pageCanvas(small, 1))) / inPage - 1), 'The small window draws the same text').toBeLessThan(0.35)
-  // The in-page window is away, and the button reads Bring back.
+  // The in-page window is away, the controller is the game's again, and the button reads Bring back.
   await expect(guide).toHaveCount(0)
+  await expect.poll(async () => (await lastPads())?.toGame).toBe(true)
   await pip.screenshot({ path: testInfo.outputPath('popped-out.png') })
   await small.getByRole('button', { name: 'Bring back' }).click()
   await expect(guide).toBeVisible()
