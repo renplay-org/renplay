@@ -255,7 +255,7 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
           </Pill>
         </div>
       )}
-      {!touch && !failed && <Legend pad={pad} pdf={w.kind === 'pdf'} />}
+      {!touch && !failed && <Legend pad={pad} kind={w.kind} />}
       {body}
     </>
   )

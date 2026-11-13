@@ -44,9 +44,25 @@ test('on a phone held upright a PDF shows page 1 drawn, goes to page 2, and the 
   await expect(sheet).toBeVisible()
   await expect(pageNow(sheet)).toHaveText('1 of 3')
   await expect.poll(() => ink(pageCanvas(sheet, 1)), { message: 'Page 1 is drawn' }).toBeGreaterThan(50)
-  // On a phone a PDF opens at 100 percent (a Letter page is 816 px wide), and is panned. A double tap fits it, and again undoes it.
+  // On a phone a PDF opens at 100 percent (a Letter page is 816 px wide), and is panned. A pinch zooms, a double tap fits it, and again undoes it.
   const width = async () => (await sheet.locator('.gr-page').first().boundingBox()).width
   expect(await width()).toBeCloseTo(816, 0)
+  // A pinch zooms: two fingers, as pointer events, move apart.
+  await sheet.locator('.gr-view').evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    const cx = r.left + r.width / 2
+    const y = r.top + r.height / 2
+    const fire = (type, id, x) => el.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 1, clientX: x, clientY: y, bubbles: true }))
+    fire('pointerdown', 1, cx - 40)
+    fire('pointerdown', 2, cx + 40)
+    for (let i = 1; i <= 6; i++) {
+      fire('pointermove', 1, cx - 40 - i * 15)
+      fire('pointermove', 2, cx + 40 + i * 15)
+    }
+    fire('pointerup', 1, cx - 130)
+    fire('pointerup', 2, cx + 130)
+  })
+  await expect.poll(width, { message: 'A pinch zooms in' }).toBeGreaterThan(816 * 2)
   const view = await sheet.locator('.gr-view').boundingBox()
   const at = { x: view.x + view.width / 2, y: view.y + view.height / 2 }
   await page.touchscreen.tap(at.x, at.y)
