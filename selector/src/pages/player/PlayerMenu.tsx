@@ -1,14 +1,14 @@
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Check, CloudOff, Expand, Play, Save, Settings2, Smartphone, Volume2, VolumeX } from 'lucide-react'
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import type { Game } from '@shared/api'
 import { Frame } from '../../lantern/art'
 import { Pill } from '../../lantern/controls'
 import { Keycap } from '../../lantern/Keycap'
 import { useModal } from '../../lantern/modal'
 import { cx } from '../../lantern/ui'
-import type { MenuLayout } from './menuLayout'
 
-export type MenuView = 'top' | 'saves' | 'options'
+/** The list, Saves, Options, or on a portrait phone the guide, which opens inside the sheet. */
+export type MenuView = 'top' | 'saves' | 'options' | 'guide'
 
 /** A row with a switch: the whole row is the button, so the target is as tall as the row. */
 export function SwitchRow({ icon, label, checked, onChange }: { icon?: ReactNode; label: string; checked: boolean; onChange: (on: boolean) => void }) {
@@ -23,7 +23,8 @@ export function SwitchRow({ icon, label, checked, onChange }: { icon?: ReactNode
 
 /**
  * The player's menu as one list: Back to the game, Save now, Guide, Saves, Options, Sound and Full screen,
- * then Save and exit. Saves and Options open in place with a Back row. A sheet from the left, from the bottom
+ * then Save and exit. Saves and Options open in place with a Back row, and so does the guide on a portrait
+ * phone. Elsewhere the guide opens beside the sheet and the menu stays. A sheet from the left, from the bottom
  * on a portrait phone. Rendered only while open, so nothing in it can take focus while it is closed.
  */
 export function PlayerMenu({
@@ -31,7 +32,7 @@ export function PlayerMenu({
   view,
   onView,
   onClose,
-  layout,
+  sheetRef,
   portrait,
   insets,
   renpy,
@@ -41,6 +42,7 @@ export function PlayerMenu({
   saving,
   onSaveNow,
   hasGuide,
+  guideOpen,
   onGuide,
   muted,
   onMute,
@@ -54,13 +56,14 @@ export function PlayerMenu({
   onExit,
   saves,
   options,
+  guide,
 }: {
   game: Game
   view: MenuView
   onView: (view: MenuView) => void
   onClose: () => void
-  /** The prototype's layout: 1 is the sheet, 2 and 3 fill the left of the screen. */
-  layout: MenuLayout
+  /** The sheet, for the guide beside it to find its edge. */
+  sheetRef: RefObject<HTMLDivElement | null>
   portrait: boolean
   insets: { top: number; right: number; bottom: number; left: number }
   renpy: boolean
@@ -73,6 +76,8 @@ export function PlayerMenu({
   onSaveNow: () => void
   /** The game has a walkthrough file: its row opens the guide. A guide the catalog links is a link row instead. */
   hasGuide: boolean
+  /** The guide window is open beside the sheet: its row hands focus to it. */
+  guideOpen: boolean
   onGuide: () => void
   muted: boolean
   onMute: () => void
@@ -89,23 +94,30 @@ export function PlayerMenu({
   onExit: () => void
   saves: ReactNode
   options: ReactNode
+  /** The guide's reader, for the guide view. */
+  guide: ReactNode
 }) {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = sheetRef
   // Escape goes back to the list first and closes from the list. Not inert: the menu is part of the player's page.
   useModal(ref, true, view === 'top' ? onClose : () => onView('top'))
   // A list opening in place takes focus with it: the Back row, which Enter, A and the arrows reach first.
-  const opened = useRef(view)
+  // Coming back from the guide, or closing the guide beside the sheet, focus goes to the Guide row.
+  const opened = useRef({ view, guideOpen })
   useEffect(() => {
-    if (opened.current !== view) ref.current?.querySelector<HTMLElement>('[data-initial]')?.focus()
-    opened.current = view
-  }, [view])
+    const before = opened.current
+    opened.current = { view, guideOpen }
+    const at = (selector: string) => ref.current?.querySelector<HTMLElement>(selector)?.focus()
+    if (before.view === 'guide' && view === 'top') at('[data-guide]')
+    else if (before.guideOpen && !guideOpen && view === 'top') at('[data-guide]')
+    else if (before.view !== view) at('[data-initial]')
+  }, [view, guideOpen, ref])
   const link = game.recipe?.links.walkthrough
   // The safe areas of the screen, which the sheet's padding adds to its own.
   const sheet = { '--pi-top': `${insets.top}px`, '--pi-right': `${insets.right}px`, '--pi-bottom': `${insets.bottom}px`, '--pi-left': `${insets.left}px` } as CSSProperties
   return (
     <>
       <div className="pm-scrim" onClick={onClose} aria-hidden="true" />
-      <aside ref={ref} role="dialog" aria-modal="true" aria-label={`${game.title}, the player menu`} className={cx('pm', layout === 1 ? portrait && 'bottom' : 'full')} data-view={view} style={sheet}>
+      <aside ref={ref} role="dialog" aria-modal="true" aria-label={`${game.title}, the player menu`} className={cx('pm', portrait && 'bottom')} data-view={view} style={sheet}>
         <header className="pm-head">
           <Frame game={game} kind="sq" className="pm-icon" style={{ flex: 'none' }} />
           <div className="pm-title truncate">{game.title}</div>
@@ -117,7 +129,7 @@ export function PlayerMenu({
                 <ChevronLeft />
                 Back
               </button>
-              {view === 'saves' ? saves : options}
+              {view === 'saves' ? saves : view === 'guide' ? guide : options}
             </>
           ) : (
             <>
@@ -143,7 +155,7 @@ export function PlayerMenu({
                 </button>
               )}
               {hasGuide ? (
-                <button type="button" className="pm-row" onClick={onGuide}>
+                <button type="button" className="pm-row" onClick={onGuide} data-guide aria-expanded={guideOpen}>
                   <BookOpen />
                   Guide
                   {keys && !pad && (

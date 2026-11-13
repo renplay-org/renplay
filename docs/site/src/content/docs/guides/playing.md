@@ -44,7 +44,8 @@ the **`** key (left of **1**), or swipe from the left edge on a phone to open th
 
 - **Back to the game** is the first row. **Save now** makes a quick save and says where it went,
   "Saved as Quick 1".
-- **Guide** opens the game's walkthroughs, when it has any.
+- **Guide** opens the game's walkthroughs, when it has any. The menu stays open and the walkthrough
+  opens beside it. On a phone held upright it opens inside the menu, and **Back** returns to the list.
 - **Saves** lists your saves, with pinned ones first and then the newest. A tap on one saves where
   you are and then loads it, so a mis-tap never loses your place. The last row, **Manage saves on
   the game page**, takes you to where you can pin, name, restore, import and export.
@@ -56,6 +57,8 @@ the **`** key (left of **1**), or swipe from the left edge on a phone to open th
 - **Sound** and **Full screen** are switches. **Save and exit** saves, waits until the server has
   every save, and goes back to where you pressed Play.
 
+**Back to the game** closes the menu and leaves the walkthrough where it is, over the game.
+
 **Esc** goes back one step in the menu and then closes it. In the game, Esc is still Ren'Py's own
 menu. In full screen on a computer the menu says **Hold Esc to leave**.
 
@@ -64,12 +67,9 @@ game in its own shape with bars around it. **Fill** has no bars at the sides: it
 game wider than the screen, and never the top or bottom, where games keep their dialogue.
 
 Walkthroughs open in a window beside the game that you can move, resize and see through, or below
-it on a phone held upright. The **\** key opens and closes the window when the game has one. The two
-keys work wherever the focus is, also in full screen, and the game never sees them. A name typed
-into a game's text field cannot contain them.
-
-Walkthroughs open in a window beside the game that you can move, resize and see through, or below
-it on a phone held upright.
+it on a phone held upright. The **\** key opens and closes the window when the game has one, also
+with the menu open, and the menu stays. The two keys work wherever the focus is, also in full
+screen, and the game never sees them. A name typed into a game's text field cannot contain them.
 
 ## Up next, status and ratings
 

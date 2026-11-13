@@ -112,23 +112,10 @@ function isParentFullscreen() {
 // backslash is the game's own when it has none.
 var KEYS = { Backquote: 'menu', Backslash: 'guide', IntlBackslash: 'guide' }
 var hasGuide = false
-// Layout 3's quick buttons hide like a video player's controls, so while they are on the player asks where the
-// pointer is: a touch or a move, at most ten a second. A prototype that goes away when the layout is chosen.
-var watching = false
-var lastActivity = 0
-function activity(e, down) {
-  var now = Date.now()
-  if (!watching || (!down && now - lastActivity < 100)) return
-  lastActivity = now
-  post('activity', { x: e.clientX, y: e.clientY, down: down })
-}
-window.addEventListener('pointermove', function (e) { activity(e, false) }, true)
-window.addEventListener('pointerdown', function (e) { activity(e, true) }, true)
 window.addEventListener('message', function (e) {
   if (e.source !== window.parent || !e.data) return
   if (e.data.type === 'renplay:fullscreen-state') parentFullscreen = !!e.data.value
   else if (e.data.type === 'renplay:keys') hasGuide = !!e.data.guide
-  else if (e.data.type === 'renplay:watch') watching = !!e.data.on
 })
 function renplayKey(e) {
   var key = KEYS[e.code]

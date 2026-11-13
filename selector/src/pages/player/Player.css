@@ -140,6 +140,13 @@
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   animation-name: pm-up;
 }
+/* The guide inside the sheet on an upright phone: tall, with the reader filling what is under the Back row. */
+.pm.bottom[data-view='guide'] {
+  height: 82dvh;
+}
+.pm[data-view='guide'] .pm-body {
+  overflow: hidden;
+}
 @keyframes pm-in {
   from {
     transform: translateX(-24px);
@@ -432,9 +439,10 @@
     height: 64px;
   }
 }
+/* Above the menu's scrim and sheet, so beside the menu the guide stays in reach. */
 .gw {
   position: absolute;
-  z-index: 40;
+  z-index: 46;
   display: flex;
   flex-direction: column;
   border-radius: 18px;

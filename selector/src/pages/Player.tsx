@@ -1,8 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, Smartphone } from 'lucide-react'
 import './player/Player.css'
-import './player/PlayerLayouts.css'
-import { GuideWindow } from '../components/GuideWindow'
+import { GuideReader, GuideWindow } from '../components/GuideWindow'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Confirm, Spinner, cx, useToast } from '../lantern/ui'
@@ -36,8 +35,6 @@ import { useElementSize, useSafeInsets, useWakeLock } from './player/useScreen'
 import OptionsView, { type GameOptionsState } from './player/OptionsView'
 import { PlayerMenu, type MenuView } from './player/PlayerMenu'
 import PlayerPill from './player/PlayerPill'
-import QuickButtons, { useQuickButtons } from './player/QuickButtons'
-import { LayoutSwitcher, useKeepButtons, useMenuLayout } from './player/menuLayout'
 import SavesView from './player/SavesView'
 import { useKeyLabels } from './player/keyboard'
 import { Bar, Pill } from '../lantern/controls'
@@ -83,7 +80,16 @@ export default function Player() {
   const waiting = (sync.pending > 0 && slowSync) || !sync.online
   // The menu: closed, or open on its list, Saves or Options.
   const [menu, setMenu] = useState<MenuView | null>(null)
+  // The guide: the file open, or none. Beside the menu on a desktop or a phone held sideways, inside it (a view) when upright.
   const [guide, setGuide] = useState<string | null>(null)
+  // The guide window was opened from the menu, so it has the focus until it closes or the menu does, and where its right edge starts.
+  const [guideIn, setGuideIn] = useState(false)
+  const [guideAfter, setGuideAfter] = useState<number | undefined>()
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef(menu)
+  menuRef.current = menu
+  const guideRef = useRef(guide)
+  guideRef.current = guide
   const toast = useToast()
   const [panel, setPanel] = useState<Panel>(null)
   // The pill and the full screen button are lit for a few seconds after the game is ready, then quiet.
@@ -108,12 +114,11 @@ export default function Player() {
   // Other engines run their own JavaScript, so they play in a sandboxed frame
   // (opaque origin, no access to Renplay) and their storage comes through here.
   const sandboxed = !!game && !isRenpy(game)
-  const openMenu = () => setMenu('top')
+  // Upright, the guide lives inside the menu: a menu opened while it is open shows it.
+  const uprightRef = useRef(false)
+  const topView = (): MenuView => (uprightRef.current && guideRef.current ? 'guide' : 'top')
+  const openMenu = () => setMenu(topView())
   const keys = useKeyLabels()
-  // The prototype's three layouts: the quick buttons are layout 3's.
-  const [layout, setLayout] = useMenuLayout()
-  const [keepButtons, setKeepButtons] = useKeepButtons()
-  const quickBox = useRef<HTMLDivElement>(null)
   const padConnected = useGamepadConnected()
   const saves = useSaves(gameId)
 
@@ -132,20 +137,21 @@ export default function Player() {
   const [muted, toggleMute] = useMute(send)
   const saving = useSaving(send, ready, toast)
   const htmlSaves = useHtmlSaves(sandboxed, userId, gameId, attempt, send, () => setSignedOut(true), setFailed)
-  const quick = useQuickButtons(layout === 3, ready, !!menu, keepButtons, quickBox, send)
-  const quickRef = useRef(quick)
-  quickRef.current = quick
   const { fullscreen, coversNotch, escLocked, toggleFullscreen } = useFullscreen(shellRef, fsMode, touch, send, () => setPanel('fullscreen'))
   const stage = useElementSize(stageRef, `${game?.id}:${isLoading}`)
+  const upright = stage.h > stage.w
+  uprightRef.current = upright
   const insets = useSafeInsets()
   useWakeLock(ready)
   usePlayTime(ready && !exiting && !failed, gameId, userId, sandboxed, frameRef, () => setSignedOut(true))
   const telemetry = useTelemetry(gameId, userId, { ready, online, fullscreen, failed })
   // On an iPhone in Safari, once the game has started and never while it loads: once, how to get full screen.
+  // It goes the moment the menu opens, so it never lies over a row.
+  const dismissTip = useRef<(() => void) | null>(null)
   useEffect(() => {
-    if (!ready || fsMode !== 'home-screen' || localStorage.getItem(HOME_TIP_KEY)) return
+    if (!ready || fsMode !== 'home-screen' || menu || localStorage.getItem(HOME_TIP_KEY)) return
     localStorage.setItem(HOME_TIP_KEY, '1')
-    toast(
+    dismissTip.current = toast(
       <>
         For full screen, add Renplay to your home screen.{' '}
         <button className="link" onClick={() => setPanel('fullscreen')}>
@@ -153,7 +159,10 @@ export default function Player() {
         </button>
       </>,
     )
-  }, [ready, fsMode, toast])
+  }, [ready, fsMode, menu, toast])
+  useEffect(() => {
+    if (menu) dismissTip.current?.()
+  }, [menu])
 
   useEffect(() => {
     const signedOut = () => setSignedOut(true)
@@ -243,14 +252,8 @@ export default function Player() {
           break
         case 'renplay:menu':
           // The controller's Menu button in the game.
-          setMenu((view) => view ?? 'top')
+          setMenu((view) => view ?? topView())
           break
-        case 'renplay:activity': {
-          // Where the pointer is in the game, which the quick buttons need to come back.
-          const at = frameRef.current?.getBoundingClientRect()
-          if (at && typeof d.x === 'number' && typeof d.y === 'number') quickRef.current.wake(at.left + d.x, at.top + d.y, !!d.down)
-          break
-        }
         case 'renplay:key':
           if (d.key === 'menu') toggleMenu()
           else if (d.key === 'guide') toggleGuide()
@@ -274,6 +277,7 @@ export default function Player() {
 
   const closeMenu = useCallback(() => {
     setMenu(null)
+    setGuideIn(false)
     send({ type: 'renplay:focus' })
   }, [send])
 
@@ -322,10 +326,6 @@ export default function Player() {
   }, [ready, sandboxed, defaults.data])
 
   // Renplay's keys on the player page: ` opens and closes the menu, \ the guide. In the game they come as messages.
-  const menuRef = useRef(menu)
-  menuRef.current = menu
-  const guideRef = useRef(guide)
-  guideRef.current = guide
   const busy = useRef(false)
   busy.current = exiting || unsent !== null || signedOut
   const toggleMenu = () => {
@@ -338,13 +338,34 @@ export default function Player() {
     if (guideRef.current) closeGuide()
     else openGuide()
   }
+  // From the menu the guide opens beside the sheet and the menu stays, or inside the sheet when it is upright.
   const openGuide = () => {
-    setGuide(game?.walkthroughs[0]?.file ?? null)
-    setMenu(null)
+    if (!guideRef.current) setGuide(game?.walkthroughs[0]?.file ?? null)
+    if (!menuRef.current) return
+    if (uprightRef.current) setMenu('guide')
+    else {
+      const sheet = sheetRef.current
+      if (!guideRef.current && sheet) setGuideAfter(sheet.offsetLeft + sheet.offsetWidth)
+      setGuideIn(true)
+    }
   }
+  // The guide stays over the game when the menu closes. Closing it with the menu open leaves the focus to the menu.
   const closeGuide = () => {
     setGuide(null)
-    send({ type: 'renplay:focus' })
+    setGuideIn(false)
+    setGuideAfter(undefined)
+    if (menuRef.current === 'guide') setMenu('top')
+    if (!menuRef.current) send({ type: 'renplay:focus' })
+  }
+  // The guide's view is for an upright phone: turned sideways, the guide becomes a window and the list comes back, and the other way.
+  useEffect(() => {
+    if (menu === 'guide' && !upright) setMenu('top')
+    else if (menu === 'top' && upright && guide) setMenu('guide')
+  }, [menu, upright, guide])
+  // Back from the guide's view closes the guide.
+  const changeView = (view: MenuView) => {
+    if (menuRef.current === 'guide' && view !== 'guide') setGuide(null)
+    setMenu(view)
   }
   useEffect(() => {
     if (!ready) return
@@ -414,7 +435,7 @@ export default function Player() {
         try { const me = await api<Me>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
       }}>Continue</Pill>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
       {/* A click in the bars around the game gives the keyboard back to the game. */}
-      <div ref={stageRef} className={cx('rp-stage absolute inset-0', menu && 'dim', layout !== 1 && 'wide')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
+      <div ref={stageRef} className={cx('rp-stage absolute inset-0', menu && 'dim')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
         <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
           <iframe
             ref={frameRef}
@@ -453,23 +474,7 @@ export default function Player() {
       )}
 
       {/* One pill over the game opens the menu. An amber cloud sits beside it while saves wait for the server. */}
-      {ready && !menu && layout === 3 && (
-        <QuickButtons
-          boxRef={quickBox}
-          style={sandboxed ? { top: 10 + Math.max(insets.top, pad.top), right: 10 + insets.right } : { top: 10 + Math.max(insets.top, pad.top), left: 10 + insets.left }}
-          visible={quick.visible}
-          hold={quick.hold}
-          pad={padConnected}
-          onMenu={openMenu}
-          onSave={sandboxed ? undefined : saving.saveNow}
-          saved={saving.savedAs}
-          onGuide={game.walkthroughs.length > 0 ? openGuide : undefined}
-          guideHref={game.walkthroughs.length > 0 ? undefined : game.recipe?.links.walkthrough}
-          onFullscreen={fsMode !== 'none' && !fullscreen ? () => void toggleFullscreen() : undefined}
-          waiting={waiting}
-        />
-      )}
-      {ready && !menu && layout !== 3 && (
+      {ready && !menu && (
         <PlayerPill
           style={sandboxed ? { top: 10 + Math.max(insets.top, pad.top), right: 10 + insets.right } : { top: 10 + Math.max(insets.top, pad.top), left: 10 + insets.left }}
           fresh={freshPill}
@@ -520,10 +525,10 @@ export default function Player() {
         <PlayerMenu
           game={game}
           view={menu}
-          layout={layout}
-          onView={setMenu}
+          onView={changeView}
           onClose={closeMenu}
-          portrait={stage.h > stage.w}
+          sheetRef={sheetRef}
+          portrait={upright}
           insets={insets}
           renpy={!sandboxed}
           ready={ready}
@@ -532,6 +537,7 @@ export default function Player() {
           saving={saving.savingNow}
           onSaveNow={saving.saveNow}
           hasGuide={game.walkthroughs.length > 0}
+          guideOpen={guide !== null && menu !== 'guide'}
           onGuide={openGuide}
           muted={muted}
           onMute={toggleMute}
@@ -557,6 +563,7 @@ export default function Player() {
               onManage={() => void exit('saves')}
             />
           }
+          guide={guide && <GuideReader game={game} file={guide} onFile={setGuide} />}
           options={
             <OptionsView
               renpy={!sandboxed}
@@ -570,14 +577,12 @@ export default function Player() {
                 send({ type: 'renplay:accessibility' })
               }}
               onDownloadLog={() => send({ type: 'renplay:download-log' })}
-              keepButtons={layout === 3 ? { value: keepButtons, onChange: setKeepButtons } : undefined}
             />
           }
         />
       )}
-      <LayoutSwitcher layout={layout} onChange={setLayout} up={stage.w < 700 && !!menu} />
-      {guide && game.walkthroughs.length > 0 && (
-        <GuideWindow game={game} file={guide} onFile={setGuide} onClose={closeGuide} portrait={stage.h > stage.w} insets={insets} />
+      {guide && game.walkthroughs.length > 0 && !(menu && upright) && (
+        <GuideWindow game={game} file={guide} onFile={setGuide} onClose={closeGuide} portrait={upright} insets={insets} after={guideAfter} modal={guideIn && !!menu} />
       )}
       {panel === 'fullscreen' && (
         <SidePanel
