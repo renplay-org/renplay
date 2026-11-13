@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.11.0] - 2026-11-13
+
 ### Added
 
 - Renplay keeps a copy of its library database before changing it and alongside the daily save backup.
@@ -779,7 +781,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.10.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.11.0...dev
+[4.11.0]: https://github.com/renplay-org/renplay/compare/v4.10.0...v4.11.0
 [4.10.0]: https://github.com/renplay-org/renplay/compare/v4.9.0...v4.10.0
 [4.9.0]: https://github.com/renplay-org/renplay/compare/v4.8.0...v4.9.0
 [4.8.0]: https://github.com/renplay-org/renplay/compare/v4.7.0...v4.8.0
