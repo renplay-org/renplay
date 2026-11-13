@@ -165,10 +165,11 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
   // Back at the page it was left at, once every page is measured, unless the person has already moved on.
   const restored = useRef(false)
   useEffect(() => {
-    if (restored.current || !measured || !view.current || !offsets.length) return
+    // Once the window's width is known too, so that the places of the pages are the ones the pages will have.
+    if (restored.current || !measured || !width || !view.current || !offsets.length) return
     restored.current = true
     if (!touched.current && kept.page > 0) goTo(kept.page)
-  }, [measured, offsets, kept.page, goTo])
+  }, [measured, width, offsets, kept.page, goTo])
 
   // The page at the top third of the window is the one being read.
   const onScroll = () => {
