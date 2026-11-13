@@ -44,8 +44,8 @@ the **`** key (left of **1**), or swipe from the left edge on a phone to open th
 
 - **Back to the game** is the first row. **Save now** makes a quick save and says where it went,
   "Saved as Quick 1".
-- **Guide** opens the game's walkthroughs, when it has any. The menu stays open and the walkthrough
-  opens beside it. On a phone held upright it opens inside the menu, and **Back** returns to the list.
+- **Guide** opens the game's walkthroughs, when it has any ([the guide](#the-guide)). On a computer
+  the menu stays open and the walkthrough opens beside it. On a phone it takes the menu's place.
 - **Saves** lists your saves, with pinned ones first and then the newest. A tap on one saves where
   you are and then loads it, so a mis-tap never loses your place. The last row, **Manage saves on
   the game page**, takes you to where you can pin, name, restore, import and export.
@@ -66,10 +66,42 @@ menu. In full screen on a computer the menu says **Hold Esc to leave**.
 game in its own shape with bars around it. **Fill** has no bars at the sides: it crops the edges of a
 game wider than the screen, and never the top or bottom, where games keep their dialogue.
 
-Walkthroughs open in a window beside the game that you can move, resize and see through, or below
-it on a phone held upright. The **\** key opens and closes the window when the game has one, also
-with the menu open, and the menu stays. The two keys work wherever the focus is, also in full
-screen, and the game never sees them. A name typed into a game's text field cannot contain them.
+The **\** key opens and closes the guide when the game has one, also with the menu open. The two
+keys work wherever the focus is, also in full screen, and the game never sees them. A name typed into
+a game's text field cannot contain them.
+
+## The guide
+
+A game can have walkthroughs: PDFs, pictures and text files. Renplay reads them itself, so they look
+the same on every device and never show a browser's toolbar with print and download buttons. An
+iPhone shows every page of a PDF, and an Android phone no longer offers to download it.
+
+On a computer the guide is a window over the game. Drag it by its title, resize it from the corner,
+and the game stays playable under it. It opens wide enough to read, 42 percent of the screen and at
+least 520 px, and then stays where you leave it, with its size, in this browser. A tab for each file
+shows when there are several.
+
+- **A small bar** has the page ("3 of 12") with **Previous page** and **Next page**, **Zoom out**,
+  **Zoom in** and **Fit**. Fit makes the page as wide as the window. A picture has the same bar
+  without pages, and a text file is wrapped text.
+- **Zoom** also works by pinching, by holding Ctrl and turning the wheel, and by double tap or
+  double click, which switches between Fit and 100 percent. The page and zoom you left are kept for
+  each file in this browser.
+- **See-through** in the title bar lets the game show through the window. It is on or off, and kept.
+- **Pop out** moves the guide into a small window of its own. In Chrome and Edge that window stays on
+  top of everything, in full screen too, and can go to another screen. **Bring back**, or closing the
+  small window, puts the guide back over the game. In Safari and Firefox it opens a popup window that
+  holds only the guide, and closing it brings the guide back. A guide the catalog links is a web page,
+  so it opens in a popup window beside the game, not in a tab.
+- **With the keyboard**, while focus is in the guide: **Esc** and **\** close it, the arrows scroll,
+  **Page Up** and **Page Down** turn pages, **+** and **-** zoom, and **0** fits. A click in the game
+  gives the keyboard back to the game and leaves the guide where it is.
+
+On a phone held upright the guide is a sheet over the lower part of the screen, with **Back to the
+game** first. Drag the handle at its top, or tap it, to switch between 58 and 92 percent of the
+screen. Held sideways the guide fills the screen. A PDF opens at 100 percent, which is readable, and
+you pan it. A double tap fits it to the width, and again undoes that. Once you have opened the guide, a
+**Guide** pill beside **Menu** switches between the guide and the game in one tap. A phone has no pop out.
 
 ## Up next, status and ratings
 
@@ -147,7 +179,13 @@ A controller works everywhere in Renplay. The d-pad or left stick moves between 
 own buttons: **A** advances and chooses, the d-pad moves through menus, the shoulder buttons roll
 back and forward, and **B** opens the game's menu. The **Menu** button (Start) opens the player
 menu instead, and closes it again. In the player menu, **A** presses and **B** goes back, then
-closes.
+closes. Hold **Menu** for half a second to open or close the guide.
+
+When the guide has focus it holds the controller, and the game does not see it. The d-pad up and down
+scroll, left and right turn pages, **LB** and **RB** switch files, **Y** switches see-through and **X**
+goes through Fit, 125 and 150 percent. **B** parks the guide: it stays over the game and the
+controller goes back to the game. **Menu** then **Guide** gives the controller to it again. While a
+controller is connected, the guide's bar shows these buttons instead of the keys.
 
 ## Saves and history
 

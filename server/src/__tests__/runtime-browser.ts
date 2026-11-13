@@ -87,6 +87,7 @@ function browser(userId: number, game: string, fetch: Fetch, framed: boolean) {
     btoa,
     console: { log: vi.fn(), warn: vi.fn(), error: vi.fn() },
     addEventListener: (type: string, listener: Listener) => (listeners[type] ??= []).push(listener),
+    removeEventListener: (type: string, listener: Listener) => { listeners[type] = (listeners[type] ?? []).filter((l) => l !== listener) },
     focus: vi.fn(),
   }
   window.window = window

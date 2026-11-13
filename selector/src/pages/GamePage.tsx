@@ -22,7 +22,7 @@ import type { ArtKind } from '@shared/recipe'
 import ArtPicker from '../components/ArtPicker'
 import { ago, capitalize, duration, jobStage, pct, playedTime, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
-import { recipeLinks, playLink } from '../lib/links'
+import { recipeLinks, playLink, popupClick } from '../lib/links'
 import { isRenpy } from '@shared/family'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
@@ -146,7 +146,7 @@ export default function GamePage() {
         </Pill>
       )}
       {game.recipe?.links.walkthrough && (
-        <Pill variant="q" size="lg" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
+        <Pill variant="q" size="lg" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer" onClick={popupClick(game.recipe.links.walkthrough)}>
           Guide
         </Pill>
       )}
@@ -464,7 +464,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
                 <p style={{ fontWeight: 650 }}>The guide the catalog links</p>
                 <p className="small muted">On the web</p>
               </div>
-              <Pill variant="s" size="sm" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
+              <Pill variant="s" size="sm" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer" onClick={popupClick(game.recipe.links.walkthrough)}>
                 Open
               </Pill>
             </div>

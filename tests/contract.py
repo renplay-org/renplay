@@ -155,6 +155,10 @@ def smoke():
         system = lib.request('/api/system')
         assert system['paths']['archives'] == ('/downloads' if DOWNLOADS else '/games/_archives'), system
         assert system['keepDownloads'] is True
+        # PDF.js's worker is a module script: a browser runs it only when it is served as JavaScript.
+        worker = lib.request('/asset-manifest.json')['node_modules/pdfjs-dist/build/pdf.worker.min.mjs']['file']
+        with urllib.request.urlopen(lib.url + '/' + worker, timeout=15) as response:
+            assert 'javascript' in response.headers['Content-Type'], response.headers['Content-Type']
         engine_zip = base64.b64encode(zip_bytes({'renpy/__init__.py': '', 'main.py': ''})).decode()
         js(lib.name, """
             import { mkdirSync, writeFileSync } from 'node:fs';

@@ -779,7 +779,7 @@
 
   // ---------------------------------------------------------------- engine
 
-  var nativeFetch = window.fetch.bind(window)
+  var nativeFetch = holdOffline(window.fetch.bind(window))
   var origFetch = function (input, init) {
     var url = typeof input === 'string' ? input : input && input.url
     if (url && new URL(url, location.href).pathname.indexOf('/api/') === 0) {
@@ -1493,7 +1493,7 @@
   /*
    * A controller plays the game through Ren'Py's own bindings, except its Menu button (Start), which
    * opens the player's drawer: Ren'Py's game menu stays on B. While the drawer is open the player
-   * has the controller, so the game sees none (pads.toGame).
+   * has the controller, so the game sees none (pads.toGame). See menuButton.
    */
   var pads = { toGame: true, held: false, start: false, polling: false }
   var realPads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null
@@ -1530,10 +1530,10 @@
       if (p.mapping === 'standard' && p.buttons[9] && p.buttons[9].pressed) down = true
     }
     if (down && !pads.start && pads.toGame && !pads.held) {
-      post('menu')
+      menuButton(true)
       // Again on each press: a game that restarts reads its bindings anew.
       unbindStart(1)
-    }
+    } else if (!down && pads.start) menuButton(false)
     pads.start = down
     if (any) requestAnimationFrame(padPoll)
     else pads.polling = false

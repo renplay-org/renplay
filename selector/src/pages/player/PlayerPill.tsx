@@ -1,4 +1,4 @@
-import { CloudOff, Expand } from 'lucide-react'
+import { BookOpen, CloudOff, Expand } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { PadMenuGlyph } from '../../lantern/Keycap'
 import { cx } from '../../lantern/ui'
@@ -15,6 +15,7 @@ export default function PlayerPill({
   pad,
   onMenu,
   onFullscreen,
+  guide,
   waiting,
   waitLabel,
 }: {
@@ -24,17 +25,25 @@ export default function PlayerPill({
   onMenu: () => void
   /** Where the device can go full screen. */
   onFullscreen?: () => void
+  /** On a touch screen, once a guide was opened: a second pill that switches between reading and playing. `over` is while the guide covers the screen, so the pills stay above it. */
+  guide?: { open: boolean; onToggle: () => void; over: boolean }
   waiting: boolean
   waitLabel: string
 }) {
   return (
     // HTML games often put their own menu in the top left (SugarCube's sidebar toggle): their pills are at the right.
-    <div className={cx('rp-pills', fresh && 'fresh')} style={style}>
+    <div className={cx('rp-pills', fresh && 'fresh', guide?.over && 'over')} style={style}>
       <button type="button" className="rp-pill" onClick={onMenu} aria-label="Menu">
         <span className="mark" aria-hidden="true" />
         Menu
         {pad && <PadMenuGlyph />}
       </button>
+      {guide && (
+        <button type="button" className="rp-pill" onClick={guide.onToggle} aria-pressed={guide.open}>
+          <BookOpen aria-hidden="true" />
+          Guide
+        </button>
+      )}
       {onFullscreen && (
         <button type="button" className="rp-pill icon" onClick={onFullscreen} aria-label="Full screen">
           <Expand aria-hidden="true" />

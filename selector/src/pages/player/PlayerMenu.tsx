@@ -6,9 +6,10 @@ import { Pill } from '../../lantern/controls'
 import { Keycap } from '../../lantern/Keycap'
 import { useModal } from '../../lantern/modal'
 import { cx } from '../../lantern/ui'
+import { popupClick } from '../../lib/links'
 
-/** The list, Saves, Options, or on a portrait phone the guide, which opens inside the sheet. */
-export type MenuView = 'top' | 'saves' | 'options' | 'guide'
+/** The list, Saves or Options. */
+export type MenuView = 'top' | 'saves' | 'options'
 
 /** A row with a switch: the whole row is the button, so the target is as tall as the row. */
 export function SwitchRow({ icon, label, checked, onChange }: { icon?: ReactNode; label: string; checked: boolean; onChange: (on: boolean) => void }) {
@@ -23,9 +24,9 @@ export function SwitchRow({ icon, label, checked, onChange }: { icon?: ReactNode
 
 /**
  * The player's menu as one list: Back to the game, Save now, Guide, Saves, Options, Sound and Full screen,
- * then Save and exit. Saves and Options open in place with a Back row, and so does the guide on a portrait
- * phone. Elsewhere the guide opens beside the sheet and the menu stays. A sheet from the left, from the bottom
- * on a portrait phone. Rendered only while open, so nothing in it can take focus while it is closed.
+ * then Save and exit. Saves and Options open in place with a Back row. The guide opens beside the sheet and the
+ * menu stays, or on a phone takes its place. A sheet from the left, from the bottom on a portrait phone.
+ * Rendered only while open, so nothing in it can take focus while it is closed.
  */
 export function PlayerMenu({
   game,
@@ -56,7 +57,6 @@ export function PlayerMenu({
   onExit,
   saves,
   options,
-  guide,
 }: {
   game: Game
   view: MenuView
@@ -94,21 +94,18 @@ export function PlayerMenu({
   onExit: () => void
   saves: ReactNode
   options: ReactNode
-  /** The guide's reader, for the guide view. */
-  guide: ReactNode
 }) {
   const ref = sheetRef
   // Escape goes back to the list first and closes from the list. Not inert: the menu is part of the player's page.
   useModal(ref, true, view === 'top' ? onClose : () => onView('top'))
   // A list opening in place takes focus with it: the Back row, which Enter, A and the arrows reach first.
-  // Coming back from the guide, or closing the guide beside the sheet, focus goes to the Guide row.
+  // Closing the guide beside the sheet gives focus back to the Guide row.
   const opened = useRef({ view, guideOpen })
   useEffect(() => {
     const before = opened.current
     opened.current = { view, guideOpen }
     const at = (selector: string) => ref.current?.querySelector<HTMLElement>(selector)?.focus()
-    if (before.view === 'guide' && view === 'top') at('[data-guide]')
-    else if (before.guideOpen && !guideOpen && view === 'top') at('[data-guide]')
+    if (before.guideOpen && !guideOpen && view === 'top') at('[data-guide]')
     else if (before.view !== view) at('[data-initial]')
   }, [view, guideOpen, ref])
   const link = game.recipe?.links.walkthrough
@@ -129,7 +126,7 @@ export function PlayerMenu({
                 <ChevronLeft />
                 Back
               </button>
-              {view === 'saves' ? saves : view === 'guide' ? guide : options}
+              {view === 'saves' ? saves : options}
             </>
           ) : (
             <>
@@ -166,7 +163,7 @@ export function PlayerMenu({
                 </button>
               ) : (
                 link && (
-                  <a className="pm-row" href={link} target="_blank" rel="noreferrer">
+                  <a className="pm-row" href={link} target="_blank" rel="noreferrer" onClick={popupClick(link)}>
                     <BookOpen />
                     Guide
                   </a>
