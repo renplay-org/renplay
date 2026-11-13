@@ -46,6 +46,13 @@ release notes say what).
 - **Save and go to the main menu** and **Game page** in the game's menu, the note "Leaving saves first", the game's version under its title, "Powered by Ren'Py", the line with the game's size, the text under the options, the three-step home screen guide in Options (a row opens the help instead), and the filters over the saves in the game.
 - The hint at the top of the screen when a game goes full screen. Under the **Full screen** switch, the menu says **Hold Esc to leave** while Esc is locked.
 
+### Fixed
+
+- Games made with Ren'Py 7.5 to 7.8 show their Ren'Py version and get the right engine.
+- Installing a game that kept the save folder of a Ren'Py sample project no longer replaces another game with that folder.
+- Games made on Windows that ask for a file in another case (data/Items.json for data/items.json) find it.
+- Games made with Ren'Py 6 that use its old themes show their frames and buttons.
+
 ## [4.10.0] - 2026-11-11
 
 ### Added
