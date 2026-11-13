@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Heart, Play, Sparkles, X } from 'lucide-react'
+import { Heart, Play, X } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '../lantern/Tile'
 import Stage, { travelToDoor, travelToPage } from '../lantern/Stage'
-import { Chip, Pill, TagPill, Bar } from '../lantern/controls'
+import { Chip, Pill, Bar } from '../lantern/controls'
 import Carousel from '../lantern/Carousel'
 import SearchField, { Marked, Toolbar, countText, holdPlace, parkResults, useSearchScroll } from '../lantern/Search'
 import { useRoom } from '../lantern/Room'
@@ -50,11 +50,6 @@ function tileMeta(g: Game) {
 /** Corner pills and the install bar inside a tile's frame. */
 function tileExtra(g: Game) {
   const parts: ReactNode[] = []
-  if (g.update && !g.job) parts.push(
-    <span key="up" className="corner">
-      <TagPill tone="dark">Update</TagPill>
-    </span>,
-  )
   if (g.job)
     parts.push(
       <div key="job" className="prog">
@@ -220,7 +215,6 @@ export default function Library() {
     } catch {}
   }
   const failedShown = failed.filter((job) => !dismissed.includes(job.id))
-  const updates = all.filter((g) => g.update)
   // A tag or a shelf's list is a filter, which Clear filters takes away. The search is not: it has its own clear button.
   const filtered = tags.length > 0 || filter !== 'all'
   const active = searching || filtered
@@ -268,29 +262,6 @@ export default function Library() {
       {home && (
         <>
           {!!upNext.length && <UpNext games={upNext} onSlide={setStageId} />}
-          {!!updates.length && (
-            <div className="stack" style={{ marginTop: 22, gap: 10 }}>
-              {updates.slice(0, 2).map((game) => (
-                <div key={game.id} className="notice">
-                  <Sparkles />
-                  <div className="grow">
-                    <b>
-                      {game.title} {game.update!.version}
-                    </b>{' '}
-                    is out. Get it from the developer and add the download. Your saves carry over.
-                  </div>
-                  <Link className="link small" to={`/game/${game.id}#update`} style={{ flex: 'none', alignSelf: 'center' }}>
-                    Details
-                  </Link>
-                </div>
-              ))}
-              {updates.length > 2 && (
-                <Link className="link small" to="/add">
-                  And {updates.length - 2} more
-                </Link>
-              )}
-            </div>
-          )}
           <Shelf title="Favourites" count={favorites.length} href="/?filter=favorites">
             {favorites.slice(0, 12).map((g) => (
               <GameTile key={g.id} game={g} />

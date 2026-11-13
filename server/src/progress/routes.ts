@@ -64,6 +64,21 @@ export function createProgressRouter(s: Services): Router {
     res.json(await answer(g))
   })
 
+  // Not now on the update card: the catalog's current version stays silenced for this person on every
+  // device, and a newer version brings the card back. DELETE undoes it.
+  router.post('/games/:id/update-not-now', async (req, res) => {
+    const g = content.game(req.params.id)
+    const update = (await answer(g)).game.update
+    if (!update) throw new HttpError(409, 'There is no update to silence')
+    progress.set(me(), g.id, { update_dismissed: update.version })
+    res.json(await answer(g))
+  })
+  router.delete('/games/:id/update-not-now', async (req, res) => {
+    const g = content.game(req.params.id)
+    progress.set(me(), g.id, { update_dismissed: null })
+    res.json(await answer(g))
+  })
+
   // The player reports visible, running time in seconds, in bounded increments.
   router.post('/games/:id/play-time', (req, res) => {
     const g = content.game(req.params.id)

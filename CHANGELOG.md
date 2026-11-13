@@ -10,6 +10,31 @@ release notes say what).
 ### Added
 
 - Renplay keeps a copy of its library database before changing it and alongside the daily save backup.
+- In a game, the **Menu** pill says what it is. It is lit for the first seconds, then stays at 75 percent so it is easy to find on a phone too. With a controller connected it shows the Menu button. The menu shows its keys as keycaps, the way your keyboard prints them, beside **Back to the game** and **Guide** and in its last line.
+- Press **`** (left of **1**) in a game to open and close the menu, and **\** to open and close the walkthrough. They work wherever the focus is, in full screen too. **Esc** in the menu goes back a step, then closes it.
+- **Guide** in the game's menu opens the walkthrough beside the menu, and the menu stays open. **Back to the game** closes the menu and leaves the walkthrough where it is. On a phone held upright the walkthrough opens inside the menu, with **Back** to its list.
+- The walkthrough window keeps its see-through setting, its place and size, and the file you had open, when you close it and open it again, also after a reload in the same browser.
+- Tapping a save in the game's menu saves where you are first, then loads it, and says "Loaded. Where you were is saved too."
+- **Save now** says where the save went, "Saved as Quick 1", and the list of saves shows it at once.
+- The game's saves list pinned saves first and then the newest, in the menu and on the game's page. The menu has a last row, **Manage saves on the game page**.
+- **Not now** on a game's update notice hides it for you on every device, until the catalog lists a still newer release.
+- When a game is running and the connection drops, a small amber cloud appears by the **Menu** pill, and the menu says that saves go up when the server is back.
+
+### Changed
+
+- The game's menu is one short list: **Back to the game**, **Save now**, **Guide**, **Saves**, **Options**, **Sound** and **Full screen**, then **Save and exit**. Saves and Options open in place with a **Back** row. Rows are at least 44 px tall (40 px on a phone held sideways), and no text is smaller than 13 px.
+- **Save and exit** goes back to where you pressed Play, the game's page or the Library.
+- On an iPhone, the tip about adding Renplay to the home screen goes as soon as you open the menu, so it no longer lies over a row.
+- A game that is already running keeps running when the network drops. Before, the whole game was replaced by an offline page and started again when the network came back.
+- A game's update notice is shown in one place, the card on its page, and only when there is an update or the version you have does not work. The Library no longer shows a banner or an Update label on the tile, and **Details** shows the version you have and the one in the catalog.
+- The loading screen's buttons can no longer be reached with the keyboard or a controller once the game has started.
+- When you resume a save, the loading screen names it, "Resuming Quick 1", not "quick-1".
+- Switches that are on are the same size as switches that are off.
+
+### Removed
+
+- **Save and go to the main menu** and **Game page** in the game's menu, the note "Leaving saves first", the game's version under its title, "Powered by Ren'Py", the line with the game's size, the text under the options, the three-step home screen guide in Options (a row opens the help instead), and the filters over the saves in the game.
+- The hint at the top of the screen when a game goes full screen. Under the **Full screen** switch, the menu says **Hold Esc to leave** while Esc is locked.
 
 ## [4.10.0] - 2026-11-11
 

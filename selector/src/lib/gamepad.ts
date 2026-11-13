@@ -5,6 +5,7 @@
  * player's drawer. With the drawer open, Menu here closes it (the 'renplay:pad-menu' event).
  */
 
+import { useSyncExternalStore } from 'react'
 import { FOCUSABLE } from '../lantern/modal'
 
 const REPEAT_AFTER = 400
@@ -133,4 +134,21 @@ export function installGamepad(): void {
   }
   window.addEventListener('gamepadconnected', start)
   if ([...navigator.getGamepads()].some((p) => p?.connected)) start()
+}
+
+const padsConnected = () => [...(navigator.getGamepads?.() ?? [])].some((p) => p?.connected)
+
+/** Whether a controller is connected now: the pill and the menu then name its buttons, not the keys. */
+export function useGamepadConnected(): boolean {
+  return useSyncExternalStore(
+    (on) => {
+      window.addEventListener('gamepadconnected', on)
+      window.addEventListener('gamepaddisconnected', on)
+      return () => {
+        window.removeEventListener('gamepadconnected', on)
+        window.removeEventListener('gamepaddisconnected', on)
+      }
+    },
+    padsConnected,
+  )
 }

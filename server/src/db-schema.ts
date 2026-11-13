@@ -91,7 +91,7 @@ const SCHEMA = `
   CREATE TABLE sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), created_at INTEGER NOT NULL, touched_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '');
   CREATE TABLE tokens (hash TEXT PRIMARY KEY, id TEXT NOT NULL UNIQUE, user_id INTEGER NOT NULL REFERENCES users(id), name TEXT NOT NULL, created_at INTEGER NOT NULL);
   CREATE TABLE device_people (device TEXT NOT NULL, user_id INTEGER NOT NULL, seen_at INTEGER NOT NULL, PRIMARY KEY (device, user_id));
-  CREATE TABLE user_games (user_id INTEGER NOT NULL REFERENCES users(id), game TEXT NOT NULL, favorite_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', last_played_at TEXT NOT NULL DEFAULT '', play_time INTEGER NOT NULL DEFAULT 0, play_status TEXT NOT NULL DEFAULT '', rating INTEGER NOT NULL DEFAULT 0, not_now_at TEXT NOT NULL DEFAULT '', PRIMARY KEY(user_id, game));
+  CREATE TABLE user_games (user_id INTEGER NOT NULL REFERENCES users(id), game TEXT NOT NULL, favorite_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '', last_played_at TEXT NOT NULL DEFAULT '', play_time INTEGER NOT NULL DEFAULT 0, play_status TEXT NOT NULL DEFAULT '', rating INTEGER NOT NULL DEFAULT 0, not_now_at TEXT NOT NULL DEFAULT '', update_dismissed TEXT, PRIMARY KEY(user_id, game));
   CREATE TABLE play_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, game TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, seconds INTEGER NOT NULL);
   CREATE INDEX play_sessions_user ON play_sessions (user_id, ended_at);
   CREATE TABLE safe_games (game TEXT PRIMARY KEY);

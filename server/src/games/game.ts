@@ -117,6 +117,7 @@ export async function toGame(game: GameRow, deps: GameParts): Promise<Game> {
         ? { id: row.recipe_id, links: {}, continuesFrom: [], status: null }
         : null,
     update: update ? { version: update.version, date: update.date ?? null, status: update.status, archives: update.archives.map((archive) => archive.name) } : null,
+    updateDismissed: update && row.update_dismissed === update.version ? update.version : null,
     favoriteAt: row.favorite_at || null,
     finishedAt: row.finished_at || null,
     playTime: row.play_time,

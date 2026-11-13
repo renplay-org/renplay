@@ -1,0 +1,530 @@
+/* The player: the Menu pill over the game, the menu, the walkthrough beside it. */
+.rp-pills {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rp-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 650;
+  opacity: 0.75;
+  transition: opacity var(--t-focus);
+}
+/* Fully lit for the first five seconds after the game starts, then 75 percent, never less. */
+.rp-pills.fresh .rp-pill,
+.rp-pill:focus-visible {
+  opacity: 1;
+}
+@media (hover: hover) {
+  .rp-pill:hover {
+    opacity: 1;
+  }
+}
+.rp-pill.icon {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.rp-pill.icon svg {
+  width: 18px;
+  height: 18px;
+}
+.rp-pill .mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #d62a68, #7556f0);
+}
+/* The controller's Menu button, after the word, while one is connected. */
+.rp-pill .pad-menu {
+  color: var(--fg-3);
+}
+/* Saves wait for the server: a cloud, no words. The menu says it. */
+.rp-cloud {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  color: var(--amber);
+}
+.rp-cloud svg {
+  width: 20px;
+  height: 20px;
+}
+/* The loading screen's own controls: back to the game page, sound, full screen. */
+.door-bar {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.door-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 650;
+}
+.door-btn.icon {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.door-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.rp-stage {
+  transition:
+    transform var(--t-pane) var(--out),
+    filter var(--t-pane);
+}
+/* The game dims and shrinks a little while the drawer is open. */
+.rp-stage.dim {
+  transform: scale(0.985);
+  filter: brightness(0.55);
+}
+.pm-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 44;
+}
+/* The player's menu: one list in a sheet from the left, from the bottom on a portrait phone. Opaque, so the game's text never shows through. */
+.pm {
+  --pm-row: 48px;
+  --pm-lead: 40px;
+  position: absolute;
+  z-index: 45;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(380px, 92vw);
+  display: flex;
+  flex-direction: column;
+  padding: calc(8px + var(--pi-top, 0px)) 12px calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
+  background: var(--ink);
+  box-shadow: 1px 0 0 var(--line), 24px 0 60px -12px rgba(0, 0, 0, 0.6);
+  border-radius: 0 var(--r-sheet) var(--r-sheet) 0;
+  animation: pm-in var(--t-pane) var(--out) both;
+}
+.pm.bottom {
+  top: auto;
+  right: 0;
+  width: auto;
+  max-height: 82dvh;
+  padding: 8px calc(12px + var(--pi-right, 0px)) calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
+  box-shadow: 0 -1px 0 var(--line), 0 -24px 60px -12px rgba(0, 0, 0, 0.6);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  animation-name: pm-up;
+}
+/* The guide inside the sheet on an upright phone: tall, with the reader filling what is under the Back row. */
+.pm.bottom[data-view='guide'] {
+  height: 82dvh;
+}
+.pm[data-view='guide'] .pm-body {
+  overflow: hidden;
+}
+@keyframes pm-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+@keyframes pm-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.pm-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s3);
+  height: 56px;
+  margin-bottom: 4px;
+  padding: 0 12px;
+}
+.pm-icon {
+  width: var(--pm-lead);
+  height: var(--pm-lead);
+}
+.pm-title {
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.pm-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.pm-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--pm-row);
+  padding: 0 12px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+}
+.pm-row.first {
+  background: var(--plate);
+}
+@media (hover: hover) {
+  .pm-row:hover {
+    background: var(--plate-2);
+  }
+}
+/* The ring of a row is drawn inside it: the list scrolls, and a ring outside would be cut off at its edges. */
+.pm-row:focus-visible,
+.pm-save:focus-visible {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+/* One grid: every row's icon sits in the same column as the game's picture above it, and its text where the title starts. */
+.pm-row > svg:first-child {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin: 0 calc((var(--pm-lead) - 20px) / 2);
+  color: var(--fg-3);
+}
+.pm-row {
+  gap: var(--s3);
+  padding-left: 12px;
+}
+.pm-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+/* The switch's track ends where the chevrons and keycaps end: the row's right padding. Its box is wider than the track. */
+.pm-row .sw {
+  flex: none;
+  margin: -5px -6px -5px auto;
+}
+/* What a row says on its right: a count, a chevron, Saved as Quick 1. */
+.pm-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--fg-3);
+  font-size: 15px;
+  font-weight: 500;
+}
+.pm-end svg {
+  width: 20px;
+  height: 20px;
+}
+/* A chevron's drawing stops 7 px inside its box: pull the box out so the drawing ends at the row's edge, like a switch. */
+.pm-end > svg {
+  margin-right: -7px;
+}
+.pm-end.done {
+  color: var(--green);
+  font-size: 13px;
+}
+.pm-end.done svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 0;
+}
+.pm-row.quiet {
+  color: var(--fg-2);
+  font-weight: 500;
+}
+.pm-note {
+  padding: 0 12px 4px calc(12px + var(--pm-lead) + var(--s3));
+  color: var(--fg-3);
+  font-size: 13px;
+}
+.pm-group,
+.pm-group-title {
+  padding: 12px 12px 4px;
+  color: var(--fg-3);
+  font-size: 13px;
+  font-weight: 650;
+}
+.pm-group-title {
+  padding: 4px 0 10px;
+}
+.pm .seg {
+  height: 48px;
+}
+.pm-rule {
+  flex: none;
+  width: auto;
+  margin: 4px 12px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.pm-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pm .src {
+  margin: 0;
+  font-size: 13px;
+}
+.pm-foot {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.pm-wait {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--amber);
+  font-size: 13px;
+}
+.pm-wait svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.pm-exit {
+  width: 100%;
+  min-height: 48px;
+  justify-content: center;
+}
+.pm-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--fg-3);
+  font-size: 13px;
+  text-align: center;
+}
+/* Saves: a 64 px row, a picture, the name and one muted line. */
+.pm-save {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 64px;
+  padding: 0 12px 0 8px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+}
+@media (hover: hover) {
+  .pm-save:hover {
+    background: var(--plate-2);
+  }
+}
+.pm-thumb {
+  width: 96px;
+  flex: none;
+  border-radius: 8px;
+}
+.pm-thumb .lbl,
+.pm-thumb .hid {
+  display: none;
+}
+.pm-save-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.pm-save-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pm-save-name svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--amber);
+  fill: currentColor;
+}
+.pm-save-line {
+  color: var(--fg-3);
+  font-size: 13px;
+}
+/* A phone held sideways: 40 px rows, Sound and Full screen on one row, no keys line. Nothing scrolls. */
+@media (max-height: 500px) {
+  .pm {
+    --pm-row: 40px;
+    padding: calc(6px + var(--pi-top, 0px)) 8px calc(6px + var(--pi-bottom, 0px)) calc(8px + var(--pi-left, 0px));
+  }
+  .pm-head {
+    height: 32px;
+  }
+  .pm-foot {
+    gap: 4px;
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+  .pm-exit {
+    min-height: 44px;
+  }
+  .pm-icon,
+  .pm-keys {
+    display: none;
+  }
+  .pm-body {
+    gap: 0;
+  }
+  .pm-switches {
+    flex-direction: row;
+    gap: 4px;
+    margin-top: 0;
+  }
+  .pm-switches .pm-row {
+    background: var(--plate);
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .pm-switches .pm-row > svg,
+  .pm-wide {
+    display: none;
+  }
+  .pm-save {
+    height: 64px;
+  }
+}
+/* Above the menu's scrim and sheet, so beside the menu the guide stays in reach. */
+.gw {
+  position: absolute;
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--glass-deep);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
+}
+.gw-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 6px 6px 6px 14px;
+  cursor: grab;
+  touch-action: none;
+}
+.gw-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 0 8px 6px;
+  scrollbar-width: none;
+}
+.gw-tabs button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-3);
+  position: relative;
+}
+.gw-tabs button::before {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+.gw-tabs button.on {
+  background: var(--plate-2);
+  color: var(--fg);
+}
+.gw-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+.gw-img {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: #111;
+}
+.gw-img img {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.gw-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--hit);
+  height: var(--hit);
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 58%, rgba(255, 255, 255, 0.35) 60%, transparent 62%, transparent 70%, rgba(255, 255, 255, 0.35) 72%, transparent 74%);
+}
+.gw-sheet {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 58dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-deep);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+}
+.gw-sheet .gw-bar {
+  cursor: default;
+  padding: 10px 10px 8px 14px;
+}

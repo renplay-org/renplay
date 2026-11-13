@@ -154,10 +154,16 @@ shares) injected. The server builds it at start and serves it at `/renplay/runti
   are counted as their bytes arrive (renpy-pre.js keeps its own `game.zip` count private), then
   Ren'Py's own reports for unpacking and loading the scripts. Each step has a share of the bar.
 - **Talks to the player** through `postMessage` (`renplay:*`): ready, progress, fullscreen,
-  save and exit, load a slot, download the log, options, the controller.
+  save and exit, load a slot, download the log, options, the controller, and the keys.
+  `renplay:save-and-load` runs the same `autosave()` as save and exit, waits for it and then loads,
+  and answers `renplay:loaded`. Saving moves the autosaves and quick saves up one place, so the slot
+  to load is copied to the hidden slot `_renplay-load` first and read from there.
+- **Catches Renplay's keys** in the capture phase (`renplay-player.js`), by `e.code`: ` opens and
+  closes the player's menu and \ its guide (only once the player has said, with `renplay:keys`,
+  that the game has one). They arrive as `renplay:key`, and the game never sees them.
 - **Hands the controller to the player** for its Menu button: Start is taken out of Ren'Py's
   `config.pad_bindings` (again on each press, since a restarted game reads them anew), and while
-  the drawer is open `navigator.getGamepads` answers empty, until every button is released after it
+  the menu is open `navigator.getGamepads` answers empty, until every button is released after it
   closes.
 
 The player (`selector/src/pages/Player.tsx`) sizes the game from the stage's real size and the
@@ -228,6 +234,10 @@ independently of builds, and their play sessions in `play_sessions`. Both belong
 `PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
 Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
 its timestamp. Uninstall keeps it. Forgetting the library entry removes it.
+`user_games.update_dismissed` (nullable, added without raising the floor) holds the catalog version
+whose update notice the person silenced with Not now. `POST` and `DELETE`
+`/api/games/:id/update-not-now` set and clear it, and the game JSON's `updateDismissed` is that
+version only while it is still the catalog's newest, so a newer release brings the notice back.
 
 Schema 5 adds `games.finished_at` (ISO timestamp or empty) and `games.play_time` (seconds,
 initially zero). The migration is transactional and changes no save files. Uninstall and rebuilds

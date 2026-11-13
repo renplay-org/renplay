@@ -35,28 +35,41 @@ While the game loads, one bar shows how far it is, from the engine to the game's
 **Game page**, **Sound** and **Full screen** sit at the top, so you can leave, mute or go full
 screen before it starts.
 
-The game paces itself to your display. Two quiet things sit over it: the **Renplay** pill at the
-top left and, beside it, **Full screen**. Both are lit for the first seconds of a game. The pill (or
-**Esc**, or a swipe from the left edge on a phone) opens the player menu:
+The game paces itself to your display. A **Menu** pill sits over it at the top left, with **Full
+screen** beside it. The pill is lit for the first seconds of a game and shows the controller's Menu
+button while one is connected. The menu shows its keys as keycaps on a computer. Press the pill, press
+the **`** key (left of **1**), or swipe from the left edge on a phone to open the player menu:
 
-![The player menu open over a game, with its saves](../../../assets/desktop-player-drawer.webp)
+![The player menu open over a game](../../../assets/desktop-player-drawer.webp)
 
-- **Sound**, **Full screen** and close at its top.
-- **Saves** to load one, **Guide** for the game's walkthroughs, and **Options** for the display,
-  the text size and Ren'Py's own accessibility menu.
-- Under **For you in this game**, **Rollback**, **Skip** and the **Developer console** turn those
-  on even where the game turns them off. They are kept with the game's saves, so they follow you
-  to every device, and the game's files do not change. An admin can set Rollback, Skip and the text
+- **Back to the game** is the first row. **Save now** makes a quick save and says where it went,
+  "Saved as Quick 1".
+- **Guide** opens the game's walkthroughs, when it has any. The menu stays open and the walkthrough
+  opens beside it. On a phone held upright it opens inside the menu, and **Back** returns to the list.
+- **Saves** lists your saves, with pinned ones first and then the newest. A tap on one saves where
+  you are and then loads it, so a mis-tap never loses your place. The last row, **Manage saves on
+  the game page**, takes you to where you can pin, name, restore, import and export.
+- **Options** has the text size, **Fit** or **Fill**, the camera cutout on a phone, **Rollback** and
+  **Skip** even where the game turns them off, Ren'Py's own accessibility screen, the developer
+  console and the game's log. The choices for the game are kept with its saves, so they follow you to
+  every device, and the game's files do not change. An admin can set Rollback, Skip and the text
   size for everyone who has not chosen ([Defaults for everyone](/accounts/#defaults-for-everyone)).
-- **Save now** makes a quick save, **Save and exit** saves and goes back to the library, and
-  **Save and go to the main menu** starts the game again at its main menu.
+- **Sound** and **Full screen** are switches. **Save and exit** saves, waits until the server has
+  every save, and goes back to where you pressed Play.
 
-**Options → Scaling** decides how the game meets a screen of another shape. **Fit** shows the whole
+**Back to the game** closes the menu and leaves the walkthrough where it is, over the game.
+
+**Esc** goes back one step in the menu and then closes it. In the game, Esc is still Ren'Py's own
+menu. In full screen on a computer the menu says **Hold Esc to leave**.
+
+**Options → Picture** decides how the game meets a screen of another shape. **Fit** shows the whole
 game in its own shape with bars around it. **Fill** has no bars at the sides: it crops the edges of a
 game wider than the screen, and never the top or bottom, where games keep their dialogue.
 
 Walkthroughs open in a window beside the game that you can move, resize and see through, or below
-it on a phone held upright.
+it on a phone held upright. The **\** key opens and closes the window when the game has one, also
+with the menu open, and the menu stays. The two keys work wherever the focus is, also in full
+screen, and the game never sees them. A name typed into a game's text field cannot contain them.
 
 ## Up next, status and ratings
 
@@ -96,7 +109,7 @@ The player explains this itself where a fullscreen button would not work.
 
 ### Android
 
-Use **Full screen** beside the **Renplay** pill.
+Use **Full screen** beside the **Menu** pill.
 
 Serve Renplay over HTTPS so the browser can cache the game and the home-screen app works. See
 [Reverse proxy and HTTPS](/install/reverse-proxy/).
@@ -112,8 +125,10 @@ wherever the server is out of reach.
    download continues where it was.
 3. With no network, open Renplay as usual. The library says it is offline, and kept games play.
 
-Saves made offline wait on the device. The player says how many are waiting, and sends them when the
-network is back, with the usual rule when another device saved too. **Update offline copy**
+Saves made offline wait on the device. A small amber cloud beside the **Menu** pill says so, and the
+menu explains it. They go up when the network is back, with the usual rule when another device saved
+too. A game that is already running keeps running when the network drops. Files it still has to
+download are the part that cannot arrive without a network. **Update offline copy**
 appears when the game gets a new version, and the old copy keeps playing until then. **Remove
 offline copy** frees the space. Your saves are never part of it.
 
@@ -131,7 +146,8 @@ A controller works everywhere in Renplay. The d-pad or left stick moves between 
 **A** presses and **B** closes sheets and menus. In a game the controller plays through Ren’Py’s
 own buttons: **A** advances and chooses, the d-pad moves through menus, the shoulder buttons roll
 back and forward, and **B** opens the game's menu. The **Menu** button (Start) opens the player
-menu instead, and closes it again.
+menu instead, and closes it again. In the player menu, **A** presses and **B** goes back, then
+closes.
 
 ## Saves and history
 
