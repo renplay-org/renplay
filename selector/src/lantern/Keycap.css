@@ -1,0 +1,29 @@
+/* A keycap: a small raised key with the layout's characters, the shifted one above. */
+.keycap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  box-shadow: 0 2px 0 rgba(255, 255, 255, 0.14);
+  color: var(--fg);
+  font: 600 15px/18px var(--sans);
+  vertical-align: middle;
+}
+.keycap .hi {
+  transform: translateY(3px);
+}
+.keycap .up {
+  color: var(--fg-3);
+  font-weight: 500;
+}
+.pad-menu {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}

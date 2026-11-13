@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp, type App } from '../app.js'
@@ -55,16 +56,30 @@ describe('save backups', () => {
     const entries = await readZipEntries(zip, () => true, { ...SAVES_ZIP, totalBytes: 64 << 20 })
     expect([...entries.keys()].sort()).toEqual(['1-owner/Story-1/1-1-LT1.save', '2-second/Other-1/auto-1-LT1.save', 'README.txt'])
     expect(entries.get('1-owner/Story-1/1-1-LT1.save')!.toString()).toBe('owner save')
+    expect(after.library).toMatchObject({ path: expect.stringContaining(join(backupDir, 'library', 'library-')), size: expect.any(Number), at: expect.any(Number) })
+    const library = new DatabaseSync(after.library.path, { readOnly: true })
+    try {
+      expect(library.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
+      expect(library.prepare('SELECT username FROM users ORDER BY id').all()).toEqual([{ username: 'owner' }, { username: 'second' }])
+    } finally { library.close() }
   })
 
   it('keeps the newest few, and never touches the saves', async () => {
     // Older backups, as earlier days left them.
-    for (const day of ['2026-01-01-0300', '2026-01-02-0300']) writeFileSync(join(backupDir, `saves-${day}.zip`), 'old')
+    for (const day of ['2026-01-01-0300', '2026-01-02-0300']) {
+      writeFileSync(join(backupDir, `saves-${day}.zip`), 'old')
+      writeFileSync(join(backupDir, 'library', `library-${day}.db`), 'old')
+    }
+    writeFileSync(join(backupDir, 'library', 'library-before-16-to-17-2026-01-01.db'), 'Migration copy')
     await new Promise((r) => setTimeout(r, 1100))
     await request(app.app).post('/api/system/backups').expect(200)
     const names = readdirSync(backupDir).filter((n) => n.endsWith('.zip'))
     expect(names).toHaveLength(2)
     expect(names.some((n) => n.startsWith('saves-2026-01-0'))).toBe(false)
+    const copies = readdirSync(join(backupDir, 'library'))
+    expect(copies.filter((n) => /^library-\d/.test(n))).toHaveLength(2)
+    expect(copies.some((n) => n.startsWith('library-2026-01-0'))).toBe(false)
+    expect(copies).toContain('library-before-16-to-17-2026-01-01.db')
     expect((await app.saves.read('Story-1', '1-1-LT1.save')).toString()).toBe('owner save')
     await request(app.app).get('/api/system/backups/../../etc/passwd').expect(404)
     await request(app.app).get('/api/system/backups/saves-1999-01-01-0000.zip').expect(404)

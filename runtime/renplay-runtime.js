@@ -779,7 +779,7 @@
 
   // ---------------------------------------------------------------- engine
 
-  var nativeFetch = window.fetch.bind(window)
+  var nativeFetch = holdOffline(window.fetch.bind(window))
   var origFetch = function (input, init) {
     var url = typeof input === 'string' ? input : input && input.url
     if (url && new URL(url, location.href).pathname.indexOf('/api/') === 0) {
@@ -1289,23 +1289,20 @@
     return exec(py, 30000)
   }
 
-  /** Saves where the person is: an autosave, or in a game without autosave a quick save. */
-  function autosave() {
-    return exec(
-      'result = False\n' +
-        'if not renpy.context()._main_menu:\n' +
-        '    if config.has_autosave:\n' +
-        '        renpy.force_autosave(take_screenshot=True, block=True)\n' +
-        '    else:\n' +
-        '        import renpy.loadsave as _rl\n' +
-        '        renpy.take_screenshot()\n' +
-        '        _rl.cycle_saves("quick-", config.quicksave_slots)\n' +
-        '        renpy.save("quick-1", extra_info=save_name)\n' +
-        '    result = True\n',
-      8000,
-    ).catch(function () {
-      return false
-    })
+  // Python run in the game unless it is at its main menu, where there is nothing to save. Its result is true once it ran.
+  function unlessMainMenu(body) {
+    return 'result = False\nif not renpy.context()._main_menu:\n' + body.replace(/^(?=.)/gm, '    ') + '    result = True\n'
+  }
+  // Ren'Py's own quick-save slots, rotated as the game's Quick Save does, with a screenshot.
+  var QUICK_SAVE = 'import renpy.loadsave as _rl\nrenpy.take_screenshot()\n_rl.cycle_saves("quick-", config.quicksave_slots)\nrenpy.save("quick-1", extra_info=save_name)\n'
+
+  // Saves where the person is: an autosave, or in a game without autosave a quick save. True when saved, false in
+  // the main menu, null when it failed. Saving moves autosaves and quick saves up one place, so a `keep` slot about
+  // to be loaded is copied to a slot of its own first (HOLD), which the load then reads.
+  var HOLD = '_renplay-load'
+  function autosave(keep) {
+    var py = (keep ? 'renpy.copy_save(' + pyStr(keep) + ', ' + pyStr(HOLD) + ')\n' : '') + 'if config.has_autosave:\n    renpy.force_autosave(take_screenshot=True, block=True)\nelse:\n' + QUICK_SAVE.replace(/^(?=.)/gm, '    ')
+    return exec(unlessMainMenu(py), 8000).catch(function () { return null })
   }
 
   window.addEventListener('message', function (e) {
@@ -1321,9 +1318,7 @@
         if (d.userId === cfg.userId) { signedOut = false; pump() }
         break
       case 'renplay:flush':
-        flush(d.timeout).then(function (ok) {
-          post('flushed', { ok: ok, id: d.id })
-        })
+        flush(d.timeout).then(function (ok) { post('flushed', { ok: ok, id: d.id }) })
         break
       case 'renplay:save-and-exit':
         autosave()
@@ -1333,27 +1328,32 @@
             })
           })
         break
+      case 'renplay:save-and-load':
+        // A tap on a save in the player's list: where the person is gets saved first, then the load.
+        var held = /^(auto|quick)-/.test(d.slot)
+        var kept = false
+        autosave(held ? d.slot : null)
+          .then(function (saved) {
+            // Saving failed: the person stays where they are rather than lose the place.
+            if (saved === null) return false
+            kept = saved
+            return flush(10000).then(function () {
+              return loadSlot(saved && held ? HOLD : d.slot).then(function () { return true })
+            })
+          })
+          .catch(function () { return false })
+          .then(function (ok) { post('loaded', { ok: ok, saved: kept, id: d.id }) })
+        break
       case 'renplay:save-now':
         // A save into Ren'Py's own quick-save slots, rotated as the game's Quick Save does, with a
         // screenshot. Not in the main menu, where there is nothing to save.
-        exec(
-          'result = False\n' +
-            'if not renpy.context()._main_menu:\n' +
-            '    import renpy.loadsave as _rl\n' +
-            '    renpy.take_screenshot()\n' +
-            '    _rl.cycle_saves("quick-", config.quicksave_slots)\n' +
-            '    renpy.save("quick-1", extra_info=save_name)\n' +
-            '    result = True\n',
-          8000,
-        )
+        exec(unlessMainMenu(QUICK_SAVE), 8000)
           .then(function (saved) {
             return flush(8000).then(function (ok) {
               post('saved-now', { ok: !!saved && ok, saved: !!saved, id: d.id })
             })
           })
-          .catch(function () {
-            post('saved-now', { ok: false, saved: false, id: d.id })
-          })
+          .catch(function () { post('saved-now', { ok: false, saved: false, id: d.id }) })
         break
       case 'renplay:options':
         // This person's patches for the game (kept in its persistent data, so they follow the person
@@ -1493,7 +1493,7 @@
   /*
    * A controller plays the game through Ren'Py's own bindings, except its Menu button (Start), which
    * opens the player's drawer: Ren'Py's game menu stays on B. While the drawer is open the player
-   * has the controller, so the game sees none (pads.toGame).
+   * has the controller, so the game sees none (pads.toGame). See menuButton.
    */
   var pads = { toGame: true, held: false, start: false, polling: false }
   var realPads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null
@@ -1530,10 +1530,10 @@
       if (p.mapping === 'standard' && p.buttons[9] && p.buttons[9].pressed) down = true
     }
     if (down && !pads.start && pads.toGame && !pads.held) {
-      post('menu')
+      menuButton(true)
       // Again on each press: a game that restarts reads its bindings anew.
       unbindStart(1)
-    }
+    } else if (!down && pads.start) menuButton(false)
     pads.start = down
     if (any) requestAnimationFrame(padPoll)
     else pads.polling = false

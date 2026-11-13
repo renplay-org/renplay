@@ -15,9 +15,11 @@ export interface Progress {
   rating: number
   /** When the person said Not now: the game leaves Up next until it is played again. */
   not_now_at: string
+  /** The catalog version whose update notice this person silenced, null when none. */
+  update_dismissed: string | null
 }
 
-const NO_PROGRESS: Progress = { favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, play_status: '', rating: 0, not_now_at: '' }
+const NO_PROGRESS: Progress = { favorite_at: '', finished_at: '', last_played_at: '', play_time: 0, play_status: '', rating: 0, not_now_at: '', update_dismissed: null }
 
 export type GameWithProgress = GameRow & Progress
 
@@ -36,7 +38,7 @@ export class ProgressStore {
   constructor(private readonly db: Db) {}
 
   of(user: number, row: GameRow): GameWithProgress {
-    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ? AND game = ?').get(user, row.id) as Partial<Progress> | undefined
+    const u = this.db.raw.prepare('SELECT favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at, update_dismissed FROM user_games WHERE user_id = ? AND game = ?').get(user, row.id) as Partial<Progress> | undefined
     return { ...row, ...NO_PROGRESS, ...u }
   }
 
@@ -95,10 +97,11 @@ export class ProgressStore {
 
   /** Gives one person's progress to another: the later time and higher rating win, and the sessions move. */
   merge(from: number, to: number): void {
-    this.db.raw.prepare(`INSERT INTO user_games (user_id, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at)
-      SELECT ?, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at FROM user_games WHERE user_id = ?
+    this.db.raw.prepare(`INSERT INTO user_games (user_id, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at, update_dismissed)
+      SELECT ?, game, favorite_at, finished_at, last_played_at, play_time, play_status, rating, not_now_at, update_dismissed FROM user_games WHERE user_id = ?
       ON CONFLICT(user_id, game) DO UPDATE SET favorite_at = MAX(user_games.favorite_at, excluded.favorite_at), finished_at = MAX(user_games.finished_at, excluded.finished_at), last_played_at = MAX(user_games.last_played_at, excluded.last_played_at), play_time = MAX(user_games.play_time, excluded.play_time),
-        play_status = CASE WHEN user_games.play_status = '' THEN excluded.play_status ELSE user_games.play_status END, rating = MAX(user_games.rating, excluded.rating), not_now_at = MAX(user_games.not_now_at, excluded.not_now_at)`).run(to, from)
+        play_status = CASE WHEN user_games.play_status = '' THEN excluded.play_status ELSE user_games.play_status END, rating = MAX(user_games.rating, excluded.rating), not_now_at = MAX(user_games.not_now_at, excluded.not_now_at),
+        update_dismissed = COALESCE(MAX(user_games.update_dismissed, excluded.update_dismissed), user_games.update_dismissed, excluded.update_dismissed)`).run(to, from)
     // Finished stays in step with finished_at: a game either account finished is finished.
     this.db.raw.prepare("UPDATE user_games SET play_status = 'finished' WHERE user_id = ? AND finished_at IS NOT NULL AND finished_at != '' AND play_status != 'finished'").run(to)
     this.db.raw.prepare("UPDATE user_games SET finished_at = ? WHERE user_id = ? AND play_status = 'finished' AND (finished_at IS NULL OR finished_at = '')").run(new Date().toISOString(), to)

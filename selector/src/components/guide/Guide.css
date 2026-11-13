@@ -1,0 +1,233 @@
+/* The guide: a window over the game, a sheet on an upright phone, the whole screen on one held sideways. */
+/* Above the menu's scrim and sheet, so beside the menu the guide stays in reach. */
+.gw {
+  position: absolute;
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0e0e14;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
+}
+/* In its own window the guide is the page. */
+.gw-popped {
+  margin: 0;
+  background: #0b0b10;
+  color: var(--fg);
+  font: 15px/1.45 var(--sans);
+}
+.gw-popped .gw {
+  border-radius: 0;
+  box-shadow: none;
+}
+.gw-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 6px 6px 6px 14px;
+  cursor: grab;
+  touch-action: none;
+}
+.gw-bar .ib[aria-pressed="true"] {
+  background: var(--plate-3);
+  color: var(--fg);
+}
+.gw-popped .gw-bar {
+  cursor: default;
+}
+.gw-tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  /* Room for the focus ring, which an element that scrolls would cut off. */
+  padding: 5px 8px 6px;
+  scrollbar-width: none;
+}
+.gw-tabs button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-3);
+  position: relative;
+}
+.gw-tabs button::before {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+.gw-tabs button.on {
+  background: var(--plate-2);
+  color: var(--fg);
+}
+.gw-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--hit);
+  height: var(--hit);
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 58%, rgba(255, 255, 255, 0.35) 60%, transparent 62%, transparent 70%, rgba(255, 255, 255, 0.35) 72%, transparent 74%);
+}
+.gw-sheet,
+.gw-cover {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0e0e14;
+}
+.gw-sheet {
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  transition: height var(--t-focus) var(--out);
+}
+.gw-sheet .gw-bar,
+.gw-cover .gw-bar {
+  cursor: default;
+  padding: 2px 10px 4px 14px;
+}
+/* The handle: a 44 px target (with its ::before) around a short bar, drawn at the top of the sheet and last to be reached by Tab, after Back to the game. */
+.gw-handle {
+  position: relative;
+  order: -1;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  width: 100%;
+  touch-action: none;
+}
+.gw-handle::before {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+.gw-handle span {
+  width: 40px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+/* Held sideways the guide covers the screen, above the Menu and Guide pills, which stay where they are: the bar leaves room for them. */
+.gw-cover {
+  top: 0;
+  z-index: 41;
+}
+.gw-cover .gw-bar {
+  padding-top: 10px;
+}
+.gw-pills {
+  flex: none;
+  width: 220px;
+}
+
+/* The reader: a bar, a line of keys, and the pages. */
+.gr {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  outline: none;
+}
+/* The reader as a whole has focus after the guide is opened with a key: the pages show it, not a ring around everything. */
+.gr:focus-visible {
+  box-shadow: none;
+}
+.gr:focus-visible > .gr-view {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+.gr-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px 4px;
+}
+.gr-count {
+  min-width: 64px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.gr-bar .btn[aria-pressed="true"] {
+  background: var(--plate-3);
+}
+.gr-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: #16161c;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+  outline: none;
+}
+.gr-view:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent-400, #d62a68);
+}
+.gr-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+.gr-page {
+  flex: none;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+.gr-page canvas,
+.gr-page img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+.gr-text {
+  padding: 16px;
+  background: var(--plate-ink);
+  background-color: #111116;
+}
+.gr-text pre {
+  margin: 0;
+  color: var(--fg);
+  font: 15px/1.6 var(--sans);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.gr-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  padding: 24px;
+  text-align: center;
+}
+
+/* The guide's own window: the title and the reader fill it. */
+.gw-popup {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: #0b0b10;
+}
+.gw-popup-title {
+  flex: none;
+  margin: 0;
+  padding: 10px 14px 6px;
+  font-size: 13.5px;
+  font-weight: 650;
+}

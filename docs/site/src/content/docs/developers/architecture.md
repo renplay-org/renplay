@@ -45,6 +45,35 @@ Modules below the routes, like the install pipeline, take only the parts they us
 `/data` is what to back up. Everything in `/games` except `_archives` can be rebuilt (from the
 archives, while they are kept).
 
+## Database changes
+
+Renplay uses SQLite only, without an ORM. `server/src/db-schema.ts` holds the single declared schema.
+On every start it creates that schema in memory and compares tables, columns and indexes with the
+open library. It adds missing objects, preserving the declared column definitions. It never changes
+an existing definition or drops an unknown object. New columns must be nullable or have a default
+that SQLite can add to a populated table. Tests migrate the real 4.0 schema and compare it with a
+fresh library, including column types, nullability, defaults and indexes.
+
+`PRAGMA user_version` is the compatibility floor: the oldest schema a release must understand to
+open this library. Additive changes leave it alone, so the previous release still opens the library.
+The `schema_migration` settings row records numbered migration progress separately. Numbered
+migrations run transactionally, each after a successful `VACUUM INTO` copy in the backups folder.
+The daily backup uses the same safe copy operation while Renplay runs.
+
+A rename, type change or removal takes two releases. For example, to rename `games.engine_label`
+to `games.engine_description`:
+
+1. In release A, add `engine_description TEXT NOT NULL DEFAULT ''`, fill it from `engine_label`,
+   and keep both columns working. Continue writing both at the current floor, refreshing the new
+   form from the old one after a downgrade. Do not raise the library's compatibility floor.
+   Prepare A to accept the next floor too: at that floor, read and write the new form without
+   relying on the old column. The highest accepted floor (`VERSION`) is separate from the floor
+   required for a fresh library (`FRESH_FLOOR`).
+2. In a later release B, remove `engine_label` with a numbered migration and raise the floor to the
+   value A already accepts. A then uses the new form even if its additive reconciliation recreates
+   an empty legacy column. Test B to A to B with real data before shipping. A copy is required
+   before the migration, and the real old-library fixture must still reach the fresh schema.
+
 ## Installing a game
 
 `server/src/pipeline/import.ts` runs as a background job:
@@ -125,17 +154,52 @@ shares) injected. The server builds it at start and serves it at `/renplay/runti
   are counted as their bytes arrive (renpy-pre.js keeps its own `game.zip` count private), then
   Ren'Py's own reports for unpacking and loading the scripts. Each step has a share of the bar.
 - **Talks to the player** through `postMessage` (`renplay:*`): ready, progress, fullscreen,
-  save and exit, load a slot, download the log, options, the controller.
+  save and exit, load a slot, download the log, options, the controller, and the keys.
+  `renplay:save-and-load` runs the same `autosave()` as save and exit, waits for it and then loads,
+  and answers `renplay:loaded`. Saving moves the autosaves and quick saves up one place, so the slot
+  to load is copied to the hidden slot `_renplay-load` first and read from there.
+- **Catches Renplay's keys** in the capture phase (`renplay-player.js`), by `e.code`: ` opens and
+  closes the player's menu and \ its guide (only once the player has said, with `renplay:keys`,
+  that the game has one). They arrive as `renplay:key`, and the game never sees them.
+- **Holds a streamed file's fetch while offline.** A `GET` under `/g/` that fails while
+  `navigator.onLine` is false waits for the `online` event and goes again (`holdOffline` in
+  `renplay-player.js`), so a short drop does not show Ren'Py's error screen. A failure while the
+  browser thinks it is online is the server's and is passed on, and an aborted request stops waiting.
 - **Hands the controller to the player** for its Menu button: Start is taken out of Ren'Py's
   `config.pad_bindings` (again on each press, since a restarted game reads them anew), and while
-  the drawer is open `navigator.getGamepads` answers empty, until every button is released after it
-  closes.
+  the menu is open `navigator.getGamepads` answers empty, until every button is released after it
+  closes. In a game with a guide the press is held back until the button is let go (the menu opens)
+  or half a second has passed (the guide toggles): `menuButton` in `renplay-player.js`.
 
 The player (`selector/src/pages/Player.tsx`) sizes the game from the stage's real size and the
 device's safe-area insets (`frameRect` in `lib/display.ts`: Fit gives the frame the game's own
 shape, Fill crops only the sides), handles fullscreen (the Fullscreen API, or Add to Home Screen on
 iPhone), and offers saves, a walkthrough and display options. Outside a game, `lib/gamepad.ts` turns
 the d-pad into arrow keys for the focus engine (`lantern/focus.ts`).
+
+### The guide's reader
+
+The guide (`components/GuideWindow.tsx`, `components/guide/`) reads walkthroughs itself.
+
+- **PDFs are drawn by PDF.js** (`pdfjs-dist`, Apache 2.0, pinned to an exact version) to canvases at
+  the device's pixel ratio, a page at a time as it comes near the window. The browser's own viewer
+  could not be set: Chrome fits a Letter page to a small frame at about 56 percent with a nine-button
+  toolbar, iPhone Safari draws only the first page of a PDF in a frame, and Android Chrome does not
+  draw it at all. The reader has one small bar, remembers the page and zoom per file, and zooms by
+  pinch, Ctrl with the wheel and double tap (`useGestures.ts`).
+- **It is a separate download.** `lib/pdfjs.ts` is imported only when a PDF guide opens, so the
+  library's first download does not grow. The worker is a Vite `?url` asset. The standard fonts and
+  decoders PDF.js asks for by name are emitted by `vite.config.ts` under
+  `/assets/pdfjs-<version>/` and added to the build's asset list, so a game kept offline keeps them. nginx
+  serves `.mjs` as JavaScript, which a module worker needs. There is no Content Security Policy to adapt.
+- **The guide is a layer beside the game**, not a trap: `useModal` with `trap: false` in
+  `lantern/modal.ts`. Escape closes it only while focus is in it. A guide with focus holds the
+  controller (`renplay:pads` with `toGame: false`), and `lib/gamepad.ts` sends its buttons to it as
+  `renplay:guide-pad` events. Y toggles see-through, X cycles the zoom, LB and RB switch files, B
+  parks it, and Menu held for half a second parks it too.
+- **Pop out** is Document Picture-in-Picture where the browser has it (`usePopout.ts`: the app's
+  stylesheets are copied into the small window and the reader is moved there with a portal), and a
+  popup window on `/guide/<game>/<file>` (`pages/GuidePopup.tsx`) elsewhere.
 
 ### Offline
 
@@ -199,6 +263,10 @@ independently of builds, and their play sessions in `play_sessions`. Both belong
 `PUT /api/games/:id/favorite` accepts `{ "on": boolean }` and returns `{ ok, game }`.
 Game JSON exposes `favoriteAt` as an ISO timestamp or null. Setting an existing favourite keeps
 its timestamp. Uninstall keeps it. Forgetting the library entry removes it.
+`user_games.update_dismissed` (nullable, added without raising the floor) holds the catalog version
+whose update notice the person silenced with Not now. `POST` and `DELETE`
+`/api/games/:id/update-not-now` set and clear it, and the game JSON's `updateDismissed` is that
+version only while it is still the catalog's newest, so a newer release brings the notice back.
 
 Schema 5 adds `games.finished_at` (ISO timestamp or empty) and `games.play_time` (seconds,
 initially zero). The migration is transactional and changes no save files. Uninstall and rebuilds
@@ -322,6 +390,39 @@ answers the admin's tags until the person saves their own. The player sends the 
 `renplay:options` message, and the runtime applies Rollback, Skip and the text size until the
 person chooses (their choice and a size-chosen flag live in the game's persistent data). The
 admin's text size is applied once each time it changes, so the game's own setting keeps working.
+
+## Player security checklist
+
+Use this checklist when changing the game frame (`selector/src/pages/Player.tsx`), the runtimes
+(`runtime/`) or the play routes (`server/src/play/`). Apply the sandbox items to the sandboxed HTML
+path. Ren'Py uses a different, trusted runtime path.
+
+- [ ] Keep the HTML frame's opaque-origin sandbox. Do not add `allow-same-origin` or
+  `allow-popups-to-escape-sandbox`. Popups must inherit the sandbox.
+- [ ] Keep the response-level CSP sandbox on every HTML game pack response, not just its entry page.
+  Keep `frame-ancestors 'self'` on game responses, including Ren'Py pages, so another site cannot
+  embed them. Check direct navigation, secondary pages and popups too (`server/src/play/routes.ts`).
+- [ ] Keep signed asset links bound to the game, the build and a live session or access token
+  (`assetUrl` and `verifyAsset` in `server/src/accounts/accounts.ts`). A link must not authorize a
+  different game or build, and sign-out, account disabling or token revocation must invalidate it.
+- [ ] Send runtime messages to the parent only at Renplay's own address (`location.origin` in
+  `runtime/renplay-player.js`), never `*` or an arbitrary embedding parent's address. Preserve the
+  player's incoming message checks for the frame window, origin and user. The player's `*`
+  destination for messages to its own opaque-origin frame is a different direction and is intentional.
+- [ ] Test new workers in a real browser inside the sandboxed player. Check origins, credentials and
+  CORS, successful loading of the game's own assets, and denied access to the authenticated library,
+  API and another game's assets. Mocks alone cannot establish these browser security properties.
+- [ ] Keep asset streaming bounded. A byte-range or HEAD request must not trigger a whole-file read
+  of an asset. Resolve sizes without buffering payloads, stream only the requested range and return
+  HEAD without reading the payload. Test bounded reads for HEAD and a small range on a large asset.
+- [ ] Do not treat the sandbox as a network firewall. It restricts origin privileges, not all outgoing
+  requests. Review any new network access or permission grant separately.
+
+Record the evidence in the pull request, distinguishing checks on real devices from automated test
+browsers and mocks. For Python compatibility, mocked tests supplement rather than replace a
+regression that loads the assembled game on the supported web engine, including save/load and rollback.
+See [nginx and sandboxed games](/developers/accounts-api/#nginx-and-sandboxed-games) for the asset
+permission boundary.
 
 ## Security notes
 

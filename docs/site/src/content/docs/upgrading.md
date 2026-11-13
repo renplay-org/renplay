@@ -28,13 +28,20 @@ only affects games you install or reinstall afterwards.
 
 ## Database migrations
 
-The library database (`/data/library.db`) is migrated when the new version starts. Do not assume an
-older version understands a newer schema. In general:
+The library database (`/data/library.db`) updates when Renplay starts. Additions leave it readable
+by the previous release. Before each numbered migration, Renplay makes a complete database copy in
+`library/` under the backups folder. It will not migrate if that copy fails. The log gives the copy's
+path. These pre-migration copies are kept until you remove them.
 
-- Always back up `/data` before upgrading.
-- To roll back, stop Renplay, restore the backup of `/data` from before the upgrade, and start the
-  older image. Without a backup you cannot roll back.
+- Always back up all of `/data` before upgrading.
+- Going back one release works without restoring a backup. To go back further when an older release
+  refuses the library, stop Renplay and restore a matching backup of `/data` before starting it.
 - Migrations never rewrite save contents.
+
+If only the database needs restoring, stop Renplay first. Keep the current `library.db` and any
+`library.db-wal` and `library.db-shm` files together in a separate folder. Copy the chosen database
+backup to `/data/library.db`, then start the matching release. Do not leave the old WAL or SHM files
+beside the restored database. This restores library records, people and settings, not save files.
 
 ## Backups
 
@@ -49,12 +56,21 @@ must be added again, but their saves are safe in `/data`.
 
 ### Daily save backups
 
-Once a day Renplay also writes a zip of everyone's saves to `/data/backups/saves` and keeps the
-newest 14. Set `RENPLAY_BACKUP_DIR` to a folder on another disk or a share to keep that copy apart
-from `/data`, `RENPLAY_BACKUP_KEEP` for how many to keep, or `RENPLAY_BACKUP_DIR=off` to turn them
-off. A server that sleeps when idle makes the backup the next time it runs. **Settings** lists the
-backups with a download link and has **Back up now**. To restore a game's saves, import its folder
-from the zip on the game's page, under **Saves**.
+Once a day Renplay writes a zip of everyone's saves to `/data/backups/saves` and a complete copy of
+`library.db` in its `library/` subfolder. The database copy is safe while Renplay runs. The newest
+14 save zips and 14 daily database copies are kept. Pre-migration copies are not pruned.
+
+Set `RENPLAY_BACKUP_DIR` to a folder on another disk or a share to keep these copies apart from
+`/data`, and `RENPLAY_BACKUP_KEEP` for how many daily copies of each kind to keep. Set
+`RENPLAY_BACKUP_DIR=off` to turn daily backups off. Pre-migration copies are still required and go
+to `/data/backups/saves/library` when daily backups are off. A server that sleeps when idle makes
+the daily backup the next time it runs.
+
+**Settings** lists the save zips with a download link and has **Back up now**, which also copies the
+database. The System backups API (`GET /api/system/backups`) gives the newest database copy's path
+in `library.path`. To restore a game's saves, import its folder from the zip on the game's page,
+under **Saves**. These daily backups do not include save history, mods, covers or walkthroughs, so
+keep a separate backup of all of `/data` too.
 
 ## Upgrading within 4.x
 

@@ -76,6 +76,8 @@ export interface Game {
   recipe: { id: string; links: Record<string, string>; continuesFrom: string[]; status: string | null } | null
   /** A newer working release listed in the catalog. */
   update: { version: string; date: string | null; status: string; archives?: string[] } | null
+  /** The update this person said Not now to, while it is still the catalog's newest. A newer one brings the notice back. */
+  updateDismissed: string | null
   createdAt: string
   installedAt: string | null
   lastPlayedAt: string | null
@@ -258,6 +260,8 @@ export interface BackupInfo {
   dir: string | null
   keep: number
   files: Array<{ name: string; size: number; at: number }>
+  /** Newest daily or pre-migration database copy, including its full server path. */
+  library: { path: string; size: number; at: number } | null
   last: number | null
   /** When the next backup is due. Renplay runs it then, or the next time it runs after. */
   next: number | null

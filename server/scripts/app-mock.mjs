@@ -58,11 +58,11 @@ const titledRecipes = TITLED.map(([title, developer, tags], i) => ({ ...recipes[
 const titledCatalog = { ...catalog, vocabulary: titledVocabulary, games: titledRecipes, status: { ...catalog.status, count: TITLED.length } }
 const me = { user: { id: 1, username: 'owner', name: 'Owner', role: 'admin', disabled: 0, created_at: '2026-01-01T00:00:00.000Z', prefs: '{}', avatar: '', avatar_uploaded: 0, admin_source: 'manual', admin_provider: '', admin_subject: '', adult_ceiling: 'off', adult_choice: 'off', adult_access: 0, hasPin: false }, auth: false, demo: false, unclaimed: false, hasPassword: false }
 
-const answers = (url, titled) => {
+const answers = (url, titled, patch = {}) => {
   const path = url.pathname
   if (path === '/api/games') return { games: titled ? titledGames : games }
   const one = path.match(/^\/api\/games\/([^/]+)$/)
-  if (one) return { game: games.find((g) => g.id === one[1]) }
+  if (one) return { game: { ...games.find((g) => g.id === one[1]), ...patch[one[1]] } }
   if (path === '/api/catalog') return titled ? titledCatalog : catalog
   if (path === '/api/me') return me
   if (path === '/api/me/tags') return { include: [], exclude: [], source: 'default' }
@@ -88,12 +88,13 @@ function picture(url) {
 /**
  * `titled` answers with the short list of real titles (TITLED) instead of the 130 and 120 made-up ones. `delay` makes
  * each picture take that many milliseconds the first time it is asked for, as a network does and a cache does not.
- * `thumbhash` gives every picture its blurred placeholder, as a library has.
+ * `thumbhash` gives every picture its blurred placeholder, as a library has. `patch` changes what a game answers: { id: { ...fields } }.
+ * `shared` answers for the whole browser context, so a popup window the page opens is answered too.
  */
-export async function mock(page, errors, label, { titled = false, delay = 0, thumbhash = false } = {}) {
+export async function mock(page, errors, label, { titled = false, delay = 0, thumbhash = false, patch = {}, shared = false } = {}) {
   page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`))
   const asked = new Set()
-  await page.route('**/api/**', async (route) => {
+  await (shared ? page.context() : page).route('**/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
     if (url.pathname.startsWith('/api/art/')) {
@@ -104,7 +105,7 @@ export async function mock(page, errors, label, { titled = false, delay = 0, thu
       return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: picture(url) })
     }
     if (request.method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
-    const body = JSON.stringify(answers(url, titled))
+    const body = JSON.stringify(answers(url, titled, patch))
     return route.fulfill({ status: 200, contentType: 'application/json', body: thumbhash ? body.replaceAll('"thumbhash":null', `"thumbhash":"${THUMBHASH}"`) : body })
   })
 }

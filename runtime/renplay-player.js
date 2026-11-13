@@ -6,8 +6,8 @@
  * - post: a message to the player, the page that frames the game.
  * - Muting like a browser tab: every Web Audio output goes through a gain node set
  *   to 0 while muted, so the game's own volume settings stay as they are.
- * - Esc held in fullscreen: with Keyboard Lock, holding Esc leaves fullscreen, and
- *   the player shows for how long. Capture runs before the game sees the key.
+ * - Renplay's keys: ` opens and closes the menu, \ the guide. Capture runs before the
+ *   game sees them, so they work wherever focus is, fullscreen too, and are never typed.
  */
 var cfg = window.__renplay || {}
 var inFrame = window.parent && window.parent !== window
@@ -99,26 +99,89 @@ function isMuted() {
   return muted
 }
 
-// ------------------------------------------------------------------ fullscreen and Esc
+// ------------------------------------------------------------------ fullscreen
 
 var parentFullscreen = false
 function isParentFullscreen() {
   return parentFullscreen
 }
+
+// ------------------------------------------------------------------ Renplay's keys
+
+// By physical key, so a layout does not move them. The player says whether the game has a guide: the
+// backslash is the game's own when it has none.
+var KEYS = { Backquote: 'menu', Backslash: 'guide', IntlBackslash: 'guide' }
+var hasGuide = false
 window.addEventListener('message', function (e) {
-  if (e.source === window.parent && e.data && e.data.type === 'renplay:fullscreen-state') parentFullscreen = !!e.data.value
+  if (e.source !== window.parent || !e.data) return
+  if (e.data.type === 'renplay:fullscreen-state') parentFullscreen = !!e.data.value
+  else if (e.data.type === 'renplay:keys') hasGuide = !!e.data.guide
 })
+function renplayKey(e) {
+  var key = KEYS[e.code]
+  if (!inFrame || !key || e.ctrlKey || e.metaKey || e.altKey || (key === 'guide' && !hasGuide)) return null
+  e.preventDefault()
+  e.stopImmediatePropagation()
+  return key
+}
 window.addEventListener(
   'keydown',
   function (e) {
-    if (e.key === 'Escape' && !e.repeat && parentFullscreen) post('escape', { down: true })
+    var key = renplayKey(e)
+    if (key && !e.repeat) post('key', { key: key })
   },
   true,
 )
-window.addEventListener(
-  'keyup',
-  function (e) {
-    if (e.key === 'Escape' && parentFullscreen) post('escape', { down: false })
-  },
-  true,
-)
+window.addEventListener('keyup', renplayKey, true)
+
+// ------------------------------------------------------------------ offline
+
+/*
+ * A game's files stream on demand while it plays. When the network drops the browser rejects such a fetch (Safari
+ * says "Load failed") and the engine shows an error for the scene it was loading. Offline, a streamed fetch waits for
+ * the browser's online event and goes again, so a short drop on a train is not seen. A failure while the browser
+ * thinks it is online is the server's, and is passed on. A fetch that is aborted stops waiting.
+ */
+function holdOffline(nativeFetch) {
+  return function held(input, init) {
+    return nativeFetch(input, init).catch(function (e) {
+      var signal = init && init.signal
+      var url = typeof input === 'string' ? input : input && input.url
+      var method = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET'
+      var streamed = !!url && method === 'GET' && new URL(url, location.href).pathname.indexOf('/g/') === 0
+      if (!streamed || navigator.onLine !== false || (signal && signal.aborted)) throw e
+      return new Promise(function (resolve, reject) {
+        var onAbort = function () {
+          window.removeEventListener('online', onOnline)
+          reject(e)
+        }
+        var onOnline = function () {
+          window.removeEventListener('online', onOnline)
+          if (signal) signal.removeEventListener('abort', onAbort)
+          resolve(held(input, init))
+        }
+        window.addEventListener('online', onOnline)
+        if (signal) signal.addEventListener('abort', onAbort)
+      })
+    })
+  }
+}
+
+// ------------------------------------------------------------------ the controller's Menu button
+
+// In a game with a guide, a press waits to see whether the button is held: let go at once it opens the menu, held half
+// a second it toggles the guide. Without a guide it opens the menu as the button goes down.
+var menuHold = 0
+function menuButton(down) {
+  if (down && !hasGuide) post('menu')
+  else if (down)
+    menuHold = setTimeout(function () {
+      menuHold = 0
+      post('key', { key: 'guide' })
+    }, 500)
+  else if (menuHold) {
+    clearTimeout(menuHold)
+    menuHold = 0
+    post('menu')
+  }
+}

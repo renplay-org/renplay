@@ -22,7 +22,7 @@ import type { ArtKind } from '@shared/recipe'
 import ArtPicker from '../components/ArtPicker'
 import { ago, capitalize, duration, jobStage, pct, playedTime, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
-import { recipeLinks, playLink } from '../lib/links'
+import { recipeLinks, playLink, popupClick } from '../lib/links'
 import { isRenpy } from '@shared/family'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
@@ -38,7 +38,8 @@ export default function GamePage() {
   const { id: gameId = '' } = useParams()
   const { data: game, isLoading, error } = useGame(gameId)
   const { data: catalog } = useCatalog()
-  const [tab, setTab] = useState<Tab>('play')
+  // Manage saves in the player's menu lands here.
+  const [tab, setTab] = useState<Tab>(() => (window.location.hash === '#saves' ? 'saves' : 'play'))
   const [picker, setPicker] = useState<ArtKind | null>(null)
   const navigate = useNavigate()
   const view = useAdultView()
@@ -145,7 +146,7 @@ export default function GamePage() {
         </Pill>
       )}
       {game.recipe?.links.walkthrough && (
-        <Pill variant="q" size="lg" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
+        <Pill variant="q" size="lg" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer" onClick={popupClick(game.recipe.links.walkthrough)}>
           Guide
         </Pill>
       )}
@@ -402,17 +403,15 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
             {game.developer && <Row label="Developer">{game.developer}</Row>}
             {game.state && <Row label="State">{stateLabel[game.state]}</Row>}
             {game.detectedVersion && game.detectedVersion !== game.version && <Row label="Detected version"><span className="muted">{game.detectedVersion}</span></Row>}
-            {game.update && (
-              <Row label="Update">
-                <span className="pink">
-                  Version {game.update.version} ({game.update.status})
-                </span>
+            {game.version && (
+              <Row label="Version">
+                {game.version}
+                {game.update && <span className="muted"> · {game.update.version} in the catalog</span>}
               </Row>
             )}
           </div>
           <p className="small muted" style={{ marginTop: 10 }}>
             {recipeStatus}
-            {game.update ? ' Download the new version from the developer and add it to update. Saves carry over.' : ''}
           </p>
           <GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} showContent />
           {links.length > 0 && (
@@ -465,7 +464,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
                 <p style={{ fontWeight: 650 }}>The guide the catalog links</p>
                 <p className="small muted">On the web</p>
               </div>
-              <Pill variant="s" size="sm" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer">
+              <Pill variant="s" size="sm" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer" onClick={popupClick(game.recipe.links.walkthrough)}>
                 Open
               </Pill>
             </div>

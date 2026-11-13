@@ -143,12 +143,14 @@ async function finds(browser, base, errors, options, label) {
   // The order: best match while there is text, the sort control says so, and clearing returns to the chosen order.
   await ready(page, base, '/?sort=title')
   const chosen = await titlesOf(page)
+  // The label follows the field once the page has rendered the change: wait for it, not for a fixed time.
+  const sortSays = (text) => page.waitForFunction((t) => document.querySelector('.toolbar .sort')?.textContent.trim() === t, text, { timeout: 5000 }).catch(() => {})
   await fieldOf(page, 'Search your games').fill('ro')
-  await page.waitForTimeout(150)
+  await sortSays('Best match')
   const sortLabel = await page.evaluate(() => document.querySelector('.toolbar .sort')?.textContent.trim())
   check(sortLabel === 'Best match', `${label}: the sort control says Best match while there is text (${sortLabel})`)
   await fieldOf(page, 'Search your games').fill('')
-  await page.waitForTimeout(150)
+  await sortSays('Title')
   const sortBack = await page.evaluate(() => document.querySelector('.toolbar .sort')?.textContent.trim())
   check(sortBack === 'Title' && (await titlesOf(page)).join() === chosen.join(), `${label}: clearing the field returns to the order chosen before (${sortBack})`)
   // Another order can still be picked for a search, and clearing forgets it.

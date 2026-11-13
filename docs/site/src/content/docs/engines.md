@@ -50,7 +50,11 @@ fullscreen, mute, wake lock, phones) is shared.
 
 1. **Detect** (`server/src/pipeline/family.ts`, `detectEngine`): family, version, the folder the
    game lives in, its start file, from the file names in an archive and a few bytes of its files.
-   `INSTALLABLE` lists the families this version installs.
+   `INSTALLABLE` lists the families this version installs. A change to what `inspectArchive`
+   detects must also raise `INSPECT_VERSION` in `server/src/pipeline/import.ts`. Inspections are
+   cached by file size, modification time and inspection version. Raising the version makes
+   previously inspected archives get inspected again. Add a regression test showing that the
+   previous inspection version is no longer accepted as current.
 2. **Build**: put the game's files into a build (`assets.pack` and its index, as for Ren'Py), so
    they are served with byte ranges and long caching. Converting images to WebP works for any
    engine that loads images by name. Streaming on demand works where the engine fetches files
@@ -62,6 +66,9 @@ fullscreen, mute, wake lock, phones) is shared.
 4. **Player**: the shared player, with the features the runtime supports.
 
 ## Security
+
+Changes to the game frame, runtimes or play routes must follow the
+[player security checklist](/developers/architecture/#player-security-checklist).
 
 A Ren'Py build runs Ren'Py's engine, which Renplay ships. HTML games run their own JavaScript. In a
 frame on Renplay's origin, that code could call Renplay's API (delete saves, uninstall games). So

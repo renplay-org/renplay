@@ -183,7 +183,8 @@ interface ToastItem {
   tone: ToastTone
   text: ReactNode
 }
-const ToastCtx = createContext<(text: ReactNode, tone?: ToastTone) => void>(() => {})
+/** Shows a toast and returns the way to take it away early. */
+const ToastCtx = createContext<(text: ReactNode, tone?: ToastTone) => () => void>(() => () => {})
 
 export function useToast() {
   return useContext(ToastCtx)
@@ -194,7 +195,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((text: ReactNode, tone: ToastTone = 'info') => {
     const id = Date.now() + Math.random()
     setItems((v) => [...v.slice(-3), { id, tone, text }])
-    setTimeout(() => setItems((v) => v.filter((t) => t.id !== id)), tone === 'error' ? 7000 : 4000)
+    const dismiss = () => setItems((v) => v.filter((t) => t.id !== id))
+    setTimeout(dismiss, tone === 'error' ? 7000 : 4000)
+    return dismiss
   }, [])
   return (
     <ToastCtx.Provider value={push}>

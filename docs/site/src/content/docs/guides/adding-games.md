@@ -55,8 +55,10 @@ pressed **Retry** on the same job.
 - **Uninstall** removes the build. **Saves stay.** So do your mods, the library entry and
   favourites.
 - **Reinstall** from the kept archive makes a fresh build, and saves stay.
-- **Updates.** When the catalog lists a newer tested release than the one you have, Renplay says
-  so. Download the new file and add it the same way.
+- **Updates.** When the catalog lists a newer tested release than the one you have, the game's page
+  says so, under **Play**. Download the new file and add it the same way. **Not now** hides the
+  notice for you, on every device, until the catalog lists a still newer release. **Details** keeps
+  the version you have and the one in the catalog.
 - **Mods.** A Ren’Py game's **Mods and files** tab (admins) starts with what your mods change: **Install
   mod zip** adds a mod as it comes, **Apply changes** builds a new version of the game with your
   mods, and **Remove all mods** goes back to the original. Below, the game's files, folder by

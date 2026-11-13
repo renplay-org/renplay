@@ -5,6 +5,7 @@ import yazl from 'yazl'
 import { walkFiles } from '../util/fsx.js'
 import { log, stamp } from '../util/log.js'
 import { bytes } from '../shared/format.js'
+import { copyDatabase } from '../util/database.js'
 import type { Config } from '../config.js'
 import type { Db } from '../db.js'
 import type { SaveStores } from './stores.js'
@@ -15,9 +16,8 @@ const DAY = 24 * 3600_000
 const NAME = /^saves-(\d{4}-\d{2}-\d{2}-\d{4}(?:\d{2})?)\.zip$/
 
 /**
- * Save backups: once a day, a zip of everyone's saves (not their history, which stays in the data
- * folder) in the backups folder, keeping the last few. A server that sleeps when idle catches up
- * the next time it runs. Saves are only read here, never changed.
+ * Daily backups: everyone's saves (not their history) and a consistent copy of the library database.
+ * A server that sleeps when idle catches up the next time it runs. Saves are only read, never changed.
  */
 export class SaveBackups {
   private running: Promise<string> | null = null
@@ -55,10 +55,26 @@ export class SaveBackups {
     }))
   }
 
+  private get libraryDir(): string {
+    // Migration copies remain mandatory even when daily backups are off.
+    return join(this.dir ?? join(this.cfg.dataDir, 'backups', 'saves'), 'library')
+  }
+
+  private async libraryFiles(): Promise<Array<{ name: string; size: number; at: number }>> {
+    const names = (await readdir(this.libraryDir).catch(() => [] as string[])).filter((n) => /^library-.+\.db$/.test(n))
+    const files = await Promise.all(names.map(async (name) => {
+      const st = await stat(join(this.libraryDir, name))
+      return { name, size: st.size, at: st.mtimeMs }
+    }))
+    return files.sort((a, b) => b.at - a.at || b.name.localeCompare(a.name))
+  }
+
   async info(): Promise<BackupInfo> {
     const files = await this.files()
+    const newest = (await this.libraryFiles())[0]
+    const library = newest ? { path: join(this.libraryDir, newest.name), size: newest.size, at: newest.at } : null
     const last = files[0]?.at ?? null
-    return { dir: this.dir, keep: this.cfg.backupKeep, files, last, next: this.dir ? (last ? last + DAY : Date.now()) : null, running: !!this.running, error: this.error }
+    return { dir: this.dir, keep: this.cfg.backupKeep, files, library, last, next: this.dir ? (last ? last + DAY : Date.now()) : null, running: !!this.running, error: this.error }
   }
 
   async runIfDue(): Promise<string | null> {
@@ -81,6 +97,7 @@ export class SaveBackups {
     let out: ReturnType<typeof createWriteStream> | null = null
     try {
       await mkdir(dir, { recursive: true })
+      const library = copyDatabase(this.db.raw, this.libraryDir)
       const zip = new yazl.ZipFile()
       // A full disk or an unwritable folder rejects this while files are still being added: it is
       // awaited below, and handled now so it never goes unhandled.
@@ -106,7 +123,10 @@ export class SaveBackups {
       await done
       await rename(temp, join(dir, name))
       for (const old of (await this.files()).slice(this.cfg.backupKeep)) await rm(join(dir, old.name), { force: true })
+      const daily = (await this.libraryFiles()).filter((f) => !f.name.startsWith('library-before-')).sort((a, b) => b.name.localeCompare(a.name))
+      for (const old of daily.slice(this.cfg.backupKeep)) await rm(join(this.libraryDir, old.name), { force: true })
       this.error = null
+      log('backup', `Library database backed up: ${library}`)
       log('backup', `Saves backed up: ${name}, ${count} ${count === 1 ? 'file' : 'files'}, ${bytes((await stat(join(dir, name))).size)}`)
       return name
     } catch (e) {

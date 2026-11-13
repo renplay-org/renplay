@@ -193,7 +193,7 @@ export const ENV_VARS: readonly EnvVar[] = [
     kind: 'text',
     fallback: '',
     shown: 'backups/saves in the data folder',
-    description: 'Where a daily zip of everyone’s saves goes. Point it at another disk or a share to keep a copy apart from the data folder. `off` turns save backups off. A server that sleeps when idle makes the backup the next time it runs.',
+    description: 'Where daily save zips and library database copies go. Database copies go in its `library/` subfolder. Point it at another disk or a share to keep a copy apart from the data folder. `off` turns daily backups off. Copies before numbered database migrations are always required, using backups/saves/library in the data folder when daily backups are off. A server that sleeps when idle makes the daily backup the next time it runs.',
   },
   {
     name: 'RENPLAY_SYNC_SERVER',
@@ -207,7 +207,7 @@ export const ENV_VARS: readonly EnvVar[] = [
     group: 'Images and saves',
     kind: 'number',
     fallback: 14,
-    description: 'Save backups kept. Older ones are deleted.',
+    description: 'Daily save zips and daily library database copies kept, counted separately. Older daily copies are deleted. Copies before numbered database migrations are kept until you remove them.',
   },
   {
     name: 'RENPLAY_KEEPALIVE_URL',

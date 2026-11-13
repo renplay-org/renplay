@@ -39,6 +39,10 @@ run = "npx vitest run"
 description = "The complete browser suite in the pinned Linux container (Docker required)"
 run = "sh scripts/test-ui.sh"
 
+["test:ui:stop"]
+description = "Remove this worktree's warm browser container"
+run = "sh scripts/test-ui.sh --stop"
+
 [screenshots]
 description = "Phone and desktop screenshots of a running Renplay: mise run screenshots <url> <dir> [--sfw]"
 dir = "server"
@@ -111,7 +115,7 @@ run = [
 
 ["check:workflows"]
 description = "GitHub workflows: actionlint and zizmor"
-run = ["actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
+run = ["node --test scripts/browser-suites.test.mjs scripts/ui-workspace.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
 
 ["check:telemetry"]
 description = "The telemetry collector: type check, tests on a local D1, and a dry run of the deploy"

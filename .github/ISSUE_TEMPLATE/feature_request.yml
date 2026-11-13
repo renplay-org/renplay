@@ -1,0 +1,40 @@
+name: An idea or a feature
+description: Propose a change to Renplay
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Discuss a new setting or a large change here before writing code. For a new engine or a change
+        to how games run, use the Engine compatibility form. Small fixes can go straight to a pull request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe what is hard or missing today, rather than only the feature you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: people
+    attributes:
+      label: Who has this problem?
+      description: Say who would benefit and describe a situation where they need this.
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: What change do you suggest?
+      description: Describe your idea and any alternatives you considered.
+    validations:
+      required: true
+
+  - type: textarea
+    id: renpy-first
+    attributes:
+      label: How does this fit Ren'Py first?
+      description: Renplay is a Ren'Py player. Other engines are Beta and must not make Ren'Py worse. Explain how your idea fits that scope.
+    validations:
+      required: true

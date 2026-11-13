@@ -10,10 +10,8 @@ import { keyboard } from './keyboard'
 export function useFullscreen(shellRef: RefObject<HTMLElement | null>, fsMode: ReturnType<typeof fullscreenMode>, touch: boolean, send: (msg: Record<string, unknown>) => void, onHomeScreen: () => void) {
   const [fullscreen, setFullscreen] = useState(false)
   const [coversNotch, setCoversNotch] = useState(false)
-  // Esc is locked (a tap reaches the game), shown as a hint for a few seconds, and currently held down.
+  // Esc is locked: a tap reaches the game and holding it leaves. The menu says so under Full screen.
   const [escLocked, setEscLocked] = useState(false)
-  const [escHint, setEscHint] = useState(false)
-  const [escHeld, setEscHeld] = useState(false)
   const toggleFullscreen = useCallback(
     async (want?: boolean) => {
       if (fsMode === 'home-screen') {
@@ -41,7 +39,6 @@ export function useFullscreen(shellRef: RefObject<HTMLElement | null>, fsMode: R
       if (!on) {
         keyboard()?.unlock?.()
         setEscLocked(false)
-        setEscHeld(false)
       }
       setFullscreen(on)
       send({ type: 'renplay:fullscreen-state', value: on })
@@ -53,27 +50,5 @@ export function useFullscreen(shellRef: RefObject<HTMLElement | null>, fsMode: R
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [send])
 
-  // Esc in fullscreen: say how to leave when it starts, and show the hold.
-  useEffect(() => {
-    if (!escLocked) return
-    setEscHint(true)
-    const t = setTimeout(() => setEscHint(false), 4000)
-    return () => clearTimeout(t)
-  }, [escLocked])
-  useEffect(() => {
-    if (!escLocked) return
-    // When the player rather than the game has focus.
-    const key = (down: boolean) => (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.repeat) setEscHeld(down)
-    }
-    const down = key(true)
-    const up = key(false)
-    window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
-    return () => {
-      window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
-    }
-  }, [escLocked])
-  return { fullscreen, coversNotch, escLocked, escHint, escHeld, setEscHeld, toggleFullscreen }
+  return { fullscreen, coversNotch, escLocked, toggleFullscreen }
 }

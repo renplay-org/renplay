@@ -68,7 +68,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/app.ts         The HTTP app, mounting each part's routes. src/index.ts starts it
   src/services.ts    The server's parts, made once at start and given to every router and job
   src/config.ts      Environment variables, read from the table in envvars.ts
-  src/db.ts          SQLite schema and migrations (PRAGMA user_version)
+  src/db.ts          SQLite access. db-schema.ts declares and reconciles the schema and runs migrations
   src/shared/        What the server and the library both use: the adult levels, the recipe format,
                      the art types, the defaults, sizes for people (format.ts), and every answer of
                      the API (api.ts), which the server builds with `satisfies`. The library
@@ -158,6 +158,23 @@ The code was untangled so that a change lands in one place. `scripts/check-struc
   way it is used (requests, messages, the built runtime), never by cutting its source text apart.
 - **Write things once.** A device check goes in `selector/src/lib/platform.ts`, a size for people is
   `bytes` in `shared/format.ts`, a control comes from `lantern/`. Look for the existing one first.
+
+## Database changes
+
+SQLite only, no external database and no ORM. `server/src/db-schema.ts` declares the schema once.
+Startup adds missing tables, columns and indexes without changing existing definitions or removing
+unknown objects. Added columns must be nullable or have a default that SQLite can add to a populated
+table. The real 4.0 SQL fixture must still migrate to match a fresh library, so unsafe additions fail
+in tests before reaching a person's library.
+
+`PRAGMA user_version` is the compatibility floor, not the latest additive schema. Additions never
+raise it. Numbered migration progress lives separately in the `schema_migration` settings row. Every
+numbered migration first makes a database copy and stops if that fails.
+
+Breaking changes take two releases. First add and fill the new form while keeping the old form working,
+without raising the floor. Only a later release removes the old form with a numbered migration that
+raises the floor. Keep the previous release able to open the library. See the worked example in
+`docs/site/src/content/docs/developers/architecture.md`.
 
 ## How it fits together
 
@@ -258,9 +275,13 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
    `npm run screenshots` or Playwright directly. No page errors.
 4. Browser acceptance is `mise run test:ui`, the pinned official Playwright Linux image with Node 24.
    Native Mac browsers are for quick tries only. The Playwright suite uses one worker, desktop Chromium, and touch
-   WebKit in portrait and landscape. To repeat without retries: `UI_REPEAT=20 sh scripts/test-ui.sh playwright
-   --project=webkit-portrait` (repeat for `chromium-desktop` and `webkit-landscape`). Results and failure
-   traces are in `ui-test-results/`. A retry-only pass warns locally and fails CI. No PR screenshots.
+   WebKit in portrait and landscape. While working, run only the tests a change touches, using
+   `sh scripts/test-ui.sh --warm playwright --grep <behavior>` or `--warm legacy --only <subject>`.
+   Run the whole suite once at the end, in the container, and push only after it passes. Never re-run
+   a passing suite to make sure. A doubt about a test is a flake to report, and the **Flake hunt**
+   workflow repeats it without retries (by hand, or nightly on `dev`). Stop the warm container with
+   `mise run test:ui:stop`. Results and failure traces are in `ui-test-results/`.
+   A retry-only pass warns locally and fails CI. No PR screenshots.
    Never loosen a test without stopping to report it and getting a maintainer's approval: no removed assertions,
    wider tolerances, added or longer fixed waits, skips, quarantine or changes only to make it pass.
    Moving an assertion needs equivalent or stronger coverage in the new runner, not less coverage.
@@ -283,7 +304,9 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
   and a read-only root, an install, the upgrade from the newest release and back, the chart on
   kind, deploy/compose.yaml; skipped when nothing in the image or the chart changed), and
   `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
-  Upgrades are tested from the newest release.
+  The browser checks run in parallel when their inputs changed. Shared script or workflow changes
+  run all three, and the `Browser suite` summary reports even when all three are skipped.
+  Superseded runs of the same pull request are cancelled. Upgrades are tested from the newest release.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
   `sites.yml` (the docs and the website, with each release or by hand, and the website also daily and on a `catalog-updated` repository_dispatch, since its game pages follow the catalog), `demo.yml` (the demo, with each release or
@@ -300,6 +323,13 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
   at least every few weeks while there are changes; patch releases for fixes any time.
 - **Versioning:** SemVer. Minor for features, patch for fixes, major when upgrading needs action
   from the operator (the changelog says what).
+
+## Outside contributions
+
+Review changes to the game frame, `runtime/` or `server/src/play/` with the
+[player security checklist](docs/site/src/content/docs/developers/architecture.md#player-security-checklist).
+Never push to a contributor's branch without asking them. A first-time contributor's CI runs need a
+maintainer's approval.
 
 ## Deployment
 
