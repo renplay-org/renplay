@@ -324,6 +324,13 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
 - **Versioning:** SemVer. Minor for features, patch for fixes, major when upgrading needs action
   from the operator (the changelog says what).
 
+## Outside contributions
+
+Review changes to the game frame, `runtime/` or `server/src/play/` with the
+[player security checklist](docs/site/src/content/docs/developers/architecture.md#player-security-checklist).
+Never push to a contributor's branch without asking them. A first-time contributor's CI runs need a
+maintainer's approval.
+
 ## Deployment
 
 Releases are deployed by the maintainers, pinned by tag and digest

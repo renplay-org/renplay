@@ -362,6 +362,39 @@ answers the admin's tags until the person saves their own. The player sends the 
 person chooses (their choice and a size-chosen flag live in the game's persistent data). The
 admin's text size is applied once each time it changes, so the game's own setting keeps working.
 
+## Player security checklist
+
+Use this checklist when changing the game frame (`selector/src/pages/Player.tsx`), the runtimes
+(`runtime/`) or the play routes (`server/src/play/`). Apply the sandbox items to the sandboxed HTML
+path. Ren'Py uses a different, trusted runtime path.
+
+- [ ] Keep the HTML frame's opaque-origin sandbox. Do not add `allow-same-origin` or
+  `allow-popups-to-escape-sandbox`. Popups must inherit the sandbox.
+- [ ] Keep the response-level CSP sandbox on every HTML game pack response, not just its entry page.
+  Keep `frame-ancestors 'self'` on game responses, including Ren'Py pages, so another site cannot
+  embed them. Check direct navigation, secondary pages and popups too (`server/src/play/routes.ts`).
+- [ ] Keep signed asset links bound to the game, the build and a live session or access token
+  (`assetUrl` and `verifyAsset` in `server/src/accounts/accounts.ts`). A link must not authorize a
+  different game or build, and sign-out, account disabling or token revocation must invalidate it.
+- [ ] Send runtime messages to the parent only at Renplay's own address (`location.origin` in
+  `runtime/renplay-player.js`), never `*` or an arbitrary embedding parent's address. Preserve the
+  player's incoming message checks for the frame window, origin and user. The player's `*`
+  destination for messages to its own opaque-origin frame is a different direction and is intentional.
+- [ ] Test new workers in a real browser inside the sandboxed player. Check origins, credentials and
+  CORS, successful loading of the game's own assets, and denied access to the authenticated library,
+  API and another game's assets. Mocks alone cannot establish these browser security properties.
+- [ ] Keep asset streaming bounded. A byte-range or HEAD request must not trigger a whole-file read
+  of an asset. Resolve sizes without buffering payloads, stream only the requested range and return
+  HEAD without reading the payload. Test bounded reads for HEAD and a small range on a large asset.
+- [ ] Do not treat the sandbox as a network firewall. It restricts origin privileges, not all outgoing
+  requests. Review any new network access or permission grant separately.
+
+Record the evidence in the pull request, distinguishing checks on real devices from automated test
+browsers and mocks. For Python compatibility, mocked tests supplement rather than replace a
+regression that loads the assembled game on the supported web engine, including save/load and rollback.
+See [nginx and sandboxed games](/developers/accounts-api/#nginx-and-sandboxed-games) for the asset
+permission boundary.
+
 ## Security notes
 
 - Game code never runs on the server: no Ren'Py SDK, no Python. Archives are parsed as data.
