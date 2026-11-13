@@ -13,6 +13,7 @@ import type { Services } from '../services.js'
 import type { OfflineManifest } from '../shared/api.js'
 import { parseGamePath, type GamePath } from './path.js'
 import { readRuntimes } from './runtime.js'
+import { decryptedRpgMaker } from './rpgmaker.js'
 
 // Game pages play only inside Renplay's own player: another site cannot frame them to trick people
 // into clicks. Checked in Chromium and WebKit, sandboxed pages too. The library stays embeddable
@@ -120,7 +121,9 @@ export function createPlayRouter(s: Services): Router {
     } catch {
       entry = null
     }
-    if (!entry) throw new HttpError(404, 'Not found')
+    // A plain name for a file an RPG Maker game ships encrypted: the decrypted file.
+    const plain = entry || !installed || !isWebGame(installed) ? null : await decryptedRpgMaker(reader, name).catch(() => null)
+    if (!entry && !plain) throw new HttpError(404, 'Not found')
     // Other engines' games run in sandboxed frames, whose requests come from an opaque origin.
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -139,11 +142,11 @@ export function createPlayRouter(s: Services): Router {
         return
       }
     }
-    const size = entry[1]
+    const size = entry ? entry[1] : plain!.length
     res.setHeader('Content-Type', mimeOf(name))
     res.setHeader('Cache-Control', 'private, no-store')
     res.setHeader('Accept-Ranges', 'bytes')
-    res.setHeader('ETag', `"${base}-${entry[0].toString(36)}"`)
+    if (entry) res.setHeader('ETag', `"${base}-${entry[0].toString(36)}"`)
     let from = 0
     let to = size - 1
     const range = req.headers.range?.match(/^bytes=(\d*)-(\d*)$/)
@@ -161,6 +164,10 @@ export function createPlayRouter(s: Services): Router {
     res.setHeader('Content-Length', String(size ? to - from + 1 : 0))
     if (req.method === 'HEAD' || !size) {
       res.end()
+      return
+    }
+    if (!entry) {
+      res.end(plain!.subarray(from, to + 1))
       return
     }
     const s = reader.stream(entry, from, to)

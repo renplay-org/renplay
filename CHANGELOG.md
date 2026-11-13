@@ -46,6 +46,12 @@ release notes say what).
 - **Save and go to the main menu** and **Game page** in the game's menu, the note "Leaving saves first", the game's version under its title, "Powered by Ren'Py", the line with the game's size, the text under the options, the three-step home screen guide in Options (a row opens the help instead), and the filters over the saves in the game.
 - The hint at the top of the screen when a game goes full screen. Under the **Full screen** switch, the menu says **Hold Esc to leave** while Esc is locked.
 
+### Fixed
+
+- RPG Maker MV and MZ games play from their PC download. Their windows and menus no longer stop the game, their music plays, encrypted pictures show when a plugin asks for the plain file, a phone gets the whole height, and on iPhone a game that looks for gamepads keeps running.
+- RPG Maker MZ games with many large pictures no longer close and start again on a phone after a while. Pictures shown long ago make room for new ones, and the game loads one again when it needs it.
+- RPG Maker games on a phone play their videos inside the game: animated scenes move in the game instead of opening full screen in the iPhone's own player and leaving a still picture. RPG Maker MV games on a phone play the music, sounds and movies of their PC download, which they used to look for in other formats and miss. A video the game turns down to nothing is silent on iPhone too, and Renplay's sound switch reaches videos while they play.
+
 ## [4.10.0] - 2026-11-11
 
 ### Added
