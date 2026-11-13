@@ -263,9 +263,8 @@ test('the controller scrolls, turns pages, switches files and toggles see-throug
   await openGuide(page, testInfo)
   const guide = guideOf(page)
   await expect(guide).toBeVisible()
-  await expect(guide.locator('.gr-keys .pad-glyph').first()).toBeVisible()
   await expect.poll(() => ink(pageCanvas(guide, 1))).toBeGreaterThan(50)
-  await page.screenshot({ path: testInfo.outputPath('pad-glyphs.png') })
+  await page.screenshot({ path: testInfo.outputPath('pad-guide.png') })
   // The guide holds the pad: the game was told to give it up.
   await expect.poll(async () => (await lastPads())?.toGame).toBe(false)
   const view = guide.locator('.gr-view')

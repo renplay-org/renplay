@@ -3,11 +3,9 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, 
 import type { Game } from '@shared/api'
 import { IconBtn, Pill } from '../../lantern/controls'
 import { Spinner } from '../../lantern/ui'
-import { useGamepadConnected } from '../../lib/gamepad'
 import type { PDFDocumentProxy } from '../../lib/pdfjs'
 import { isTouchDevice } from '../../lib/platform'
 import { keepFile, keepView, keptView, type Zoom } from './keep'
-import { Legend } from './Legend'
 import PdfPage, { CSS_UNITS } from './PdfPage'
 import { useGestures, type Focal } from './useGestures'
 
@@ -38,7 +36,6 @@ type Size = [number, number]
  */
 function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | null> }) {
   const touch = useMemo(isTouchDevice, [])
-  const pad = useGamepadConnected()
   const kept = useMemo(() => keptView(w.file), [w.file])
   const view = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
@@ -260,7 +257,6 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
           </Pill>
         </div>
       )}
-      {!touch && !failed && <Legend pad={pad} kind={w.kind} />}
       {body}
     </>
   )

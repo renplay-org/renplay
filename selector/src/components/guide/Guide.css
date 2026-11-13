@@ -162,21 +162,6 @@
 .gr-bar .btn[aria-pressed="true"] {
   background: var(--plate-3);
 }
-.gr-keys {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 0;
-  padding: 0 14px 6px;
-  color: var(--fg-3);
-  font-size: 13px;
-}
-.gr-key {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
 .gr-view {
   flex: 1 1 auto;
   min-height: 0;
