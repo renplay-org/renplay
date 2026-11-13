@@ -1,5 +1,10 @@
-// A small real PDF for the guide's checks: Letter pages with a heading and lines of 10 point Helvetica, which
-// is not embedded, so PDF.js reads its standard font from the library's own files.
+import { readFileSync } from 'node:fs'
+
+// A small real PDF for the guide's checks: Letter pages with a heading and lines of 10 point text. The body font
+// is embedded (Liberation Sans, a TrueType font PDF.js ships), as in most guides, so the page is drawn with a font
+// PDF.js loads itself. The heading is Helvetica, which is not embedded, so PDF.js reads its standard font from the
+// library's own files.
+const liberation = readFileSync(new URL('../../../selector/node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf', import.meta.url))
 const pad = (n) => String(n).padStart(10, '0')
 
 /** `pages` is how many pages, `lines` how many lines of body text on each. */
@@ -8,7 +13,9 @@ export function pdf(pages = 3, lines = 40) {
   const add = (body) => objects.push(body) && objects.length
   const catalog = add('')
   const tree = add('')
-  const font = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
+  const file = add(`<< /Length ${liberation.length} /Length1 ${liberation.length} >>\nstream\n${liberation.toString('latin1')}\nendstream`)
+  const descriptor = add(`<< /Type /FontDescriptor /FontName /LiberationSans /Flags 32 /FontBBox [-200 -300 1200 1000] /ItalicAngle 0 /Ascent 905 /Descent -212 /CapHeight 700 /StemV 80 /FontFile2 ${file} 0 R >>`)
+  const font = add(`<< /Type /Font /Subtype /TrueType /BaseFont /LiberationSans /Encoding /WinAnsiEncoding /FontDescriptor ${descriptor} 0 R >>`)
   const bold = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>')
   const kids = []
   for (let p = 1; p <= pages; p++) {

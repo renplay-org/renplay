@@ -39,7 +39,9 @@ export default function PdfPage({ pdf, index, width, height, scale, root }: { pd
         if (stopped) return
         const ratio = Math.min(target.ownerDocument.defaultView?.devicePixelRatio ?? 1, Math.sqrt(MAX_PIXELS / (width * scale * height * scale)))
         const viewport = page.getViewport({ scale: scale * CSS_UNITS * ratio })
-        const off = target.ownerDocument.createElement('canvas')
+        // Drawn on a canvas of the page's own document, where PDF.js has put the fonts it loaded, and copied to the one on show,
+        // which may be in a small window of its own.
+        const off = document.createElement('canvas')
         off.width = Math.ceil(viewport.width)
         off.height = Math.ceil(viewport.height)
         task = page.render({ canvas: off, viewport })

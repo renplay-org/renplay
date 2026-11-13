@@ -25,6 +25,14 @@ const ink = (canvas) =>
     for (let i = 0; i < data.length; i += 28) if (data[i] < 100) n++
     return n
   })
+/** The share of a canvas that is dark: the same page has about the same at any size, and a page of missing glyphs has several times more. */
+const inkShare = (canvas) =>
+  canvas.evaluate((c) => {
+    const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+    let n = 0
+    for (let i = 0; i < data.length; i += 4) if (data[i] < 100) n++
+    return n / (c.width * c.height)
+  })
 const pageCanvas = (guide, n) => guide.locator(`canvas[aria-label="Page ${n}"]`)
 const pageNow = (guide) => guide.getByRole('status')
 
@@ -299,10 +307,14 @@ test('pop out moves the reader to a Picture-in-Picture window, Bring back and cl
   await openGuide(page, testInfo)
   const guide = guideOf(page)
   await expect(guide).toBeVisible()
+  await expect.poll(() => ink(pageCanvas(guide, 1))).toBeGreaterThan(50)
+  const inPage = await inkShare(pageCanvas(guide, 1))
   const [pip] = await Promise.all([context.waitForEvent('page'), guide.getByRole('button', { name: 'Pop out' }).click()])
   const small = guideOf(pip)
   await expect(small).toBeVisible()
   await expect.poll(() => ink(pageCanvas(small, 1)), { message: 'The page is drawn in the small window' }).toBeGreaterThan(50)
+  // With its own fonts: the text is as dense as in the page, not boxes where the glyphs should be.
+  expect(Math.abs((await inkShare(pageCanvas(small, 1))) / inPage - 1), 'The small window draws the same text').toBeLessThan(0.35)
   // The in-page window is away, and the button reads Bring back.
   await expect(guide).toHaveCount(0)
   await pip.screenshot({ path: testInfo.outputPath('popped-out.png') })
