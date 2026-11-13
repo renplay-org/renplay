@@ -14,6 +14,7 @@ import { keptGames, refreshShell } from './lib/offline'
 
 const GamePage = lazy(() => import('./pages/GamePage'))
 const Player = lazy(() => import('./pages/Player'))
+const GuidePopup = lazy(() => import('./pages/GuidePopup'))
 const AddGames = lazy(() => import('./pages/AddGames'))
 const Catalog = lazy(() => import('./pages/Catalog'))
 const Activity = lazy(() => import('./pages/Activity'))
@@ -61,6 +62,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/setup" element={<Setup />} />
               <Route element={<AuthGuard />}>
               <Route path="/play/:id" element={<Player />} />
+              <Route path="/guide/:id/:file" element={<GuidePopup />} />
               <Route element={<AppShell />}>
                 <Route path="/" element={<Library />} />
                 <Route path="/catalog" element={<Catalog />} />

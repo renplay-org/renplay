@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, Smartphone } from 'lucide-react'
 import './player/Player.css'
-import { GuideReader, GuideWindow, keptFile } from '../components/GuideWindow'
+import { GuideWindow, type GuideMode } from '../components/GuideWindow'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Confirm, Spinner, cx, useToast } from '../lantern/ui'
@@ -37,6 +37,7 @@ import { PlayerMenu, type MenuView } from './player/PlayerMenu'
 import PlayerPill from './player/PlayerPill'
 import SavesView from './player/SavesView'
 import { useKeyLabels } from './player/keyboard'
+import { useGuide } from './player/useGuide'
 import { Bar, Pill } from '../lantern/controls'
 import { useGoBack } from '../lantern/flight'
 import { useModal } from '../lantern/modal'
@@ -80,16 +81,9 @@ export default function Player() {
   const waiting = (sync.pending > 0 && slowSync) || !sync.online
   // The menu: closed, or open on its list, Saves or Options.
   const [menu, setMenu] = useState<MenuView | null>(null)
-  // The guide: the file open, or none. Beside the menu on a desktop or a phone held sideways, inside it (a view) when upright.
-  const [guide, setGuide] = useState<string | null>(null)
-  // The guide window was opened from the menu, so it has the focus until it closes or the menu does, and where its right edge starts.
-  const [guideIn, setGuideIn] = useState(false)
-  const [guideAfter, setGuideAfter] = useState<number | undefined>()
   const sheetRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef(menu)
   menuRef.current = menu
-  const guideRef = useRef(guide)
-  guideRef.current = guide
   const toast = useToast()
   const [panel, setPanel] = useState<Panel>(null)
   // The pill and the full screen button are lit for a few seconds after the game is ready, then quiet.
@@ -114,10 +108,7 @@ export default function Player() {
   // Other engines run their own JavaScript, so they play in a sandboxed frame
   // (opaque origin, no access to Renplay) and their storage comes through here.
   const sandboxed = !!game && !isRenpy(game)
-  // Upright, the guide lives inside the menu: a menu opened while it is open shows it.
-  const uprightRef = useRef(false)
-  const topView = (): MenuView => (uprightRef.current && guideRef.current ? 'guide' : 'top')
-  const openMenu = () => setMenu(topView())
+  const openMenu = () => setMenu('top')
   const keys = useKeyLabels()
   const padConnected = useGamepadConnected()
   const saves = useSaves(gameId)
@@ -140,7 +131,11 @@ export default function Player() {
   const { fullscreen, coversNotch, escLocked, toggleFullscreen } = useFullscreen(shellRef, fsMode, touch, send, () => setPanel('fullscreen'))
   const stage = useElementSize(stageRef, `${game?.id}:${isLoading}`)
   const upright = stage.h > stage.w
-  uprightRef.current = upright
+  // The guide: a window beside the menu on a computer, a sheet on an upright phone, the whole screen on one held sideways.
+  const guideMode: GuideMode = upright ? 'sheet' : touch && stage.h < 500 ? 'cover' : 'window'
+  const guide = useGuide({ game, mode: guideMode, menuOpen: () => !!menuRef.current, leaveMenu: () => setMenu(null), sheetRef, send })
+  const guideNow = useRef(guide)
+  guideNow.current = guide
   const insets = useSafeInsets()
   useWakeLock(ready)
   usePlayTime(ready && !exiting && !failed, gameId, userId, sandboxed, frameRef, () => setSignedOut(true))
@@ -252,7 +247,7 @@ export default function Player() {
           break
         case 'renplay:menu':
           // The controller's Menu button in the game.
-          setMenu((view) => view ?? topView())
+          setMenu((view) => view ?? 'top')
           break
         case 'renplay:key':
           if (d.key === 'menu') toggleMenu()
@@ -277,7 +272,6 @@ export default function Player() {
 
   const closeMenu = useCallback(() => {
     setMenu(null)
-    setGuideIn(false)
     send({ type: 'renplay:focus' })
   }, [send])
 
@@ -287,15 +281,17 @@ export default function Player() {
     return () => clearTimeout(t)
   }, [ready])
 
-  // The menu has the controller while it is open, and its Menu button closes it again.
+  // The menu has the controller while it is open, and the guide while focus is in it. Their Menu button closes
+  // the menu, or opens it from the guide.
+  const gameHasPad = !menu && !guide.active
   useEffect(() => {
-    if (ready && !sandboxed) send({ type: 'renplay:pads', toGame: !menu })
-    setGameHasPad(ready && !sandboxed && !menu)
-    if (!menu) return () => setGameHasPad(false)
-    const onMenu = () => closeMenu()
+    if (ready && !sandboxed) send({ type: 'renplay:pads', toGame: gameHasPad })
+    setGameHasPad(ready && !sandboxed && gameHasPad)
+    if (gameHasPad) return () => setGameHasPad(false)
+    const onMenu = () => (menuRef.current ? closeMenu() : openMenu())
     window.addEventListener('renplay:pad-menu', onMenu)
     return () => window.removeEventListener('renplay:pad-menu', onMenu)
-  }, [menu, ready, sandboxed, send, closeMenu])
+  }, [gameHasPad, ready, sandboxed, send, closeMenu])
 
   const { saveAndFlush } = saving
 
@@ -334,38 +330,7 @@ export default function Player() {
     else openMenu()
   }
   const toggleGuide = () => {
-    if (busy.current || !game?.walkthroughs.length) return
-    if (guideRef.current) closeGuide()
-    else openGuide()
-  }
-  // From the menu the guide opens beside the sheet and the menu stays, or inside the sheet when it is upright.
-  const openGuide = () => {
-    if (!guideRef.current) setGuide(game ? keptFile(game) : null)
-    if (!menuRef.current) return
-    if (uprightRef.current) setMenu('guide')
-    else {
-      const sheet = sheetRef.current
-      if (!guideRef.current && sheet) setGuideAfter(sheet.offsetLeft + sheet.offsetWidth)
-      setGuideIn(true)
-    }
-  }
-  // The guide stays over the game when the menu closes. Closing it with the menu open leaves the focus to the menu.
-  const closeGuide = () => {
-    setGuide(null)
-    setGuideIn(false)
-    setGuideAfter(undefined)
-    if (menuRef.current === 'guide') setMenu('top')
-    if (!menuRef.current) send({ type: 'renplay:focus' })
-  }
-  // The guide's view is for an upright phone: turned sideways, the guide becomes a window and the list comes back, and the other way.
-  useEffect(() => {
-    if (menu === 'guide' && !upright) setMenu('top')
-    else if (menu === 'top' && upright && guide) setMenu('guide')
-  }, [menu, upright, guide])
-  // Back from the guide's view closes the guide.
-  const changeView = (view: MenuView) => {
-    if (menuRef.current === 'guide' && view !== 'guide') setGuide(null)
-    setMenu(view)
+    if (!busy.current) guideNow.current.toggle()
   }
   useEffect(() => {
     if (!ready) return
@@ -481,6 +446,7 @@ export default function Player() {
           pad={padConnected}
           onMenu={openMenu}
           onFullscreen={fsMode !== 'none' && !fullscreen ? () => void toggleFullscreen() : undefined}
+          guide={touch && guide.seen && game.walkthroughs.length > 0 ? { open: guide.file !== null, onToggle: guide.toggle, over: guideMode === 'cover' && guide.file !== null } : undefined}
           waiting={waiting}
           waitLabel={online ? 'Some saves have not reached the server yet' : 'Offline. Saves wait on this device'}
         />
@@ -525,7 +491,7 @@ export default function Player() {
         <PlayerMenu
           game={game}
           view={menu}
-          onView={changeView}
+          onView={setMenu}
           onClose={closeMenu}
           sheetRef={sheetRef}
           portrait={upright}
@@ -537,8 +503,8 @@ export default function Player() {
           saving={saving.savingNow}
           onSaveNow={saving.saveNow}
           hasGuide={game.walkthroughs.length > 0}
-          guideOpen={guide !== null && menu !== 'guide'}
-          onGuide={openGuide}
+          guideOpen={guide.file !== null}
+          onGuide={guide.open}
           muted={muted}
           onMute={toggleMute}
           fsMode={fsMode}
@@ -563,7 +529,6 @@ export default function Player() {
               onManage={() => void exit('saves')}
             />
           }
-          guide={guide && <GuideReader game={game} file={guide} onFile={setGuide} />}
           options={
             <OptionsView
               renpy={!sandboxed}
@@ -581,8 +546,8 @@ export default function Player() {
           }
         />
       )}
-      {guide && game.walkthroughs.length > 0 && !(menu && upright) && (
-        <GuideWindow game={game} file={guide} onFile={setGuide} onClose={closeGuide} portrait={upright} insets={insets} after={guideAfter} modal={guideIn && !!menu} />
+      {guide.file && game.walkthroughs.length > 0 && (
+        <GuideWindow game={game} file={guide.file} onFile={guide.setFile} onClose={guide.close} mode={guideMode} insets={insets} after={guide.after} focusToken={guide.focusToken} onActive={guide.setActive} onPark={guide.park} />
       )}
       {panel === 'fullscreen' && (
         <SidePanel

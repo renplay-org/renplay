@@ -5,7 +5,7 @@ import { Pill, TagPill } from '../lantern/controls'
 import { BetaBadge } from '../lantern/ui'
 import type { CatalogGame } from '@shared/api'
 import { stateLabel, gameTags } from '../lib/tags'
-import { recipeLinks } from '../lib/links'
+import { popupClick, recipeLinks } from '../lib/links'
 import { useCatalog } from '../lib/queries'
 
 /** A catalog recipe, as the sheet a catalog tile opens: what it is, where to get it, how it installs. */
@@ -84,7 +84,7 @@ export default function RecipeCard({ recipe: r }: { recipe: CatalogGame }) {
           </Pill>
         )}
         {links.map(([k, label, url]) => (
-          <Pill key={k} variant="s" size="sm" href={url} target="_blank" rel="noreferrer" icon={<ExternalLink />}>
+          <Pill key={k} variant="s" size="sm" href={url} target="_blank" rel="noreferrer" icon={<ExternalLink />} onClick={k === 'walkthrough' ? popupClick(url) : undefined}>
             {label}
           </Pill>
         ))}

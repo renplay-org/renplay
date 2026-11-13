@@ -27,3 +27,33 @@
   height: 22px;
   flex: none;
 }
+.keycap.sm {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 13px;
+  line-height: 16px;
+}
+.pad-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  vertical-align: middle;
+}
+.pad-glyph.disc,
+.pad-glyph.bumper {
+  border: 1.5px solid currentColor;
+  color: var(--fg-2);
+  font: 700 13px/1 var(--sans);
+}
+.pad-glyph.disc {
+  border-radius: 999px;
+}
+.pad-glyph.bumper {
+  width: 34px;
+  height: 22px;
+  border-radius: 8px;
+}
