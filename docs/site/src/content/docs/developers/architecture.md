@@ -161,16 +161,45 @@ shares) injected. The server builds it at start and serves it at `/renplay/runti
 - **Catches Renplay's keys** in the capture phase (`renplay-player.js`), by `e.code`: ` opens and
   closes the player's menu and \ its guide (only once the player has said, with `renplay:keys`,
   that the game has one). They arrive as `renplay:key`, and the game never sees them.
+- **Holds a streamed file's fetch while offline.** A `GET` under `/g/` that fails while
+  `navigator.onLine` is false waits for the `online` event and goes again (`holdOffline` in
+  `renplay-player.js`), so a short drop does not show Ren'Py's error screen. A failure while the
+  browser thinks it is online is the server's and is passed on, and an aborted request stops waiting.
 - **Hands the controller to the player** for its Menu button: Start is taken out of Ren'Py's
   `config.pad_bindings` (again on each press, since a restarted game reads them anew), and while
   the menu is open `navigator.getGamepads` answers empty, until every button is released after it
-  closes.
+  closes. In a game with a guide the press is held back until the button is let go (the menu opens)
+  or half a second has passed (the guide toggles): `menuButton` in `renplay-player.js`.
 
 The player (`selector/src/pages/Player.tsx`) sizes the game from the stage's real size and the
 device's safe-area insets (`frameRect` in `lib/display.ts`: Fit gives the frame the game's own
 shape, Fill crops only the sides), handles fullscreen (the Fullscreen API, or Add to Home Screen on
 iPhone), and offers saves, a walkthrough and display options. Outside a game, `lib/gamepad.ts` turns
 the d-pad into arrow keys for the focus engine (`lantern/focus.ts`).
+
+### The guide's reader
+
+The guide (`components/GuideWindow.tsx`, `components/guide/`) reads walkthroughs itself.
+
+- **PDFs are drawn by PDF.js** (`pdfjs-dist`, Apache 2.0, pinned to an exact version) to canvases at
+  the device's pixel ratio, a page at a time as it comes near the window. The browser's own viewer
+  could not be set: Chrome fits a Letter page to a small frame at about 56 percent with a nine-button
+  toolbar, iPhone Safari draws only the first page of a PDF in a frame, and Android Chrome does not
+  draw it at all. The reader has one small bar, remembers the page and zoom per file, and zooms by
+  pinch, Ctrl with the wheel and double tap (`useGestures.ts`).
+- **It is a separate download.** `lib/pdfjs.ts` is imported only when a PDF guide opens, so the
+  library's first download does not grow. The worker is a Vite `?url` asset. The standard fonts and
+  decoders PDF.js asks for by name are emitted by `vite.config.ts` under
+  `/assets/pdfjs-<version>/` and added to the build's asset list, so a game kept offline keeps them. nginx
+  serves `.mjs` as JavaScript, which a module worker needs. There is no Content Security Policy to adapt.
+- **The guide is a layer beside the game**, not a trap: `useModal` with `trap: false` in
+  `lantern/modal.ts`. Escape closes it only while focus is in it. A guide with focus holds the
+  controller (`renplay:pads` with `toGame: false`), and `lib/gamepad.ts` sends its buttons to it as
+  `renplay:guide-pad` events. Y toggles see-through, X cycles the zoom, LB and RB switch files, B
+  parks it, and Menu held for half a second parks it too.
+- **Pop out** is Document Picture-in-Picture where the browser has it (`usePopout.ts`: the app's
+  stylesheets are copied into the small window and the reader is moved there with a portal), and a
+  popup window on `/guide/<game>/<file>` (`pages/GuidePopup.tsx`) elsewhere.
 
 ### Offline
 

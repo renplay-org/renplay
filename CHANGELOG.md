@@ -12,8 +12,14 @@ release notes say what).
 - Renplay keeps a copy of its library database before changing it and alongside the daily save backup.
 - In a game, the **Menu** pill says what it is. It is lit for the first seconds, then stays at 75 percent so it is easy to find on a phone too. With a controller connected it shows the Menu button. The menu shows its keys as keycaps, the way your keyboard prints them, beside **Back to the game** and **Guide** and in its last line.
 - Press **`** (left of **1**) in a game to open and close the menu, and **\** to open and close the walkthrough. They work wherever the focus is, in full screen too. **Esc** in the menu goes back a step, then closes it.
-- **Guide** in the game's menu opens the walkthrough beside the menu, and the menu stays open. **Back to the game** closes the menu and leaves the walkthrough where it is. On a phone held upright the walkthrough opens inside the menu, with **Back** to its list.
+- **Guide** in the game's menu opens the walkthrough beside the menu, and the menu stays open. **Back to the game** closes the menu and leaves the walkthrough where it is.
 - The walkthrough window keeps its see-through setting, its place and size, and the file you had open, when you close it and open it again, also after a reload in the same browser.
+- Renplay reads walkthroughs itself, so a PDF looks the same on every device. An iPhone shows every page, an Android phone no longer offers to download it, and the browser's toolbar with print and download is gone. A small bar shows the page ("3 of 12") with previous and next, zoom out, zoom in and **Fit**. Pinch, Ctrl with the wheel or a double tap zoom. The page and zoom are kept for each file in this browser. Pictures get the same bar, and text files are wrapped text on the dark plate.
+- The walkthrough window opens wider, 42 percent of the screen and at least 520 px, so that **Fit** is readable. A window you have already placed stays as you left it. On a phone a PDF opens at 100 percent and you pan it, and a double tap switches to **Fit**.
+- **See-through** in the walkthrough's title bar is one button, on or off, in place of the three steps. A setting you had kept before is on.
+- **Pop out** moves the walkthrough into a small window of its own. In Chrome and Edge the window stays on top of everything, also in full screen, and can go to another screen. **Bring back**, or closing the small window, puts it back. In Safari and Firefox it opens a popup window that holds only the walkthrough. A guide the catalog links opens in a popup window beside the game, not in a tab.
+- On a phone held upright the walkthrough is a sheet with a handle: drag it between 58 and 92 percent of the screen, with **Back to the game** first. Held sideways it fills the screen. After you have opened it, a **Guide** pill beside **Menu** switches between the walkthrough and the game in one tap.
+- With the keyboard in the walkthrough, **Esc** and **\** close it, the arrows scroll, **Page Up** and **Page Down** turn pages, **+** and **-** zoom and **0** fits. With a controller, the walkthrough holds the controller while it has focus: up and down scroll, left and right turn pages, **LB** and **RB** switch files, **Y** switches see-through, **X** zooms and **B** gives the controller back to the game. Hold **Menu** for half a second to open or close the walkthrough. The walkthrough's bar shows the controller's buttons while one is connected.
 - Tapping a save in the game's menu saves where you are first, then loads it, and says "Loaded. Where you were is saved too."
 - **Save now** says where the save went, "Saved as Quick 1", and the list of saves shows it at once.
 - The game's saves list pinned saves first and then the newest, in the menu and on the game's page. The menu has a last row, **Manage saves on the game page**.
@@ -30,6 +36,8 @@ release notes say what).
 - The loading screen's buttons can no longer be reached with the keyboard or a controller once the game has started.
 - When you resume a save, the loading screen names it, "Resuming Quick 1", not "quick-1".
 - Switches that are on are the same size as switches that are off.
+- When the network drops while you play, a file the game is loading waits for the network and goes on, where it showed an error before.
+- The tabs of the walkthrough's files have room for their focus ring.
 
 ### Removed
 
