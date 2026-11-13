@@ -99,7 +99,7 @@ export function GuideWindow({ game, file, onFile, onClose, mode, insets, after, 
   )
 
   if (mode === 'sheet') {
-    // A drag of the handle up or down chooses the height, and a tap on it switches.
+    // A drag of the handle up or down chooses the height, and a tap on it switches. From the keyboard it is a click.
     const resize = (e: ReactPointerEvent) => {
       const y0 = e.clientY
       const target = e.currentTarget as HTMLElement
@@ -113,13 +113,13 @@ export function GuideWindow({ game, file, onFile, onClose, mode, insets, after, 
     }
     return (
       <section ref={windowRef} role="dialog" aria-label={label} tabIndex={-1} className="gw-sheet" data-guide-window="" style={{ height: `${tall ? SHEET.tall : SHEET.short}dvh`, paddingBottom: insets.bottom }} {...focusEvents}>
-        <button type="button" className="gw-handle" aria-label={tall ? 'Make the guide shorter' : 'Make the guide taller'} onPointerDown={resize}>
-          <span />
-        </button>
         <div className="gw-bar">
           {back}
           <span className="grow" />
         </div>
+        <button type="button" className="gw-handle" aria-label={tall ? 'Make the guide shorter' : 'Make the guide taller'} onPointerDown={resize} onClick={(e) => e.detail === 0 && setTall((t) => !t)}>
+          <span />
+        </button>
         {body}
       </section>
     )

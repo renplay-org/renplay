@@ -89,11 +89,12 @@ function picture(url) {
  * `titled` answers with the short list of real titles (TITLED) instead of the 130 and 120 made-up ones. `delay` makes
  * each picture take that many milliseconds the first time it is asked for, as a network does and a cache does not.
  * `thumbhash` gives every picture its blurred placeholder, as a library has. `patch` changes what a game answers: { id: { ...fields } }.
+ * `shared` answers for the whole browser context, so a popup window the page opens is answered too.
  */
-export async function mock(page, errors, label, { titled = false, delay = 0, thumbhash = false, patch = {} } = {}) {
+export async function mock(page, errors, label, { titled = false, delay = 0, thumbhash = false, patch = {}, shared = false } = {}) {
   page.on('pageerror', (e) => errors.push(`${label}: ${e.message}`))
   const asked = new Set()
-  await page.route('**/api/**', async (route) => {
+  await (shared ? page.context() : page).route('**/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
     if (url.pathname.startsWith('/api/art/')) {

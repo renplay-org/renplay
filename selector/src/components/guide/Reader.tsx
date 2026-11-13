@@ -150,12 +150,14 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
   scaleNow.current = scale
   const zoomBy = useCallback((factor: number, at?: Focal) => zoomTo(Math.max(MIN, Math.min(MAX, scaleNow.current * factor)), at), [zoomTo])
   const toggle = useCallback((at?: Focal) => zoomTo(remember.current.zoom === 'fit' ? 1 : 'fit', at), [zoomTo])
-  useGestures(view, content, () => scaleNow.current, zoomBy, toggle, w.kind !== 'text')
+  useGestures(view, content, () => scaleNow.current, zoomBy, toggle, w.kind !== 'text' && sizes !== null)
 
+  const reading = useRef(0)
   const goTo = useCallback(
     (index: number) => {
       const n = Math.max(0, Math.min((sizes?.length ?? 1) - 1, index))
       if (view.current && offsets[n] !== undefined) view.current.scrollTop = offsets[n]! - PAD
+      reading.current = n
       setPage(n)
     },
     [sizes, offsets],
@@ -169,7 +171,6 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
   }, [measured, offsets, kept.page, goTo])
 
   // The page at the top third of the window is the one being read.
-  const reading = useRef(0)
   const onScroll = () => {
     const el = view.current
     if (!el || !offsets.length) return

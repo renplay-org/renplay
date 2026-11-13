@@ -10,6 +10,7 @@ export interface Focal {
  * Zoom by pinch, by Ctrl with the wheel (a trackpad's pinch comes the same way) and a double tap or double
  * click. During a pinch the content is only scaled by CSS, which is cheap, and the new zoom is applied when the
  * fingers lift. `scale` reads the zoom now, `zoomBy` and `toggle` apply a change, and `content` is what is scaled.
+ * `on` is while the pages are there to be zoomed: the scrolling element does not exist before.
  */
 export function useGestures(view: RefObject<HTMLElement | null>, content: RefObject<HTMLElement | null>, scale: () => number, zoomBy: (factor: number, at: Focal) => void, toggle: (at: Focal) => void, on: boolean) {
   const latest = useRef({ scale, zoomBy, toggle })

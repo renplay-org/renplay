@@ -41,7 +41,8 @@
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  padding: 0 8px 6px;
+  /* Room for the focus ring, which an element that scrolls would cut off. */
+  padding: 5px 8px 6px;
   scrollbar-width: none;
 }
 .gw-tabs button {
@@ -49,7 +50,7 @@
   min-height: 36px;
   padding: 0 12px;
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--fg-3);
   position: relative;
@@ -93,8 +94,9 @@
   cursor: default;
   padding: 2px 10px 8px 14px;
 }
-/* The handle: a 44 px target around a short bar, at the top of the sheet. */
+/* The handle: a 44 px target around a short bar, drawn at the top of the sheet and last to be reached by Tab, after Back to the game. */
 .gw-handle {
+  order: -1;
   flex: none;
   display: flex;
   align-items: center;
