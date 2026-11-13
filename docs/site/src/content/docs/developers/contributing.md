@@ -11,8 +11,14 @@ Thanks for helping with Renplay. Pick what fits:
 - **A bug in Renplay itself:** open a
   [bug report](https://github.com/renplay-org/renplay/issues/new?template=bug_report.yml). For a
   failed install, attach the job log from **Settings** → **Activity**.
-- **An idea:** open an [issue](https://renplay.org/issues) describing it before writing code, so we
-  can agree on the approach.
+- **An idea or a feature:** open an
+  [idea](https://github.com/renplay-org/renplay/issues/new?template=feature_request.yml) or
+  [engine compatibility](https://github.com/renplay-org/renplay/issues/new?template=engine_compatibility.yml)
+  issue first for a new engine, a change to how games run (runtimes, the game frame or Python
+  compatibility), a new setting or anything large. Small fixes can go straight to a pull request.
+
+Please follow the [code of conduct](https://github.com/renplay-org/renplay/blob/dev/CODE_OF_CONDUCT.md).
+We aim to give a first answer to an issue or pull request within a week.
 
 ## Development setup
 
@@ -72,16 +78,42 @@ These decide most review comments:
 
 ## Pull requests
 
-1. Branch from `dev` and open the pull request against `dev`.
-2. Keep it focused. The title follows Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`).
+1. Fork the repository and create a branch from `dev`, the default branch. Keep one change per
+   pull request and target `dev`, not `main` or a release branch.
+2. Use Conventional Commit titles (`feat:`, `fix:`, `perf:`, `docs:`, `chore:`) for commits and the
+   pull request. Explain what changes and why, and link the issue it closes.
 3. Run `mise run check`: type checks, tests, the structure rules (no import cycles, layers that
-   point down, no unused exports, files of at most 600 lines) and the writing rule. Add a test for
-   new server behavior.
-4. For UI changes, look at them on a phone size and a desktop size
-   (`cd server && npm run screenshots -- http://localhost:5199 /tmp/shots --sfw`).
-5. Add a line to `CHANGELOG.md` under `Unreleased` for anything users notice.
+   point down, no unused exports, files of at most 600 lines) and the writing rule. Add a test of
+   new behavior that fails without the change.
+4. For interface changes, check a 390 px phone in portrait and landscape, and a desktop. State which
+   devices and browsers you tried by hand and what was only checked in a test browser. Follow the
+   [browser test guide](https://github.com/renplay-org/renplay/blob/dev/CONTRIBUTING.md#browser-tests)
+   for the required pinned Linux container run.
+5. Add a line to `CHANGELOG.md` under `Unreleased` for anything users notice. Update the docs when
+   setup, configuration or described behavior changes.
+6. For the game frame, `runtime/` or `server/src/play/`, follow the
+   [player security checklist](/developers/architecture/#player-security-checklist).
 
-Pull requests are squash-merged.
+CI runs on pull requests, including those from forks. A first-time contributor's runs wait for a
+maintainer's approval so untrusted code does not run before review. The required checks are `check`,
+`Install contract` and `Browser suite`. Jobs may be skipped when their inputs have not changed, but
+these required checks still report a result.
+
+A maintainer reviews the pull request and may request changes. After review and passing required
+checks, it is squash-merged into `dev`. You do not need to sign your commits: `dev` does not require
+signed commits, and GitHub signs the squash commit. `main` and release branches require signed
+commits, but contributors never target them.
+
+### AI-assisted work
+
+AI-assisted work is welcome. The person opening the pull request must have run and tested the work,
+understand it and answer for it. State what was checked by hand and on which devices, separately
+from what was only checked in a test browser. This evidence is needed whether or not AI helped.
+
+### Licence
+
+Contributions are under the project's [MIT licence](https://github.com/renplay-org/renplay/blob/dev/LICENSE).
+There is no contributor agreement.
 
 ## Releases
 

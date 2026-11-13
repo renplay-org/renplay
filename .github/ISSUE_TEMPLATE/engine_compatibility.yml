@@ -1,0 +1,57 @@
+name: Engine compatibility
+description: Discuss a new engine or a change to how games run
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form before changing engine support, runtimes, the game frame or Python compatibility.
+        Individual game requests and broken catalog recipes belong in the catalog.
+        Do not attach commercial game files, personal saves or adult pictures.
+
+  - type: textarea
+    id: game
+    attributes:
+      label: Game and normal PC download
+      description: Give the game title, release version and a link to the developer's normal PC download page. Do not share private or signed download links.
+    validations:
+      required: true
+
+  - type: input
+    id: engine
+    attributes:
+      label: Engine and version
+      description: Name the engine and its version. Say if the version is unknown.
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: What fails?
+      description: Include reproduction steps, expected behavior and relevant logs. Say which Renplay version you tried.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Expected Beta scope
+      description: For other engines, describe the smallest useful Beta support for the normal PC download and what stays unsupported. For Ren'Py, describe the compatibility change and which games it affects.
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Origins, workers, permissions, storage and saves
+      description: Describe what would change in each area, or say why it stays unchanged. Include save compatibility. The opaque-origin sandbox must stay intact.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Test evidence
+      description: List tests and results, including install, playback and save/load checks. Separate real devices and browsers tried by hand from test browsers and mocks. Say what remains untested.
+    validations:
+      required: true
