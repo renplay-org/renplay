@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, Smartphone } from 'lucide-react'
 import './player/Player.css'
-import { GuideReader, GuideWindow } from '../components/GuideWindow'
+import { GuideReader, GuideWindow, keptFile } from '../components/GuideWindow'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Confirm, Spinner, cx, useToast } from '../lantern/ui'
@@ -340,7 +340,7 @@ export default function Player() {
   }
   // From the menu the guide opens beside the sheet and the menu stays, or inside the sheet when it is upright.
   const openGuide = () => {
-    if (!guideRef.current) setGuide(game?.walkthroughs[0]?.file ?? null)
+    if (!guideRef.current) setGuide(game ? keptFile(game) : null)
     if (!menuRef.current) return
     if (uprightRef.current) setMenu('guide')
     else {

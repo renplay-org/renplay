@@ -30,7 +30,9 @@ const gamePage = `<!doctype html><html><body tabindex="0" style="margin:0;backgr
 const slot = (n, minutes) => ({ file: `quick-${n}-LT1.save`, size: 1, mtime: 0, kind: 'quick', label: `Quick ${n}`, name: 'Diya', ctime: Date.parse('2026-11-11T12:00:00Z') - minutes * 60_000, screenshot: null, valid: true, title: null, note: null, pinnedAt: null })
 
 /** Opens the game with its saves, and what the made-up engine saw. */
-async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = false } = {}) {
+const GUIDE = { file: 'guide.png', title: 'Guide', kind: 'image', size: 1, addedAt: '2026-11-01T00:00:00Z', url: '/api/walkthroughs/guide.png' }
+
+async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = false, walkthroughs = [GUIDE] } = {}) {
   // Safari on an iPhone: no Fullscreen API, so the menu has the home screen row and the first game shows the tip.
   if (iphone)
     await page.addInitScript(() => {
@@ -42,7 +44,7 @@ async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = false }
     Object.defineProperty(Navigator.prototype, 'keyboard', { configurable: true, get: () => ({ lock: async () => {}, unlock() {}, getLayoutMap: async () => new Map([['Backquote', '`'], ['Backslash', '\\']]) }) })
   })
   // The game has a guide, so the Guide row and the backslash key are there. Asked again, the mock answers with the patch.
-  await mock(page, [], 'player', { titled: true, patch: { [GAME]: { walkthroughs: [{ file: 'guide.png', title: 'Guide', kind: 'image', size: 1, addedAt: '2026-11-01T00:00:00Z', url: '/api/walkthroughs/guide.png' }] } } })
+  await mock(page, [], 'player', { titled: true, patch: { [GAME]: { walkthroughs } } })
   const list = [...slots]
   await page.exposeFunction('__saved', () => { list.unshift(slot(1, 0)) })
   await page.route(`**/api/saves/${GAME}`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ saveDir: 'save-0', slots: list, other: [], conflicts: [], sync: false }) }))
@@ -311,6 +313,47 @@ test('the guide opens beside the menu, which stays open, and Back to the game le
   await expect(guide).toBeVisible()
   await page.keyboard.press('Backslash')
   await expect(guide).toBeHidden()
+})
+
+test('the guide window keeps its see-through, place, size and file when it is closed and opened again, and after a reload', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'webkit-portrait', 'Upright, the guide is a sheet with no window to place')
+  await play(page, { walkthroughs: [GUIDE, { ...GUIDE, file: 'route.png', title: 'Route map' }] })
+  const guide = page.getByRole('region', { name: /^Walkthrough/ })
+  const open = async () => {
+    await page.keyboard.press('Backslash')
+    await expect(guide).toBeVisible()
+  }
+  const close = async () => {
+    await page.keyboard.press('Backslash')
+    await expect(guide).toBeHidden()
+  }
+  await open()
+  // See-through, a move by the title bar, a resize from the grip, and the second file.
+  await guide.getByRole('radio', { name: '70%' }).or(guide.getByRole('button', { name: '70%' })).first().click()
+  const bar = await guide.locator('.gw-bar').boundingBox()
+  await page.mouse.move(bar.x + 20, bar.y + bar.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(bar.x - 80, bar.y + bar.height / 2 + 40, { steps: 5 })
+  await page.mouse.up()
+  const grip = await guide.getByRole('separator', { name: 'Resize the walkthrough' }).boundingBox()
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(grip.x + grip.width / 2 - 30, grip.y + grip.height / 2 - 30, { steps: 5 })
+  await page.mouse.up()
+  await guide.getByRole('tab', { name: 'Route map' }).click()
+  const state = async () => ({ box: await guide.boundingBox(), opacity: await guide.evaluate((el) => getComputedStyle(el).opacity), file: await guide.getByRole('tab', { selected: true }).textContent() })
+  const before = await state()
+  expect(before.opacity).toBe('0.7')
+  expect(before.file).toBe('Route map')
+  // Closed and opened again: the same window.
+  await close()
+  await open()
+  expect(await state()).toEqual(before)
+  // And after a reload, in this browser.
+  await page.reload()
+  await expect(page.locator('.rp-pill').first()).toBeVisible()
+  await open()
+  expect(await state()).toEqual(before)
 })
 
 test('on a phone held upright the guide opens inside the menu, and Back returns to the list', async ({ page }, testInfo) => {

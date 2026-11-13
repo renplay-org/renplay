@@ -13,6 +13,7 @@ release notes say what).
 - In a game, the **Menu** pill says what it is. It is lit for the first seconds, then stays at 75 percent so it is easy to find on a phone too. With a controller connected it shows the Menu button. The menu shows its keys as keycaps, the way your keyboard prints them, beside **Back to the game** and **Guide** and in its last line.
 - Press **`** (left of **1**) in a game to open and close the menu, and **\** to open and close the walkthrough. They work wherever the focus is, in full screen too. **Esc** in the menu goes back a step, then closes it.
 - **Guide** in the game's menu opens the walkthrough beside the menu, and the menu stays open. **Back to the game** closes the menu and leaves the walkthrough where it is. On a phone held upright the walkthrough opens inside the menu, with **Back** to its list.
+- The walkthrough window keeps its see-through setting, its place and size, and the file you had open, when you close it and open it again, also after a reload in the same browser.
 - Tapping a save in the game's menu saves where you are first, then loads it, and says "Loaded. Where you were is saved too."
 - **Save now** says where the save went, "Saved as Quick 1", and the list of saves shows it at once.
 - The game's saves list pinned saves first and then the newest, in the menu and on the game's page. The menu has a last row, **Manage saves on the game page**.

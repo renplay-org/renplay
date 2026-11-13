@@ -37,7 +37,7 @@ export function GuideReader({ game, file, onFile }: { game: Game; file: string; 
       {files.length > 1 && (
         <div className="gw-tabs" role="tablist" aria-label="Walkthroughs">
           {files.map((w) => (
-            <button key={w.file} type="button" role="tab" aria-selected={w.file === current.file} className={w.file === current.file ? 'on' : ''} onClick={() => onFile(w.file)}>
+            <button key={w.file} type="button" role="tab" aria-selected={w.file === current.file} className={w.file === current.file ? 'on' : ''} onClick={() => (keepFile(game, w.file), onFile(w.file))}>
               {w.title}
             </button>
           ))}
@@ -55,6 +55,41 @@ interface Box {
   h: number
 }
 
+/** The window's see-through and place, kept in this browser: closing and opening it again changes nothing. */
+const KEPT = 'renplay:guide-window'
+const kept = (): { opacity?: string; box?: Box } => {
+  try {
+    return JSON.parse(localStorage.getItem(KEPT) ?? '{}') as { opacity?: string; box?: Box }
+  } catch {
+    return {}
+  }
+}
+const keep = (change: { opacity?: string; box?: Box }) => {
+  try {
+    localStorage.setItem(KEPT, JSON.stringify({ ...kept(), ...change }))
+  } catch {
+    // Private browsing without storage: the window starts as new next time.
+  }
+}
+
+/** The guide file a game last had open in this browser, when the game still has it. */
+export const keptFile = (game: Game): string | null => {
+  let file: string | null = null
+  try {
+    file = localStorage.getItem(`renplay:guide-file:${game.id}`)
+  } catch {
+    // Storage off: the first file.
+  }
+  return game.walkthroughs.find((w) => w.file === file)?.file ?? game.walkthroughs[0]?.file ?? null
+}
+const keepFile = (game: Game, file: string) => {
+  try {
+    localStorage.setItem(`renplay:guide-file:${game.id}`, file)
+  } catch {
+    // Storage off.
+  }
+}
+
 /**
  * The walkthrough beside the game. A floating window on desktop and in landscape: drag it by its
  * title, resize it from the 44 px grip, a tab per file, see-through, pop it out. It stays inside
@@ -68,10 +103,22 @@ interface Box {
 export function GuideWindow({ game, file, onFile, onClose, portrait, insets, after, modal }: { game: Game; file: string; onFile: (file: string) => void; onClose: () => void; portrait: boolean; insets: { top: number; right: number; bottom: number; left: number }; after?: number; modal: boolean }) {
   const files = game.walkthroughs
   const current = files.find((w) => w.file === file) ?? files[0]
-  const [opacity, setOpacity] = useState('1')
+  const [opacity, setOpacityState] = useState(() => kept().opacity ?? '1')
+  const setOpacity = (value: string) => {
+    setOpacityState(value)
+    keep({ opacity: value })
+  }
   const bounds = () => ({ left: insets.left + 8, top: insets.top + 8, right: window.innerWidth - insets.right - 8, bottom: window.innerHeight - insets.bottom - 8 })
   const [box, setBox] = useState<Box>(() => {
     const b = bounds()
+    // Where the person left it, inside the screen, and never under the menu's sheet when it opens beside it.
+    const last = kept().box
+    if (last) {
+      const w = Math.max(260, Math.min(last.w, b.right - b.left))
+      const h = Math.max(200, Math.min(last.h, b.bottom - b.top))
+      const x = after !== undefined ? Math.max(last.x, after + 12) : last.x
+      return { w, h, x: Math.min(Math.max(x, b.left), b.right - w), y: Math.min(Math.max(last.y, b.top), b.bottom - h) }
+    }
     const h = Math.min(640, (b.bottom - b.top) * 0.82)
     if (after !== undefined) {
       const x = after + 12
@@ -108,6 +155,10 @@ export function GuideWindow({ game, file, onFile, onClose, portrait, insets, aft
     const up = () => {
       target.removeEventListener('pointermove', move)
       target.removeEventListener('pointerup', up)
+      setBox((b) => {
+        keep({ box: b })
+        return b
+      })
     }
     target.addEventListener('pointermove', move)
     target.addEventListener('pointerup', up)
