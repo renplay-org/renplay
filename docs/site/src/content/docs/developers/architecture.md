@@ -174,8 +174,15 @@ shares) injected. The server builds it at start and serves it at `/renplay/runti
 The player (`selector/src/pages/Player.tsx`) sizes the game from the stage's real size and the
 device's safe-area insets (`frameRect` in `lib/display.ts`: Fit gives the frame the game's own
 shape, Fill crops only the sides), handles fullscreen (the Fullscreen API, or Add to Home Screen on
-iPhone), and offers saves, a walkthrough and display options. Outside a game, `lib/gamepad.ts` turns
-the d-pad into arrow keys for the focus engine (`lantern/focus.ts`).
+iPhone), and offers saves, a walkthrough and display options. Outside a game, `lib/padinput.ts` reads
+the controller (one direction from the d-pad or the left stick, with a dead zone, hysteresis and a
+repeat that starts late) and `lib/gamepad.ts` acts on it: an arrow key first, for the controls that
+handle arrows, then the focus engine's move to the nearest control in that direction
+(`moveSpatial` in `lantern/focus.ts`; menus and sheets step through their controls in order). The
+right stick scrolls, LB and RB switch pages (`renplay:pad-page`) and B goes back (`renplay:pad-back`),
+both handled by the app shell. Focus is brought into view with the header, the stuck toolbar and the
+tab bar kept clear (`reveal`), without page-wide scroll padding, which would make a field in the
+toolbar count as hidden under it.
 
 ### The guide's reader
 
