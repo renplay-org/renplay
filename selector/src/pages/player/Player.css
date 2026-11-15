@@ -178,11 +178,10 @@
 .pm-title {
   min-width: 0;
   font-family: var(--serif);
-  font-variation-settings: "opsz" var(--opsz-title);
+  font-optical-sizing: auto;
   font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  word-spacing: 0.08em;
+  letter-spacing: -0.01em;
 }
 .pm-clock {
   flex: none;

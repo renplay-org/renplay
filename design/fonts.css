@@ -21,10 +21,11 @@
   font-style: normal;
   font-display: swap;
 }
-/* Fraunces' metrics on Georgia, by weight, measured on the titles and the story voice. Titles are set at the largest
-   optical size, which is much narrower than Georgia Bold, so each weight has its own size: 400 at optical size 14,
-   700 and 850 at 144. The ascent and descent are Fraunces' (1956 and 510 of 2000), divided by the size adjustment,
-   and the line gap is Fraunces', none. Linux has no Georgia: its twin there is Gelasio. */
+/* Fraunces' metrics on Georgia, by weight, measured on the titles and the story voice. Its optical size changes its
+   width a good deal, so each weight has its own size for the optical size it is set at: 400 at 14 (the story voice),
+   700 following the size (15 to 20 px, small titles), 850 at 144 (large titles). The ascent and descent are Fraunces'
+   (1956 and 510 of 2000), divided by the size adjustment, and the line gap is Fraunces', none. Linux has no Georgia:
+   its twin there is Gelasio. */
 @font-face {
   font-family: 'Fraunces fallback';
   src: local(Georgia), local(Gelasio);
@@ -38,9 +39,9 @@
   font-family: 'Fraunces fallback';
   src: local('Georgia Bold'), local(Georgia-Bold), local('Gelasio Bold'), local(Georgia), local(Gelasio);
   font-weight: 600 799;
-  size-adjust: 79.5%;
-  ascent-override: 123%;
-  descent-override: 32.1%;
+  size-adjust: 97%;
+  ascent-override: 100.8%;
+  descent-override: 26.3%;
   line-gap-override: 0%;
 }
 @font-face {
