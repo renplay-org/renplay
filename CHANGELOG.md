@@ -24,6 +24,10 @@ release notes say what).
 
 ### Fixed
 
+- A name, note and pin follow their save. When a quick save or an autosave moves a save to the next slot, its name, note and pin move with it, and the new save in the first slot starts without them. A save written over with new content no longer keeps the old name. The earlier version stays in History, and restoring it brings the name back.
+
+### Changed
+
 - The website no longer says Renplay sends no telemetry. It says what it sends: one small anonymous report a day, which you can turn off.
 - The game page's saves on a phone: the tabs and the toolbar no longer run off the screen, the actions list is one action to a line, and the history is titled with the save's name and says in plain words why each version is there.
 

@@ -236,7 +236,7 @@ function gameSaves(s: Services): Router {
   })
 
   /** A save's name, note and pin for this person. The save file itself is not touched. */
-  router.put('/:id/meta', (req, res) => {
+  router.put('/:id/meta', async (req, res) => {
     const g = game(req)
     const saveDir = requireSaveDir(g)
     const file = cleanRelPath(req.query['file'])
@@ -253,7 +253,9 @@ function gameSaves(s: Services): Router {
       note: b.note !== undefined ? b.note.trim() : row.note,
       pinned_at: b.pinned === undefined ? row.pinned_at : b.pinned ? row.pinned_at || new Date().toISOString() : '',
     }
-    saveStores.setNote(user, saveDir, file, next)
+    // What the save holds, so the name follows it when Ren'Py moves it to another file.
+    const held = await s.saves.read(saveDir, file).then(sha1, () => '')
+    saveStores.setNote(user, saveDir, file, next, held)
     res.json({ ok: true, title: next.title || null, note: next.note || null, pinnedAt: next.pinned_at || null })
   })
 
