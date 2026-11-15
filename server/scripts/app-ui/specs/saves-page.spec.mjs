@@ -86,6 +86,59 @@ test('the game page\'s Saves tab, its action sheet and its history sheet have no
   await page.screenshot({ path: testInfo.outputPath('history-all.png') })
 })
 
+/** The opacity of the surface a sheet or menu is drawn on, as computed: what shows through when nothing is blurred. */
+const opacity = (locator) =>
+  locator.evaluate((el) => {
+    const surface = el.closest('.sheet, .pop') ?? el
+    const color = getComputedStyle(surface).backgroundColor
+    const alpha = color.match(/^rgba\(.*,\s*([\d.]+)\)$/)
+    return { surface: surface.className, alpha: alpha ? Number(alpha[1]) : 1 }
+  })
+
+test('every sheet and menu reads with no blur: what is behind it does not show through', async ({ page }, testInfo) => {
+  await play(page, {
+    path: '/game/game-000#saves',
+    slots: [{ ...slot(1, 5), title: 'Meeting Diya', note: 'Before the first lunch scene' }, slot(2, 30), slot(3, 60)],
+  })
+  // No blur at all, as in the test browser and on a phone with reduced transparency.
+  await page.addStyleTag({ content: '*, *::before, *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important }' })
+  const solid = async (locator, what) => {
+    const { surface, alpha } = await opacity(locator)
+    expect(alpha, `${what} (${surface})`).toBeGreaterThanOrEqual(0.95)
+  }
+  await press(testInfo, page.getByRole('button', { name: 'Save actions' }).first())
+  const actions = page.locator('.menu')
+  await expect(actions).toBeVisible()
+  await solid(actions, 'The actions')
+  // The picture is of the sheet at rest, not while it rises in.
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect.getComputedTiming().endTime !== Infinity).map((a) => a.finished.catch(() => {}))))
+  await page.screenshot({ path: testInfo.outputPath('actions-no-blur.png') })
+  await press(testInfo, actions.getByRole('button', { name: 'Name and note' }))
+  const naming = page.getByRole('dialog', { name: 'Name and note' })
+  await expect(naming).toBeVisible()
+  await solid(naming, 'Name and note')
+  await press(testInfo, naming.getByRole('button', { name: 'Close' }))
+  await press(testInfo, page.getByRole('button', { name: 'Save actions' }).first())
+  await press(testInfo, page.locator('.menu').getByRole('button', { name: 'Previous versions' }))
+  const history = page.getByRole('dialog', { name: /^Previous versions of / })
+  await expect(history).toBeVisible()
+  await solid(history, 'The history of a save')
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect.getComputedTiming().endTime !== Infinity).map((a) => a.finished.catch(() => {}))))
+  await page.screenshot({ path: testInfo.outputPath('history-no-blur.png') })
+  await press(testInfo, history.getByRole('button', { name: 'Close' }))
+  await press(testInfo, page.getByRole('button', { name: 'History' }))
+  const all = page.getByRole('dialog', { name: 'Save history' })
+  await expect(all).toBeVisible()
+  await solid(all, 'The history of every save')
+  await press(testInfo, all.getByRole('button', { name: 'Close' }))
+  // Lantern's Sheet and menu in general, whatever opens them: the style they are drawn with.
+  for (const classes of ['sheet', 'sheet wide', 'sheet xwide', 'sheet full-ph', 'pop', 'pop menu-pop']) {
+    const probe = await page.evaluateHandle((c) => document.body.appendChild(Object.assign(document.createElement('div'), { className: c })), classes)
+    await solid(probe.asElement(), `.${classes.replace(/ /g, '.')}`)
+    await probe.evaluate((el) => el.remove())
+  }
+})
+
 test('Start from the main menu sits under Resume and opens the game without a save', async ({ page }, testInfo) => {
   await play(page, { path: '/game/game-000' })
   const resume = page.getByRole('button', { name: 'Resume' }).first()

@@ -36,7 +36,8 @@
   --s6: 32px;
   --hit: 44px;
   --glass: rgba(10, 10, 16, 0.74);
-  --glass-deep: rgba(10, 10, 16, 0.9);
+  /* Sheets and menus read with no blur at all (reduced transparency, or a browser that draws none). */
+  --glass-sheet: rgb(12, 12, 19);
   --line: rgba(255, 255, 255, 0.08);
   --pink: #f4508a;
   --pink-2: #ff9ec0;
@@ -2079,7 +2080,7 @@ select.input option {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--glass);
+  background: var(--glass-sheet);
   backdrop-filter: blur(30px) saturate(140%);
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   padding: 10px 20px calc(22px + var(--sab));
@@ -2216,7 +2217,7 @@ select.input option {
   position: fixed;
   z-index: 100;
   width: min(390px, 100vw - 32px);
-  background: var(--glass);
+  background: var(--glass-sheet);
   backdrop-filter: blur(30px) saturate(140%);
   border-radius: 18px;
   padding: 16px 18px;
@@ -2747,12 +2748,6 @@ input[type="range"] {
 @media (max-width: 719px) {
   .picker .prev .card:not(.wide) {
     width: 120px;
-  }
-}
-/* A sheet that fills a phone screen sits over the page's text, not over art: deep glass keeps it legible. */
-@media (max-width: 719px) {
-  .sheet.full-ph {
-    background: var(--glass-deep);
   }
 }
 /* The Choose artwork footer spans the sheet: its sentence, then the lit pill and Skip. */
