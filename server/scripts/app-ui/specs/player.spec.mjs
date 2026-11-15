@@ -502,6 +502,18 @@ test('Name it with the controller: A opens the field, the d-pad reaches Done, an
   expect(engine.named()).toHaveLength(1)
 })
 
+test('the turn line goes the moment the menu opens, so it never lies over a row', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
+  await play(page)
+  const turn = page.locator('.toast', { hasText: 'Turn your phone sideways for a bigger picture' })
+  await expect(turn).toBeVisible()
+  await press(testInfo, page.locator('.rp-pill').first())
+  await expect(page.getByRole('dialog', { name: /the player menu/ })).toBeVisible()
+  // Gone with the menu, well before a toast's own four seconds are up.
+  await expect(turn).toHaveCount(0, { timeout: 1000 })
+  await page.screenshot({ path: testInfo.outputPath('menu-without-the-turn-line.png') })
+})
+
 test('the portrait gate is only there while the game loads, and the toast comes once', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
   const engine = await play(page, { holdReady: true })

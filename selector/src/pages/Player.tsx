@@ -371,16 +371,16 @@ export default function Player() {
   const rect = frameRect(area.w, area.h, screenSize, prefs.fit)
   const hasCutout = notch > 0 || insets.top + insets.right + insets.bottom + insets.left > 0
   const portrait = touch && stage.h > stage.w && (!screenSize || screenSize[0] > screenSize[1])
+  // Both tips below go the moment the menu opens, so they never lie over a row.
+  const dismissTip = useRef<(() => void) | null>(null)
   // The game is ready and the phone is still upright: the first time, one line says what a turn gives. Never over the game's first scene.
   useEffect(() => {
     if (!ready || !portrait || portraitOk || localStorage.getItem(TURN_TIP_KEY)) return
     localStorage.setItem(TURN_TIP_KEY, '1')
-    toast('Turn your phone sideways for a bigger picture')
+    dismissTip.current = toast('Turn your phone sideways for a bigger picture')
   }, [ready, portrait, portraitOk, toast])
   // On an iPhone in Safari, once the game has started and never while it loads: once, how to get full screen.
   // One message at a time: the turn line above goes first, and this waits until no toast shows.
-  // It goes the moment the menu opens, so it never lies over a row.
-  const dismissTip = useRef<(() => void) | null>(null)
   const { showing, busy: toastBusy } = useToasting()
   useEffect(() => {
     if (!ready || fsMode !== 'home-screen' || menu || showing || toastBusy() || localStorage.getItem(HOME_TIP_KEY)) return
