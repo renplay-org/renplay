@@ -61,6 +61,20 @@ describe('SaveStore', () => {
     db.close()
   }, 25_000)
 
+  it('names the slot of each version in the history, for people', async () => {
+    const db = Db.open(join(root, 'data'))
+    db.insertGame({ id: 'g', title: 'G', status: 'installed', build: 'b1', save_dir: 'G-1' })
+    const app = express()
+    app.use('/api', createSavesRouter({ db, content: new ContentMode(loadConfig(), db), cfg: { syncServer: 'https://sync.renpy.org', saveLimits: { file: 100, total: 250, files: 9 } }, saves: store } as never))
+    for (const name of ['quick-1-LT1.save', '2-3-LT1.save']) {
+      await store.write('G-1', name, Buffer.from('one'))
+      await store.write('G-1', name, Buffer.from('two'))
+    }
+    const { body } = await request(app).get('/api/saves/g/history').expect(200)
+    expect(body.versions.map((v: { name: string; label: string }) => [v.name, v.label]).sort()).toEqual([['2-3-LT1.save', 'Page 2 · Slot 3'], ['quick-1-LT1.save', 'Quick 1']])
+    db.close()
+  })
+
   it('writes, keeps history on overwrite, and restores', async () => {
     await store.write('Game-1', '1-1-LT1.save', Buffer.from('v1'))
     await store.write('Game-1', '1-1-LT1.save', Buffer.from('v2'))

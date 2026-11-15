@@ -321,7 +321,8 @@ function gameSaves(s: Services): Router {
   router.get('/:id/history', async (req, res) => {
     const g = game(req)
     const name = typeof req.query['file'] === 'string' ? cleanRelPath(req.query['file']) : undefined
-    res.json({ versions: await s.saves.history(requireSaveDir(g), name) } satisfies SaveVersions)
+    const versions = await s.saves.history(requireSaveDir(g), name)
+    res.json({ versions: versions.map((v) => ({ ...v, label: slotInfo(v.name).label })) } satisfies SaveVersions)
   })
 
   router.post('/:id/history/restore', async (req, res) => {

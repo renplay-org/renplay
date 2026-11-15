@@ -150,11 +150,11 @@ export default function GamePage() {
 
   return (
     <div style={{ paddingBottom: 20 }}>
-      <Stage game={game} eyebrow={installed ? 'In your library' : game.status === 'installing' ? 'Installing' : 'Not installed'} back={{ to: '/', label: 'Library' }} meta={meta} body={body} actions={actions} actsRef={actsRef} />
+      <Stage game={game} under={installed && !game.job && renpy && latest ? <button className="link-q" onClick={() => resume(true)}>Start from the main menu</button> : undefined} eyebrow={installed ? 'In your library' : game.status === 'installing' ? 'Installing' : 'Not installed'} back={{ to: '/', label: 'Library' }} meta={meta} body={body} actions={actions} actsRef={actsRef} />
 
       <div style={{ marginTop: 32, marginBottom: 24 }}>
         <Seg<Tab>
-          scroll
+          wrap
           label="Game page sections"
           value={tab}
           onChange={setTab}
