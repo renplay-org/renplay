@@ -457,4 +457,14 @@
   .pm-save {
     height: 64px;
   }
+  /* Name it takes one row of 40 px, with its ring. */
+  .pm-name {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .pm-name .input,
+  .pm-name .btn {
+    height: 40px;
+    min-height: 40px;
+  }
 }

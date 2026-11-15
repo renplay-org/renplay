@@ -147,7 +147,8 @@ test('every control in the menu, Saves and Options is tall enough and no text is
   }
   // Nothing scrolls on the list at 844 x 390, also with the line about saves that wait, which is two lines there.
   if (landscape) {
-    // Name it goes with Esc, and the list is where it is.
+    // Name it, open, is one more row of 40 px and the list still does not scroll. It goes with Esc, and the list is where it is.
+    expect(await menu.locator('.pm-body').evaluate((b) => b.scrollHeight - b.clientHeight)).toBeLessThanOrEqual(0)
     await page.keyboard.press('Escape')
     await expect(menu.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
     await context.setOffline(true)
