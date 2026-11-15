@@ -92,6 +92,19 @@ test.describe('reaching every game', () => {
     await expect(page, 'A opens the game').toHaveURL(new RegExp(`/game/${end}$`))
   })
 
+  test('right and left across the rows keep each tile whole and clear of the header, the stuck toolbar and the bottom', async ({ page }, testInfo) => {
+    desktopOnly(testInfo)
+    await library(page)
+    for (const button of ['right', 'left']) {
+      for (let i = 0; i < (button === 'right' ? 40 : 30); i++) {
+        await tap(page, button, 60)
+        const at = await place(page)
+        expect(at.top, `${at.id} starts below the header and toolbar going ${button}`).toBeGreaterThanOrEqual(at.ceiling)
+        expect(at.bottom, `${at.id} ends above the bottom of the screen going ${button}`).toBeLessThanOrEqual(at.floor)
+      }
+    }
+  })
+
   test('up from the first row reaches the search, the tags and the Up next buttons, and right moves along them', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
     await library(page)

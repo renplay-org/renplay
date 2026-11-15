@@ -22,14 +22,26 @@ const targets = (root: ParentNode): HTMLElement[] => {
 /** The bars that stay on the screen while the page scrolls under them: they cover what is behind, so they never need scrolling to. */
 const CHROME = '.top, .toolbar, .tabbar'
 
+/** How far from the edges of the screen a control is kept when it is scrolled to. */
+const MARGIN = 12
+
 /**
- * Brings what has focus fully into view, under the header and the stuck toolbar and above the tab bar (the page's
- * `scroll-padding` says how far). Instant: a controller moves again before a glide would finish, and the next move
- * then reads where things really are.
+ * Brings what has focus fully into view: under the header and the toolbar stuck below it, above the tab bar on a
+ * phone. The page's own scroll padding is not used: a field in the toolbar would count as hidden under it, and the
+ * browser would scroll the page on every key typed. Instant: a controller moves again before a glide would finish,
+ * and the next move then reads where things really are.
  */
 export function reveal(el: HTMLElement): void {
   if (el.closest(CHROME)) return
+  const bottomOf = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().bottom ?? 0
+  const bar = document.querySelector('.tabbar')
+  const tabs = bar && getComputedStyle(bar).display !== 'none' ? bar.getBoundingClientRect().height : 0
+  const root = document.documentElement.style
+  root.scrollPaddingTop = `${Math.max(bottomOf('.top'), bottomOf('.toolbar-glass[data-stuck]')) + MARGIN}px`
+  root.scrollPaddingBottom = `${tabs + MARGIN}px`
   el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
+  root.removeProperty('scroll-padding-top')
+  root.removeProperty('scroll-padding-bottom')
 }
 
 export type Direction = 'up' | 'down' | 'left' | 'right'
@@ -125,7 +137,8 @@ export function useArrowFocus(): void {
         if (next) {
           e.preventDefault()
           next.focus({ preventScroll: true })
-          next.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: beh })
+          if (padKeys.has(e)) reveal(next)
+          else next.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: beh })
         }
         return
       }
