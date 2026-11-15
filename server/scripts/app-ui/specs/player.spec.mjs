@@ -436,6 +436,35 @@ test('Name it with the keyboard: Esc closes the field and not the menu, and noth
   await expect.poll(() => engine.named()).toEqual([{ file: 'quick-1-LT1.save', title: 'Tabbed' }])
 })
 
+test('with a controller the menu shows its buttons: Menu on Back to the game, the hold of Menu on Guide, A on the focused row and B on Back', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-desktop', 'A computer with a controller')
+  await play(page, { pad: true })
+  const hold = (name, ms = 120) => page.evaluate(([n, t]) => new Promise((done) => { window.__hold(n, true); setTimeout(() => { window.__hold(n, false); setTimeout(done, 80) }, t) }), [name, ms])
+  await page.keyboard.press('Backquote')
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  await expect(menu).toBeVisible()
+  const back = menu.getByRole('button', { name: /Back to the game/ })
+  await expect(back.locator('.pad-menu'), 'Menu closes the menu').toBeVisible()
+  const guide = menu.getByRole('button', { name: /Guide/ })
+  await expect(guide.locator('.pad-menu'), 'the hold of Menu opens the guide').toBeVisible()
+  await expect(guide).toContainText('hold')
+  await expect(menu.locator('.keycap'), 'no keys while a controller is connected').toHaveCount(0)
+  // A is on the focused row, and only there.
+  await expect(menu.locator('.pm-a .pad-face')).toHaveCount(1)
+  await expect(back.locator('.pm-a')).toHaveCount(1)
+  await hold('down')
+  await expect(menu.getByRole('button', { name: 'Save now' })).toBeFocused()
+  await expect(menu.getByRole('button', { name: 'Save now' }).locator('.pm-a')).toHaveCount(1)
+  await expect(menu.locator('.pm-a')).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath('menu-glyphs.png') })
+  // Inside a list the Back row has B.
+  await menu.getByRole('button', { name: /Saves/ }).focus()
+  await hold('a')
+  const list = menu.getByRole('button', { name: 'Back', exact: true })
+  await expect(list).toBeFocused()
+  await expect(list.locator('.pm-end .pad-face')).toContainText('B')
+})
+
 test('Name it with the controller: A opens the field, the d-pad reaches Done, and B closes it', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium-desktop', 'A computer with a controller')
   const engine = await play(page, { pad: true })

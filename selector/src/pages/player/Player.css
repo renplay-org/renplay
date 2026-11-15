@@ -266,6 +266,17 @@
 .pm-end > svg {
   margin-right: -7px;
 }
+/* The controller's A, on the row that has focus: at its far end, or right after what the row says there. */
+.pm-a {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  color: var(--fg-3);
+}
+:is(.pm-end, .sw) + .pm-a,
+.pm-exit > .pm-a {
+  margin-left: 6px;
+}
 .pm-end.done {
   color: var(--green);
   font-size: 13px;

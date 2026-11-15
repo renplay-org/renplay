@@ -1,0 +1,29 @@
+/* The controller's legend: a small bar in the corner above the tab bar on a phone, never in the way of a tap. */
+.pad-legend {
+  position: fixed;
+  right: calc(16px + var(--sar));
+  bottom: calc(14px + var(--sab));
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(10, 10, 15, 0.82);
+  backdrop-filter: blur(16px);
+  color: var(--fg-3);
+  font-size: 12.5px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.pad-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (max-width: 719px) {
+  .pad-legend {
+    bottom: calc(var(--tab-h) + var(--sab) + 10px);
+  }
+}

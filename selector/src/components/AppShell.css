@@ -3,3 +3,15 @@
   justify-content: center;
   min-width: var(--hit);
 }
+
+/* What focus and anchors scroll into view stays clear of the bars that cover the page: the header, the toolbar
+   while it is stuck under it (--toolbar-h is set by the Toolbar) and, on a phone, the tab bar. */
+html {
+  scroll-padding-top: calc(var(--top-h) + var(--sat) + var(--toolbar-h, 0px) + 12px);
+  scroll-padding-bottom: 12px;
+}
+@media (max-width: 719px) {
+  html {
+    scroll-padding-bottom: calc(var(--tab-h) + var(--sab) + 12px);
+  }
+}

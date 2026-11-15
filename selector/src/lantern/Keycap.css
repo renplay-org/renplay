@@ -27,3 +27,21 @@
   height: 22px;
   flex: none;
 }
+.pad-face {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+/* A shoulder button: a short bar with its letters. */
+.pad-bumper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1.5px solid currentColor;
+  border-radius: 8px 8px 5px 5px;
+  font: 700 11px/1 var(--sans);
+  flex: none;
+}

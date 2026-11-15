@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { IconBtn } from './controls'
+import { padKeys } from './focus'
 import { reducedMotion } from './travel'
 import './Carousel.css'
 
@@ -192,6 +193,8 @@ export default function Carousel<T extends { id: string; title: string }>({
         onKeyDown={(e) => {
           if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
           if ((e.target as HTMLElement).closest('input, textarea, select')) return
+          // A controller moves between the buttons of a slide, and turns slides with the arrows beside them.
+          if (padKeys.has(e.nativeEvent)) return
           // The page's own arrow keys (tile to tile) are not for this.
           e.preventDefault()
           e.stopPropagation()

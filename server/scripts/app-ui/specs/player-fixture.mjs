@@ -3,6 +3,7 @@ import sharp from 'sharp'
 import { mock } from '../../app-mock.mjs'
 import { pdf } from '../pdf.mjs'
 import { expect } from './fixtures.mjs'
+import { padScript } from './pad.mjs'
 
 // The in-game view with a made-up game page: the real shared runtime part (runtime/renplay-player.js, which
 // catches the keys) and a small stand-in for the engine that answers the player's messages. What it was sent
@@ -42,16 +43,6 @@ export const TEXT = file('notes.txt', 'Notes', 'text')
 /** A PDF with wide margins, like a guide set for print, and one with no text at all, like a scan. */
 export const WIDE = file('wide.pdf', 'Wide margins', 'pdf')
 export const SCAN = file('scan.pdf', 'Scan', 'pdf')
-
-/** A controller: the player reads `window.__pad`. `__hold(button, on)` presses a button, 'dpad-down' and the like included. */
-const padScript = () => {
-  const buttons = Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }))
-  const pad = { id: 'Test pad', index: 0, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons, timestamp: 0 }
-  navigator.getGamepads = () => [pad]
-  const names = { a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, menu: 9, up: 12, down: 13, left: 14, right: 15 }
-  window.__hold = (name, on) => { buttons[names[name]].pressed = on }
-  window.dispatchEvent(new Event('gamepadconnected'))
-}
 
 /** Opens the game with its saves (the player, or the game page with `path`), and what the made-up engine saw. */
 export async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = false, walkthroughs = [GUIDE], pad = false, holdReady = false, path = `/play/${GAME}` } = {}) {

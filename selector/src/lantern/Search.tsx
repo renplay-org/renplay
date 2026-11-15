@@ -241,8 +241,14 @@ export function Toolbar({ label, wrap, style, children }: { label: string; wrap?
       cover.toggleAttribute('data-stuck', stuck)
       page.toggleAttribute('data-stuck', stuck)
     }
+    // The page keeps what it scrolls to clear of the toolbar (the root's scroll-padding).
+    const height = () => document.documentElement.style.setProperty('--toolbar-h', `${toolbar.offsetHeight}px`)
     settle()
-    const watcher = new ResizeObserver(settle)
+    height()
+    const watcher = new ResizeObserver(() => {
+      settle()
+      height()
+    })
     watcher.observe(toolbar)
     watcher.observe(document.body)
     window.addEventListener('scroll', settle, { passive: true })
@@ -250,6 +256,7 @@ export function Toolbar({ label, wrap, style, children }: { label: string; wrap?
       watcher.disconnect()
       window.removeEventListener('scroll', settle)
       page.removeAttribute('data-stuck')
+      document.documentElement.style.removeProperty('--toolbar-h')
     }
   }, [])
   return (

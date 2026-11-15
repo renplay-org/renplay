@@ -5,13 +5,14 @@ import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType } fr
 import { api } from '../lib/api'
 import { jobTitle } from '../lib/format'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useAuth } from '../lib/auth'
 import AccountMenu from './AccountMenu'
+import PadLegend from './PadLegend'
 import { useGames, useJobs } from '../lib/queries'
 import { RoomProvider } from '../lantern/Room'
 import { useArrowFocus } from '../lantern/focus'
-import { useFlightBack } from '../lantern/flight'
+import { useFlightBack, useGoBack } from '../lantern/flight'
 import type { Health } from '@shared/api'
 import { Pill } from '../lantern/controls'
 import { focusSearch, wantSearch } from '../lantern/Search'
@@ -136,8 +137,48 @@ function useSearchShortcut() {
   }, [navigate])
 }
 
+/** The top-level pages in the order of the header and the tab bar, with where each one's own pages belong: LB and RB go through them. */
+const PAGE_OF: Array<[string, RegExp]> = [
+  ['/', /^\/(game\/.*)?$/],
+  ['/catalog', /^\/catalog/],
+  ['/add', /^\/add/],
+  ['/activity', /^\/activity/],
+  ['/account', /^\/(account|settings|history|import-saves)/],
+]
+
+/**
+ * A controller's bumpers switch pages: LB the one before and RB the one after, round the ends. The same on
+ * every page, so a page's own tabs (the game page's Play, Saves and Details) are reached with the d-pad and A:
+ * the bumpers never change what they do from one screen to the next. The game keeps them for Ren'Py's rollback.
+ */
+function usePadPages(available: string[]) {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  useEffect(() => {
+    const go = (e: Event) => {
+      const pages = PAGE_OF.filter(([to]) => available.includes(to))
+      const here = pages.findIndex(([, own]) => own.test(pathname))
+      const by = (e as CustomEvent<number>).detail
+      const next = pages[here < 0 ? 0 : (here + by + pages.length) % pages.length]
+      if (next) navigate(next[0])
+    }
+    window.addEventListener('renplay:pad-page', go)
+    return () => window.removeEventListener('renplay:pad-page', go)
+  }, [navigate, pathname, available])
+}
+
+/** B on a page with nothing open goes back to the page before, the way the page's own Back button does (see lib/gamepad.ts). */
+function usePadBack() {
+  const goBack = useGoBack()
+  useEffect(() => {
+    window.addEventListener('renplay:pad-back', goBack)
+    return () => window.removeEventListener('renplay:pad-back', goBack)
+  })
+}
+
 function Shell() {
   useScrollMemory()
+  usePadBack()
   useSearchShortcut()
   useFlightBack()
   const { data } = useAuth()
@@ -150,6 +191,7 @@ function Shell() {
     ...(admin ? [{ to: '/add', label: 'Add games', icon: Plus, end: false }] : []),
     ...(!embed ? [{ to: '/account', label: 'You', icon: User, end: false }] : []),
   ]
+  usePadPages(useMemo(() => ['/', '/catalog', ...(admin ? ['/add', '/activity'] : []), ...(!embed ? ['/account'] : [])], [admin, embed]))
   const online = useOnline()
   const { data: games } = useGames()
   // A kept copy of an uninstalled game goes too. A copy belongs to the browser, so a game this person
@@ -211,6 +253,7 @@ function Shell() {
       </main>
       <Footer />
       {admin && <ChooseArtwork />}
+      <PadLegend />
       <nav className="tabbar" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }} aria-label="Sections">
         {tabs.map((t) => (
           <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => (isActive ? 'on' : '')}>

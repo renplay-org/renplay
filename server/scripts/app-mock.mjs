@@ -73,6 +73,9 @@ const answers = (url, titled, patch = {}) => {
   if (path === '/api/health') return { ok: true, uptime: 1, version: '0.0.0' }
   if (path === '/api/defaults') return { tagsExclude: [], lighterBackground: null, textSize: null, rollback: null, skip: null }
   if (path.startsWith('/api/saves/')) return { saveDir: 'x', slots: [], other: [], conflicts: [], sync: false }
+  if (path === '/api/me/identities') return { identities: [] }
+  if (path === '/api/me/sessions') return { sessions: [] }
+  if (path === '/api/me/tokens') return { tokens: [] }
   if (path === '/api/history') return { totals: { seconds: 0, sessions: 0, games: 0, since: null }, days: [], games: [], next: null }
   return {}
 }
