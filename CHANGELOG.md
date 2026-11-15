@@ -12,6 +12,7 @@ release notes say what).
 - The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
 - Buttons have a new look. The one button to press on a screen is cream, the others have a thin outline, corners are squarer, and the glowing gradient buttons are gone. Nothing moved: every control is where it was, at the size it was.
 - Titles are set in a book face, Fraunces (67 KB), and labels, counts, codes, paths, keys and the clock in a small monospace, JetBrains Mono (21 KB), both loaded once. The words under a title that speak to you, such as on the sign-in page and where a list is empty, are in the book face too.
+- Corners follow one scale, rounder as a thing gets larger: small on controls, a little more on rows, menus and notices, more on cards, panels, saves and tiles, and the most on sheets and the game's menu. Labels such as Free, Does not work or Chosen are plain words on a card instead of coloured badges, and the notice that appears at the bottom is dark glass with its icon in the colour of what happened. The page that asks you to turn your phone has a cream button.
 
 ### Fixed
 

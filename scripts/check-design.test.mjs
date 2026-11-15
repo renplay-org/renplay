@@ -24,7 +24,7 @@ function check(files) {
 
 test('a look made of tokens, white, black and transparent passes', () => {
   const css = `.a { color: var(--fg); background: rgb(255 255 255 / .1); border: 1px solid rgba(0, 0, 0, .4); border-radius: var(--r-2); }
-.b { background: linear-gradient(transparent, rgba(0, 0, 0, 0.5)); font: 15px/1.4 var(--sans); border-radius: 0 var(--r-sheet) var(--r-sheet) 0; }
+.b { background: linear-gradient(transparent, rgba(0, 0, 0, 0.5)); font: 15px/1.4 var(--sans); border-radius: 0 var(--r-4) var(--r-4) 0; }
 .c { font-family: inherit; border-radius: 50%; } /* #ff00aa and 12px in a comment */`
   assert.deepEqual(check({ 'selector/src/a.css': css }), { ok: true, said: '' })
   assert.equal(check({ 'website/pages/a.html': '<a href="#add">Add</a> &#169;' }).ok, true)

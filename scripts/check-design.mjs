@@ -25,21 +25,18 @@ const SCAN = [
 
 /** Places that may keep this many literals for now, each one to move to a token. Counts only go down. */
 const ALLOWED = {
-  'selector/src/index.css': 55,
+  'selector/src/index.css': 30,
   'website/site.css': 76,
   'docs/site/src/styles/renplay.css': 37,
   'website/catalog.css': 36,
-  'selector/src/components/guide/Guide.css': 8,
-  'selector/src/lantern/Carousel.css': 8,
-  'selector/src/pages/player/Player.css': 7,
+  'selector/src/components/guide/Guide.css': 7,
+  'selector/src/lantern/Carousel.css': 7,
+  'selector/src/pages/player/Player.css': 4,
   'selector/src/lantern/Search.css': 4,
-  'selector/src/components/PadLegend.css': 2,
+  'selector/src/components/PadLegend.css': 1,
   'selector/src/components/SceneCard.tsx': 2,
   'selector/src/lantern/Room.tsx': 2,
-  'selector/src/components/LibrarySkeleton.css': 1,
-  'selector/src/components/UpdateCard.tsx': 1,
   'selector/src/lantern/art.tsx': 1,
-  'selector/src/pages/Activity.tsx': 1,
   'website/partials/footer.html': 1,
   'website/partials/nav.html': 1,
 }

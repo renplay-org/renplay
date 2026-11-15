@@ -463,7 +463,7 @@ export default function Player() {
           <h2 className="h2">Turn your phone sideways</h2>
           <p className="max-w-xs text-sm text-(color:--fg-3)">{game.title} is made for a wide screen. The game loads in the meantime.</p>
           <div className="mt-4 w-full max-w-xs"><p className="mb-3 font-mono text-xs tracking-[0.02em] text-(color:--fg-3)">{failed || (!progress ? 'Starting engine' : `Loading game ${Math.round(loadPct * 100)}%`)}</p>{failed ? <Pill onClick={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }}>Try again</Pill> : <Bar value={loadPct} indeterminate={!progress || !progress.total} />}</div>
-          <Pill variant="q" size="sm" className="mt-2" onClick={() => setPortraitOk(true)}>
+          <Pill variant="p" size="sm" className="mt-2" onClick={() => setPortraitOk(true)}>
             Play upright anyway
           </Pill>
         </div>
