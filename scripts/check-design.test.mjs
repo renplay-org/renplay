@@ -47,7 +47,7 @@ test('a colour, gradient, face or corner written as a literal fails, with its pl
   ]) {
     const result = check({ [file]: text })
     assert.equal(result.ok, false, text)
-    assert.match(result.said, new RegExp(what.replace(/[()/.]/g, '\\$&')), text)
+    assert.ok(result.said.includes(what), `${text}\n${result.said}`)
   }
 })
 
