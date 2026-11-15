@@ -1,0 +1,108 @@
+/* Lamplight: Renplay's design tokens. The one source for the app, the demo, the docs and the website.
+   Everything that is a colour, a face, a radius or a duration anywhere in Renplay points here. The rules are in
+   README.md next to this file.
+
+   The art is the light, ink is the room, and the person holds a lamp. */
+:root {
+  /* The room */
+  --ink: #0a0a0f;
+  --ink-2: #12121a;
+  --ink-3: #1c1c26;
+
+  /* Text, four steps */
+  --fg: #f4f4f8;
+  --fg-2: #cfcfda;
+  --fg-3: #b8b8c6;
+  --fg-4: #8a8a9a;
+
+  /* The light. Pink is the warm light on things, violet the cool shadow of the night, lamp the flame. */
+  --pink: #f4508a;
+  --pink-2: #ff9ec0;
+  --pink-3: #ffc0d6;
+  --violet: #8b6bff;
+  --violet-2: #c4b5fd;
+  --lamp: #ffc58a;
+
+  /* Paper: the one lit control on a screen, and what is written on it */
+  --paper: #f2e8d8;
+  --paper-2: #fff6e6;
+  --on-paper: #1a1420;
+
+  /* Status: a word's colour, never a surface */
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --red: #f87171;
+
+  /* Surfaces: a plate on the room, glass over art, a hairline around a quiet control */
+  --plate-ink: rgba(10, 10, 15, 0.55);
+  --plate: linear-gradient(rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.055)), var(--plate-ink);
+  --plate-2: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)), var(--plate-ink);
+  --plate-3: linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.16)), var(--plate-ink);
+  --plate-3-flat: rgba(255, 255, 255, 0.16);
+  --glass: rgba(10, 10, 16, 0.74);
+  --glass-sheet: rgb(12, 12, 19);
+  --line: rgba(255, 255, 255, 0.08);
+  --hair: rgba(255, 255, 255, 0.22);
+  --hair-lit: rgba(255, 255, 255, 0.55);
+
+  /* The brand gradient: the logo, the avatar and the room's glow. Never a control. */
+  --brand: linear-gradient(135deg, #d62a68, #7556f0);
+
+  /* The game in focus lights its surroundings in its own colour (from the catalog's art) */
+  --tint: #5a5a7a;
+  --tint-soft: color-mix(in oklab, var(--tint) 45%, transparent);
+  --tint-ink: color-mix(in oklab, var(--tint) 14%, var(--ink));
+
+  /* The hour: five sky stops the website scrolls through. Paper sections take 10 to 14 percent of one over ink. */
+  --t0: #c86a9a;
+  --t1: #8b6bff;
+  --t2: #6c4f9e;
+  --t3: #3a3570;
+  --t4: #0a0a0f;
+
+  /* Type: a book face for titles and the story voice, a sans for everything used, a mono for labels */
+  --serif: Fraunces, 'Fraunces fallback', Georgia, serif;
+  --sans: Inter, 'Inter fallback', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --opsz-title: 144;
+  --opsz-text: 14;
+
+  /* Radii: 4 for controls, 8 for rows, 12 for plates and tiles, 16 for sheets. Round is for dots, avatars and switches. */
+  --r-1: 4px;
+  --r-2: 8px;
+  --r-3: 12px;
+  --r-4: 16px;
+  --r-round: 999px;
+
+  /* Space and the hit area */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --hit: 44px;
+
+  /* Motion: things settle, they never bounce */
+  --out: cubic-bezier(0.22, 1, 0.36, 1);
+  --inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --t-press: 120ms;
+  --t-focus: 200ms;
+  --t-pane: 320ms;
+  --t-travel: 480ms;
+  --t-room: 600ms;
+
+  /* The ring: keyboard and controller focus, the same everywhere */
+  --ring: 0 0 0 2px var(--ink), 0 0 0 4px #fff;
+
+  color-scheme: dark;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-press: 0ms;
+    --t-focus: 0ms;
+    --t-pane: 0ms;
+    --t-travel: 0ms;
+    --t-room: 0ms;
+  }
+}

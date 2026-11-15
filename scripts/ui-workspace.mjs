@@ -41,7 +41,7 @@ for (const path of Object.keys(previous)) if (!current.has(path)) rmSync(join(ta
 sync()
 const library = createHash('sha256')
 for (const [path, hash] of Object.entries(files)) {
-  if (path.startsWith('selector/') || path.startsWith('server/src/shared/') ||
+  if (path.startsWith('selector/') || path.startsWith('design/') || path.startsWith('server/src/shared/') ||
       ['mise.toml', 'scripts/test-ui-container.sh', 'scripts/ui-workspace.mjs'].includes(path)) library.update(path).update(hash)
 }
 mkdirSync(target, { recursive: true })

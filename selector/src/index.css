@@ -1,56 +1,19 @@
+@import "../../design/fonts.css";
+@import "../../design/tokens.css";
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
-  --font-display: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --color-ink-950: #0a0a0f;
-  --color-ink-900: #12121a;
-  --color-ink-850: #17171f;
-  --color-ink-800: #1c1c26;
-  --color-ink-700: #22222c;
-  --color-ink-600: #2e2e3a;
-  --color-accent-300: #ffc0d6;
-  --color-accent-400: #ff9ec0;
-  --color-accent-500: #f4508a;
-  --color-accent-600: #d62a68;
+/* Lamplight's tokens are in design/. Tailwind reads the face from them, and the three colour utilities that are still
+   in use (the pull request that replaces them with tokens removes these lines). */
+@theme inline {
+  --font-sans: var(--sans);
+  --color-ink-950: var(--ink);
+  --color-ink-900: var(--ink-2);
+  --color-accent-300: var(--pink-3);
 }
 
-/* Renplay 4.0, Lantern: the art is the light, ink is the room. Plates and glass are the only two surfaces. */
+/* The app's own layout tokens. The corners are today's values: the pull request that gives tiles, plates and sheets
+   Lamplight's --r-2 to --r-4 replaces them. */
 :root {
-  --ink: #0a0a0f;
-  --ink-2: #12121a;
-  --fg: #f4f4f8;
-  --fg-2: #cfcfda;
-  --fg-3: #b8b8c6;
-  --fg-4: #8a8a9a;
-  --plate-ink: rgba(10, 10, 15, 0.55);
-  --plate: linear-gradient(rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.055)), var(--plate-ink);
-  --plate-2: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)), var(--plate-ink);
-  --plate-3: linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.16)), var(--plate-ink);
-  --plate-3-flat: rgba(255, 255, 255, 0.16);
-  --s1: 4px;
-  --s2: 8px;
-  --s3: 12px;
-  --s4: 16px;
-  --s5: 24px;
-  --s6: 32px;
-  --hit: 44px;
-  --glass: rgba(10, 10, 16, 0.74);
-  /* Sheets and menus read with no blur at all (reduced transparency, or a browser that draws none). */
-  --glass-sheet: rgb(12, 12, 19);
-  --line: rgba(255, 255, 255, 0.08);
-  --pink: #f4508a;
-  --pink-2: #ff9ec0;
-  --pink-3: #ffc0d6;
-  --violet: #8b6bff;
-  --violet-2: #c4b5fd;
-  --brand: linear-gradient(135deg, #d62a68, #7556f0);
-  --green: #4ade80;
-  --amber: #fbbf24;
-  --red: #f87171;
-  --tint: #5a5a7a;
-  --tint-soft: color-mix(in oklab, var(--tint) 45%, transparent);
-  --tint-ink: color-mix(in oklab, var(--tint) 14%, var(--ink));
   --r-tile: 10px;
   --r-plate: 18px;
   --r-sheet: 24px;
@@ -58,14 +21,6 @@
   --cols: 3;
   --gap: 10px;
   --tile-w: calc((100vw - 2 * var(--gutter) - (var(--cols) - 1) * var(--gap)) / var(--cols));
-  --sans: var(--font-sans);
-  --out: cubic-bezier(0.22, 1, 0.36, 1);
-  --inout: cubic-bezier(0.65, 0, 0.35, 1);
-  --t-press: 120ms;
-  --t-focus: 200ms;
-  --t-pane: 320ms;
-  --t-travel: 480ms;
-  --t-room: 600ms;
   --tab-h: 62px;
   --top-h: 56px;
   --maxw: 1536px;
@@ -73,7 +28,6 @@
   --sab: env(safe-area-inset-bottom);
   --sal: env(safe-area-inset-left);
   --sar: env(safe-area-inset-right);
-  color-scheme: dark;
 }
 @media (min-width: 720px) {
   :root {

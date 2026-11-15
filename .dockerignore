@@ -1,4 +1,4 @@
-# The image needs server/, selector/, runtime/ and image/ only.
+# The image needs server/, selector/, design/, runtime/ and image/ only.
 **/node_modules
 **/dist
 **/*.tsbuildinfo

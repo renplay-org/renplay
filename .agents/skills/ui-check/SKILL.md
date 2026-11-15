@@ -83,6 +83,8 @@ Look at every screenshot, not only the one you changed:
   (also after "·"), no all-caps labels.
 - No editable title, tags, cover or save folder (they come from the catalog).
 - Text is short, plain and in full sentences.
+- Faces, fills and corners come from the tokens: Fraunces titles, Inter controls, mono labels, one paper button,
+  no gradient on a control (`design/README.md`).
 
 What emulation cannot show: real safe-area insets (camera cutout, home indicator), Add to Home
 Screen behavior, and Safari's toolbars. For player changes, ask the maintainer to try it on a real

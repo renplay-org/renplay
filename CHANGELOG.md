@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
+
 ## [4.12.0] - 2026-11-15
 
 ### Added

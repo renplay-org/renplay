@@ -48,6 +48,10 @@ These decide most review comments. Follow them without being asked.
   ellipses in text people read: the interface, server messages and logs, docs, the changelog,
   commit and pull request text. Hyphens in compound words, and semicolons in code, are fine.
   `node scripts/check-copy.mjs` checks the interface, server messages and the changelog in CI.
+- **Lamplight, the one look.** Colours, faces, corners and durations come only from `design/tokens.css`, fonts from
+  `design/fonts.css`, the mark from `design/logo/`. Titles are Fraunces, controls Inter, labels mono. One paper button
+  per screen, and the brand gradient only on the logo, the avatar and the room. The rules are in `design/README.md`.
+  `node scripts/check-design.mjs` checks them in CI: today's exceptions are counted there and only shrink.
 - **Adult games have three levels.** Off (they do not exist for that person), Blurred (they show,
   but no picture of them is ever sent) and Shown, set by the installation, the person's account (an
   admin or a sign-in group), the person and the device. Each layer only narrows the one above. The
@@ -109,6 +113,8 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. B
   src/components/    AppShell (header, tab bar, footer), AuthGuard, SaveGallery, FileBrowser, ActionMenu
   src/lib/           api.ts (fetching), queries.ts, display.ts (screen geometry), platform.ts (what
                      device and browser this is), format.ts
+design/            Lamplight, the one source of the look: tokens.css, fonts.css and fonts/, grain.webp, logo/mark.svg,
+                     build.mjs (the icons, from the mark) and README.md. The library, the docs and the website import it
 runtime/           Plain ES5-style scripts for the game pages: renplay-runtime.js (Ren'Py) and
                      renplay-html.js (HTML games), each with renplay-player.js, what they share, in
                      front. The server builds them (server/src/play/runtime.ts)
@@ -253,7 +259,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
 mise install && mise run install    # tools and npm packages
 mise run dev                        # server on :3999 (data in /tmp/rp) and library on http://localhost:5199
 RENPLAY_BACKEND=https://renplay.example mise run dev:ui   # library against a deployed server
-mise run check                      # everything CI checks, or one part: check:server, check:ui,
+mise run check                      # everything CI checks, or one part: check:server, check:design, check:ui,
                                     # check:docs, check:website, check:layout (layout shift of the website and docs),
                                     # check:chart, check:copy, check:workflows, check:examples
 mise run test                       # server tests only
@@ -268,7 +274,7 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
 
 ## Definition of done
 
-1. `mise run check` passes: type checks (the tests' too), tests, the structure rules and the writing
+1. `mise run check` passes: type checks (the tests' too), tests, the structure rules, the look and the writing
    rule. New behavior has a test (`server/src/__tests__`).
 2. The UI type-checks and builds.
 3. UI changes are looked at on a phone size (WebKit, iPhone) and a desktop size, using
