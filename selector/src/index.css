@@ -2,13 +2,9 @@
 @import "../../design/tokens.css";
 @import "tailwindcss";
 
-/* Lamplight's tokens are in design/. Tailwind reads the face from them, and the three colour utilities that are still
-   in use (the pull request that replaces them with tokens removes these lines). */
+/* Lamplight's tokens are in design/. Tailwind reads the face from them. */
 @theme inline {
   --font-sans: var(--sans);
-  --color-ink-950: var(--ink);
-  --color-ink-900: var(--ink-2);
-  --color-accent-300: var(--pink-3);
 }
 
 /* The app's own layout tokens. The corners are today's values: the pull request that gives tiles, plates and sheets
@@ -112,7 +108,7 @@ kbd {
     11px/1 var(--sans);
   color: var(--fg-3);
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--r-1);
   padding: 3px 5px;
 }
 code {
@@ -194,8 +190,7 @@ code {
 :focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px var(--ink),
-    0 0 0 4px #fff,
+    var(--ring),
     0 0 28px 6px var(--tint-soft);
 }
 ::selection {
@@ -302,7 +297,7 @@ code {
   align-items: center;
   height: 40px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   color: var(--fg-2);
   font-weight: 600;
   font-size: 15px;
@@ -330,7 +325,7 @@ code {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 999px;
+  border-radius: var(--r-round);
   color: var(--fg-2);
   transition:
     background var(--t-focus),
@@ -353,7 +348,7 @@ code {
   gap: 8px;
   height: 40px;
   padding: 0 12px 0 10px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   color: var(--fg-2);
   font-size: 13.5px;
   background: var(--plate);
@@ -581,7 +576,8 @@ main.mid {
   max-width: 62ch;
 }
 
-/* Controls: pills. One lit primary per visible task. */
+/* Controls. One lit primary per visible task: paper, flat. The secondary is a hairline, drawn inside the box so that no
+   control is a pixel wider or taller than it was. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -589,7 +585,7 @@ main.mid {
   gap: 9px;
   height: 46px;
   padding: 0 20px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   font-weight: 650;
   font-size: 15px;
   white-space: nowrap;
@@ -608,26 +604,26 @@ main.mid {
   transform: scale(0.96);
 }
 .btn.p {
-  background: var(--brand);
-  color: #fff;
-  box-shadow: 0 12px 30px -12px rgba(244, 80, 138, 0.7);
+  background: var(--paper);
+  color: var(--on-paper);
 }
 .btn.p:hover {
-  box-shadow: 0 16px 34px -12px rgba(244, 80, 138, 0.9);
-}
-/* The glow above outranks the focus ring: the lit pill keeps both. */
-.btn.p:focus-visible {
-  box-shadow:
-    0 0 0 2px var(--ink),
-    0 0 0 4px #fff,
-    0 12px 30px -12px rgba(244, 80, 138, 0.7);
+  background: var(--paper-2);
 }
 .btn.s {
-  background: var(--plate-2);
   color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--hair);
 }
 .btn.s:hover {
-  background: var(--plate-3);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px var(--hair-lit);
+}
+/* The ring outranks the hairline above: a focused secondary keeps both. */
+.btn.s:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px var(--hair),
+    var(--ring),
+    0 0 28px 6px var(--tint-soft);
 }
 .btn.q {
   color: var(--fg-2);
@@ -714,7 +710,7 @@ main.mid {
   gap: 6px;
   height: 40px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   background: var(--plate);
   color: var(--fg-2);
   font-size: 13.5px;
@@ -733,8 +729,11 @@ main.mid {
   transform: scale(0.95);
 }
 .chip.on {
-  background: var(--fg);
-  color: #0b0b0e;
+  background: var(--paper);
+  color: var(--on-paper);
+}
+.chip.on:hover {
+  background: var(--paper-2);
 }
 .chip.ex {
   color: var(--red);
@@ -747,7 +746,8 @@ main.mid {
   font-weight: 500;
 }
 .chip.on .n {
-  color: #55555f;
+  color: var(--on-paper);
+  opacity: 0.6;
 }
 .pill {
   display: inline-flex;
@@ -755,7 +755,7 @@ main.mid {
   gap: 5px;
   height: 24px;
   padding: 0 9px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   font-size: 11.5px;
   font-weight: 650;
   background: var(--plate-2);
@@ -796,7 +796,7 @@ main.mid {
   height: 28px;
   align-items: center;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--r-1);
   background: var(--plate);
   color: var(--fg-2);
   font-size: 12.5px;
@@ -810,7 +810,7 @@ main.mid {
   display: inline-flex;
   height: 44px;
   padding: 2px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   background: var(--plate);
   flex: none;
   max-width: 100%;
@@ -822,7 +822,7 @@ main.mid {
 }
 .seg button {
   padding: 0 15px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   font-size: 13.5px;
   font-weight: 600;
   color: var(--fg-3);
@@ -866,7 +866,7 @@ main.mid {
   gap: 6px;
   height: 44px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   background: var(--plate);
   font-size: 13.5px;
   font-weight: 600;
@@ -884,7 +884,7 @@ main.mid {
   gap: 8px;
   height: 46px;
   padding: 0 14px;
-  border-radius: 14px;
+  border-radius: var(--r-1);
   background: var(--plate);
   color: var(--fg);
   font-size: 15px;
@@ -897,11 +897,9 @@ main.mid {
   color: var(--fg-4);
 }
 .input:focus-visible {
-  box-shadow:
-    0 0 0 2px var(--ink),
-    0 0 0 4px #fff;
+  box-shadow: var(--ring);
   outline: none;
-  border-radius: 14px;
+  border-radius: var(--r-1);
 }
 .input.mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -940,7 +938,7 @@ select.input option {
   height: 40px;
   margin: -5px -6px;
   padding: 5px 6px;
-  border-radius: 999px;
+  border-radius: var(--r-round);
   background: var(--plate-3-flat);
   background-clip: content-box;
   flex: none;
@@ -1075,7 +1073,7 @@ select.input option {
 }
 .bar {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-round);
   background: var(--plate-3);
   overflow: hidden;
 }
@@ -1083,7 +1081,7 @@ select.input option {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--brand);
+  background: var(--lamp);
   transition: width 0.5s var(--out);
 }
 .bar.thin {
@@ -1132,7 +1130,7 @@ select.input option {
   align-items: center;
   height: 40px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   font-size: 14px;
   color: var(--fg-3);
   font-weight: 600;
@@ -1167,7 +1165,7 @@ select.input option {
   }
   .side-nav a,
   .side-nav button {
-    border-radius: 12px;
+    border-radius: var(--r-1);
   }
 }
 .split {
@@ -1791,7 +1789,7 @@ select.input option {
   height: 40px;
   margin-bottom: 12px;
   padding: 0 12px 0 8px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   background: var(--plate);
   font-size: 13px;
   font-weight: 600;
@@ -2606,7 +2604,7 @@ input[type="range"] {
   align-items: center;
   justify-content: center;
   color: var(--fg-4);
-  border-radius: 999px;
+  border-radius: var(--r-round);
 }
 .stars button svg {
   width: 26px;
@@ -2681,7 +2679,7 @@ input[type="range"] {
 .picker .grp-h { display: flex; align-items: center; gap: var(--s3); margin: var(--s5) 0 var(--s3); font-size: 13.5px; font-weight: 650; color: var(--fg-2); flex-wrap: wrap; }
 .picker .grp-h .muted { font-weight: 500; }
 .picker .grp-h:first-child { margin-top: 0; }
-.picker .grp-h .input { height: 40px; width: 220px; font-size: 13px; border-radius: 999px; }
+.picker .grp-h .input { height: 40px; width: 220px; font-size: 13px; border-radius: var(--r-1); }
 .picker .who { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); align-items: center; margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--line); font-size: 13px; color: var(--fg-3); }
 .picker .who .xs { flex: 1 1 100%; }
 .pk-foot { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--line); }
@@ -2782,7 +2780,7 @@ input[type="range"] {
 .files .crumbs button {
   min-height: 44px;
   padding: 0 8px;
-  border-radius: 10px;
+  border-radius: var(--r-1);
   color: var(--fg-2);
   font-size: 14px;
   font-weight: 600;
@@ -2876,7 +2874,7 @@ button.frow:hover {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 14px;
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: var(--r-1);
   background: var(--plate);
   overflow-wrap: anywhere;
 }

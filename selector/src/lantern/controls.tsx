@@ -5,8 +5,8 @@ import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
 import './Seg.css'
 
 /**
- * The pill: the one button shape. Primary is the brand gradient (one lit pill per visible task),
- * plate secondary, quiet text, danger red text. While `loading` it spins and takes no taps.
+ * The button: Primary is paper (one lit button per visible task), secondary a hairline, quiet text,
+ * danger red text. While `loading` it spins and takes no taps.
  */
 export function Pill({
   variant = 's',
@@ -81,7 +81,7 @@ export function IconBtn(props: IconBtnProps) {
   )
 }
 
-/** Filter chips: 40 px, selected white on ink, excluded red with a strike, dim when nothing would show. */
+/** Filter chips: 40 px, selected paper, excluded red with a strike, dim when nothing would show. */
 export function Chip({ on, ex, n, dim, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number; dim?: boolean }) {
   return (
     <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''} ${dim ? 'dim' : ''}`} {...rest}>
@@ -92,7 +92,7 @@ export function Chip({ on, ex, n, dim, children, ...rest }: ButtonHTMLAttributes
   )
 }
 
-/** Segmented control: pill buttons on a plate, 44 px (40 small), every button at least 44 wide. */
+/** Segmented control: buttons on a plate, 44 px (40 small), every button at least 44 wide. */
 export function Seg<T extends string>({
   value,
   onChange,
@@ -179,8 +179,7 @@ export function Tag({ dim, children }: { dim?: boolean; children: ReactNode }) {
   return <span className={`tag ${dim ? 'dim' : ''}`}>{children}</span>
 }
 
-/** A progress bar in the brand gradient. */
-/** A progress bar, `value` from 0 to 1. Indeterminate: a shimmer while the size is not known yet. */
+/** A progress bar filled in lamp, `value` from 0 to 1. Indeterminate: a shimmer while the size is not known yet. */
 export function Bar({ value, thin, indeterminate, style }: { value: number; thin?: boolean; indeterminate?: boolean; style?: CSSProperties }) {
   return (
     <div className={`bar ${thin ? 'thin' : ''}`} style={style}>

@@ -49,7 +49,7 @@
   flex: none;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   font-size: 13px;
   font-weight: 600;
   color: var(--fg-3);
@@ -114,7 +114,7 @@
 .gw-handle span {
   width: 40px;
   height: 5px;
-  border-radius: 999px;
+  border-radius: var(--r-round);
   background: rgba(255, 255, 255, 0.35);
 }
 /* Held sideways the guide covers the screen, above the Menu and Guide pills, which stay where they are: the bar leaves room for them. */
