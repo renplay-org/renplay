@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
+
 ## [4.12.0] - 2026-11-15
 
 ### Added
@@ -21,7 +25,6 @@ release notes say what).
 
 ### Changed
 
-- The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
 - A controller moves focus to the nearest control in that direction, so the Up next buttons, the search, the tags and the games in a grid are all reached with the d-pad, and **A** opens them. The first press, with nothing selected, goes into the page.
 - A held direction on a controller waits half a second before it repeats, then repeats a little faster, so a press that is a little long no longer skips an option.
 - A PDF guide on a phone opens fitted to its text column, scrolled to where the text starts, so it is readable without panning. **Fit** and a double tap switch between the text column and the whole page. A scanned page with no text opens at Fit, and a picture is fitted to the width. A zoom you chose is still kept for the file.
