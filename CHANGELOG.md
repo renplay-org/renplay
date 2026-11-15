@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.12.0] - 2026-11-15
+
 ### Added
 
 - **LB** and **RB** on a controller switch between the pages: Library, Catalog, Add games and Activity (for admins) and You, round the ends, from any page. A page's own tabs, such as the game page's, are reached with the d-pad and **A**. In a game the shoulder buttons stay Ren'Py's. **B** goes back to the page before when nothing is open.
@@ -808,7 +810,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.11.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.12.0...dev
+[4.12.0]: https://github.com/renplay-org/renplay/compare/v4.11.0...v4.12.0
 [4.11.0]: https://github.com/renplay-org/renplay/compare/v4.10.0...v4.11.0
 [4.10.0]: https://github.com/renplay-org/renplay/compare/v4.9.0...v4.10.0
 [4.9.0]: https://github.com/renplay-org/renplay/compare/v4.8.0...v4.9.0
