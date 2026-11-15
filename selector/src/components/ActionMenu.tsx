@@ -14,5 +14,5 @@ export default function ActionMenu({ trigger, children, ...rest }: ComponentProp
   const phone = useSyncExternalStore(subscribe, () => window.matchMedia(query).matches)
   const [open, setOpen] = useState(false)
   if (!phone) return <Menu trigger={trigger} {...rest}>{children}</Menu>
-  return <>{trigger(() => setOpen(true))}<Sheet open={open} onClose={() => setOpen(false)} title="Actions"><div className="[&_button]:min-h-11">{children(() => setOpen(false))}</div></Sheet></>
+  return <>{trigger(() => setOpen(true))}<Sheet open={open} onClose={() => setOpen(false)} title="Actions"><div className="menu">{children(() => setOpen(false))}</div></Sheet></>
 }

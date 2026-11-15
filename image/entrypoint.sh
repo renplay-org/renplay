@@ -37,8 +37,12 @@ case "$log_level" in
 esac
 export RENPLAY_LOG_RULES="$log_rules" RENPLAY_NGINX_ERRORS="$nginx_errors"
 
+# Read the same validated demo-only policy as the server. An empty nginx header is not sent.
+RENPLAY_DEMO_FRAME_POLICY=$(node --input-type=module -e 'import { loadConfig } from "/app/server/dist/config.js"; import { demoFrameAncestors } from "/app/server/dist/shared/demo-embed.js"; const c = loadConfig(); process.stdout.write(c.demo ? demoFrameAncestors(true, c.demoEmbedder) : "")')
+export RENPLAY_DEMO_FRAME_POLICY
+
 mkdir -p /tmp/nginx "$HOME" "$DATA_DIR" "$RENPLAY_DIR/engines"
-envsubst '${PORT} ${GAMES_DIR} ${DATA_DIR} ${RENPLAY_DIR} ${RENPLAY_LOG_RULES} ${RENPLAY_NGINX_ERRORS}' < /app/deploy/nginx.conf.template > /tmp/nginx/nginx.conf
+envsubst '${PORT} ${GAMES_DIR} ${DATA_DIR} ${RENPLAY_DIR} ${RENPLAY_LOG_RULES} ${RENPLAY_NGINX_ERRORS} ${RENPLAY_DEMO_FRAME_POLICY}' < /app/deploy/nginx.conf.template > /tmp/nginx/nginx.conf
 
 node /app/server/dist/index.js &
 server=$!

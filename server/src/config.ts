@@ -4,6 +4,7 @@ import { parseAdultGroups } from './content/levels.js'
 import { parseAdultLevel, type AdultLevel } from './shared/levels.js'
 import { SAVE_FILE_BYTES } from './saves/savefile.js'
 import { fallbackOf } from './envvars.js'
+import { demoEmbedderOrigin } from './shared/demo-embed.js'
 
 /*
  * Every variable is documented, with its default, in envvars.ts. These read one, falling back to
@@ -146,6 +147,7 @@ export interface Config {
   adultGames: '' | AdultLevel
   /** A public demo: a shared guest, no uploads or account changes, a stop after 4 hours (RENPLAY_DEMO). */
   demo: boolean
+  demoEmbedder: string
   /** How much one person may store in saves: a file, and all files with their history. Limited in a demo. */
   saveLimits: SaveLimits
   /** Pin every build to this engine version instead of the latest 8.x. */
@@ -182,6 +184,7 @@ export function loadConfig(): Config {
     warnedDeleteArchives = true
   }
   const keepDownloads = deleteArchives && !keepSet ? !bool('RENPLAY_DELETE_ARCHIVES') : bool('RENPLAY_KEEP_DOWNLOADS')
+  const demoEmbedder = text('RENPLAY_DEMO_EMBEDDER')
   const auth = text('RENPLAY_AUTH')
   if (auth && auth !== 'on' && auth !== 'off') throw new Error('RENPLAY_AUTH must be on or off')
   if (process.env['RENPLAY_LDAP_ADULT_GROUPS']?.trim() && process.env['RENPLAY_LDAP_ADULT_FILTER']?.trim())
@@ -240,6 +243,7 @@ export function loadConfig(): Config {
       .filter(Boolean),
     adultGames: adultGames(),
     demo: bool('RENPLAY_DEMO'),
+    demoEmbedder: bool('RENPLAY_DEMO') ? demoEmbedderOrigin(demoEmbedder) : '',
     saveLimits: bool('RENPLAY_DEMO') ? { file: 2 << 20, total: 32 << 20, files: 1000 } : { file: SAVE_FILE_BYTES, total: Infinity, files: Infinity },
     defaultEngine: text('RENPLAY_ENGINE'),
     keepaliveUrl: text('RENPLAY_KEEPALIVE_URL'),

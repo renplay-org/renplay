@@ -95,7 +95,8 @@ const SCHEMA = `
   CREATE TABLE play_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, game TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, seconds INTEGER NOT NULL);
   CREATE INDEX play_sessions_user ON play_sessions (user_id, ended_at);
   CREATE TABLE safe_games (game TEXT PRIMARY KEY);
-  CREATE TABLE save_meta (user_id INTEGER NOT NULL, save_dir TEXT NOT NULL, file TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', pinned_at TEXT NOT NULL DEFAULT '', PRIMARY KEY (user_id, save_dir, file));
+  CREATE TABLE save_meta (user_id INTEGER NOT NULL, save_dir TEXT NOT NULL, file TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', pinned_at TEXT NOT NULL DEFAULT '', hash TEXT NOT NULL DEFAULT '', PRIMARY KEY (user_id, save_dir, file));
+  CREATE TABLE save_meta_parked (user_id INTEGER NOT NULL, save_dir TEXT NOT NULL, hash TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', pinned_at TEXT NOT NULL DEFAULT '', parked_at INTEGER NOT NULL, slot TEXT NOT NULL DEFAULT '', slot_hash TEXT NOT NULL DEFAULT '', PRIMARY KEY (user_id, save_dir, hash));
   CREATE TABLE walkthroughs (file TEXT PRIMARY KEY, game TEXT NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, added_at TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0);
   CREATE INDEX walkthroughs_game ON walkthroughs (game, position);
   CREATE TABLE art_made (key TEXT PRIMARY KEY, file1x TEXT NOT NULL, file2x TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, thumbhash TEXT NOT NULL, tint TEXT NOT NULL, made TEXT NOT NULL DEFAULT '', adult INTEGER NOT NULL DEFAULT 0, dark INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);

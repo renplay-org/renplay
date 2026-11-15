@@ -524,7 +524,7 @@ export class Accounts {
       this.invalidate(); this.cookie(req, res, '')
       res.json({ ok: true })
     })
-    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: this.cfg.demo && this.current().id === this.demoGuest(), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) } satisfies Me))
+    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: this.cfg.demo && this.current().id === this.demoGuest(), ...(this.cfg.demo ? { demoEmbedder: this.cfg.demoEmbedder } : {}), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) } satisfies Me))
     r.put('/me', async (req, res) => {
       this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(validName(req.body?.name), this.current().id)
       await this.tag(this.user(this.current().id)); res.json({ ok: true })

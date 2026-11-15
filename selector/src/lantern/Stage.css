@@ -1,0 +1,5 @@
+/* A quiet link under the buttons, such as Start from the main menu under Resume. */
+.stage .acts .under {
+  margin: 14px 0 0;
+  font-size: 13.5px;
+}

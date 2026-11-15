@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { artCarriesTitle, formatFor, Frame, hashUrl, TitleArt, tintOf, useHidden, type ArtGame } from './art'
 import { cameFromList, useGoBack } from './flight'
 import { flyGhost, startTravel, takeTravel, travelSource } from './travel'
+import './Stage.css'
 
 /** Pressing Resume: the stage's art grows to the whole screen and becomes the door. */
 export function travelToDoor(game: ArtGame & { id: string }, hidden: boolean, from?: Element | null): void {
@@ -85,6 +86,7 @@ export default function Stage({
   eyebrow,
   meta,
   actions,
+  under,
   body,
   back,
   actsRef,
@@ -94,6 +96,8 @@ export default function Stage({
   eyebrow?: ReactNode
   meta?: ReactNode
   actions?: ReactNode
+  /** A quiet line under the actions. */
+  under?: ReactNode
   /** Tags and summary, under the title on phones, in column two on desktop. */
   body?: ReactNode
   back?: { to: string; label: string }
@@ -146,6 +150,7 @@ export default function Stage({
         {actions && (
           <div className="acts" ref={actsRef}>
             <div className="actions">{actions}</div>
+            {under && <p className="under">{under}</p>}
           </div>
         )}
       </div>

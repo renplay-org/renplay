@@ -9,13 +9,15 @@ import { deviceHeaders } from '../lib/device'
 import type { Game, SaveSlot } from '@shared/api'
 import { ago, dateTime, duration, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
+import { slotInfo } from '@shared/saveslot'
 import { useGames, useSaves } from '../lib/queries'
-import { groupSaves } from '../lib/saves'
+import { groupSaves, saveName, versionReason } from '../lib/saves'
 import { playLink } from '../lib/links'
 import { Seg, Pill, IconBtn } from '../lantern/controls'
 import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveVersions, SyncDownloaded } from '@shared/api'
 import Sheet from '../lantern/Sheet'
+import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
 
 type Kind = 'all' | 'manual' | 'auto' | 'quick'
 
@@ -35,6 +37,8 @@ export default function SaveGallery({ game }: { game: Game }) {
   const qc = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
+  const embed = useDemoEmbed()
+  const openSave = (file: string) => demoPlayTarget(embed) ? window.top!.location.assign(playLink(game.id, file)) : navigate(playLink(game.id, file))
   const fileRef = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState<Kind>('all')
   const [importing, setImporting] = useState(false)
@@ -98,7 +102,7 @@ export default function SaveGallery({ game }: { game: Game }) {
     <div key={s.file} className={`save ${s.pinnedAt ? 'pinned' : ''}`.trim()}>
       <button
         className="relative block w-full"
-        onClick={() => game.playUrl && navigate(playLink(game.id, s.file))}
+        onClick={() => game.playUrl && openSave(s.file)}
         disabled={!game.playUrl}
         title={game.playUrl ? 'Load this save' : 'Install the game to load saves'}
         aria-label={game.playUrl ? `Load ${s.name || s.label}` : 'Install the game to load saves'}
@@ -126,7 +130,7 @@ export default function SaveGallery({ game }: { game: Game }) {
         >
           {(close) => (
             <>
-              <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); navigate(playLink(game.id, s.file)) }}>Load</MenuItem>
+              <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); openSave(s.file) }}>Load</MenuItem>
               <MenuItem icon={<Pin />} onClick={() => { close(); void saveMeta(s, { pinned: !s.pinnedAt }, s.pinnedAt ? 'Unpinned' : 'Pinned. Every previous version is kept.') }}>
                 {s.pinnedAt ? 'Unpin' : 'Pin'}
               </MenuItem>
@@ -177,7 +181,7 @@ export default function SaveGallery({ game }: { game: Game }) {
           </div>
         </div>
       )}
-      <div className="toolbar" style={{ position: 'static', margin: 0, padding: '0 0 14px' }}>
+      <div className="toolbar wrap" style={{ position: 'static', margin: 0, padding: '0 0 14px' }}>
         <Seg<Kind>
           small
           scroll
@@ -271,7 +275,7 @@ export default function SaveGallery({ game }: { game: Game }) {
 
       {copying && <CopyDialog game={game} slot={copying} onClose={() => setCopying(null)} />}
       {syncing && <SyncDialog game={game} onClose={() => setSyncing(false)} onDownloaded={refresh} />}
-      {history && <HistoryDialog game={game} file={history === 'all' ? undefined : history.file} onClose={() => setHistory(null)} onRestored={refresh} />}
+      {history && <HistoryDialog game={game} slot={history === 'all' ? undefined : history} onClose={() => setHistory(null)} onRestored={refresh} />}
     </div>
   )
 }
@@ -316,16 +320,22 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
   )
 }
 
-function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?: string; onClose: () => void; onRestored: () => void }) {
+/** The versions of one save, titled with its name, or of every save, each named. Why each went to History is in plain words. */
+function HistoryDialog({ game, slot, onClose, onRestored }: { game: Game; slot?: SaveSlot; onClose: () => void; onRestored: () => void }) {
   const toast = useToast()
+  const file = slot?.file
+  const { data: saves } = useSaves(game.id)
   const { data, isLoading } = useQuery({
     queryKey: ['history', game.id, file],
     queryFn: () => api<SaveVersions>(`/api/saves/${game.id}/history${file ? `?file=${encodeURIComponent(file)}` : ''}`),
   })
-  const reason = (r: string) =>
-    ({ overwrite: 'Replaced in game', game: 'Replaced in game', 'game-delete': 'Deleted in game', 'user-delete': 'Deleted here', import: 'Replaced by import', restore: 'Before a restore', copy: 'Replaced by a copy', conflict: 'Older of two versions' })[r] ?? r
+  // A save that is still there goes by the name its person gave it, one that was deleted by its slot.
+  const nameOf = (v: SaveVersions['versions'][number]) => {
+    const now = saves?.slots.find((x) => x.file === v.name)
+    return now ? saveName(now) : slotInfo(v.name).label
+  }
   return (
-    <Sheet open onClose={onClose} title={file ? `Previous versions of ${file}` : 'Save history'} wide fullPhone>
+    <Sheet open onClose={onClose} title={slot ? `Previous versions of ${saveName(slot)}` : 'Save history'} wide fullPhone>
       {isLoading ? (
         <Spinner />
       ) : !data?.versions.length ? (
@@ -335,9 +345,10 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
           {data.versions.slice(0, 200).map((v) => (
             <div key={v.id} className="row between small" style={{ gap: 12 }}>
               <div className="grow">
-                <div className="truncate">{v.name}</div>
+                <div className="truncate">{slot ? versionReason(v.reason) : nameOf(v)}</div>
                 <div className="xs muted">
-                  {reason(v.reason)} · {dateTime(v.savedAt)} · {bytes(v.size)}
+                  {slot ? '' : `${versionReason(v.reason)} · `}
+                  {dateTime(v.savedAt)} · {bytes(v.size)}
                 </div>
               </div>
               <Pill
@@ -345,7 +356,7 @@ function HistoryDialog({ game, file, onClose, onRestored }: { game: Game; file?:
                 onClick={async () => {
                   try {
                     await post(`/api/saves/${game.id}/history/restore`, { id: v.id })
-                    toast(`Restored ${v.name}`, 'success')
+                    toast(`Restored ${nameOf(v)}`, 'success')
                     onRestored()
                   } catch (e) {
                     toast(errorText(e), 'error')

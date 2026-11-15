@@ -3,6 +3,8 @@ import { replayHtmlSaves } from '../../lib/html-save-queue'
 import { htmlSaveKeeper, type HtmlSaveContext, type HtmlSaveKeeper } from './htmlSaves'
 
 type Send = (msg: Record<string, unknown>) => void
+/** How long Name it is offered after Save now, in milliseconds. */
+const NAME_FOR = 8000
 const newId = () => Math.random().toString(36).slice(2)
 
 /**
@@ -14,6 +16,9 @@ export function useSaving(send: Send, ready: boolean, toast: (text: string, tone
   // What Save now just did, said on its row for three seconds.
   const [savedAs, setSavedAs] = useState<string | null>(null)
   const savedTimer = useRef(0)
+  // For a few seconds after a save is made, it can be named.
+  const [canName, setCanName] = useState(false)
+  const nameTimer = useRef(0)
   const savingId = useRef<string | null>(null)
   const waiters = useRef(new Map<string, (ok: boolean) => void>())
 
@@ -61,9 +66,17 @@ export function useSaving(send: Send, ready: boolean, toast: (text: string, tone
     setSavedAs(saved ? 'Saved as Quick 1' : 'Nothing to save yet')
     window.clearTimeout(savedTimer.current)
     savedTimer.current = window.setTimeout(() => setSavedAs(null), 3000)
+    window.clearTimeout(nameTimer.current)
+    setCanName(saved)
+    if (saved) nameTimer.current = window.setTimeout(() => setCanName(false), NAME_FOR)
+  }
+  const holdNaming = () => window.clearTimeout(nameTimer.current)
+  const doneNaming = () => {
+    window.clearTimeout(nameTimer.current)
+    setCanName(false)
   }
 
-  return { savingNow, savedAs, saveNow, savedNow, saveAndFlush, flushed }
+  return { savingNow, savedAs, canName, holdNaming, doneNaming, saveNow, savedNow, saveAndFlush, flushed }
 }
 
 /**

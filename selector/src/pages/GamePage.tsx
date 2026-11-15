@@ -23,6 +23,7 @@ import ArtPicker from '../components/ArtPicker'
 import { ago, capitalize, duration, jobStage, pct, playedTime, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
 import { recipeLinks, playLink, popupClick } from '../lib/links'
+import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
 import { isRenpy } from '@shared/family'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
@@ -41,8 +42,8 @@ export default function GamePage() {
   // Manage saves in the player's menu lands here.
   const [tab, setTab] = useState<Tab>(() => (window.location.hash === '#saves' ? 'saves' : 'play'))
   const [picker, setPicker] = useState<ArtKind | null>(null)
-  const navigate = useNavigate()
   const view = useAdultView()
+  const embed = useDemoEmbed()
   const actsRef = useRef<HTMLDivElement>(null)
   const { data: saves } = useSaves(gameId, !!game?.saveDir)
   const latest = saves?.slots.find((s) => s.kind !== 'internal' && s.valid)
@@ -70,11 +71,6 @@ export default function GamePage() {
   const renpy = isRenpy(game)
   const hidden = game.nsfw && view !== 'shown'
   const credits = hidden ? [] : (['grid', 'hero'] as const).map((kind) => ({ kind, credit: game.art[kind]?.credit, made: game.art[kind]?.made })).filter((c, i, all) => c.credit && all.findIndex((o) => JSON.stringify(o.credit) === JSON.stringify(c.credit)) === i)
-  const primary = () => navigate(playLink(gameId, latest?.file))
-  const resume = (menu: boolean) => {
-    travelToDoor(game, hidden)
-    navigate(menu ? playLink(gameId) : playLink(gameId, latest?.file))
-  }
 
   // The parts the game has, with a separator between each two.
   const metaParts = [
@@ -127,11 +123,9 @@ export default function GamePage() {
   ) : (
     <>
       {installed ? (
-        <>
-          <Pill variant="p" size="lg" icon={<Play />} onClick={() => resume(false)}>
-            {latest ? 'Resume' : 'Play'}
-          </Pill>
-        </>
+        <Pill variant="p" size="lg" icon={<Play />} to={playLink(gameId, latest?.file)} onClick={() => travelToDoor(game, hidden)}>
+          {latest ? 'Resume' : 'Play'}
+        </Pill>
       ) : (
         <InstallButton game={game} />
       )}
@@ -156,11 +150,11 @@ export default function GamePage() {
 
   return (
     <div style={{ paddingBottom: 20 }}>
-      <Stage game={game} eyebrow={installed ? 'In your library' : game.status === 'installing' ? 'Installing' : 'Not installed'} back={{ to: '/', label: 'Library' }} meta={meta} body={body} actions={actions} actsRef={actsRef} />
+      <Stage game={game} under={installed && !game.job && renpy && latest ? <Link className="link-q" to={playLink(gameId)} target={demoPlayTarget(embed)} onClick={() => travelToDoor(game, hidden)}>Start from the main menu</Link> : undefined} eyebrow={installed ? 'In your library' : game.status === 'installing' ? 'Installing' : 'Not installed'} back={{ to: '/', label: 'Library' }} meta={meta} body={body} actions={actions} actsRef={actsRef} />
 
       <div style={{ marginTop: 32, marginBottom: 24 }}>
         <Seg<Tab>
-          scroll
+          wrap
           label="Game page sections"
           value={tab}
           onChange={setTab}
@@ -190,9 +184,7 @@ export default function GamePage() {
       {!game.job && (
         <ActionBar watch={actsRef}>
           {installed ? (
-            <>
-              <Pill variant="p" onClick={primary}>{latest ? 'Resume' : 'Play'}</Pill>
-            </>
+            <Pill variant="p" to={playLink(gameId, latest?.file)}>{latest ? 'Resume' : 'Play'}</Pill>
           ) : (
             <InstallButton game={game} />
           )}

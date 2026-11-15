@@ -4,7 +4,7 @@ import './player/Player.css'
 import { GuideWindow, type GuideMode } from '../components/GuideWindow'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Confirm, Spinner, cx, useToast } from '../lantern/ui'
+import { Confirm, Spinner, cx, errorText, useToast, useToasting } from '../lantern/ui'
 import { useAuth } from '../lib/auth'
 import { api, userHeader } from '../lib/api'
 import {
@@ -41,13 +41,16 @@ import { useGuide } from './player/useGuide'
 import { Bar, Pill } from '../lantern/controls'
 import { useGoBack } from '../lantern/flight'
 import { useModal } from '../lantern/modal'
+import { useDemoEmbed } from '../lib/demo-embed'
 
 type Panel = null | 'fullscreen'
 
 const HOME_TIP_KEY = 'renplay:home-screen-tip'
+const TURN_TIP_KEY = 'renplay:turn-tip'
 
 export default function Player() {
   const { data: account } = useAuth()
+  const embed = useDemoEmbed()
   const userId = useRef(account!.user.id).current
   const [signedOut, setSignedOut] = useState(false)
   const signedOutRef = useRef<HTMLElement>(null)
@@ -76,6 +79,7 @@ export default function Player() {
   const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [sync, setSync] = useState({ pending: 0, online: true, lastSync: 0 })
+  const lastEmbedSync = useRef(0)
   const slowSync = useSlow(sync.pending > 0, SLOW_SYNC)
   // Saves wait for the server: the pill row shows a cloud and the menu says it. The word Offline is for no network at all.
   const waiting = (sync.pending > 0 && slowSync) || !sync.online
@@ -137,28 +141,10 @@ export default function Player() {
   const guideNow = useRef(guide)
   guideNow.current = guide
   const insets = useSafeInsets()
-  useWakeLock(ready)
+  // The website owns the outer screen. Its device frames do not request extra permissions.
+  useWakeLock(ready && !embed)
   usePlayTime(ready && !exiting && !failed, gameId, userId, sandboxed, frameRef, () => setSignedOut(true))
   const telemetry = useTelemetry(gameId, userId, { ready, online, fullscreen, failed })
-  // On an iPhone in Safari, once the game has started and never while it loads: once, how to get full screen.
-  // It goes the moment the menu opens, so it never lies over a row.
-  const dismissTip = useRef<(() => void) | null>(null)
-  useEffect(() => {
-    if (!ready || fsMode !== 'home-screen' || menu || localStorage.getItem(HOME_TIP_KEY)) return
-    localStorage.setItem(HOME_TIP_KEY, '1')
-    dismissTip.current = toast(
-      <>
-        For full screen, add Renplay to your home screen.{' '}
-        <button className="link" onClick={() => setPanel('fullscreen')}>
-          How
-        </button>
-      </>,
-    )
-  }, [ready, fsMode, menu, toast])
-  useEffect(() => {
-    if (menu) dismissTip.current?.()
-  }, [menu])
-
   useEffect(() => {
     const signedOut = () => setSignedOut(true)
     window.addEventListener('renplay:signed-out', signedOut)
@@ -197,6 +183,8 @@ export default function Player() {
           else toast('The game did not take that change.')
           break
         case 'renplay:sync':
+          if (account?.demo && d.lastSync && d.lastSync !== lastEmbedSync.current) window.dispatchEvent(new Event('renplay:saves-changed'))
+          lastEmbedSync.current = d.lastSync
           setSync({ pending: d.pending, online: d.online, lastSync: d.lastSync })
           break
         case 'renplay:info':
@@ -294,6 +282,23 @@ export default function Player() {
   }, [gameHasPad, ready, sandboxed, send, closeMenu])
 
   const { saveAndFlush } = saving
+  /** Names the quick save Save now just made, through the same route as the game page's Name and note. */
+  const nameSave = async (title: string) => {
+    const file = saves.data?.slots.find((s) => slotName(s.file) === 'quick-1')?.file
+    if (!file) {
+      toast('That save is not on the list yet. Try again in a moment.', 'error')
+      return false
+    }
+    try {
+      await api(`/api/saves/${gameId}/meta?file=${encodeURIComponent(file)}`, { method: 'PUT', json: { title } })
+      void qc.invalidateQueries({ queryKey: ['saves', gameId] })
+      toast('Named', 'success')
+      return true
+    } catch (e) {
+      toast(errorText(e), 'error')
+      return false
+    }
+  }
 
   const goBack = useGoBack()
   /** Save, wait for the server, and go back to where Play was pressed, or open the game page's Saves. */
@@ -366,6 +371,32 @@ export default function Player() {
   const rect = frameRect(area.w, area.h, screenSize, prefs.fit)
   const hasCutout = notch > 0 || insets.top + insets.right + insets.bottom + insets.left > 0
   const portrait = touch && stage.h > stage.w && (!screenSize || screenSize[0] > screenSize[1])
+  // The game is ready and the phone is still upright: the first time, one line says what a turn gives. Never over the game's first scene.
+  useEffect(() => {
+    if (!ready || !portrait || portraitOk || localStorage.getItem(TURN_TIP_KEY)) return
+    localStorage.setItem(TURN_TIP_KEY, '1')
+    toast('Turn your phone sideways for a bigger picture')
+  }, [ready, portrait, portraitOk, toast])
+  // On an iPhone in Safari, once the game has started and never while it loads: once, how to get full screen.
+  // One message at a time: the turn line above goes first, and this waits until no toast shows.
+  // It goes the moment the menu opens, so it never lies over a row.
+  const dismissTip = useRef<(() => void) | null>(null)
+  const { showing, busy: toastBusy } = useToasting()
+  useEffect(() => {
+    if (!ready || fsMode !== 'home-screen' || menu || showing || toastBusy() || localStorage.getItem(HOME_TIP_KEY)) return
+    localStorage.setItem(HOME_TIP_KEY, '1')
+    dismissTip.current = toast(
+      <>
+        For full screen, add Renplay to your home screen.{' '}
+        <button className="link" onClick={() => setPanel('fullscreen')}>
+          How
+        </button>
+      </>,
+    )
+  }, [ready, fsMode, menu, showing, toastBusy, toast])
+  useEffect(() => {
+    if (menu) dismissTip.current?.()
+  }, [menu])
 
   if (isLoading)
     return (
@@ -425,13 +456,13 @@ export default function Player() {
         </div>
       )}
 
-      {/* Portrait phones: games are wide. */}
-      {portrait && !portraitOk && (
+      {/* Portrait phones: games are wide. Asked only while the game loads, which is when turning the phone costs nothing. */}
+      {portrait && !portraitOk && !ready && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/95 p-8 text-center backdrop-blur-sm">
           <Smartphone className="mb-2 size-10 rotate-90 text-accent-300" />
           <p className="text-lg font-semibold">Turn your phone sideways</p>
           <p className="max-w-xs text-sm text-zinc-400">{game.title} is made for a wide screen. The game loads in the meantime.</p>
-          {!ready && <div className="mt-4 w-full max-w-xs"><p className="mb-3 text-sm text-zinc-400">{failed || (!progress ? 'Starting engine' : `Loading game ${Math.round(loadPct * 100)}%`)}</p>{failed ? <Pill onClick={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }}>Try again</Pill> : <Bar value={loadPct} indeterminate={!progress || !progress.total} />}</div>}
+          <div className="mt-4 w-full max-w-xs"><p className="mb-3 text-sm text-zinc-400">{failed || (!progress ? 'Starting engine' : `Loading game ${Math.round(loadPct * 100)}%`)}</p>{failed ? <Pill onClick={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }}>Try again</Pill> : <Bar value={loadPct} indeterminate={!progress || !progress.total} />}</div>
           <Pill variant="q" size="sm" className="mt-2" onClick={() => setPortraitOk(true)}>
             Play upright anyway
           </Pill>
@@ -502,6 +533,7 @@ export default function Player() {
           savedAs={saving.savedAs}
           saving={saving.savingNow}
           onSaveNow={saving.saveNow}
+          naming={saving.canName ? { onName: nameSave, onOpen: saving.holdNaming, onDone: saving.doneNaming } : null}
           hasGuide={game.walkthroughs.length > 0}
           guideOpen={guide.file !== null}
           onGuide={guide.open}

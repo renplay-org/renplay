@@ -29,3 +29,21 @@ export function PadMenuGlyph() {
     </svg>
   )
 }
+
+/** A controller's A, B, X or Y, drawn as a round button with its letter, and LB or RB as a rounded bar. Decoration: the words beside it say what it does. */
+export function PadGlyph({ button }: { button: 'a' | 'b' | 'x' | 'y' | 'lb' | 'rb' }) {
+  if (button === 'lb' || button === 'rb')
+    return (
+      <span className="pad-bumper" aria-hidden="true">
+        {button.toUpperCase()}
+      </span>
+    )
+  return (
+    <svg className="pad-face" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <text x="12" y="16.4" textAnchor="middle" fontSize="12.5" fontWeight="700" fill="currentColor">
+        {button.toUpperCase()}
+      </text>
+    </svg>
+  )
+}

@@ -111,8 +111,19 @@ test('every control in the menu, Saves and Options is tall enough and no text is
   const press = (locator) => (touch(testInfo) ? locator.tap() : locator.click())
   await press(page.locator('.rp-pill').first())
   const menu = page.getByRole('dialog', { name: /the player menu/ })
-  for (const [name, open] of MENU_VIEWS) {
-    if (open) {
+  // Name it, offered after Save now, in its two states: the row, and the field with Done.
+  const views = [...MENU_VIEWS, ['Name it', 'name'], ['Name it field', 'field']]
+  for (const [name, open] of views) {
+    if (open === 'name' || open === 'field') {
+      const back = menu.getByRole('button', { name: 'Back', exact: true })
+      if (await back.count()) await press(back)
+      await press(menu.getByRole('button', { name: 'Save now' }))
+      await expect(menu.getByRole('button', { name: 'Name it' })).toBeVisible()
+      if (open === 'field') {
+        await press(menu.getByRole('button', { name: 'Name it' }))
+        await expect(menu.getByRole('textbox', { name: 'Name' })).toBeVisible()
+      }
+    } else if (open) {
       const back = menu.getByRole('button', { name: 'Back', exact: true })
       if (await back.count()) await press(back)
       await press(menu.getByRole('button', { name: open }))
@@ -128,7 +139,7 @@ test('every control in the menu, Saves and Options is tall enough and no text is
         const e = n.parentElement
         if (text && e.getBoundingClientRect().width && parseFloat(getComputedStyle(e).fontSize) < 13) small.push(`${text} (${getComputedStyle(e).fontSize})`)
       }
-      const short = [...el.querySelectorAll('button, a, [role=switch]')].filter((c) => c.getBoundingClientRect().width).map((c) => ({ name: (c.getAttribute('aria-label') || c.textContent || '').trim().slice(0, 40), h: Math.round(c.getBoundingClientRect().height * 10) / 10 }))
+      const short = [...el.querySelectorAll('button, a, [role=switch], input')].filter((c) => c.getBoundingClientRect().width).map((c) => ({ name: (c.getAttribute('aria-label') || c.textContent || '').trim().slice(0, 40), h: Math.round(c.getBoundingClientRect().height * 10) / 10 }))
       return { small, short }
     })
     expect(found.small, `Text under 13 px in ${name}`).toEqual([])
@@ -136,7 +147,10 @@ test('every control in the menu, Saves and Options is tall enough and no text is
   }
   // Nothing scrolls on the list at 844 x 390, also with the line about saves that wait, which is two lines there.
   if (landscape) {
-    await press(menu.getByRole('button', { name: 'Back', exact: true }))
+    // Name it, open, is one more row of 40 px and the list still does not scroll. It goes with Esc, and the list is where it is.
+    expect(await menu.locator('.pm-body').evaluate((b) => b.scrollHeight - b.clientHeight)).toBeLessThanOrEqual(0)
+    await page.keyboard.press('Escape')
+    await expect(menu.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
     await context.setOffline(true)
     await expect(menu.getByText('Some saves have not reached the server yet.')).toBeVisible()
     expect(await menu.locator('.pm-body').evaluate((b) => b.scrollHeight - b.clientHeight)).toBeLessThanOrEqual(0)
@@ -159,6 +173,27 @@ test('the focus ring of every control in the menu is whole', async ({ page }) =>
   }
   await keyboard(page.locator('.rp-pill').first())
   const menu = page.getByRole('dialog', { name: /the player menu/ })
+  const focused = () =>
+    page.evaluate(() => {
+      const el = document.activeElement
+      if (!el || !el.closest('[role=dialog]')) return null
+      el.scrollIntoView({ block: 'nearest' })
+      const r = el.getBoundingClientRect()
+      return { name: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30), x: r.x, y: r.y, width: r.width, height: r.height }
+    })
+  const ringWhole = async () => {
+    expect(await focused(), 'Focus stays in the menu').not.toBeNull()
+    // The box is read again on every try: the menu slides in, so it has not settled at first.
+    await expect.poll(async () => ringShown(page, await focused()), { message: `The ring of ${(await focused()).name} is whole` }).toEqual([])
+  }
+  /** Every control of the view, by Tab. */
+  const walk = async () => {
+    const count = await menu.locator('button, a, [role=switch], input').count()
+    for (let i = 0; i < count; i++) {
+      await ringWhole()
+      await page.keyboard.press('Tab')
+    }
+  }
   for (const open of [null, /^Saves/, /^Options/]) {
     if (open) {
       // From a view back to the list, then into the next one.
@@ -167,22 +202,18 @@ test('the focus ring of every control in the menu is whole', async ({ page }) =>
       await keyboard(menu.getByRole('button', { name: open }))
       await expect(menu.getByRole('button', { name: 'Back', exact: true })).toBeFocused()
     }
-    const count = await menu.locator('button, a, [role=switch]').count()
-    for (let i = 0; i < count; i++) {
-      const focused = () =>
-        page.evaluate(() => {
-          const el = document.activeElement
-          if (!el || !el.closest('[role=dialog]')) return null
-          el.scrollIntoView({ block: 'nearest' })
-          const r = el.getBoundingClientRect()
-          return { name: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30), x: r.x, y: r.y, width: r.width, height: r.height }
-        })
-      expect(await focused(), 'Focus stays in the menu').not.toBeNull()
-      // The box is read again on every try: the menu slides in, so it has not settled at first.
-      await expect.poll(async () => ringShown(page, await focused()), { message: `The ring of ${(await focused()).name} is whole` }).toEqual([])
-      await page.keyboard.press('Tab')
-    }
+    await walk()
   }
+  // Name it, after Save now: the row, which is there for a few seconds and so is looked at alone, and the field with Done, which stays.
+  const back = menu.getByRole('button', { name: 'Back', exact: true })
+  if (await back.count()) await keyboard(back)
+  await keyboard(menu.getByRole('button', { name: 'Save now' }))
+  const row = menu.getByRole('button', { name: 'Name it' })
+  await row.focus()
+  await ringWhole()
+  await keyboard(row)
+  await expect(menu.getByRole('textbox', { name: 'Name' })).toBeFocused()
+  await walk()
 })
 
 test('the keys are drawn as keycaps with the layout characters, and the pill has no key in it', async ({ page }, testInfo) => {
@@ -324,6 +355,8 @@ test('on a phone held upright the guide is a sheet that takes the menu\'s place,
 test('the home screen tip goes the moment the menu opens, so it never lies over a row', async ({ page }, testInfo) => {
   await play(page, { iphone: true })
   const tip = page.locator('.toast', { hasText: 'add Renplay to your home screen' })
+  // Upright, the turn line goes first, and the tip waits for it to go.
+  if (testInfo.project.name === 'webkit-portrait') await expect(tip).toHaveCount(0)
   // On a phone upright it sits where the menu's lower rows are: it is there before the menu opens, and gone with it.
   await expect(tip).toBeVisible()
   await press(testInfo, page.locator('.rp-pill').first())
@@ -339,4 +372,213 @@ test('the home screen tip goes the moment the menu opens, so it never lies over 
   await expect(menu).toBeVisible()
   await expect(tip).toHaveCount(0)
   expect(await page.evaluate(() => localStorage.getItem('renplay:home-screen-tip'))).toBe('1')
+})
+
+/** Save now, then Name it, as a person does within a few seconds. */
+async function nameIt(testInfo, menu) {
+  await press(testInfo, menu.getByRole('button', { name: 'Save now' }))
+  await press(testInfo, menu.getByRole('button', { name: 'Name it' }))
+  return menu.getByRole('textbox', { name: 'Name' })
+}
+
+test('after Save now the row offers Name it, which names the save with Enter or Done and with touch or a click', async ({ page }, testInfo) => {
+  const engine = await play(page)
+  await press(testInfo, page.locator('.rp-pill').first())
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  // Not before a save was made.
+  await expect(menu.getByRole('button', { name: 'Name it' })).toHaveCount(0)
+  const field = await nameIt(testInfo, menu)
+  await expect(field).toBeFocused()
+  await page.screenshot({ path: testInfo.outputPath('name-it-open.png') })
+  await field.fill('Meeting Diya')
+  await page.keyboard.press('Enter')
+  await expect(page.getByText('Named', { exact: true })).toBeVisible()
+  // The save's title went through the meta route, for the quick save Save now made, and the row is gone.
+  await expect.poll(() => engine.named()).toEqual([{ file: 'quick-1-LT1.save', title: 'Meeting Diya' }])
+  await expect(menu.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
+  await expect(menu.getByRole('button', { name: 'Name it' })).toHaveCount(0)
+  await expect(menu.getByRole('button', { name: 'Save now' })).toBeFocused()
+  await page.screenshot({ path: testInfo.outputPath('name-it-saved.png') })
+  // The menu's list shows the name.
+  await press(testInfo, menu.getByRole('button', { name: /^Saves/ }))
+  await expect(menu.locator('.pm-save').first()).toContainText('Meeting Diya')
+  // Done does the same as Enter.
+  await press(testInfo, menu.getByRole('button', { name: 'Back', exact: true }))
+  const again = await nameIt(testInfo, menu)
+  await again.fill('Before lunch')
+  await press(testInfo, menu.getByRole('button', { name: 'Done' }))
+  await expect.poll(() => engine.named().length).toBe(2)
+  expect(engine.named()[1]).toEqual({ file: 'quick-1-LT1.save', title: 'Before lunch' })
+})
+
+test('Name it with the keyboard: Esc closes the field and not the menu, and nothing is named', async ({ page }, testInfo) => {
+  test.skip(touch(testInfo), 'A keyboard')
+  const engine = await play(page)
+  await page.keyboard.press('Backquote')
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  const field = await nameIt(testInfo, menu)
+  await field.fill('Not this one')
+  await page.keyboard.press('Escape')
+  await expect(field).toHaveCount(0)
+  await expect(menu).toBeVisible()
+  expect(engine.named()).toEqual([])
+  // An empty name leaves the save as it is, too.
+  const empty = await nameIt(testInfo, menu)
+  await page.keyboard.press('Enter')
+  await expect(empty).toHaveCount(0)
+  expect(engine.named()).toEqual([])
+  // Tab from the field to Done, and Enter on it.
+  const third = await nameIt(testInfo, menu)
+  await third.fill('Tabbed')
+  await page.keyboard.press('Tab')
+  await expect(menu.getByRole('button', { name: 'Done' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect.poll(() => engine.named()).toEqual([{ file: 'quick-1-LT1.save', title: 'Tabbed' }])
+})
+
+test('with a controller the menu shows its buttons: Menu on Back to the game, the hold of Menu on Guide, A on the focused row and B on Back', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-desktop', 'A computer with a controller')
+  await play(page, { pad: true })
+  const hold = (name, ms = 120) => page.evaluate(([n, t]) => new Promise((done) => { window.__hold(n, true); setTimeout(() => { window.__hold(n, false); setTimeout(done, 80) }, t) }), [name, ms])
+  await page.keyboard.press('Backquote')
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  await expect(menu).toBeVisible()
+  const back = menu.getByRole('button', { name: /Back to the game/ })
+  await expect(back.locator('.pad-menu'), 'Menu closes the menu').toBeVisible()
+  const guide = menu.getByRole('button', { name: /Guide/ })
+  await expect(guide.locator('.pad-menu'), 'the hold of Menu opens the guide').toBeVisible()
+  await expect(guide).toContainText('hold')
+  await expect(menu.locator('.keycap'), 'no keys while a controller is connected').toHaveCount(0)
+  // A is on the focused row, and only there.
+  await expect(menu.locator('.pm-a .pad-face')).toHaveCount(1)
+  await expect(back.locator('.pm-a')).toHaveCount(1)
+  await hold('down')
+  await expect(menu.getByRole('button', { name: 'Save now' })).toBeFocused()
+  await expect(menu.getByRole('button', { name: 'Save now' }).locator('.pm-a')).toHaveCount(1)
+  await expect(menu.locator('.pm-a')).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath('menu-glyphs.png') })
+  // Inside a list the Back row has B.
+  await menu.getByRole('button', { name: /Saves/ }).focus()
+  await hold('a')
+  const list = menu.getByRole('button', { name: 'Back', exact: true })
+  await expect(list).toBeFocused()
+  await expect(list.locator('.pm-end .pad-face')).toContainText('B')
+})
+
+test('Name it with the controller: A opens the field, the d-pad reaches Done, and B closes it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-desktop', 'A computer with a controller')
+  const engine = await play(page, { pad: true })
+  const hold = (name, ms = 120) => page.evaluate(([n, t]) => new Promise((done) => { window.__hold(n, true); setTimeout(() => { window.__hold(n, false); setTimeout(done, 80) }, t) }), [name, ms])
+  // The game's own controller handling is not in the stand-in, so the menu opens by key and then holds the controller.
+  await page.keyboard.press('Backquote')
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  await expect(menu).toBeVisible()
+  await expect(menu.getByRole('button', { name: 'Back to the game' })).toBeFocused()
+  await hold('down')
+  await expect(menu.getByRole('button', { name: 'Save now' })).toBeFocused()
+  await hold('a')
+  await expect(menu.getByRole('button', { name: 'Name it' })).toBeVisible()
+  await hold('down')
+  await expect(menu.getByRole('button', { name: 'Name it' })).toBeFocused()
+  await hold('a')
+  const field = menu.getByRole('textbox', { name: 'Name' })
+  await expect(field).toBeFocused()
+  // A controller types with the system's keyboard: here the keys do.
+  await page.keyboard.type('Pad name')
+  await hold('down')
+  await expect(menu.getByRole('button', { name: 'Done' })).toBeFocused()
+  await hold('a')
+  await expect.poll(() => engine.named()).toEqual([{ file: 'quick-1-LT1.save', title: 'Pad name' }])
+  // B closes the field of another save, not the menu.
+  await expect(menu.getByRole('button', { name: 'Save now' })).toBeFocused()
+  await hold('a')
+  await expect(menu.getByRole('button', { name: 'Name it' })).toBeVisible()
+  await hold('down')
+  await hold('a')
+  await expect(field).toBeFocused()
+  await hold('b')
+  await expect(field).toHaveCount(0)
+  await expect(menu).toBeVisible()
+  expect(engine.named()).toHaveLength(1)
+})
+
+test('the portrait gate is only there while the game loads, and the toast comes once', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
+  const engine = await play(page, { holdReady: true })
+  const gate = page.getByText('Turn your phone sideways', { exact: true })
+  const toast = page.locator('.toast', { hasText: 'Turn your phone sideways for a bigger picture' })
+  await expect(gate).toBeVisible()
+  await expect(toast).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('gate.png') })
+  await engine.ready()
+  await expect(page.locator('.rp-pill').first()).toBeVisible()
+  await expect(gate).toHaveCount(0)
+  await expect(toast).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('gate-toast.png') })
+  // Once: the next game on this phone says nothing.
+  await page.reload()
+  await expect(gate).toBeVisible()
+  await expect(async () => engine.ready()).toPass()
+  await expect(page.locator('.rp-pill').first()).toBeVisible()
+  await expect(gate).toHaveCount(0)
+  await expect(page.locator('.toast')).toHaveCount(0)
+})
+
+test('on an iPhone held upright one message shows at a time: the turn line, then the home screen tip once', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
+  await play(page, { iphone: true })
+  await expect(page.getByText('Turn your phone sideways', { exact: true })).toHaveCount(0)
+  const turn = page.locator('.toast', { hasText: 'Turn your phone sideways for a bigger picture' })
+  const tip = page.locator('.toast', { hasText: 'add Renplay to your home screen' })
+  await expect(turn).toBeVisible()
+  await expect(tip).toHaveCount(0)
+  await expect(page.locator('.toast')).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath('iphone-turn-toast.png') })
+  // When the turn line has gone, the tip follows, on its own.
+  await expect(tip).toBeVisible()
+  await expect(turn).toHaveCount(0)
+  await expect(page.locator('.toast')).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath('iphone-home-screen-tip.png') })
+  expect(await page.evaluate(() => localStorage.getItem('renplay:home-screen-tip'))).toBe('1')
+})
+
+test('the home screen tip is not shown over the open menu, nor after it while the menu stays open', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
+  await play(page, { iphone: true })
+  await page.evaluate(() => {
+    window.__toasts = []
+    new MutationObserver(() => document.querySelectorAll('.toast').forEach((t) => window.__toasts.push(t.textContent))).observe(document.body, { childList: true, subtree: true })
+  })
+  await expect(page.locator('.toast', { hasText: 'Turn your phone sideways for a bigger picture' })).toBeVisible()
+  await press(testInfo, page.locator('.rp-pill').first())
+  await expect(page.getByRole('dialog', { name: /the player menu/ })).toBeVisible()
+  // The turn line goes by itself, and the tip does not take its place over the menu.
+  await expect(page.locator('.toast')).toHaveCount(0)
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+  await expect(page.locator('.toast')).toHaveCount(0)
+  expect((await page.evaluate(() => window.__toasts)).join(' ')).not.toContain('home screen')
+})
+
+test('the menu shows the time in full screen and not otherwise', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-desktop', 'Full screen of a computer')
+  await play(page)
+  await page.locator('.rp-pill').first().click()
+  const menu = page.getByRole('dialog', { name: /the player menu/ })
+  const clock = menu.locator('time')
+  await expect(clock).toHaveCount(0)
+  await menu.getByRole('switch', { name: 'Full screen' }).click()
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true)
+  await expect(clock).toBeVisible()
+  // The person's own locale, on one line: the time as the page itself formats it, within the minute.
+  const now = () => page.evaluate(() => new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))
+  const shown = (await clock.textContent()).trim()
+  expect(shown).toMatch(/^\d{1,2}:\d{2}\s?[AP]M$/)
+  expect([await now(), await page.evaluate(() => new Date(Date.now() - 60_000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))]).toContain(shown)
+  const box = await clock.boundingBox()
+  expect(box.height, 'One line').toBeLessThan(24)
+  expect(await clock.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(13)
+  await page.screenshot({ path: testInfo.outputPath('clock.png') })
+  await menu.getByRole('switch', { name: 'Full screen' }).click()
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(false)
+  await expect(clock).toHaveCount(0)
 })

@@ -3,6 +3,7 @@ import sharp from 'sharp'
 import { mock } from '../../app-mock.mjs'
 import { pdf } from '../pdf.mjs'
 import { expect } from './fixtures.mjs'
+import { padScript } from './pad.mjs'
 
 // The in-game view with a made-up game page: the real shared runtime part (runtime/renplay-player.js, which
 // catches the keys) and a small stand-in for the engine that answers the player's messages. What it was sent
@@ -26,7 +27,9 @@ const gamePage = `<!doctype html><html><body tabindex="0" style="margin:0;backgr
   })
   // The runtime tells the player when the server cannot be reached.
   window.addEventListener('offline', function () { post('sync', { pending: 1, online: false, lastSync: 0 }) })
-  post('ready')
+  // A test that holds the game's start (holdReady) says when it is ready.
+  window.__ready = function () { post('ready') }
+  if (!parent.__holdReady) post('ready')
 })()
 </script></body></html>`
 
@@ -37,20 +40,14 @@ const file = (name, title, kind) => ({ file: name, title, kind, size: 1, addedAt
 export const GUIDE = file('guide.png', 'Guide', 'image')
 export const PDF = file('guide.pdf', 'Walkthrough', 'pdf')
 export const TEXT = file('notes.txt', 'Notes', 'text')
+/** A PDF with wide margins, like a guide set for print, and one with no text at all, like a scan. */
+export const WIDE = file('wide.pdf', 'Wide margins', 'pdf')
+export const SCAN = file('scan.pdf', 'Scan', 'pdf')
 
-/** A controller: the player reads `window.__pad`. `__hold(button, on)` presses a button, 'dpad-down' and the like included. */
-const padScript = () => {
-  const buttons = Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }))
-  const pad = { id: 'Test pad', index: 0, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons, timestamp: 0 }
-  navigator.getGamepads = () => [pad]
-  const names = { a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, menu: 9, up: 12, down: 13, left: 14, right: 15 }
-  window.__hold = (name, on) => { buttons[names[name]].pressed = on }
-  window.dispatchEvent(new Event('gamepadconnected'))
-}
-
-/** Opens the game with its saves, and what the made-up engine saw. */
-export async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = false, walkthroughs = [GUIDE], pad = false } = {}) {
+/** Opens the game with its saves (the player, or the game page with `path`), and what the made-up engine saw. */
+export async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = false, walkthroughs = [GUIDE], pad = false, holdReady = false, path = `/play/${GAME}` } = {}) {
   if (pad) await page.addInitScript(padScript)
+  if (holdReady) await page.addInitScript(() => { window.__holdReady = true })
   // Safari on an iPhone: no Fullscreen API, so the menu has the home screen row and the first game shows the tip.
   if (iphone)
     await page.addInitScript(() => {
@@ -69,6 +66,8 @@ export async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = 
   const text = Array.from({ length: 120 }, (_, i) => `Line ${i + 1}: talk to Diya, then Min-seo, and pick the second option.`).join('\n')
   const files = (route) => {
     const name = new URL(route.request().url()).pathname
+    if (name.endsWith('wide.pdf')) return route.fulfill({ status: 200, contentType: 'application/pdf', body: pdf(3, 40, { margin: 140 }) })
+    if (name.endsWith('scan.pdf')) return route.fulfill({ status: 200, contentType: 'application/pdf', body: pdf(2, 0, { text: false }) })
     if (name.endsWith('.pdf')) return route.fulfill({ status: 200, contentType: 'application/pdf', body: pdf(3, 40) })
     if (name.endsWith('.txt')) return route.fulfill({ status: 200, contentType: 'text/plain; charset=utf-8', body: text })
     return route.fulfill({ status: 200, contentType: 'image/png', body: picture })
@@ -77,13 +76,39 @@ export async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = 
   await page.route('**/api/walkthroughs/*', files)
   const list = [...slots]
   await page.exposeFunction('__saved', () => { list.unshift(slot(1, 0)) })
+  // Naming a save, as the server answers it: the title is kept on the list. What was asked is kept in `named`.
+  const named = []
+  await page.route(`**/api/saves/${GAME}/meta?*`, (route) => {
+    const file = new URL(route.request().url()).searchParams.get('file')
+    const body = route.request().postDataJSON()
+    named.push({ file, ...body })
+    const save = list.find((s) => s.file === file)
+    if (save) save.title = body.title
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, title: body.title, note: null, pinnedAt: null }) })
+  })
   await page.route(`**/api/saves/${GAME}`, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ saveDir: 'save-0', slots: list, other: [], conflicts: [], sync: false }) }))
+  // Earlier versions of a save, as the server lists them: one save's, or every save's.
+  await page.route(`**/api/saves/${GAME}/history*`, (route) => {
+    const only = new URL(route.request().url()).searchParams.get('file')
+    const all = [
+      { id: 'quick-1-LT1.save/1', name: 'quick-1-LT1.save', label: 'Quick 1', size: 2048, savedAt: Date.parse('2026-11-11T11:00:00Z'), reason: 'game' },
+      { id: 'quick-1-LT1.save/2', name: 'quick-1-LT1.save', label: 'Quick 1', size: 2048, savedAt: Date.parse('2026-11-11T10:00:00Z'), reason: 'conflict' },
+      { id: 'quick-2-LT1.save/3', name: 'quick-2-LT1.save', label: 'Quick 2', size: 2048, savedAt: Date.parse('2026-11-11T09:00:00Z'), reason: 'user-delete' },
+      { id: '2-3-LT1.save/4', name: '2-3-LT1.save', label: 'Page 2 · Slot 3', size: 2048, savedAt: Date.parse('2026-11-11T08:00:00Z'), reason: 'sync' },
+    ]
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ versions: only ? all.filter((v) => v.name === only) : all }) })
+  })
   await page.route(`**/g/${GAME}/b1/**`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: gamePage }))
-  await page.goto(`/play/${GAME}`)
-  // A phone held upright is asked to turn: it plays upright anyway.
-  const { width, height } = page.viewportSize()
-  if (height > width) await page.getByRole('button', { name: 'Play upright anyway' }).click()
+  await page.goto(path)
+  const engine = {
+    sent: (type) => page.evaluate((t) => (window.__frameMsgs ?? []).filter((m) => m.type === t), type),
+    named: () => named,
+    /** The game is ready: the engine's page says so. */
+    ready: () => page.frames().find((f) => f.url().includes(`/g/${GAME}/`)).evaluate(() => window.__ready()),
+  }
+  // Only the player has the pill: the game page is opened to be looked at.
+  if (holdReady || !path.startsWith('/play/')) return engine
   await expect(page.locator('.rp-pill').first()).toBeVisible()
-  return { sent: (type) => page.evaluate((t) => (window.__frameMsgs ?? []).filter((m) => m.type === t), type) }
+  return engine
 }
 

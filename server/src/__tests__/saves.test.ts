@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it } from 'vitest'
 import yazl from 'yazl'
-import { SAVES_ZIP,readSaveMeta, slotInfo } from '../saves/savefile.js'
+import { SAVES_ZIP,readSaveMeta } from '../saves/savefile.js'
+import { slotInfo } from '../shared/saveslot.js'
 import { readZipEntries } from '../util/zip.js'
 import { SaveStore, fnv } from '../saves/store.js'
 import express from 'express'
@@ -60,6 +61,20 @@ describe('SaveStore', () => {
     await tiny('1-3-LT1.save').expect(507)
     db.close()
   }, 25_000)
+
+  it('lists the history of every slot, and each version names its slot for people', async () => {
+    const db = Db.open(join(root, 'data'))
+    db.insertGame({ id: 'g', title: 'G', status: 'installed', build: 'b1', save_dir: 'G-1' })
+    const app = express()
+    app.use('/api', createSavesRouter({ db, content: new ContentMode(loadConfig(), db), cfg: { syncServer: 'https://sync.renpy.org', saveLimits: { file: 100, total: 250, files: 9 } }, saves: store } as never))
+    for (const name of ['quick-1-LT1.save', '2-3-LT1.save']) {
+      await store.write('G-1', name, Buffer.from('one'))
+      await store.write('G-1', name, Buffer.from('two'))
+    }
+    const { body } = await request(app).get('/api/saves/g/history').expect(200)
+    expect(body.versions.map((v: { name: string }) => [v.name, slotInfo(v.name).label]).sort()).toEqual([['2-3-LT1.save', 'Page 2 · Slot 3'], ['quick-1-LT1.save', 'Quick 1']])
+    db.close()
+  })
 
   it('writes, keeps history on overwrite, and restores', async () => {
     await store.write('Game-1', '1-1-LT1.save', Buffer.from('v1'))

@@ -13,11 +13,7 @@ import type { Services } from '../services.js'
 import type { OfflineManifest } from '../shared/api.js'
 import { parseGamePath, type GamePath } from './path.js'
 import { readRuntimes } from './runtime.js'
-
-// Game pages play only inside Renplay's own player: another site cannot frame them to trick people
-// into clicks. Checked in Chromium and WebKit, sandboxed pages too. The library stays embeddable
-// (dashboards frame it).
-const FRAME_ANCESTORS = "frame-ancestors 'self'"
+import { demoFrameAncestors } from '../shared/demo-embed.js'
 
 /** The URL an installed game plays at. HTML games start at their own page. */
 export function playPath(g: GameRow): string {
@@ -31,6 +27,7 @@ export function playPath(g: GameRow): string {
  */
 export function createPlayRouter(s: Services): Router {
   const { cfg, db, builds, engines, content, accounts, telemetry } = s
+  const frameAncestors = demoFrameAncestors(cfg.demo, cfg.demoEmbedder)
   const runtimes = readRuntimes()
   const runtimeVersion = runtimes.version
   const router = Router({ caseSensitive: true, strict: true })
@@ -61,7 +58,7 @@ export function createPlayRouter(s: Services): Router {
       userId: accounts.current().id,
     })
     res.setHeader('Cache-Control', 'private, no-store')
-    res.setHeader('Content-Security-Policy', FRAME_ANCESTORS)
+    res.setHeader('Content-Security-Policy', frameAncestors)
     res.type('html').send(html)
   })
 
@@ -128,7 +125,7 @@ export function createPlayRouter(s: Services): Router {
       // Sandbox every pack response, independent of MIME, suffixes or browser sniffing.
       // This follows direct navigations, secondary pages and popups too.
       // Never allow-same-origin or popup escape: game scripts must not gain account cookies.
-      res.setHeader('Content-Security-Policy', `sandbox allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms; ${FRAME_ANCESTORS}`)
+      res.setHeader('Content-Security-Policy', `sandbox allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms; ${frameAncestors}`)
     }
     if (/\.html?$/i.test(name)) {
       const game = db.getGame(id)

@@ -7,6 +7,35 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.12.0] - 2026-11-15
+
+### Added
+
+- **LB** and **RB** on a controller switch between the pages: Library, Catalog, Add games and Activity (for admins) and You, round the ends, from any page. A page's own tabs, such as the game page's, are reached with the d-pad and **A**. In a game the shoulder buttons stay Ren'Py's. **B** goes back to the page before when nothing is open.
+- The right stick scrolls the page, a list or a menu. The d-pad scrolls the page too when there is nothing to move to up or down.
+- With a controller connected, the game's menu shows the controller's buttons instead of keys: **Menu** on **Back to the game**, a hold of **Menu** on **Guide**, **A** on the row that has focus and **B** on **Back**. The library shows a small line with what **A**, **B**, **LB** and **RB** do, only while you are using the controller, and hides it when you use the mouse, the keyboard or touch.
+- **Name it** appears for a few seconds under **Save now** in the game's menu. It opens a small field in place: **Enter** or **Done** names that save, **Esc** leaves it. It works with touch, the keyboard and the controller. The name shows in the menu's saves and on the game page.
+- **Start from the main menu**, a quiet link under **Resume** on a game's page when it has saves, opens the game's own main menu.
+- In full screen, the game's menu shows the time, in the way your language writes it.
+- Public demos can be embedded on one website, with a shared guest session and messages for saves and refreshes. `RENPLAY_DEMO_EMBEDDER` chooses that website. This works only with `RENPLAY_DEMO` on and does not change normal installations.
+
+### Changed
+
+- A controller moves focus to the nearest control in that direction, so the Up next buttons, the search, the tags and the games in a grid are all reached with the d-pad, and **A** opens them. The first press, with nothing selected, goes into the page.
+- A held direction on a controller waits half a second before it repeats, then repeats a little faster, so a press that is a little long no longer skips an option.
+- A PDF guide on a phone opens fitted to its text column, scrolled to where the text starts, so it is readable without panning. **Fit** and a double tap switch between the text column and the whole page. A scanned page with no text opens at Fit, and a picture is fitted to the width. A zoom you chose is still kept for the file.
+- On an upright phone, "Turn your phone sideways" shows only while the game loads. Once it has started, a line says it once, "Turn your phone sideways for a bigger picture", and the game is not covered.
+
+### Fixed
+
+- A controller no longer skips options. The left stick has a dead zone and presses at 60 percent and lets go at 35, so a thumb resting near the edge does not press again and again, and the d-pad and the stick count as one press.
+- What gets focus with a controller is always fully in view, under the header and the search bar and above the tab bar on a phone, and the games of a long list load before focus runs out.
+- The website no longer says Renplay sends no telemetry. It says what it sends: one small anonymous report a day, which you can turn off.
+- The game page's saves on a phone: the tabs and the toolbar no longer run off the screen, the actions list is one action to a line, and the history is titled with the save's name and says in plain words why each version is there.
+- A name, note and pin follow their save. When a quick save or an autosave moves a save to the next slot, its name, note and pin move with it, and the new save in the first slot starts without them. A save written over with new content no longer keeps the old name or note, and the earlier version stays in History, where restoring it brings them back. A pin is different: it stays on a slot that is saved over, so every version of that slot is kept, and it moves only when its save turns up in another slot.
+- Sheets and menus, such as a save's actions and its history, are solid enough to read on a phone that draws no blur or has reduced transparency. Nothing behind them shows through.
+- On an iPhone held upright, the "Turn your phone sideways" line and the home screen tip no longer show together. The turn line comes first, and the tip follows once, when no other message shows and the menu is shut.
+
 ## [4.11.0] - 2026-11-13
 
 ### Added
@@ -781,7 +810,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.11.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.12.0...dev
+[4.12.0]: https://github.com/renplay-org/renplay/compare/v4.11.0...v4.12.0
 [4.11.0]: https://github.com/renplay-org/renplay/compare/v4.10.0...v4.11.0
 [4.10.0]: https://github.com/renplay-org/renplay/compare/v4.9.0...v4.10.0
 [4.9.0]: https://github.com/renplay-org/renplay/compare/v4.8.0...v4.9.0

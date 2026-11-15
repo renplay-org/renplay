@@ -1,9 +1,11 @@
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Check, CloudOff, Expand, Play, Save, Settings2, Smartphone, Volume2, VolumeX } from 'lucide-react'
-import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import type { Game } from '@shared/api'
 import { Frame } from '../../lantern/art'
 import { Pill } from '../../lantern/controls'
-import { Keycap } from '../../lantern/Keycap'
+import NameIt from './NameIt'
+import { Keycap, PadGlyph, PadMenuGlyph } from '../../lantern/Keycap'
 import { useModal } from '../../lantern/modal'
 import { cx } from '../../lantern/ui'
 import { popupClick } from '../../lib/links'
@@ -19,6 +21,42 @@ export function SwitchRow({ icon, label, checked, onChange }: { icon?: ReactNode
       <span>{label}</span>
       <span className={cx('sw', checked && 'on')} aria-hidden="true" />
     </button>
+  )
+}
+
+/** The row that has focus, which the controller's A is shown on: null when focus is elsewhere or there is no controller. */
+function useFocusedRow(ref: RefObject<HTMLElement | null>, on: boolean): HTMLElement | null {
+  const [row, setRow] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !on) return
+    const rowOf = () => (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.pm-row, .pm-save, .pm-exit') ?? null
+    const enter = () => setRow(rowOf())
+    // Moving from one row to the next is a focusout straight followed by a focusin: only leaving the list clears.
+    const leave = (e: FocusEvent) => !e.relatedTarget && setRow(null)
+    enter()
+    el.addEventListener('focusin', enter)
+    el.addEventListener('focusout', leave)
+    return () => {
+      el.removeEventListener('focusin', enter)
+      el.removeEventListener('focusout', leave)
+      setRow(null)
+    }
+  }, [ref, on])
+  return on ? row : null
+}
+
+/** The time in the person's own locale, on again each minute. */
+function Clock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = window.setTimeout(() => setNow(new Date()), 60_000 - (Date.now() % 60_000))
+    return () => clearTimeout(t)
+  }, [now])
+  return (
+    <time className="pm-clock" dateTime={now.toISOString()}>
+      {now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+    </time>
   )
 }
 
@@ -42,6 +80,7 @@ export function PlayerMenu({
   savedAs,
   saving,
   onSaveNow,
+  naming,
   hasGuide,
   guideOpen,
   onGuide,
@@ -74,6 +113,8 @@ export function PlayerMenu({
   savedAs: string | null
   saving: boolean
   onSaveNow: () => void
+  /** Name it, offered for a few seconds after Save now: null when it is not. */
+  naming: { onName: (title: string) => Promise<boolean>; onOpen: () => void; onDone: () => void } | null
   /** The game has a walkthrough file: its row opens the guide. A guide the catalog links is a link row instead. */
   hasGuide: boolean
   /** The guide window is open beside the sheet: its row hands focus to it. */
@@ -108,6 +149,7 @@ export function PlayerMenu({
     if (before.guideOpen && !guideOpen && view === 'top') at('[data-guide]')
     else if (before.view !== view) at('[data-initial]')
   }, [view, guideOpen, ref])
+  const aRow = useFocusedRow(ref, pad)
   const link = game.recipe?.links.walkthrough
   // The safe areas of the screen, which the sheet's padding adds to its own.
   const sheet = { '--pi-top': `${insets.top}px`, '--pi-right': `${insets.right}px`, '--pi-bottom': `${insets.bottom}px`, '--pi-left': `${insets.left}px` } as CSSProperties
@@ -118,6 +160,7 @@ export function PlayerMenu({
         <header className="pm-head">
           <Frame game={game} kind="sq" className="pm-icon" style={{ flex: 'none' }} />
           <div className="pm-title truncate">{game.title}</div>
+          {fullscreen && <Clock />}
         </header>
         <div className="pm-body">
           {view !== 'top' ? (
@@ -125,6 +168,11 @@ export function PlayerMenu({
               <button type="button" className="pm-row first" onClick={() => onView('top')} data-initial>
                 <ChevronLeft />
                 Back
+                {pad && (
+                  <span className="pm-end">
+                    <PadGlyph button="b" />
+                  </span>
+                )}
               </button>
               {view === 'saves' ? saves : options}
             </>
@@ -133,14 +181,20 @@ export function PlayerMenu({
               <button type="button" className="pm-row first" onClick={onClose} data-initial>
                 <ArrowLeft />
                 Back to the game
-                {keys && !pad && (
+                {pad ? (
                   <span className="pm-end">
-                    <Keycap char={keys.menu} />
+                    <PadMenuGlyph />
                   </span>
+                ) : (
+                  keys && (
+                    <span className="pm-end">
+                      <Keycap char={keys.menu} />
+                    </span>
+                  )
                 )}
               </button>
               {renpy && ready && (
-                <button type="button" className="pm-row" onClick={onSaveNow} aria-disabled={saving}>
+                <button type="button" className="pm-row" onClick={onSaveNow} aria-disabled={saving} data-save-now>
                   <Save />
                   {saving ? 'Saving' : 'Save now'}
                   {savedAs && (
@@ -151,14 +205,32 @@ export function PlayerMenu({
                   )}
                 </button>
               )}
+              {renpy && ready && naming && (
+                <NameIt
+                  onName={naming.onName}
+                  onOpen={naming.onOpen}
+                  onDone={() => {
+                    naming.onDone()
+                    // The field is gone, so focus goes back to the row above it.
+                    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[data-save-now]')?.focus())
+                  }}
+                />
+              )}
               {hasGuide ? (
                 <button type="button" className="pm-row" onClick={onGuide} data-guide aria-expanded={guideOpen}>
                   <BookOpen />
                   Guide
-                  {keys && !pad && (
+                  {pad ? (
                     <span className="pm-end">
-                      <Keycap char={keys.guide} />
+                      hold
+                      <PadMenuGlyph />
                     </span>
+                  ) : (
+                    keys && (
+                      <span className="pm-end">
+                        <Keycap char={keys.guide} />
+                      </span>
+                    )
                   )}
                 </button>
               ) : (
@@ -217,17 +289,14 @@ export function PlayerMenu({
             <Pill variant="p" className="pm-exit" onClick={onExit}>
               Save and exit
             </Pill>
-            {pad ? (
-              <p className="pm-keys">A select, B back</p>
-            ) : (
-              keys && (
-                <p className="pm-keys">
-                  <Keycap char={keys.menu} /> opens this menu{hasGuide ? <>, <Keycap char={keys.guide} /> the guide</> : null}
-                </p>
-              )
+            {!pad && keys && (
+              <p className="pm-keys">
+                <Keycap char={keys.menu} /> opens this menu{hasGuide ? <>, <Keycap char={keys.guide} /> the guide</> : null}
+              </p>
             )}
           </footer>
         )}
+        {aRow && createPortal(<span className="pm-a"><PadGlyph button="a" /></span>, aRow)}
       </aside>
     </>
   )

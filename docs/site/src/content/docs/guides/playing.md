@@ -29,11 +29,15 @@ games level, as the library does.
 
 Open the game and press **Resume** (or **Play** the first time). **Resume** opens your latest save,
 and the game's own menu is a tap away for a new game or another save. **Up next** on the library
-home resumes straight away.
+home resumes straight away. **Start from the main menu**, under **Resume**, opens the game's own main
+menu instead, when the game has saves.
 
 While the game loads, one bar shows how far it is, from the engine to the game's first screen.
 **Game page**, **Sound** and **Full screen** sit at the top, so you can leave, mute or go full
 screen before it starts.
+
+In full screen the menu's title line shows the time, in your own language's way of writing it, so a
+long scene does not make you lose it.
 
 The game paces itself to your display. A **Menu** pill sits over it at the top left, with **Full
 screen** beside it. The pill is lit for the first seconds of a game and shows the controller's Menu
@@ -43,7 +47,9 @@ the **`** key (left of **1**), or swipe from the left edge on a phone to open th
 ![The player menu open over a game](../../../assets/desktop-player-drawer.webp)
 
 - **Back to the game** is the first row. **Save now** makes a quick save and says where it went,
-  "Saved as Quick 1".
+  "Saved as Quick 1". For a few seconds after it, **Name it** opens a small field in place. Type a
+  name and press **Enter** or **Done** to give that save a name, or **Esc** to leave it as it is.
+  With a controller, **A** opens the field and the d-pad reaches **Done**.
 - **Guide** opens the game's walkthroughs, when it has any ([the guide](#the-guide)). On a computer
   the menu stays open and the walkthrough opens beside it. On a phone it takes the menu's place.
 - **Saves** lists your saves, with pinned ones first and then the newest. A tap on one saves where
@@ -85,8 +91,8 @@ shows when there are several.
   **Zoom in** and **Fit**. Fit makes the page as wide as the window. A picture has the same bar
   without pages, and a text file is wrapped text.
 - **Zoom** also works by pinching, by holding Ctrl and turning the wheel, and by double tap or
-  double click, which switches between Fit and 100 percent. The page and zoom you left are kept for
-  each file in this browser.
+  double click, which switches between Fit and 100 percent (on a phone, between Fit and the text
+  column, below). The page and zoom you left are kept for each file in this browser.
 - **See-through** in the title bar lets the game show through the window. It is on or off, and kept.
 - **Pop out** moves the guide into a small window of its own. In Chrome and Edge that window stays on
   top of everything, in full screen too, and can go to another screen. **Bring back**, or closing the
@@ -99,8 +105,11 @@ shows when there are several.
 
 On a phone held upright the guide is a sheet over the lower part of the screen, with **Back to the
 game** first. Drag the handle at its top, or tap it, to switch between 58 and 92 percent of the
-screen. Held sideways the guide fills the screen. A PDF opens at 100 percent, which is readable, and
-you pan it. A double tap fits it to the width, and again undoes that. Once you have opened the guide, a
+screen. Held sideways the guide fills the screen. A PDF opens fitted to its **text column**: as wide
+as the text on its pages, with the white margins left out, and scrolled so that the text starts at
+the left edge. That is much larger than the whole page and does not need panning to read. **Fit** and
+a double tap switch between the text column and the whole page. A scanned page with no text opens
+at Fit, and a picture opens fitted to the width. Once you have opened the guide, a
 **Guide** pill beside **Menu** switches between the guide and the game in one tap. A phone has no pop out.
 
 ## Up next, status and ratings
@@ -127,7 +136,9 @@ own history.
 
 Open Renplay in the phone’s browser. **Resume** and **Play** come right under a game's title, on the
 first screen, held upright or sideways. Hold the phone sideways to play: the game fills the screen
-around the camera cutout. Every screen works with touch only.
+around the camera cutout. While a game loads upright, Renplay asks you to turn the phone, and
+the game loads in the meantime. Once it has started, it does not ask again: the first time, a
+line says that a sideways phone gives a bigger picture. Every screen works with touch only.
 
 ### iPhone and iPad: add it to the Home Screen
 
@@ -174,12 +185,27 @@ offline copy** frees the space. Your saves are never part of it.
 
 ## With a controller
 
-A controller works everywhere in Renplay. The d-pad or left stick moves between tiles and buttons,
-**A** presses and **B** closes sheets and menus. In a game the controller plays through Ren’Py’s
-own buttons: **A** advances and chooses, the d-pad moves through menus, the shoulder buttons roll
-back and forward, and **B** opens the game's menu. The **Menu** button (Start) opens the player
-menu instead, and closes it again. In the player menu, **A** presses and **B** goes back, then
-closes. Hold **Menu** for half a second to open or close the guide.
+A controller works everywhere in Renplay. The d-pad or the left stick moves to the nearest tile or
+button in that direction, **A** presses and **B** closes sheets and menus, or goes back to the page
+before when nothing is open. The right stick scrolls the page, a list or a menu. When there is nothing
+to move to up or down, the d-pad scrolls too.
+
+A press moves one step. The stick presses at 60 percent and lets go at 35, the d-pad and the stick count
+as one press, and a held direction repeats after half a second, then a little faster. A small line in the
+corner of the library says what **A**, **B**, **LB** and **RB** do while you use the controller. It goes
+away when you use the mouse, the keyboard or touch.
+
+**LB** and **RB** switch between the pages, in the order of the header: Library, Catalog, Add games and
+Activity (admins) and You, round the ends. It is the same on every page. A page's own tabs, such as
+Saves and Details on a game's page, are reached with the d-pad and **A**, so the shoulder buttons never
+change what they do from one page to the next.
+
+In a game the controller plays through Ren’Py’s own buttons: **A** advances and chooses, the d-pad moves
+through menus, the shoulder buttons roll back and forward, and **B** opens the game's menu. The **Menu**
+button (Start) opens the player menu instead, and closes it again. In the player menu, **A** presses and
+**B** goes back, then closes. The menu shows the buttons: **Menu** beside **Back to the game**, a hold of
+**Menu** beside **Guide** and **A** on the row that has focus. Hold **Menu** for half a second to open or
+close the guide.
 
 When the guide has focus it holds the controller, and the game does not see it. The d-pad up and down
 scroll, left and right turn pages, **LB** and **RB** switch files, **Y** switches see-through and **X**
@@ -193,13 +219,19 @@ controller is connected, the guide's bar shows these buttons instead of the keys
   another device and its saves are there.
 - They are stored the way desktop Ren’Py stores them.
 - **Every overwrite and delete keeps the earlier version.** `RENPLAY_SAVE_HISTORY` sets how many
-  versions are kept per save file (20 by default). Look at them in the game’s saves view.
+  versions are kept per save file (20 by default). Look at them with **Previous versions** in a
+  save's menu, or with **History** for every save. Each version says why it is there, for example
+  "Saved over in the game" or "Deleted here", and has a **Restore** button.
 - Uninstalling or reinstalling a game never deletes saves.
 - When two devices change the same save without seeing each other's copy, the copy saved later
   stays in the slot and the other is kept in History. The player and the game's saves both say so.
 - Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every
   earlier version instead of the newest few. Only you see names, notes and pins, and the save file
-  itself never changes.
+  itself never changes. A name and a note belong to the save, not to its slot: when a quick save
+  moves "Quick 1" to "Quick 2", they move with it. A save written over with new content starts
+  without them, and they come back if you restore the earlier version from its history. A pin
+  protects the slot's history, so it stays on a slot you save over, and moves only when its save
+  moves to another slot.
 - Admins also get a daily zip of everyone's saves. See [Backups](/upgrading/#daily-save-backups).
 
 ## Export to desktop Ren’Py, and import from it

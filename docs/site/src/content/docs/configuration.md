@@ -768,6 +768,20 @@ Enable username and password sign-in. With sign-in on, disabling the only provid
 
 </div>
 
+<div class="config-entry" id="renplay-demo-embedder">
+
+**`RENPLAY_DEMO_EMBEDDER`**
+
+<div class="config-default">
+
+Default: `https://renplay.org`
+
+</div>
+
+One HTTP or HTTPS origin allowed to frame the public demo and exchange embed messages, without a trailing slash. Used only when RENPLAY_DEMO is on. Normal installations keep their existing framing rules.
+
+</div>
+
 <div class="config-entry" id="renplay-demo">
 
 **`RENPLAY_DEMO`**

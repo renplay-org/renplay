@@ -255,13 +255,18 @@ def upgrade():
                 console.log(JSON.stringify(files));
             """))
 
-        def verify(save):
+        def verify(save, named=True):
             game = lib.request('/api/games/story')['game']
             for key in ('favoriteAt', 'finishedAt', 'playTime', 'playStatus', 'rating'):
                 assert game[key] == before[key], (key, game[key], before[key])
             assert lib.request('/api/saves/story/raw?path=Story-1/1-1-LT1.save') == save
             slot = [s for s in lib.request('/api/saves/story')['slots'] if s['file'] == '1-1-LT1.save']
-            assert slot and slot[0]['title'] == 'Before the storm' and slot[0]['note'] == 'Lake next time.' and slot[0]['pinnedAt'], slot
+            # The pin stays on its slot. The name and note belong to the save they were written about.
+            assert slot and slot[0]['pinnedAt'], slot
+            if named:
+                assert slot[0]['title'] == 'Before the storm' and slot[0]['note'] == 'Lake next time.', slot
+            else:
+                assert not slot[0]['title'] and not slot[0]['note'], slot
 
         tree = save_tree()
         assert len(tree) >= 2, tree
@@ -275,13 +280,19 @@ def upgrade():
         lib.stop()
 
         lib.start(RELEASED)
-        verify(b'third save')
+        verify(b'third save', named=False)
         lib.request(path, b'fourth save', 'PUT')
         lib.stop()
 
         lib.start()
-        verify(b'fourth save')
-        assert len(lib.request('/api/saves/story/history')['versions']) == 3
+        verify(b'fourth save', named=False)
+        versions = lib.request('/api/saves/story/history')['versions']
+        assert len(versions) == 3, versions
+        # The named save comes back from its history with its name, after a release that knew nothing of it.
+        named = [v for v in versions if v['size'] == len(b'second save')]
+        assert len(named) == 1, versions
+        lib.request('/api/saves/story/history/restore', {'id': named[0]['id']}, 'POST')
+        verify(b'second save')
         print('PASS upgrade from the newest release, back to it and up again')
     finally:
         lib.close()
