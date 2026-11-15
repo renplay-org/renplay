@@ -9,6 +9,7 @@ import { deviceHeaders } from '../lib/device'
 import type { Game, SaveSlot } from '@shared/api'
 import { ago, dateTime, duration, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
+import { slotInfo } from '@shared/saveslot'
 import { useGames, useSaves } from '../lib/queries'
 import { groupSaves, saveName, versionReason } from '../lib/saves'
 import { playLink } from '../lib/links'
@@ -331,7 +332,7 @@ function HistoryDialog({ game, slot, onClose, onRestored }: { game: Game; slot?:
   // A save that is still there goes by the name its person gave it, one that was deleted by its slot.
   const nameOf = (v: SaveVersions['versions'][number]) => {
     const now = saves?.slots.find((x) => x.file === v.name)
-    return now ? saveName(now) : v.label
+    return now ? saveName(now) : slotInfo(v.name).label
   }
   return (
     <Sheet open onClose={onClose} title={slot ? `Previous versions of ${saveName(slot)}` : 'Save history'} wide fullPhone>

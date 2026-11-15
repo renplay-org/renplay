@@ -483,9 +483,9 @@ export interface ArtUploaded {
 
 // ---- saves ----------------------------------------------------------------------------------
 
-/** Earlier versions of a save, newest first. `label` is its slot's name for people, "Quick 1", where `name` is the file. */
+/** Earlier versions of a save, newest first. `slotInfo(name).label` names the slot for people. */
 export interface SaveVersions {
-  versions: Array<{ id: string; name: string; label: string; size: number; savedAt: number; reason: string }>
+  versions: Array<{ id: string; name: string; size: number; savedAt: number; reason: string }>
 }
 
 /** What a sync code brought in. */
