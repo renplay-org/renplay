@@ -157,7 +157,6 @@ try {
     assert.equal((await context.request.get(`${base}/g/html/b1/game/index.html?/s/forged`)).status(), 403)
     await tab.goto(`${base}/play/html`)
     await tab.frameLocator('iframe').locator('#popup').waitFor()
-    if (name === 'phone') await tab.getByRole('button', { name: 'Play upright anyway' }).click()
     const iframe = tab.frames().find((f) => f.url().includes('/game/index.html'))
     assert.equal((await iframe.evaluate(() => window.probe())).isolated, true)
     const popupWait = context.waitForEvent('page', { timeout: 3000 }).catch(() => null)
@@ -259,7 +258,6 @@ try {
     })
     if (realHtmlFixtures) for (const id of ['college-daze', 'risky-stream']) {
       await tab.goto(`${base}/play/${id}`)
-      if (name === 'phone') await tab.getByRole('button', { name: 'Play upright anyway' }).click()
       await tab.frameLocator('iframe').locator(id === 'college-daze' ? '#story' : '#root').waitFor()
       let frame = tab.frames().find((f) => f.url().includes(`/g/${id}/`))
       await until(() => frame.evaluate((game) => game === 'college-daze' ? !!window.SugarCube : !!document.querySelector('#root')?.textContent, id))
@@ -291,7 +289,6 @@ try {
       const localSave = join(dataDir, 'users', '1', 'saves', id, 'localStorage.json')
       await until(async () => (await readFile(localSave, 'utf-8').catch(() => '')).includes('durable fixture'))
       await tab.reload()
-      if (name === 'phone') await tab.getByRole('button', { name: 'Play upright anyway' }).click()
       await tab.frameLocator('iframe').locator(id === 'college-daze' ? '#story' : '#root').waitFor()
       frame = tab.frames().find((f) => f.url().includes(`/g/${id}/`))
       assert.equal(await frame.evaluate(() => localStorage.getItem('renplay-security-save')), 'durable fixture')

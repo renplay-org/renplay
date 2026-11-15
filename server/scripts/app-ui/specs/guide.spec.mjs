@@ -149,7 +149,7 @@ test('on a phone a PDF with wide margins opens at its text column, larger than F
   const chosen = await width()
   expect(chosen).toBeGreaterThan(fit * 1.2)
   await page.reload()
-  await page.getByRole('button', { name: 'Play upright anyway' }).click()
+  await expect(page.locator('.rp-pill').first()).toBeVisible()
   await openGuide(page, testInfo)
   await expect.poll(width, { message: 'The zoom the person chose is kept' }).toBeCloseTo(chosen, -1)
 })
