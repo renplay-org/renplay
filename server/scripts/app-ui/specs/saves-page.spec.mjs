@@ -141,8 +141,8 @@ test('every sheet and menu reads with no blur: what is behind it does not show t
 
 test('Start from the main menu sits under Resume and opens the game without a save', async ({ page }, testInfo) => {
   await play(page, { path: '/game/game-000' })
-  const resume = page.getByRole('button', { name: 'Resume' }).first()
-  const link = page.getByRole('button', { name: 'Start from the main menu' })
+  const resume = page.getByRole('link', { name: 'Resume' }).first()
+  const link = page.getByRole('link', { name: 'Start from the main menu' })
   await expect(link).toBeVisible()
   // Under Resume, quiet.
   expect((await link.boundingBox()).y).toBeGreaterThan((await resume.boundingBox()).y + (await resume.boundingBox()).height - 1)
@@ -153,12 +153,12 @@ test('Start from the main menu sits under Resume and opens the game without a sa
 
 test('Resume loads the newest save, which is what Start from the main menu is not', async ({ page }, testInfo) => {
   await play(page, { path: '/game/game-000' })
-  await press(testInfo, page.getByRole('button', { name: 'Resume' }).first())
+  await press(testInfo, page.getByRole('link', { name: 'Resume' }).first())
   await expect(page).toHaveURL(/\/play\/game-000\?resume=quick-2$/)
 })
 
 test('a game with no saves has no Start from the main menu', async ({ page }) => {
   await play(page, { path: '/game/game-000', slots: [] })
-  await expect(page.getByRole('button', { name: 'Play' }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Start from the main menu' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Play' }).first()).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Start from the main menu' })).toHaveCount(0)
 })
