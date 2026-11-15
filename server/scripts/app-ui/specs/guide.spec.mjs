@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures.mjs'
 import { ringShown } from '../focus-ring.mjs'
-import { GUIDE, PDF, TEXT, play } from './player-fixture.mjs'
+import { GUIDE, PDF, SCAN, TEXT, WIDE, play } from './player-fixture.mjs'
 
 // The guide, Renplay's own reader: PDFs drawn by PDF.js, pictures and text, the bar, the keys, the controller,
 // the window, the sheet and the whole screen on a phone, and pop out. The game is the made-up one of player-fixture.mjs.
@@ -44,9 +44,11 @@ test('on a phone held upright a PDF shows page 1 drawn, goes to page 2, and the 
   await expect(sheet).toBeVisible()
   await expect(pageNow(sheet)).toHaveText('1 of 3')
   await expect.poll(() => ink(pageCanvas(sheet, 1)), { message: 'Page 1 is drawn' }).toBeGreaterThan(50)
-  // On a phone a PDF opens at 100 percent (a Letter page is 816 px wide), and is panned. A pinch zooms, a double tap fits it, and again undoes it.
+  // On a phone a PDF opens fitted to its text column, wider than the sheet and panned. A pinch zooms, a double tap shows the whole page, and again undoes it.
   const width = async () => (await sheet.locator('.gr-page').first().boundingBox()).width
-  expect(await width()).toBeCloseTo(816, 0)
+  const opened = await width()
+  expect(opened).toBeGreaterThan(390)
+  expect(opened).toBeLessThan(816)
   // A pinch zooms: two fingers, as pointer events, move apart.
   await sheet.locator('.gr-view').evaluate((el) => {
     const r = el.getBoundingClientRect()
@@ -62,7 +64,7 @@ test('on a phone held upright a PDF shows page 1 drawn, goes to page 2, and the 
     fire('pointerup', 1, cx - 130)
     fire('pointerup', 2, cx + 130)
   })
-  await expect.poll(width, { message: 'A pinch zooms in' }).toBeGreaterThan(816 * 2)
+  await expect.poll(width, { message: 'A pinch zooms in' }).toBeGreaterThan(opened * 2)
   const view = await sheet.locator('.gr-view').boundingBox()
   const at = { x: view.x + view.width / 2, y: view.y + view.height / 2 }
   await page.touchscreen.tap(at.x, at.y)
@@ -70,7 +72,7 @@ test('on a phone held upright a PDF shows page 1 drawn, goes to page 2, and the 
   await expect.poll(width, { message: 'A double tap fits the page to the width' }).toBeLessThan(390)
   await page.touchscreen.tap(at.x, at.y)
   await page.touchscreen.tap(at.x, at.y)
-  await expect.poll(width).toBeCloseTo(816, 0)
+  await expect.poll(width).toBeCloseTo(opened, 0)
   // Next page.
   await sheet.getByRole('button', { name: 'Next page' }).tap()
   await expect(pageNow(sheet)).toHaveText('2 of 3')
@@ -94,6 +96,75 @@ test('on a phone held upright a PDF shows page 1 drawn, goes to page 2, and the 
   await page.mouse.move(down.x + down.width / 2, down.y + 150, { steps: 6 })
   await page.mouse.up()
   await expect.poll(async () => Math.abs((await height()) - screen * 0.58)).toBeLessThan(3)
+})
+
+/** Where the text is in the first page's canvas, as the box it covers on screen. */
+const textBox = (guide) =>
+  guide.locator('canvas[aria-label="Page 1"]').evaluate((c) => {
+    const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+    let left = c.width
+    let right = -1
+    for (let y = 0; y < c.height; y += 2)
+      for (let x = 0; x < c.width; x++) {
+        if (data[(y * c.width + x) * 4] < 110) {
+          if (x < left) left = x
+          if (x > right) right = x
+        }
+      }
+    const r = c.getBoundingClientRect()
+    const k = r.width / c.width
+    return { left: r.left + left * k, right: r.left + (right + 1) * k }
+  })
+
+test('on a phone a PDF with wide margins opens at its text column, larger than Fit, with no text cut off, and Fit and a double tap switch', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
+  await play(page, { walkthroughs: [WIDE] })
+  await openGuide(page, testInfo)
+  const sheet = guideOf(page)
+  await expect(pageNow(sheet)).toHaveText('1 of 3')
+  await expect.poll(() => ink(pageCanvas(sheet, 1)), { message: 'Page 1 is drawn' }).toBeGreaterThan(50)
+  const view = await sheet.locator('.gr-view').boundingBox()
+  const width = async () => (await sheet.locator('.gr-page').first().boundingBox()).width
+  const opened = await width()
+  // The page is 816 px wide at 100 percent: Fit is the sheet's width less the padding, and the text column is larger than that.
+  const fit = view.width - 16
+  expect(opened, 'The text is larger than at Fit').toBeGreaterThan(fit * 1.5)
+  // The text column starts at the left edge and ends before the right one: none of it is cut off.
+  await expect.poll(async () => (await textBox(sheet)).left, { message: 'The text starts at the left edge' }).toBeLessThan(view.x + 24)
+  const box = await textBox(sheet)
+  expect(box.left).toBeGreaterThanOrEqual(view.x)
+  expect(box.right, 'The text column ends inside the window').toBeLessThanOrEqual(view.x + view.width)
+  await page.screenshot({ path: testInfo.outputPath('guide-text-column.png') })
+  // Fit shows the whole page, and pressed again goes back to the column.
+  await sheet.getByRole('button', { name: 'Fit' }).tap()
+  await expect.poll(width).toBeCloseTo(fit, -1)
+  await sheet.getByRole('button', { name: 'Fit' }).tap()
+  await expect.poll(width).toBeCloseTo(opened, 0)
+  // A double tap does the same, and a zoom the person chose is kept for the file.
+  const at = { x: view.x + view.width / 2, y: view.y + view.height / 2 }
+  await page.touchscreen.tap(at.x, at.y)
+  await page.touchscreen.tap(at.x, at.y)
+  await expect.poll(width).toBeCloseTo(fit, -1)
+  await sheet.getByRole('button', { name: 'Zoom in' }).tap()
+  const chosen = await width()
+  expect(chosen).toBeGreaterThan(fit * 1.2)
+  await page.reload()
+  await page.getByRole('button', { name: 'Play upright anyway' }).click()
+  await openGuide(page, testInfo)
+  await expect.poll(width, { message: 'The zoom the person chose is kept' }).toBeCloseTo(chosen, -1)
+})
+
+test('on a phone a page with no text opens at Fit, and a picture is fitted to the width', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
+  await play(page, { walkthroughs: [SCAN, GUIDE] })
+  await openGuide(page, testInfo)
+  const sheet = guideOf(page)
+  await expect(pageNow(sheet)).toHaveText('1 of 2')
+  const view = await sheet.locator('.gr-view').boundingBox()
+  const width = async () => (await sheet.locator('.gr-page').first().boundingBox()).width
+  await expect.poll(width, { message: 'A page with no text is the whole page' }).toBeCloseTo(view.width - 16, -1)
+  await sheet.getByRole('tab', { name: 'Guide' }).tap()
+  await expect.poll(async () => (await sheet.locator('.gr-page').first().boundingBox()).width, { message: 'A picture is fitted to the width' }).toBeCloseTo(view.width - 16, -1)
 })
 
 test('on a phone held sideways the guide fills the screen, and the Guide pill brings the game back in one tap', async ({ page }, testInfo) => {

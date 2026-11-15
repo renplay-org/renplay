@@ -37,6 +37,9 @@ const file = (name, title, kind) => ({ file: name, title, kind, size: 1, addedAt
 export const GUIDE = file('guide.png', 'Guide', 'image')
 export const PDF = file('guide.pdf', 'Walkthrough', 'pdf')
 export const TEXT = file('notes.txt', 'Notes', 'text')
+/** A PDF with wide margins, like a guide set for print, and one with no text at all, like a scan. */
+export const WIDE = file('wide.pdf', 'Wide margins', 'pdf')
+export const SCAN = file('scan.pdf', 'Scan', 'pdf')
 
 /** A controller: the player reads `window.__pad`. `__hold(button, on)` presses a button, 'dpad-down' and the like included. */
 const padScript = () => {
@@ -69,6 +72,8 @@ export async function play(page, { slots = [slot(2, 30), slot(3, 60)], iphone = 
   const text = Array.from({ length: 120 }, (_, i) => `Line ${i + 1}: talk to Diya, then Min-seo, and pick the second option.`).join('\n')
   const files = (route) => {
     const name = new URL(route.request().url()).pathname
+    if (name.endsWith('wide.pdf')) return route.fulfill({ status: 200, contentType: 'application/pdf', body: pdf(3, 40, { margin: 140 }) })
+    if (name.endsWith('scan.pdf')) return route.fulfill({ status: 200, contentType: 'application/pdf', body: pdf(2, 0, { text: false }) })
     if (name.endsWith('.pdf')) return route.fulfill({ status: 200, contentType: 'application/pdf', body: pdf(3, 40) })
     if (name.endsWith('.txt')) return route.fulfill({ status: 200, contentType: 'text/plain; charset=utf-8', body: text })
     return route.fulfill({ status: 200, contentType: 'image/png', body: picture })
