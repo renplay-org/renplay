@@ -34,6 +34,17 @@ const inkShare = (canvas) =>
     return n / (c.width * c.height)
   })
 const pageCanvas = (guide, n) => guide.locator(`canvas[aria-label="Page ${n}"]`)
+/**
+ * A page is drawn again after each zoom, and the old picture stays, stretched, until the new one is ready: it is ready when its pixels
+ * are the page's size on screen times the pixel ratio (PdfPage caps that at 16 million pixels). The drawing of a big page keeps the
+ * browser busy for seconds on a slow machine, and a double tap made meanwhile has its two taps further apart than the window for one.
+ */
+const drawnAtThisSize = (canvas) =>
+  canvas.evaluate((c) => {
+    const box = c.parentElement.getBoundingClientRect()
+    const ratio = Math.min(window.devicePixelRatio, Math.sqrt(16_000_000 / (box.width * box.height)))
+    return Math.abs(c.width - box.width * ratio) <= 2
+  })
 const pageNow = (guide) => guide.getByRole('status')
 
 test('on a phone held upright a PDF shows page 1 drawn, goes to page 2, and the sheet drags to 92 percent', async ({ page }, testInfo) => {
@@ -67,9 +78,11 @@ test('on a phone held upright a PDF shows page 1 drawn, goes to page 2, and the 
   await expect.poll(width, { message: 'A pinch zooms in' }).toBeGreaterThan(opened * 2)
   const view = await sheet.locator('.gr-view').boundingBox()
   const at = { x: view.x + view.width / 2, y: view.y + view.height / 2 }
+  await expect.poll(() => drawnAtThisSize(pageCanvas(sheet, 1)), { message: 'Page 1 is drawn at the zoom' }).toBe(true)
   await page.touchscreen.tap(at.x, at.y)
   await page.touchscreen.tap(at.x, at.y)
   await expect.poll(width, { message: 'A double tap fits the page to the width' }).toBeLessThan(390)
+  await expect.poll(() => drawnAtThisSize(pageCanvas(sheet, 1)), { message: 'Page 1 is drawn at the whole page' }).toBe(true)
   await page.touchscreen.tap(at.x, at.y)
   await page.touchscreen.tap(at.x, at.y)
   await expect.poll(width).toBeCloseTo(opened, 0)
