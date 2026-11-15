@@ -52,7 +52,7 @@ run = "npm run screenshots --"
 
 [check]
 description = "Everything CI checks, except the image"
-depends = ["check:server", "check:structure", "check:runtime", "check:copy", "check:ui", "test:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
+depends = ["check:server", "check:structure", "check:design", "check:runtime", "check:copy", "check:ui", "test:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
 
 ["check:server"]
 description = "Server type check, the tests' type check, and the tests"
@@ -64,13 +64,17 @@ run = ["npx tsc --noEmit", "npx tsc -p tsconfig.test.json", "npx vitest run"]
 description = "No import cycles, layers in order, no unused exports, files within the size budget"
 run = "node scripts/check-structure.mjs"
 
+["check:design"]
+description = "The look comes from design/tokens.css: no colour, gradient, face or corner written as a literal beyond what is allowed for now"
+run = "node scripts/check-design.mjs"
+
 ["check:types"]
 description = "Type checks of the server, its tests and the library"
 run = ["cd server && npx tsc --noEmit && npx tsc -p tsconfig.test.json", "cd selector && npx tsc -b --noEmit"]
 
 ["check:fast"]
-description = "What the pre-push hook runs: types, structure, the runtimes and the writing rule"
-depends = ["check:types", "check:structure", "check:runtime", "check:copy"]
+description = "What the pre-push hook runs: types, structure, the look, the runtimes and the writing rule"
+depends = ["check:types", "check:structure", "check:design", "check:runtime", "check:copy"]
 
 ["check:runtime"]
 description = "The game runtimes parse"
@@ -115,7 +119,7 @@ run = [
 
 ["check:workflows"]
 description = "GitHub workflows: actionlint and zizmor"
-run = ["node --test scripts/browser-suites.test.mjs scripts/ui-workspace.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
+run = ["node --test scripts/browser-suites.test.mjs scripts/ui-workspace.test.mjs scripts/check-design.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
 
 ["check:telemetry"]
 description = "The telemetry collector: type check, tests on a local D1, and a dry run of the deploy"

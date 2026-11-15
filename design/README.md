@@ -16,8 +16,9 @@ The art is the light, ink is the room, and the person holds a lamp.
 
 ## The rules
 
-- **Everything that is a colour, a face, a corner or a duration is a token.** A literal anywhere else is a defect. White
-  and black at any alpha, `transparent` and `currentColor` are fine.
+- **Everything that is a colour, a face, a corner or a duration is a token.** `node scripts/check-design.mjs` fails on a
+  literal anywhere else, and counts what is allowed for now in the file. White and black at any alpha, `transparent` and
+  `currentColor` are fine.
 - **Three faces, one job each.** Fraunces (`--serif`) for a title and the story voice, Inter (`--sans`) for everything
   used, JetBrains Mono (`--mono`) for a label or a small fact. A title that is a sentence ends with a full stop, a title
   that is a name does not. Labels are sentence case, never uppercase.
