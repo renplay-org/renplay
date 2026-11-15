@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -113,6 +114,78 @@ describe('names, notes and pins follow their save', () => {
       expect(await slot('auto-2')).toMatchObject({ title: 'The lake', note: 'A note', pinnedAt: null })
       expect((await slot('auto-3'))!.pinnedAt).not.toBeNull()
       expect(await slot('auto-1')).toMatchObject({ title: null, note: null, pinnedAt: null })
+    })
+  })
+
+  describe('a pin stays on its slot when the slot is saved over in place', () => {
+    const tag = (data: string) => createHash('sha1').update(data).digest('hex').slice(0, 10)
+    const versions = async (name: string) => (await request(app.app).get('/api/saves/story/history?file=' + file(name)).expect(200)).body.versions as Array<{ id: string }>
+
+    it('keeps a pinned manual slot pinned, and its name and note follow the old content', async () => {
+      await put('3-1', 'chapter one')
+      await meta('3-1', { pinned: true, title: 'Chapter one', note: 'Before the fight' })
+      await put('3-1', 'chapter two')
+      expect((await slot('3-1'))!.pinnedAt).toMatch(/^\d{4}-/)
+      expect(await slot('3-1')).toMatchObject({ title: null, note: null })
+    })
+
+    it('keeps the first pinned content in the history however often the slot is saved over', async () => {
+      await put('3-1', 'the first save')
+      await meta('3-1', { pinned: true })
+      const limit = loadConfig().saveHistoryVersions
+      for (let i = 0; i < limit + 5; i++) await put('3-1', `save ${i}`)
+      const list = await versions('3-1')
+      expect(list).toHaveLength(limit + 5)
+      expect(list.some((v) => v.id.endsWith('__' + tag('the first save')))).toBe(true)
+      expect((await slot('3-1'))!.pinnedAt).not.toBeNull()
+    })
+
+    it('keeps the pinned content when the pin was given to a save that was already written over', async () => {
+      await put('3-1', 'the first save')
+      await meta('3-1', { pinned: true })
+      await put('3-1', 'the second save')
+      await put('3-1', 'the first save')
+      await put('3-1', 'the third save')
+      expect((await slot('3-1'))!.pinnedAt).not.toBeNull()
+    })
+
+    it('does not prune a version of a slot while the slot is pinned, in a quick save that has not rotated yet', async () => {
+      await put('quick-1', 'the lake')
+      await meta('quick-1', { pinned: true })
+      const limit = loadConfig().saveHistoryVersions
+      for (let i = 0; i < limit + 3; i++) await put('quick-1', `the pier ${i}`)
+      expect((await versions('quick-1')).some((v) => v.id.endsWith('__' + tag('the lake')))).toBe(true)
+    })
+
+    it('still moves a pin when a quick save rotates, and the slot it left is no longer pinned', async () => {
+      await put('quick-1', 'the lake')
+      await meta('quick-1', { pinned: true, title: 'The lake' })
+      await put('quick-2', 'the lake')
+      await put('quick-1', 'the pier')
+      expect(await slot('quick-2')).toMatchObject({ title: 'The lake' })
+      expect((await slot('quick-2'))!.pinnedAt).not.toBeNull()
+      expect((await slot('quick-1'))!.pinnedAt).toBeNull()
+    })
+
+    it('moves a pin that stayed on the slot when the new save was written first, once its old save turns up', async () => {
+      await put('quick-1', 'the lake')
+      await meta('quick-1', { pinned: true })
+      await put('quick-1', 'the pier')
+      expect((await slot('quick-1'))!.pinnedAt).not.toBeNull()
+      await put('quick-2', 'the lake')
+      expect((await slot('quick-2'))!.pinnedAt).not.toBeNull()
+      expect((await slot('quick-1'))!.pinnedAt).toBeNull()
+    })
+
+    it('keeps the pin on a slot restored from History to its pinned content', async () => {
+      await put('3-1', 'the lake')
+      await meta('3-1', { pinned: true, title: 'The lake' })
+      await put('3-1', 'the pier')
+      const [version] = (await versions('3-1'))
+      await request(app.app).post('/api/saves/story/history/restore').send({ id: version!.id }).expect(200)
+      await put('quick-2', 'the pier')
+      expect(await slot('3-1')).toMatchObject({ title: 'The lake' })
+      expect((await slot('3-1'))!.pinnedAt).not.toBeNull()
     })
   })
 

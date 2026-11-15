@@ -212,9 +212,11 @@ controller is connected, the guide's bar shows these buttons instead of the keys
   stays in the slot and the other is kept in History. The player and the game's saves both say so.
 - Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every
   earlier version instead of the newest few. Only you see names, notes and pins, and the save file
-  itself never changes. A name, note and pin belong to the save, not to its slot: when a quick save
+  itself never changes. A name and a note belong to the save, not to its slot: when a quick save
   moves "Quick 1" to "Quick 2", they move with it. A save written over with new content starts
-  without them, and they come back if you restore the earlier version from its history.
+  without them, and they come back if you restore the earlier version from its history. A pin
+  protects the slot's history, so it stays on a slot you save over, and moves only when its save
+  moves to another slot.
 - Admins also get a daily zip of everyone's saves. See [Backups](/upgrading/#daily-save-backups).
 
 ## Export to desktop Ren’Py, and import from it

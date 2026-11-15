@@ -107,7 +107,9 @@ export class SaveStores {
    * - a file whose save was replaced lets go of its name, and the name waits (parked) for the same
    *   save to turn up under another file name;
    * - a file that now holds a save with a name, parked or on another file, takes the name.
-   * A save with other content than any named one gets nothing.
+   * A save with other content than any named one gets nothing. A pin is the exception: it protects
+   * the slot's history, so it stays on a slot that is saved over in place, and moves only when its
+   * save turns up in another file.
    */
   private async follow(user: number, dir: string, file: string, before: Buffer | null, after: Buffer): Promise<void> {
     if (!isSlot(file)) return
@@ -123,26 +125,41 @@ export class SaveStores {
     const db = this.db.raw
     for (const [other, hash] of known) db.prepare("UPDATE save_meta SET hash = ? WHERE user_id = ? AND save_dir = ? AND file = ? AND hash = ''").run(hash, user, dir, other)
     const own = db.prepare('SELECT title, note, pinned_at, hash FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').get(user, dir, file) as (SaveNote & { hash: string }) | undefined
+    const held = own ? own.hash || (before ? sha1(before) : '') : ''
+    if (own && held === now) {
+      db.prepare('UPDATE save_meta SET hash = ? WHERE user_id = ? AND save_dir = ? AND file = ?').run(now, user, dir, file)
+      return
+    }
+    const live = db.prepare('SELECT title, note, pinned_at FROM save_meta WHERE user_id = ? AND save_dir = ? AND file != ? AND hash = ?').get(user, dir, file, now) as SaveNote | undefined
+    const parked = live ? undefined : db.prepare('SELECT title, note, pinned_at, slot, slot_hash FROM save_meta_parked WHERE user_id = ? AND save_dir = ? AND hash = ?').get(user, dir, now) as (SaveNote & { slot: string; slot_hash: string }) | undefined
+    const source = live ?? parked
+    // A pin stays on the slot when the slot is saved over in place, so its history keeps every
+    // version. It moves only with its save, to the file the same save turns up in.
+    let kept = ''
     if (own) {
-      const held = own.hash || (before ? sha1(before) : '')
-      if (held === now) {
-        db.prepare('UPDATE save_meta SET hash = ? WHERE user_id = ? AND save_dir = ? AND file = ?').run(now, user, dir, file)
-        return
-      }
-      const named = db.prepare('SELECT 1 FROM save_meta WHERE user_id = ? AND save_dir = ? AND file != ? AND hash = ?').get(user, dir, file, held)
-      if (held && !named) this.park(user, dir, held, own)
+      const moved = held && db.prepare('SELECT 1 FROM save_meta WHERE user_id = ? AND save_dir = ? AND file != ? AND hash = ?').get(user, dir, file, held)
+      if (!moved) kept = own.pinned_at
+      // A bare pin has nothing to wait for when the save that comes back brings its own.
+      const bare = !own.title && !own.note && !!source?.pinned_at
+      if (held && !moved && !bare) this.park(user, dir, held, own, kept ? { file, hash: now } : null)
       this.dropNote(user, dir, file)
     }
-    const source = (db.prepare('SELECT title, note, pinned_at FROM save_meta WHERE user_id = ? AND save_dir = ? AND file != ? AND hash = ?').get(user, dir, file, now)
-      ?? db.prepare('SELECT title, note, pinned_at FROM save_meta_parked WHERE user_id = ? AND save_dir = ? AND hash = ?').get(user, dir, now)) as SaveNote | undefined
     db.prepare('DELETE FROM save_meta_parked WHERE user_id = ? AND save_dir = ? AND hash = ?').run(user, dir, now)
-    if (source) this.setNote(user, dir, file, source, now)
+    if (parked?.pinned_at && parked.slot && parked.slot !== file) this.unpin(user, dir, parked.slot, parked.slot_hash, parked.pinned_at)
+    if (source) this.setNote(user, dir, file, { ...source, pinned_at: source.pinned_at || kept }, now)
+    else if (kept) this.setNote(user, dir, file, { title: '', note: '', pinned_at: kept }, now)
   }
 
-  /** Keeps a name for a save that left its file, for a while, and forgets the ones that waited too long. */
-  private park(user: number, dir: string, hash: string, note: SaveNote): void {
+  /** Keeps a name for a save that left its file, for a while, and forgets the ones that waited too long. `slot` is where its pin stayed. */
+  private park(user: number, dir: string, hash: string, note: SaveNote, slot: { file: string; hash: string } | null): void {
     this.db.raw.prepare('DELETE FROM save_meta_parked WHERE parked_at < ?').run(Date.now() - PARKED_FOR)
-    this.db.raw.prepare('INSERT OR REPLACE INTO save_meta_parked (user_id, save_dir, hash, title, note, pinned_at, parked_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(user, dir, hash, note.title, note.note, note.pinned_at, Date.now())
+    this.db.raw.prepare('INSERT OR REPLACE INTO save_meta_parked (user_id, save_dir, hash, title, note, pinned_at, parked_at, slot, slot_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(user, dir, hash, note.title, note.note, note.pinned_at, Date.now(), slot?.file ?? '', slot?.hash ?? '')
+  }
+
+  /** The pin that stayed on a slot goes when its save turns up in another file, if the slot still holds what it did then. */
+  private unpin(user: number, dir: string, file: string, hash: string, pinned: string): void {
+    const row = this.db.raw.prepare('SELECT title, note FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ? AND hash = ? AND pinned_at = ?').get(user, dir, file, hash, pinned) as Pick<SaveNote, 'title' | 'note'> | undefined
+    if (row) this.setNote(user, dir, file, { ...row, pinned_at: '' }, hash)
   }
 
   /** A deleted save's name, note and pin go with it, so a new save in the slot starts clean. */
