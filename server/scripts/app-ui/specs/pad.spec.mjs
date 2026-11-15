@@ -108,6 +108,20 @@ test.describe('reaching every game', () => {
   })
 })
 
+test.describe('the first press', () => {
+  for (const button of ['down', 'right', 'a']) {
+    test(`${button} with nothing selected goes into the page's content, not to the header, the page or the carousel's box`, async ({ page }, testInfo) => {
+      desktopOnly(testInfo)
+      await withPad(page)
+      await open(page, '/')
+      await settled(page)
+      await tap(page, button, 60)
+      const at = await page.evaluate(() => { const el = document.activeElement; return { inMain: !!el.closest('main'), box: el.classList.contains('carousel'), body: el === document.body, scrolled: scrollY } })
+      expect(at).toEqual({ inMain: true, box: false, body: false, scrolled: 0 })
+    })
+  }
+})
+
 test.describe('scrolling', () => {
   test('the right stick scrolls the page, and a d-pad press with nothing to move to scrolls it too', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
@@ -203,5 +217,29 @@ test.describe('B', () => {
     await tap(page, 'b', 60)
     await expect(page.getByRole('textbox', { name: 'Search your games' })).not.toBeFocused()
     expect(await path()).toBe('/')
+  })
+})
+
+test.describe('sheets', () => {
+  test('A on a catalog tile opens its sheet with focus inside, the d-pad stays in it, and B closes it and gives focus back to the tile', async ({ page }, testInfo) => {
+    desktopOnly(testInfo)
+    await withPad(page)
+    await mock(page, [], 'pad')
+    await open(page, '/catalog')
+    await settled(page)
+    // A recipe not in the library opens its sheet; one that is goes to its game page.
+    const tile = page.locator('.grid[data-row] .card:not(:has(.corner))').first()
+    await tile.focus()
+    await tap(page, 'a', 60)
+    const sheet = page.getByRole('dialog')
+    await expect(sheet).toBeVisible()
+    await expect.poll(() => sheet.evaluate((el) => el.contains(document.activeElement))).toBe(true)
+    for (let i = 0; i < 12; i++) {
+      await tap(page, 'down', 60)
+      expect(await sheet.evaluate((el) => el.contains(document.activeElement)), 'the d-pad keeps to the sheet').toBe(true)
+    }
+    await tap(page, 'b', 60)
+    await expect(sheet).toHaveCount(0)
+    await expect(tile, 'focus is back on the tile that opened it').toBeFocused()
   })
 })

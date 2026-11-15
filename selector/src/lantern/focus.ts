@@ -5,12 +5,18 @@ import { reducedMotion } from './travel'
 /** The arrow keys a controller sends (lib/gamepad.ts). They go the same way to what has focus, but the page's tiles do not take them from outside: a controller moves focus by where things are (`moveSpatial`). */
 export const padKeys = new WeakSet<Event>()
 
-/** What a controller can land on in `root`: in view of the layout, not hidden, not inert, not a stop the page keeps out of the tab order (the stage's cover link repeats its buttons). */
+/** What a controller can land on in `root`: laid out, not hidden, not inert, not a stop the page keeps out of the tab order (the stage's cover link repeats its buttons). */
 export function focusables(root: ParentNode): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => {
     const r = el.getBoundingClientRect()
     return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[inert], [aria-hidden="true"]') && el.getAttribute('tabindex') !== '-1'
   })
+}
+
+/** The same without the controls that hold other controls (the carousel's box): a place to be inside of, not a target. */
+const targets = (root: ParentNode): HTMLElement[] => {
+  const all = focusables(root)
+  return all.filter((el) => !all.some((other) => other !== el && el.contains(other)))
 }
 
 /** The bars that stay on the screen while the page scrolls under them: they cover what is behind, so they never need scrolling to. */
@@ -30,7 +36,7 @@ export type Direction = 'up' | 'down' | 'left' | 'right'
 
 /** Focus goes in: to the first control the person can see in the page's content (else in `root`), in reading order. False when there is none. */
 export function enter(root: ParentNode): boolean {
-  const all = focusables(root)
+  const all = targets(root)
   const ceiling = document.querySelector('.top')?.getBoundingClientRect().bottom ?? 0
   const visible = (el: HTMLElement) => {
     const r = el.getBoundingClientRect()
@@ -54,9 +60,6 @@ export function enter(root: ParentNode): boolean {
  * of the screen. False when there is nothing that way.
  */
 export function moveSpatial(direction: Direction, root: ParentNode): boolean {
-  const all = focusables(root)
-  // A control that holds other controls (the carousel's box) is a place to be inside of, not a target.
-  const targets = all.filter((el) => !all.some((other) => other !== el && el.contains(other)))
   const current = document.activeElement as HTMLElement | null
   const from = current && current !== document.body && root.contains(current) ? current.getBoundingClientRect() : null
   // Nothing has focus yet: the first press goes in, whichever way it points.
@@ -71,7 +74,7 @@ export function moveSpatial(direction: Direction, root: ParentNode): boolean {
   const centre = (r: DOMRect) => (vertical ? (sign > 0 ? r.top + r.height / 2 - (origin.top + origin.height / 2) : origin.top + origin.height / 2 - (r.top + r.height / 2)) : sign > 0 ? r.left + r.width / 2 - (origin.left + origin.width / 2) : origin.left + origin.width / 2 - (r.left + r.width / 2))
   let best: HTMLElement | null = null
   let score = Infinity
-  for (const el of targets) {
+  for (const el of targets(root)) {
     if (el === current || (current && (el.contains(current) || current.contains(el)))) continue
     const r = el.getBoundingClientRect()
     // Beyond the origin's own middle, or it is not that way at all.

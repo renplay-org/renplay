@@ -185,12 +185,27 @@ offline copy** frees the space. Your saves are never part of it.
 
 ## With a controller
 
-A controller works everywhere in Renplay. The d-pad or left stick moves between tiles and buttons,
-**A** presses and **B** closes sheets and menus. In a game the controller plays through Ren’Py’s
-own buttons: **A** advances and chooses, the d-pad moves through menus, the shoulder buttons roll
-back and forward, and **B** opens the game's menu. The **Menu** button (Start) opens the player
-menu instead, and closes it again. In the player menu, **A** presses and **B** goes back, then
-closes. Hold **Menu** for half a second to open or close the guide.
+A controller works everywhere in Renplay. The d-pad or the left stick moves to the nearest tile or
+button in that direction, **A** presses and **B** closes sheets and menus, or goes back to the page
+before when nothing is open. The right stick scrolls the page, a list or a menu. When there is nothing
+to move to up or down, the d-pad scrolls too.
+
+A press moves one step. The stick presses at 60 percent and lets go at 35, the d-pad and the stick count
+as one press, and a held direction repeats after half a second, then a little faster. A small line in the
+corner of the library says what **A**, **B**, **LB** and **RB** do while you use the controller. It goes
+away when you use the mouse, the keyboard or touch.
+
+**LB** and **RB** switch between the pages, in the order of the header: Library, Catalog, Add games and
+Activity (admins) and You, round the ends. It is the same on every page. A page's own tabs, such as
+Saves and Details on a game's page, are reached with the d-pad and **A**, so the shoulder buttons never
+change what they do from one page to the next.
+
+In a game the controller plays through Ren’Py’s own buttons: **A** advances and chooses, the d-pad moves
+through menus, the shoulder buttons roll back and forward, and **B** opens the game's menu. The **Menu**
+button (Start) opens the player menu instead, and closes it again. In the player menu, **A** presses and
+**B** goes back, then closes. The menu shows the buttons: **Menu** beside **Back to the game**, a hold of
+**Menu** beside **Guide** and **A** on the row that has focus. Hold **Menu** for half a second to open or
+close the guide.
 
 When the guide has focus it holds the controller, and the game does not see it. The d-pad up and down
 scroll, left and right turn pages, **LB** and **RB** switch files, **Y** switches see-through and **X**
