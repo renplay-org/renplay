@@ -221,7 +221,7 @@ async function heading(browser, base, errors, options, label) {
   // A font made of an installed one, in place of the page's: the same on every machine, at its own width and 50% wider.
   const font = (adjust) =>
     page.addStyleTag({
-      content: `@font-face { font-family: Wide${adjust}; src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo"), local("DejaVu Sans"); size-adjust: ${adjust}%; } :root { --font-sans: Wide${adjust}, sans-serif; --font-display: Wide${adjust}, sans-serif; }`,
+      content: `@font-face { font-family: Wide${adjust}; src: local("Arial"), local("Helvetica"), local("Liberation Sans"), local("Arimo"), local("DejaVu Sans"); size-adjust: ${adjust}%; } :root { --sans: Wide${adjust}, sans-serif; }`,
     })
   await font(100)
   await page.evaluate(() => document.fonts.ready)

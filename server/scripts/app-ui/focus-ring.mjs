@@ -5,8 +5,10 @@ export async function ringAt(page, box) {
   const margin = 8
   const clip = { x: box.x - margin, y: box.y - margin, width: box.width + 2 * margin, height: box.height + 2 * margin }
   const { data, info } = await sharp(await page.screenshot({ clip, scale: 'css' })).raw().toBuffer({ resolveWithObject: true })
+  // The ring is 2 px wide and read at the middle of it, 3 px out: the pixel that holds that point is whole ring at any
+  // fraction of a pixel. Rounding would read the ring's edge when a box is half a pixel wide.
   const px = (x, y) => {
-    const i = (Math.round(y) * info.width + Math.round(x)) * info.channels
+    const i = (Math.floor(y) * info.width + Math.floor(x)) * info.channels
     return Math.min(data[i], data[i + 1], data[i + 2])
   }
   const at = (d) => d + margin
