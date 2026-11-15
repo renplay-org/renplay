@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- The website no longer says Renplay sends no telemetry. It says what it sends: one small anonymous report a day, which you can turn off.
+
 ## [4.11.0] - 2026-11-13
 
 ### Added
