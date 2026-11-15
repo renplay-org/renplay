@@ -61,7 +61,7 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
     return (
       <section className="empty">
         <h1 className="h1">Your library is empty.</h1>
-        <p className="lead" style={{ marginTop: 12 }}>
+        <p className="lead story" style={{ marginTop: 12 }}>
           Ask an admin to add a game.
         </p>
       </section>
@@ -70,7 +70,7 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
   return (
     <section className="empty">
       <h1 className="h1">Your library is empty.</h1>
-      <p className="lead" style={{ margin: '12px auto 0' }}>
+      <p className="lead story" style={{ margin: '12px auto 0' }}>
         Let us fix that. Start with a story, or add a game you already have.
       </p>
       {starter && (

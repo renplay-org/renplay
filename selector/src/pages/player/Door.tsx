@@ -85,7 +85,7 @@ export default function Door({
       </div>
       <div className="tb">
         <TitleArt game={game} hidden={hidden} />
-        <div className="muted-2" style={{ marginTop: 8, fontSize: 14 }}>
+        <div className="muted-2 line">
           {resume ? `Resuming ${resume}` : 'Starting from the main menu'} · {status}
           {!failed && progress && progress.total > 0 ? <> <span className="tnum">{Math.round(loadPct * 100)}%</span></> : null}
         </div>

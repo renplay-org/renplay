@@ -11,6 +11,7 @@ release notes say what).
 
 - The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
 - Buttons have a new look. The one button to press on a screen is cream, the others have a thin outline, corners are squarer, and the glowing gradient buttons are gone. Nothing moved: every control is where it was, at the size it was.
+- Titles are set in a book face, Fraunces (67 KB), and labels, counts, codes, paths, keys and the clock in a small monospace, JetBrains Mono (21 KB), both loaded once. The words under a title that speak to you, such as on the sign-in page and where a list is empty, are in the book face too.
 
 ### Fixed
 

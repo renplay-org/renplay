@@ -460,9 +460,9 @@ export default function Player() {
       {portrait && !portraitOk && !ready && (
         <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-[rgba(0,0,0,0.95)] p-8 text-center backdrop-blur-sm">
           <Smartphone className="mb-2 size-10 rotate-90 text-(color:--pink-3)" />
-          <p className="text-lg font-semibold">Turn your phone sideways</p>
+          <h2 className="h2">Turn your phone sideways</h2>
           <p className="max-w-xs text-sm text-(color:--fg-3)">{game.title} is made for a wide screen. The game loads in the meantime.</p>
-          <div className="mt-4 w-full max-w-xs"><p className="mb-3 text-sm text-(color:--fg-3)">{failed || (!progress ? 'Starting engine' : `Loading game ${Math.round(loadPct * 100)}%`)}</p>{failed ? <Pill onClick={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }}>Try again</Pill> : <Bar value={loadPct} indeterminate={!progress || !progress.total} />}</div>
+          <div className="mt-4 w-full max-w-xs"><p className="mb-3 font-mono text-xs tracking-[0.02em] text-(color:--fg-3)">{failed || (!progress ? 'Starting engine' : `Loading game ${Math.round(loadPct * 100)}%`)}</p>{failed ? <Pill onClick={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }}>Try again</Pill> : <Bar value={loadPct} indeterminate={!progress || !progress.total} />}</div>
           <Pill variant="q" size="sm" className="mt-2" onClick={() => setPortraitOk(true)}>
             Play upright anyway
           </Pill>
