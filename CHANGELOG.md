@@ -12,15 +12,12 @@ release notes say what).
 - **Name it** appears for a few seconds under **Save now** in the game's menu. It opens a small field in place: **Enter** or **Done** names that save, **Esc** leaves it. It works with touch, the keyboard and the controller. The name shows in the menu's saves and on the game page.
 - **Start from the main menu**, a quiet link under **Resume** on a game's page when it has saves, opens the game's own main menu.
 - In full screen, the game's menu shows the time, in the way your language writes it.
+- Public demos can be embedded on one website, with a shared guest session and messages for saves and refreshes. `RENPLAY_DEMO_EMBEDDER` chooses that website. This works only with `RENPLAY_DEMO` on and does not change normal installations.
 
 ### Changed
 
 - A PDF guide on a phone opens fitted to its text column, scrolled to where the text starts, so it is readable without panning. **Fit** and a double tap switch between the text column and the whole page. A scanned page with no text opens at Fit, and a picture is fitted to the width. A zoom you chose is still kept for the file.
 - On an upright phone, "Turn your phone sideways" shows only while the game loads. Once it has started, a line says it once, "Turn your phone sideways for a bigger picture", and the game is not covered.
-
-### Changed
-
-- Public demos can be embedded on one website, with a shared guest session and messages for saves and refreshes. `RENPLAY_DEMO_EMBEDDER` chooses that website. This works only with `RENPLAY_DEMO` on and does not change normal installations.
 
 ### Fixed
 
