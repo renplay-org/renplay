@@ -17,6 +17,7 @@ import { Pill } from '../lantern/controls'
 import { focusSearch, wantSearch } from '../lantern/Search'
 import { isApple } from '../lib/platform'
 import './AppShell.css'
+import { useDemoEmbed } from '../lib/demo-embed'
 
 // Links go through renplay.org (redirects on the website), so moving GitHub or Ko-fi needs no release.
 const REPO_URL = 'https://renplay.org/github'
@@ -141,12 +142,13 @@ function Shell() {
   useFlightBack()
   const { data } = useAuth()
   const admin = data?.user.role === 'admin'
+  const embed = useDemoEmbed()
   useArrowFocus()
   const tabs = [
     { to: '/', label: 'Library', icon: LibraryIcon, end: true },
     { to: '/catalog', label: 'Catalog', icon: LayoutGrid, end: false },
     ...(admin ? [{ to: '/add', label: 'Add games', icon: Plus, end: false }] : []),
-    { to: '/account', label: 'You', icon: User, end: false },
+    ...(!embed ? [{ to: '/account', label: 'You', icon: User, end: false }] : []),
   ]
   const online = useOnline()
   const { data: games } = useGames()
@@ -181,14 +183,14 @@ function Shell() {
               </Pill>
             )}
             {admin && <ActivityRing />}
-            <span className="hide-phone">
+            {!embed && <span className="hide-phone">
               <AccountMenu />
-            </span>
+            </span>}
           </div>
         </div>
       </header>
       <main className="rise">
-        {data?.demo && (
+        {data?.demo && !embed && (
           <p className="notice" role="note" style={{ margin: '12px 16px 0' }}>
             <Sparkles aria-hidden />
             <span>

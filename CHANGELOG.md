@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- Public demos can be embedded on one website, with a shared guest session and messages for saves and refreshes. `RENPLAY_DEMO_EMBEDDER` chooses that website. This works only with `RENPLAY_DEMO` on and does not change normal installations.
+
 ### Fixed
 
 - The website no longer says Renplay sends no telemetry. It says what it sends: one small anonymous report a day, which you can turn off.

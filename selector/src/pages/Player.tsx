@@ -41,6 +41,7 @@ import { useGuide } from './player/useGuide'
 import { Bar, Pill } from '../lantern/controls'
 import { useGoBack } from '../lantern/flight'
 import { useModal } from '../lantern/modal'
+import { useDemoEmbed } from '../lib/demo-embed'
 
 type Panel = null | 'fullscreen'
 
@@ -48,6 +49,7 @@ const HOME_TIP_KEY = 'renplay:home-screen-tip'
 
 export default function Player() {
   const { data: account } = useAuth()
+  const embed = useDemoEmbed()
   const userId = useRef(account!.user.id).current
   const [signedOut, setSignedOut] = useState(false)
   const signedOutRef = useRef<HTMLElement>(null)
@@ -76,6 +78,7 @@ export default function Player() {
   const [attempt, setAttempt] = useState(0)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [sync, setSync] = useState({ pending: 0, online: true, lastSync: 0 })
+  const lastEmbedSync = useRef(0)
   const slowSync = useSlow(sync.pending > 0, SLOW_SYNC)
   // Saves wait for the server: the pill row shows a cloud and the menu says it. The word Offline is for no network at all.
   const waiting = (sync.pending > 0 && slowSync) || !sync.online
@@ -137,7 +140,8 @@ export default function Player() {
   const guideNow = useRef(guide)
   guideNow.current = guide
   const insets = useSafeInsets()
-  useWakeLock(ready)
+  // The website owns the outer screen. Its device frames do not request extra permissions.
+  useWakeLock(ready && !embed)
   usePlayTime(ready && !exiting && !failed, gameId, userId, sandboxed, frameRef, () => setSignedOut(true))
   const telemetry = useTelemetry(gameId, userId, { ready, online, fullscreen, failed })
   // On an iPhone in Safari, once the game has started and never while it loads: once, how to get full screen.
@@ -197,6 +201,8 @@ export default function Player() {
           else toast('The game did not take that change.')
           break
         case 'renplay:sync':
+          if (account?.demo && d.lastSync && d.lastSync !== lastEmbedSync.current) window.dispatchEvent(new Event('renplay:saves-changed'))
+          lastEmbedSync.current = d.lastSync
           setSync({ pending: d.pending, online: d.online, lastSync: d.lastSync })
           break
         case 'renplay:info':

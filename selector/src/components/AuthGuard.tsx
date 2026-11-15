@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { ApiError } from '../lib/api'
+import { ApiError, post } from '../lib/api'
+import { DemoEmbed, demoEmbedMode } from '../lib/demo-embed'
 import { useAuth, useProviders } from '../lib/auth'
 import { setAdminLighterBackground } from '../lib/backdrop'
 import { useDefaults } from '../lib/queries'
@@ -15,6 +16,16 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
     return () => window.removeEventListener('renplay:signed-out', refresh)
   }, [me.refetch])
   const providers = useProviders()
+  const embeddedGuest = !!(providers.data?.demo && demoEmbedMode(location.search) && me.error instanceof ApiError && me.error.status === 401)
+  const openingDemo = useRef(false)
+  const [demoFailed, setDemoFailed] = useState(false)
+  useEffect(() => {
+    if (!embeddedGuest) { openingDemo.current = false; return }
+    if (openingDemo.current) return
+    openingDemo.current = true
+    void post('/api/auth/demo').then(() => me.refetch()).catch(() => setDemoFailed(true))
+  }, [embeddedGuest, me.refetch])
+  if (embeddedGuest) return demoFailed ? <p className="p-6">Could not open the demo. Reload to try again.</p> : <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
   if (providers.data?.setup && !providers.data.oidc && !providers.data.ldap && !me.isPending && !(me.data?.user.role === 'admin' && me.data.user.id !== 1)) return <Navigate to="/setup" replace />
   if (me.isPending || providers.isPending) return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
   if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />
@@ -30,5 +41,5 @@ function WithDefaults() {
   useEffect(() => {
     setAdminLighterBackground(defaults.data?.lighterBackground ?? null)
   }, [defaults.data?.lighterBackground])
-  return <Outlet />
+  return <DemoEmbed><Outlet /></DemoEmbed>
 }

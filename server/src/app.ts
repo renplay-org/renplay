@@ -34,6 +34,7 @@ import { createServices, type Services } from './services.js'
 import { HttpError } from './util/paths.js'
 import type { Purger } from './util/purge.js'
 import { log } from './util/log.js'
+import { demoFrameAncestors } from './shared/demo-embed.js'
 
 export interface App {
   app: express.Express
@@ -72,6 +73,11 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
       !/^\/(?:api|g)\//.test(path) || path.includes('//') || /%(?:2f|5c|00|25[0-9a-f]{2})/i.test(path) || /%(?:25|3f|23)/i.test(structure) || path.includes('\\') ||
       (path.startsWith('/api/') && path.endsWith('/'))
     )) return next(new HttpError(400, 'Use a canonical resource path'))
+    next()
+  })
+  // The library normally supports dashboard frames. Only the public demo restricts its embedder.
+  if (cfg.demo) app.use((req, res, next) => {
+    if (!/^\/(?:api|g|engine)(?:\/|$)/.test(req.path)) res.setHeader('Content-Security-Policy', demoFrameAncestors(true, cfg.demoEmbedder))
     next()
   })
   app.use(accounts.middleware)
