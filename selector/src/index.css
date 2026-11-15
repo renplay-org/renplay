@@ -1264,25 +1264,6 @@ select.input option {
   gap: 20px var(--gap);
   padding: 8px 0;
 }
-.shelf {
-  display: flex;
-  gap: var(--gap);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  margin: 0 calc(-1 * var(--gutter));
-  padding: 8px var(--gutter) 12px;
-}
-.shelf::-webkit-scrollbar {
-  display: none;
-}
-.shelf .card {
-  flex: none;
-  width: var(--tile-w);
-  scroll-snap-align: start;
-  scroll-margin-left: var(--gutter);
-}
-
 /* The stage: the game's door. The hero across the top on desktop, the wide grid on phones, the grid sunk into the bottom edge, the logo or title beside it, actions below. */
 .stage {
   position: relative;
@@ -1331,11 +1312,6 @@ select.input option {
   margin-top: -58px;
   position: relative;
   z-index: 2;
-}
-.stage .cover .frame {
-  box-shadow:
-    0 18px 40px -14px rgba(0, 0, 0, 0.95),
-    0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 .stage .tb {
   min-width: 0;

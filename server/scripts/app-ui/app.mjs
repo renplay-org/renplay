@@ -98,8 +98,8 @@ async function flight(browser, base, errors, options, label) {
   const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
   const page = await ctx.newPage()
   await mock(page, errors, label)
-  // A pointer left over a tile lifts it 4 percent: the tile's place is measured without that.
-  await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => document.head.insertAdjacentHTML('beforeend', '<style>.card:not(.on):hover .frame { transform: none !important }</style>')))
+  // A pointer left over a tile lifts it and tilts it (lantern/lean.ts): the tile's place is measured without that.
+  await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => document.head.insertAdjacentHTML('beforeend', '<style>.card:not(.on):hover .tilt { transform: none !important; translate: none !important }</style>')))
   const near = (a, b) => Math.abs(a.x - b.x) <= 3 && Math.abs(a.y - b.y) <= 3 && Math.abs((a.w ?? a.width) - b.width) <= 3
   const rectOf = (selector) => page.evaluate((s) => {
     const r = document.querySelector(s)?.getBoundingClientRect()

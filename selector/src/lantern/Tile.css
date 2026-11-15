@@ -17,14 +17,13 @@
     border-radius: var(--r-3);
   }
 }
-/* The tile: the grid, 2:3, and the wide grid, 920x430. Art fills the frame, the title sits below. Focus grows it and lights the ring. */
+/* The tile: the grid, 2:3, and the wide grid, 920x430. Art fills the frame, the title sits below. */
 .frame {
   position: relative;
   aspect-ratio: 2/3;
   overflow: hidden;
   background: var(--tint-ink);
   box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.8);
-  transform-origin: center;
   isolation: isolate;
 }
 .frame.wide {
@@ -101,41 +100,117 @@
   min-width: 0;
   outline: none;
   -webkit-tap-highlight-color: transparent;
+  perspective: 900px;
+}
+
+/* The tile is the website's shelf card. It has a border in the game's own colour mixed with white and a sheen that
+   follows the pointer. Under the hand or the focus it lifts, and casts the colour's long shadow with its halo. The
+   lean, a tilt toward the pointer, is lantern/lean.ts: it sets a transform on .tilt and where the sheen is. */
+.card {
+  --tile-rest: 0 8px 24px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --tile-lit: 0 30px 64px -16px var(--tint), 0 0 0 1px rgba(0, 0, 0, 0.4), 0 0 70px -6px color-mix(in srgb, var(--tint) 80%, transparent);
+}
+.card .tilt {
+  position: relative;
+  transition: translate var(--t-focus) var(--out);
 }
 .card .frame {
-  transition:
-    transform var(--t-focus) var(--out),
-    box-shadow var(--t-focus) var(--out);
-  will-change: transform;
+  border: 1px solid color-mix(in srgb, var(--tint) 60%, #fff 10%);
+  box-shadow: var(--tile-rest);
+  transition: box-shadow var(--t-pane) var(--out);
 }
-.card:hover .frame,
-.card:focus-visible .frame,
-.card.focus .frame,
-/* The tile the stage shows: lifted and lit in its own colour. The white ring is keyboard focus only. */
-.card.on .frame {
-  transform: scale(1.04);
-  box-shadow:
-    0 18px 40px -14px rgba(0, 0, 0, 0.9),
-    0 0 0 2px var(--tint-soft),
-    0 0 36px 6px var(--tint-soft);
+.card .frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 30%), rgba(255, 255, 255, 0.34), transparent 55%);
+  mix-blend-mode: soft-light;
+  opacity: 0.55;
+  transition: opacity var(--t-pane);
+}
+/* Lit: under a mouse, with the keyboard or a controller (the white ring stays), and the tile the stage shows. */
+@media (hover: hover) {
+  .card:hover {
+    z-index: 2;
+  }
+  .card:hover .frame {
+    box-shadow: var(--tile-lit);
+  }
+  .card:hover .frame::after {
+    opacity: 1;
+  }
+}
+.card.on,
+.card:focus-visible {
   z-index: 2;
 }
-.card.on:focus-visible .frame {
-  box-shadow:
-    0 18px 40px -14px rgba(0, 0, 0, 0.9),
-    0 0 0 2px var(--ink),
-    0 0 0 4px #fff,
-    0 0 36px 6px var(--tint-soft);
-}
-.card:hover .frame {
-  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.9);
-}
+/* The ring is the frame's, so it follows the tile when it lifts. */
 .card:focus-visible {
   box-shadow: none;
 }
-.card:active .frame {
-  transform: scale(0.97);
+.card.on .tilt,
+.card:focus-visible .tilt {
+  --gx: 50%;
+  --gy: 50%;
+}
+.card.on .frame {
+  box-shadow: var(--tile-lit);
+}
+.card:focus-visible .frame {
+  box-shadow: var(--ring), var(--tile-lit);
+}
+.card.on .frame::after,
+.card:focus-visible .frame::after {
+  opacity: 1;
+}
+/* A press leans toward the finger (lean.ts) and lights the tile. */
+.card[data-press] .frame {
+  box-shadow: var(--tile-lit);
   transition-duration: var(--t-press);
+}
+.card[data-press] .frame::after {
+  opacity: 1;
+}
+/* The lift. Not under reduced motion, not while the flight measures or lands on the tile, and under a mouse not while
+   a search is typed (Search.css), when the list moves under a pointer that is still. A press pushes in a little. */
+@media (prefers-reduced-motion: no-preference) {
+  @media (hover: hover) {
+    html:not([data-typing]) .card:not([data-rest]):hover .tilt {
+      translate: 0 -6px 14px;
+    }
+  }
+  .card.on:not([data-rest]) .tilt,
+  .card:focus-visible:not([data-rest]) .tilt {
+    translate: 0 -6px 14px;
+  }
+  .card[data-press]:not([data-rest]) .tilt {
+    translate: 0 -2px 6px;
+    transition-duration: var(--t-press);
+  }
+}
+/* At rest: the cover's flight is measuring or landing on this tile. */
+.card[data-rest] .tilt {
+  transform: none !important;
+  transition: none !important;
+}
+.card[data-rest] .frame {
+  box-shadow: var(--tile-rest) !important;
+  transition: none !important;
+}
+.card[data-rest] .frame::after {
+  opacity: 0.55 !important;
+}
+/* Reduced motion keeps the border, the glow and the sheen, and takes the tilt away (lean.ts does not make one). */
+@media (prefers-reduced-motion: reduce) {
+  .card .tilt {
+    transform: none !important;
+  }
+}
+/* Above the frame's shadow, which spills over what is under it. */
+.card .ct,
+.card .cm {
+  position: relative;
 }
 .card .ct {
   margin-top: 8px;
@@ -184,6 +259,13 @@
     left: 8px;
   }
 }
+/* Where a tile is wide enough (five columns and up) its title is in the book face, as on the website's shelf. */
+@media (min-width: 1000px) {
+  .card .ct {
+    font: 700 15px/1.25 var(--serif);
+    letter-spacing: 0;
+  }
+}
 @media (max-width: 719px) {
   .frame .corner .pill .lbl {
     display: none;
@@ -191,4 +273,28 @@
   .frame .corner .pill {
     padding: 0 6px;
   }
+}
+/* A shelf of tiles scrolls sideways, and its box would cut a lifted tile's shadow. It has room for the shadow in its padding
+   and takes the room back in its margin, so nothing of the page moves. The heading above stays over it, to be clicked. */
+.shelf {
+  display: flex;
+  gap: var(--gap);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  margin: -48px calc(-1 * var(--gutter)) -68px;
+  padding: 56px var(--gutter) 80px;
+}
+.sec:has(> .shelf) > .sec-h {
+  position: relative;
+  z-index: 1;
+}
+.shelf::-webkit-scrollbar {
+  display: none;
+}
+.shelf .card {
+  flex: none;
+  width: var(--tile-w);
+  scroll-snap-align: start;
+  scroll-margin-left: var(--gutter);
 }

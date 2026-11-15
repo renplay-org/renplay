@@ -1,6 +1,7 @@
 import { useLayoutEffect } from 'react'
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { browserEngine } from '../lib/platform'
+import { restRect } from './lean'
 import { flyGhost, reducedMotion } from './travel'
 
 /**
@@ -71,10 +72,21 @@ function land(l: Leaving): void {
   const places = [...document.querySelectorAll<HTMLElement>('main .carousel .slide:not(.copy) .stage[data-id], main .card[data-id]')].filter((t) => t.dataset['id'] === l.id)
   for (const place of places) {
     const frame = place.querySelector<HTMLElement>(place.matches('.stage') ? '.cover .frame' : '.frame')
-    const rect = frame?.getBoundingClientRect()
-    if (!frame || !rect || shown(rect) < MIN_SHOWN) continue
+    // The tile the picture lands on is at rest: no tilt, no lift, until the flight is done.
+    const rect = frame && restRect(frame)
+    if (!frame || !rect || shown(new DOMRect(rect.x, rect.y, rect.w, rect.h)) < MIN_SHOWN) continue
+    const card = frame.closest<HTMLElement>('.card')
+    if (card) card.dataset['rest'] = ''
     frame.style.visibility = 'hidden'
-    flyGhost({ id: l.id, src: l.src, rect: { x: l.rect.x, y: l.rect.y, w: l.rect.width, h: l.rect.height } }, { x: rect.x, y: rect.y, w: rect.width, h: rect.height }, () => (frame.style.visibility = ''), l.short ? SHORT_MS : 480)
+    flyGhost(
+      { id: l.id, src: l.src, rect: { x: l.rect.x, y: l.rect.y, w: l.rect.width, h: l.rect.height } },
+      rect,
+      () => {
+        frame.style.visibility = ''
+        if (card) delete card.dataset['rest']
+      },
+      l.short ? SHORT_MS : 480,
+    )
     return
   }
 }
