@@ -25,6 +25,9 @@ test('shared scripts, workflows and tool pins always select everything', () => {
     assert.deepEqual(suites(path), ['legacy', 'playwright', 'layout'], path)
   }
 })
+test('design inputs select the library and the sites, which all take them', () => {
+  for (const path of ['design/tokens.css', 'design/fonts/inter.woff2']) assert.deepEqual(suites(path), ['legacy', 'playwright', 'layout'], path)
+})
 test('unrelated changes select none, mixed changes select the union', () => {
   assert.deepEqual(suites('README.md', 'telemetry/src/index.ts', 'charts/renplay/values.yaml'), [])
   assert.deepEqual(suites('selector/src/App.tsx', 'docs/site/package-lock.json'), ['legacy', 'playwright', 'layout'])

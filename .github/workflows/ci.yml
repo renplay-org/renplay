@@ -180,7 +180,7 @@ jobs:
           fi
           gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' > files.txt
           echo "browser-suites=$(node scripts/browser-suites.mjs < files.txt)" >> "$GITHUB_OUTPUT"
-          if grep -qE '^(server/|selector/|runtime/|image/|charts/|tests/|deploy/compose\.yaml$|Dockerfile$|\.dockerignore$|mise\.toml$|tasks\.toml$|\.github/workflows/ci\.yml$)' files.txt; then
+          if grep -qE '^(server/|selector/|design/|runtime/|image/|charts/|tests/|deploy/compose\.yaml$|Dockerfile$|\.dockerignore$|mise\.toml$|tasks\.toml$|\.github/workflows/ci\.yml$)' files.txt; then
             echo "image=true" >> "$GITHUB_OUTPUT"
           else
             echo "image=false" >> "$GITHUB_OUTPUT"

@@ -109,6 +109,8 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. B
   src/components/    AppShell (header, tab bar, footer), AuthGuard, SaveGallery, FileBrowser, ActionMenu
   src/lib/           api.ts (fetching), queries.ts, display.ts (screen geometry), platform.ts (what
                      device and browser this is), format.ts
+design/            Lamplight, the one source of the look: tokens.css, fonts.css and fonts/, grain.webp, logo/mark.svg,
+                     build.mjs (the icons, from the mark) and README.md. The library, the docs and the website import it
 runtime/           Plain ES5-style scripts for the game pages: renplay-runtime.js (Ren'Py) and
                      renplay-html.js (HTML games), each with renplay-player.js, what they share, in
                      front. The server builds them (server/src/play/runtime.ts)

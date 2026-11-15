@@ -7,6 +7,8 @@ import { unified } from '@astrojs/markdown-remark'
 
 export default defineConfig({
   site: 'https://docs.renplay.org',
+  // The dev server may read design/ (the fonts and tokens), as well as these docs.
+  vite: { server: { fs: { allow: ['.', '../../design'] } } },
   markdown: { processor: unified({ remarkPlugins: [remarkInclude, remarkVersion] }) },
   integrations: [
     starlight({
@@ -38,7 +40,8 @@ export default defineConfig({
       locales: { root: { label: 'English', lang: 'en' } },
       editLink: { baseUrl: 'https://github.com/renplay-org/renplay/edit/dev/docs/site/' },
       lastUpdated: false,
-      customCss: ['./src/styles/renplay.css'],
+      // Lamplight's fonts and tokens come first (design/), and renplay.css maps Starlight's variables to them.
+      customCss: ['../../design/fonts.css', '../../design/tokens.css', './src/styles/renplay.css'],
       head: [
         // Dark unless the reader picked a theme before.
         {

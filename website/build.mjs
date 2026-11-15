@@ -83,7 +83,8 @@ function head({ title, description, canonical, image, imageAlt, imageSize, card:
     '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">',
     '<link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48">',
     '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
-    ...['/site.css', ...css].map((href) => `<link rel="stylesheet" href="${href}">`),
+    '<link rel="preload" href="/design/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>',
+    ...['/design/fonts.css', '/design/tokens.css', '/site.css', ...css].map((href) => `<link rel="stylesheet" href="${href}">`),
     extra,
   ].filter(Boolean).join('\n')
 }
@@ -109,6 +110,11 @@ const starters = STARTERS.map((id) => {
   return card(g, { link: true })
 }).join('')
 
+// What the pages take from design/ (Lamplight's tokens, fonts and grain), at /design/.
+function copyDesign(out) {
+  for (const f of ['tokens.css', 'fonts.css', 'fonts', 'grain.webp']) cpSync(join(root, '../design', f), join(root, out, 'design', f), { recursive: true })
+}
+
 // ---- renplay.org ----------------------------------------------------------------------------------------------------
 const OUT = 'dist'
 rmSync(join(root, OUT), { recursive: true, force: true })
@@ -117,6 +123,7 @@ for (const f of ['site.css', 'catalog.css', 'logo.svg', 'logo.png', 'favicon.ico
   cpSync(join(root, f), join(root, OUT, f), { recursive: true })
 }
 cpSync(join(root, '../LICENSE'), join(root, OUT, 'LICENSE'))
+copyDesign(OUT)
 
 const software = {
   '@context': 'https://schema.org',
@@ -270,6 +277,7 @@ for (const f of ['site.css', 'catalog.css', 'logo.svg', 'favicon.ico', 'favicon-
   cpSync(join(root, f), join(root, ADULT_OUT, f), { recursive: true })
 }
 cpSync(join(root, '../LICENSE'), join(root, ADULT_OUT, 'LICENSE'))
+copyDesign(ADULT_OUT)
 write(ADULT_OUT, 'index.html', render(read('pages/catalog.html'), {
   modes: ['adult'],
   ...here(SITE),
