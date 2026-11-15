@@ -62,7 +62,7 @@ export default function SignIn() {
         Renplay
       </div>
       <h1 className="h1 center" style={{ fontSize: 26 }}>Sign in</h1>
-      <p className="lead center" style={{ margin: '8px auto 0' }}>
+      <p className="lead story center" style={{ margin: '8px auto 0' }}>
         Your games and saves are waiting.
       </p>
       {providers.data?.oidc && (

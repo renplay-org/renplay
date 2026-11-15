@@ -519,7 +519,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
             {game.phone && <Row label="Phones">{phoneLabel[game.phone]}</Row>}
             {isRenpy(game) && game.saveDir && (
               <Row label="Save folder">
-                <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13 }}>{game.saveDir}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>{game.saveDir}</span>
               </Row>
             )}
             {game.source.archive && <Row label="Source">{game.source.archive}</Row>}

@@ -38,7 +38,7 @@ export function Empty({ icon, title, children, action }: { icon?: ReactNode; tit
   return (
     <div className="empty-filter">
       {icon && <div className="muted" style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}>{icon}</div>}
-      <div className="h3">{title}</div>
+      <div className="story">{title}</div>
       {children && <div className="small muted" style={{ maxWidth: 460, margin: '6px auto 0' }}>{children}</div>}
       {action && <div className="actions" style={{ justifyContent: 'center', marginTop: 16 }}>{action}</div>}
     </div>

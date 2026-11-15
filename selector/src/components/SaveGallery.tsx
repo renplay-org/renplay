@@ -463,7 +463,7 @@ function SyncDialog({ game, onClose, onDownloaded }: { game: Game; onClose: () =
               autoComplete="off"
               spellCheck={false}
               maxLength={11}
-              style={{ width: 180, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', letterSpacing: '0.08em' }}
+              style={{ width: 180, fontFamily: 'var(--mono)', letterSpacing: '0.08em' }}
             />
             <Pill type="submit" loading={fetching} disabled={code.replace(/-/g, '').trim().length !== 10}>
               Bring in the saves
