@@ -43,7 +43,7 @@ async function search(browser, base, errors, options, label) {
     }, field)
     check(found.inputs === 1 && found.labelled === 1 && found.header === 0, `${label}: ${name} has one search and the header has none (${found.inputs} fields)`)
     check(found.placeholder === field && found.fits, `${label}: ${name}'s search says what it searches and the words fit (${found.room} px for "${found.placeholder}")`)
-    check(found.height === found.beside && found.radius === '999px', `${label}: ${name}'s search is as high as the control beside it and a pill (${found.height} and ${found.beside} px, radius ${found.radius})`)
+    check(found.height === found.beside && found.radius === '4px', `${label}: ${name}'s search is as high as the control beside it and has a control's corners (${found.height} and ${found.beside} px, radius ${found.radius})`)
     check(found.hint === !phone, `${label}: ${name}'s shortcut hint is ${phone ? 'not shown on a phone' : 'shown on a desktop'}`)
     check(found.inLandmark && found.chipsInLandmark && !found.gridInLandmark, `${label}: ${name}'s field and tag chips are in a search landmark and the results are not`)
     check(/\//.test(found.shortcuts), `${label}: ${name}'s field names / as a shortcut (${found.shortcuts})`)

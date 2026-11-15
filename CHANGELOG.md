@@ -10,6 +10,7 @@ release notes say what).
 ### Changed
 
 - The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
+- Buttons have a new look. The one button to press on a screen is cream, the others have a thin outline, corners are squarer, and the glowing gradient buttons are gone. Nothing moved: every control is where it was, at the size it was.
 
 ### Fixed
 

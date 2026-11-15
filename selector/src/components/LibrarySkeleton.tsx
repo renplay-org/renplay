@@ -35,8 +35,8 @@ const Stage = (
       </div>
       <div className="acts skel-acts">
         <div className="actions">
-          <div className="skel" style={{ width: 150, height: 54, borderRadius: 999 }} />
-          <div className="skel" style={{ width: 150, height: 54, borderRadius: 999 }} />
+          <div className="skel" style={{ width: 150, height: 54, borderRadius: 'var(--r-1)' }} />
+          <div className="skel" style={{ width: 150, height: 54, borderRadius: 'var(--r-1)' }} />
         </div>
       </div>
     </div>
@@ -71,11 +71,11 @@ export default function LibrarySkeleton() {
           <div className="skel skel-line" style={{ width: 130, height: 24 }} />
         </div>
         <div className="toolbar" style={{ position: 'static' }}>
-          <div className="skel" style={{ flex: '1 1 200px', maxWidth: 360, height: 44, borderRadius: 999 }} />
-          <div className="skel" style={{ width: 110, height: 44, borderRadius: 999, flex: 'none' }} />
+          <div className="skel" style={{ flex: '1 1 200px', maxWidth: 360, height: 44, borderRadius: 'var(--r-1)' }} />
+          <div className="skel" style={{ width: 110, height: 44, borderRadius: 'var(--r-1)', flex: 'none' }} />
         </div>
         <div className="chip-bar" style={{ marginBottom: 16, minHeight: 48 }}>
-          <div className="skel" style={{ width: 150, height: 40, borderRadius: 999 }} />
+          <div className="skel" style={{ width: 150, height: 40, borderRadius: 'var(--r-1)' }} />
         </div>
         <div className="grid">
           {Array.from({ length: cols * 2 }, (_, i) => (

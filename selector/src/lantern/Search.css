@@ -1,11 +1,11 @@
-/* The search: a pill, the height of the controls beside it. */
+/* The search: a field, the height of the controls beside it. */
 .search-field {
   display: flex;
   align-items: center;
   gap: 8px;
   height: 44px;
   padding: 0 4px 0 14px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   background: var(--plate);
   color: var(--fg-3);
   min-width: 0;
@@ -34,9 +34,7 @@
   text-overflow: ellipsis;
 }
 .search-field:focus-within {
-  box-shadow:
-    0 0 0 2px var(--ink),
-    0 0 0 4px #fff;
+  box-shadow: var(--ring);
 }
 .search-field .clear {
   display: inline-flex;
@@ -45,7 +43,7 @@
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: 999px;
+  border-radius: var(--r-round);
   color: var(--fg-3);
 }
 .search-field .clear:hover {

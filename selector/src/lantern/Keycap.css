@@ -8,7 +8,7 @@
   height: 40px;
   padding: 0 8px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
+  border-radius: var(--r-1);
   background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
   box-shadow: 0 2px 0 rgba(255, 255, 255, 0.14);
   color: var(--fg);
@@ -41,7 +41,7 @@
   height: 20px;
   padding: 0 6px;
   border: 1.5px solid currentColor;
-  border-radius: 8px 8px 5px 5px;
+  border-radius: var(--r-1);
   font: 700 11px/1 var(--sans);
   flex: none;
 }

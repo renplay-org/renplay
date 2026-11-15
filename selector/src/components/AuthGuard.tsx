@@ -29,7 +29,7 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
   if (providers.data?.setup && !providers.data.oidc && !providers.data.ldap && !me.isPending && !(me.data?.user.role === 'admin' && me.data.user.id !== 1)) return <Navigate to="/setup" replace />
   if (me.isPending || providers.isPending) return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
   if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />
-  if (!me.data) return <p className="p-6 text-zinc-300">Could not reach Renplay. Reload to try again.</p>
+  if (!me.data) return <p className="p-6 text-(color:--fg-2)">Could not reach Renplay. Reload to try again.</p>
   if (admin && me.data.user.role !== 'admin') return <Navigate to="/" replace />
   return <WithDefaults />
 }

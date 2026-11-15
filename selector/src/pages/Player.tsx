@@ -400,21 +400,21 @@ export default function Player() {
 
   if (isLoading)
     return (
-      <div className="flex h-dvh items-center justify-center bg-black">
+      <div className="flex h-dvh items-center justify-center bg-[#000]">
         <Spinner />
       </div>
     )
   // Only before the game is ready: once it runs, losing the network takes nothing away.
   if (!online && !keptGame(gameId) && !ready)
     return (
-      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-black p-6 text-center text-zinc-300">
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-[#000] p-6 text-center text-(color:--fg-2)">
         <p>You are offline, and this game is not kept in this browser. Keep it offline from its page next time you have a network.</p>
         <Pill onClick={() => navigate('/')}>Go back</Pill>
       </div>
     )
   if (!game || !game.playUrl)
     return (
-      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-black text-zinc-300">
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-[#000] text-(color:--fg-2)">
         <p>This game is not installed.</p>
         <Pill onClick={() => navigate(game ? `/game/${gameId}` : '/')}>Go back</Pill>
       </div>
@@ -426,10 +426,10 @@ export default function Player() {
   const resumeName = resume ? (resumed_ ? (resumed_ as SaveSlot).title || resumed_.label : resume.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())) : null
 
   return (
-    <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-black text-white outline-none">
-      {signedOut && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center"><section ref={signedOutRef} role="dialog" aria-modal="true" aria-label="You were signed out" className="safe-bottom w-full max-w-md space-y-4 rounded-3xl bg-ink-950 p-6 ring-1 ring-white/10"><h2 className="text-xl font-semibold">You were signed out.</h2><p className="text-sm text-zinc-400">Your saves are kept on this device until you sign in to the same account.</p><Pill variant="p" style={{ display: 'inline-flex' }} href="/signin" target="_blank" rel="noreferrer">Sign in</Pill><Pill className="ml-3" onClick={async () => {
+    <div ref={shellRef} className="fixed inset-0 touch-manipulation overflow-hidden overscroll-none bg-[#000] text-(color:--fg) outline-none">
+      {signedOut && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-[rgba(0,0,0,0.6)] p-4 sm:items-center"><section ref={signedOutRef} role="dialog" aria-modal="true" aria-label="You were signed out" className="safe-bottom w-full max-w-md space-y-4 rounded-(--r-4) bg-(--ink) p-6 ring-1 ring-(color:--line)"><h2 className="text-xl font-semibold">You were signed out.</h2><p className="text-sm text-(color:--fg-3)">Your saves are kept on this device until you sign in to the same account.</p><Pill variant="p" style={{ display: 'inline-flex' }} href="/signin" target="_blank" rel="noreferrer">Sign in</Pill><Pill className="ml-3" onClick={async () => {
         try { const me = await api<Me>('/api/me'); if (me.user.id !== userId) { setSignInError('Sign in to the account that started this game.'); return }; send({ type: 'renplay:resume-sync', userId }); setSignedOut(false); setSignInError('') } catch { setSignInError('Sign in first, then try again.') }
-      }}>Continue</Pill>{signInError && <p role="alert" className="text-sm text-rose-300">{signInError}</p>}</section></div>}
+      }}>Continue</Pill>{signInError && <p role="alert" className="text-sm text-(color:--red)">{signInError}</p>}</section></div>}
       {/* A click in the bars around the game gives the keyboard back to the game. */}
       <div ref={stageRef} className={cx('rp-stage absolute inset-0', menu && 'dim')} onPointerDown={(e) => !sandboxed && e.target !== frameRef.current && send({ type: 'renplay:focus' })}>
         <div className="absolute overflow-hidden" style={{ top: pad.top, right: pad.right, bottom: pad.bottom, left: pad.left }}>
@@ -440,7 +440,7 @@ export default function Player() {
             title={game.title}
             allow="autoplay; fullscreen; gamepad; clipboard-read; clipboard-write"
             sandbox={sandboxed ? 'allow-scripts allow-modals allow-pointer-lock allow-popups allow-downloads allow-forms' : undefined}
-            className="absolute border-0 bg-black outline-none"
+            className="absolute border-0 bg-[#000] outline-none"
             style={{ width: rect.width || '100%', height: rect.height || '100%', left: rect.left, top: rect.top }}
           />
         </div>
@@ -450,19 +450,19 @@ export default function Player() {
       <Door game={game} ready={ready || (portrait && !portraitOk)} resume={resume ? resumeName : null} progress={progress} loadPct={loadPct} failed={failed} slow={slow} sandboxed={sandboxed} muted={muted} onMute={toggleMute} fsMode={fsMode} fullscreen={fullscreen} onFullscreen={() => void toggleFullscreen()} onBack={() => (progress ? void exit() : navigate(`/game/${gameId}`))} insets={insets} onRetry={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }} onShowGame={() => setReady(true)} />
 
       {exiting && (
-        <div className="absolute inset-0 z-50 flex animate-fade-in flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm">
-          <Loader2 className="size-6 animate-spin text-accent-300" />
-          <p className="text-sm text-zinc-200">Saving your progress</p>
+        <div className="absolute inset-0 z-50 flex animate-fade-in flex-col items-center justify-center gap-3 bg-[rgba(0,0,0,0.7)] backdrop-blur-sm">
+          <Loader2 className="size-6 animate-spin text-(color:--pink-3)" />
+          <p className="text-sm text-(color:--fg-2)">Saving your progress</p>
         </div>
       )}
 
       {/* Portrait phones: games are wide. Asked only while the game loads, which is when turning the phone costs nothing. */}
       {portrait && !portraitOk && !ready && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/95 p-8 text-center backdrop-blur-sm">
-          <Smartphone className="mb-2 size-10 rotate-90 text-accent-300" />
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-[rgba(0,0,0,0.95)] p-8 text-center backdrop-blur-sm">
+          <Smartphone className="mb-2 size-10 rotate-90 text-(color:--pink-3)" />
           <p className="text-lg font-semibold">Turn your phone sideways</p>
-          <p className="max-w-xs text-sm text-zinc-400">{game.title} is made for a wide screen. The game loads in the meantime.</p>
-          <div className="mt-4 w-full max-w-xs"><p className="mb-3 text-sm text-zinc-400">{failed || (!progress ? 'Starting engine' : `Loading game ${Math.round(loadPct * 100)}%`)}</p>{failed ? <Pill onClick={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }}>Try again</Pill> : <Bar value={loadPct} indeterminate={!progress || !progress.total} />}</div>
+          <p className="max-w-xs text-sm text-(color:--fg-3)">{game.title} is made for a wide screen. The game loads in the meantime.</p>
+          <div className="mt-4 w-full max-w-xs"><p className="mb-3 text-sm text-(color:--fg-3)">{failed || (!progress ? 'Starting engine' : `Loading game ${Math.round(loadPct * 100)}%`)}</p>{failed ? <Pill onClick={() => { setFailed(null); setProgress(null); setAttempt((n) => n + 1) }}>Try again</Pill> : <Bar value={loadPct} indeterminate={!progress || !progress.total} />}</div>
           <Pill variant="q" size="sm" className="mt-2" onClick={() => setPortraitOk(true)}>
             Play upright anyway
           </Pill>
