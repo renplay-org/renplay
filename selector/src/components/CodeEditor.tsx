@@ -48,5 +48,5 @@ export default function CodeEditor({ value, onChange, onSave, language }: { valu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return <div ref={host} className="h-full overflow-hidden rounded-xl ring-1 ring-white/10" />
+  return <div ref={host} className="h-full overflow-hidden rounded-(--r-3) ring-1 ring-(color:--line)" />
 }

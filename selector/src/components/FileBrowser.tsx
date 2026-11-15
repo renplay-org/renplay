@@ -392,7 +392,7 @@ function EditorDialog({ game, path, isNew, onClose, onSaved }: { game: Game; pat
       title={<span className="font-mono text-[13px]">{path}</span>}
       footer={
         <>
-          <span className="mr-auto text-xs text-zinc-500">{dirty ? 'Unsaved changes · ⌘S to save' : 'Saved'}</span>
+          <span className="mr-auto text-xs text-(color:--fg-4)">{dirty ? 'Unsaved changes · ⌘S to save' : 'Saved'}</span>
           <Pill variant="q" onClick={onClose}>
             Close
           </Pill>
