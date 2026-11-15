@@ -355,6 +355,8 @@ test('on a phone held upright the guide is a sheet that takes the menu\'s place,
 test('the home screen tip goes the moment the menu opens, so it never lies over a row', async ({ page }, testInfo) => {
   await play(page, { iphone: true })
   const tip = page.locator('.toast', { hasText: 'add Renplay to your home screen' })
+  // Upright, the turn line goes first, and the tip waits for it to go.
+  if (testInfo.project.name === 'webkit-portrait') await expect(tip).toHaveCount(0)
   // On a phone upright it sits where the menu's lower rows are: it is there before the menu opens, and gone with it.
   await expect(tip).toBeVisible()
   await press(testInfo, page.locator('.rp-pill').first())
@@ -493,13 +495,39 @@ test('the portrait gate is only there while the game loads, and the toast comes 
   await expect(page.locator('.toast')).toHaveCount(0)
 })
 
-test('on an iPhone the home screen tip is not under a gate, and the turn toast sits beside it', async ({ page }, testInfo) => {
+test('on an iPhone held upright one message shows at a time: the turn line, then the home screen tip once', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
   await play(page, { iphone: true })
   await expect(page.getByText('Turn your phone sideways', { exact: true })).toHaveCount(0)
-  await expect(page.locator('.toast', { hasText: 'add Renplay to your home screen' })).toBeVisible()
+  const turn = page.locator('.toast', { hasText: 'Turn your phone sideways for a bigger picture' })
+  const tip = page.locator('.toast', { hasText: 'add Renplay to your home screen' })
+  await expect(turn).toBeVisible()
+  await expect(tip).toHaveCount(0)
+  await expect(page.locator('.toast')).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath('iphone-turn-toast.png') })
+  // When the turn line has gone, the tip follows, on its own.
+  await expect(tip).toBeVisible()
+  await expect(turn).toHaveCount(0)
+  await expect(page.locator('.toast')).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath('iphone-home-screen-tip.png') })
+  expect(await page.evaluate(() => localStorage.getItem('renplay:home-screen-tip'))).toBe('1')
+})
+
+test('the home screen tip is not shown over the open menu, nor after it while the menu stays open', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'webkit-portrait', 'A phone held upright')
+  await play(page, { iphone: true })
+  await page.evaluate(() => {
+    window.__toasts = []
+    new MutationObserver(() => document.querySelectorAll('.toast').forEach((t) => window.__toasts.push(t.textContent))).observe(document.body, { childList: true, subtree: true })
+  })
   await expect(page.locator('.toast', { hasText: 'Turn your phone sideways for a bigger picture' })).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('iphone-toasts.png') })
+  await press(testInfo, page.locator('.rp-pill').first())
+  await expect(page.getByRole('dialog', { name: /the player menu/ })).toBeVisible()
+  // The turn line goes by itself, and the tip does not take its place over the menu.
+  await expect(page.locator('.toast')).toHaveCount(0)
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+  await expect(page.locator('.toast')).toHaveCount(0)
+  expect((await page.evaluate(() => window.__toasts)).join(' ')).not.toContain('home screen')
 })
 
 test('the menu shows the time in full screen and not otherwise', async ({ page }, testInfo) => {

@@ -4,7 +4,7 @@ import './player/Player.css'
 import { GuideWindow, type GuideMode } from '../components/GuideWindow'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Confirm, Spinner, cx, errorText, useToast } from '../lantern/ui'
+import { Confirm, Spinner, cx, errorText, useToast, useToasting } from '../lantern/ui'
 import { useAuth } from '../lib/auth'
 import { api, userHeader } from '../lib/api'
 import {
@@ -145,25 +145,6 @@ export default function Player() {
   useWakeLock(ready && !embed)
   usePlayTime(ready && !exiting && !failed, gameId, userId, sandboxed, frameRef, () => setSignedOut(true))
   const telemetry = useTelemetry(gameId, userId, { ready, online, fullscreen, failed })
-  // On an iPhone in Safari, once the game has started and never while it loads: once, how to get full screen.
-  // It goes the moment the menu opens, so it never lies over a row.
-  const dismissTip = useRef<(() => void) | null>(null)
-  useEffect(() => {
-    if (!ready || fsMode !== 'home-screen' || menu || localStorage.getItem(HOME_TIP_KEY)) return
-    localStorage.setItem(HOME_TIP_KEY, '1')
-    dismissTip.current = toast(
-      <>
-        For full screen, add Renplay to your home screen.{' '}
-        <button className="link" onClick={() => setPanel('fullscreen')}>
-          How
-        </button>
-      </>,
-    )
-  }, [ready, fsMode, menu, toast])
-  useEffect(() => {
-    if (menu) dismissTip.current?.()
-  }, [menu])
-
   useEffect(() => {
     const signedOut = () => setSignedOut(true)
     window.addEventListener('renplay:signed-out', signedOut)
@@ -396,6 +377,26 @@ export default function Player() {
     localStorage.setItem(TURN_TIP_KEY, '1')
     toast('Turn your phone sideways for a bigger picture')
   }, [ready, portrait, portraitOk, toast])
+  // On an iPhone in Safari, once the game has started and never while it loads: once, how to get full screen.
+  // One message at a time: the turn line above goes first, and this waits until no toast shows.
+  // It goes the moment the menu opens, so it never lies over a row.
+  const dismissTip = useRef<(() => void) | null>(null)
+  const { showing, busy: toastBusy } = useToasting()
+  useEffect(() => {
+    if (!ready || fsMode !== 'home-screen' || menu || showing || toastBusy() || localStorage.getItem(HOME_TIP_KEY)) return
+    localStorage.setItem(HOME_TIP_KEY, '1')
+    dismissTip.current = toast(
+      <>
+        For full screen, add Renplay to your home screen.{' '}
+        <button className="link" onClick={() => setPanel('fullscreen')}>
+          How
+        </button>
+      </>,
+    )
+  }, [ready, fsMode, menu, showing, toastBusy, toast])
+  useEffect(() => {
+    if (menu) dismissTip.current?.()
+  }, [menu])
 
   if (isLoading)
     return (

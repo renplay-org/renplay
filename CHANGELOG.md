@@ -26,6 +26,7 @@ release notes say what).
 
 - A name, note and pin follow their save. When a quick save or an autosave moves a save to the next slot, its name, note and pin move with it, and the new save in the first slot starts without them. A save written over with new content no longer keeps the old name. The earlier version stays in History, and restoring it brings the name back.
 - Sheets and menus, such as a save's actions and its history, are solid enough to read on a phone that draws no blur or has reduced transparency. Nothing behind them shows through.
+- On an iPhone held upright, the "Turn your phone sideways" line and the home screen tip no longer show together. The turn line comes first, and the tip follows once, when no other message shows and the menu is shut.
 
 ### Changed
 
