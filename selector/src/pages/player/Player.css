@@ -180,6 +180,14 @@
   font-size: 17px;
   font-weight: 700;
 }
+.pm-clock {
+  flex: none;
+  margin-left: auto;
+  color: var(--fg-3);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .pm-body {
   display: flex;
   flex: 1 1 auto;
@@ -270,6 +278,14 @@
 .pm-row.quiet {
   color: var(--fg-2);
   font-weight: 500;
+}
+.pm-name {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  /* Room at the right for the ring of Done, which the list would cut off. */
+  padding: 4px 6px 4px 12px;
 }
 .pm-note {
   padding: 0 12px 4px calc(12px + var(--pm-lead) + var(--s3));
@@ -440,5 +456,15 @@
   }
   .pm-save {
     height: 64px;
+  }
+  /* Name it takes one row of 40 px, with its ring. */
+  .pm-name {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .pm-name .input,
+  .pm-name .btn {
+    height: 40px;
+    min-height: 40px;
   }
 }

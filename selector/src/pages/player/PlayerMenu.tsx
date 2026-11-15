@@ -1,8 +1,9 @@
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Check, CloudOff, Expand, Play, Save, Settings2, Smartphone, Volume2, VolumeX } from 'lucide-react'
-import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import type { Game } from '@shared/api'
 import { Frame } from '../../lantern/art'
 import { Pill } from '../../lantern/controls'
+import NameIt from './NameIt'
 import { Keycap } from '../../lantern/Keycap'
 import { useModal } from '../../lantern/modal'
 import { cx } from '../../lantern/ui'
@@ -19,6 +20,20 @@ export function SwitchRow({ icon, label, checked, onChange }: { icon?: ReactNode
       <span>{label}</span>
       <span className={cx('sw', checked && 'on')} aria-hidden="true" />
     </button>
+  )
+}
+
+/** The time in the person's own locale, on again each minute. */
+function Clock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = window.setTimeout(() => setNow(new Date()), 60_000 - (Date.now() % 60_000))
+    return () => clearTimeout(t)
+  }, [now])
+  return (
+    <time className="pm-clock" dateTime={now.toISOString()}>
+      {now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+    </time>
   )
 }
 
@@ -42,6 +57,7 @@ export function PlayerMenu({
   savedAs,
   saving,
   onSaveNow,
+  naming,
   hasGuide,
   guideOpen,
   onGuide,
@@ -74,6 +90,8 @@ export function PlayerMenu({
   savedAs: string | null
   saving: boolean
   onSaveNow: () => void
+  /** Name it, offered for a few seconds after Save now: null when it is not. */
+  naming: { onName: (title: string) => Promise<boolean>; onOpen: () => void; onDone: () => void } | null
   /** The game has a walkthrough file: its row opens the guide. A guide the catalog links is a link row instead. */
   hasGuide: boolean
   /** The guide window is open beside the sheet: its row hands focus to it. */
@@ -118,6 +136,7 @@ export function PlayerMenu({
         <header className="pm-head">
           <Frame game={game} kind="sq" className="pm-icon" style={{ flex: 'none' }} />
           <div className="pm-title truncate">{game.title}</div>
+          {fullscreen && <Clock />}
         </header>
         <div className="pm-body">
           {view !== 'top' ? (
@@ -140,7 +159,7 @@ export function PlayerMenu({
                 )}
               </button>
               {renpy && ready && (
-                <button type="button" className="pm-row" onClick={onSaveNow} aria-disabled={saving}>
+                <button type="button" className="pm-row" onClick={onSaveNow} aria-disabled={saving} data-save-now>
                   <Save />
                   {saving ? 'Saving' : 'Save now'}
                   {savedAs && (
@@ -150,6 +169,17 @@ export function PlayerMenu({
                     </span>
                   )}
                 </button>
+              )}
+              {renpy && ready && naming && (
+                <NameIt
+                  onName={naming.onName}
+                  onOpen={naming.onOpen}
+                  onDone={() => {
+                    naming.onDone()
+                    // The field is gone, so focus goes back to the row above it.
+                    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[data-save-now]')?.focus())
+                  }}
+                />
               )}
               {hasGuide ? (
                 <button type="button" className="pm-row" onClick={onGuide} data-guide aria-expanded={guideOpen}>

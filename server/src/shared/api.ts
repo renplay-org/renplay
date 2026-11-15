@@ -483,7 +483,7 @@ export interface ArtUploaded {
 
 // ---- saves ----------------------------------------------------------------------------------
 
-/** Earlier versions of a save, newest first. */
+/** Earlier versions of a save, newest first. `slotInfo(name).label` names the slot for people. */
 export interface SaveVersions {
   versions: Array<{ id: string; name: string; size: number; savedAt: number; reason: string }>
 }

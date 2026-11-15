@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react'
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
+import './Seg.css'
 
 /**
  * The pill: the one button shape. Primary is the brand gradient (one lit pill per visible task),
@@ -99,6 +100,7 @@ export function Seg<T extends string>({
   label,
   small,
   scroll,
+  wrap,
   className,
   disabled,
 }: {
@@ -108,11 +110,13 @@ export function Seg<T extends string>({
   label?: string
   small?: boolean
   scroll?: boolean
+  /** A group with more than fits goes on a second line, so that no label is cut. */
+  wrap?: boolean
   className?: string
   disabled?: boolean
 }) {
   return (
-    <div role="group" aria-label={label} className={`seg ${small ? 'sm' : ''} ${scroll ? 'scroll' : ''} ${className ?? ''}`.trim()}>
+    <div role="group" aria-label={label} className={`seg ${small ? 'sm' : ''} ${scroll ? 'scroll' : ''} ${wrap ? 'wrap' : ''} ${className ?? ''}`.trim()}>
       {options.map((o) => (
         <button
           key={o.value}

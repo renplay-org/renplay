@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -190,18 +191,32 @@ export function useToast() {
   return useContext(ToastCtx)
 }
 
+/** Whether a toast shows, for a message that waits its turn: `busy` answers at once, before a toast just made has drawn. */
+const ToastingCtx = createContext<{ showing: boolean; busy: () => boolean }>({ showing: false, busy: () => false })
+
+export function useToasting() {
+  return useContext(ToastingCtx)
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([])
+  const live = useRef(new Set<number>())
   const push = useCallback((text: ReactNode, tone: ToastTone = 'info') => {
     const id = Date.now() + Math.random()
+    live.current.add(id)
     setItems((v) => [...v.slice(-3), { id, tone, text }])
-    const dismiss = () => setItems((v) => v.filter((t) => t.id !== id))
+    const dismiss = () => {
+      live.current.delete(id)
+      setItems((v) => v.filter((t) => t.id !== id))
+    }
     setTimeout(dismiss, tone === 'error' ? 7000 : 4000)
     return dismiss
   }, [])
+  const busy = useCallback(() => live.current.size > 0, [])
+  const toasting = useMemo(() => ({ showing: items.length > 0, busy }), [items.length, busy])
   return (
     <ToastCtx.Provider value={push}>
-      {children}
+      <ToastingCtx.Provider value={toasting}>{children}</ToastingCtx.Provider>
       {createPortal(
         <div className="toasts">
           {items.map((t) => (

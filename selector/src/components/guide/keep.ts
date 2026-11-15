@@ -9,8 +9,11 @@ export interface Box {
   h: number
 }
 
-/** 'fit' fills the window's width. A number is that share of the page's natural size, 1 being 100 percent. */
-export type Zoom = 'fit' | number
+/**
+ * 'fit' fills the window's width with the whole page. 'text' fills it with the page's text column, which a phone
+ * reads at. A number is that share of the page's natural size, 1 being 100 percent.
+ */
+export type Zoom = 'fit' | 'text' | number
 
 export interface View {
   /** The page at the top, counted from 0. */
@@ -69,6 +72,6 @@ export const keepFile = (game: Game, file: string) => {
 /** Where a file was left, so a guide reopens at the page and zoom it had. */
 export const keptView = (file: string): View => {
   const v = read<Partial<View>>(`renplay:guide-view:${file}`, {})
-  return { page: Number.isInteger(v.page) && v.page! >= 0 ? v.page! : 0, zoom: v.zoom === 'fit' || (typeof v.zoom === 'number' && v.zoom > 0) ? v.zoom : null }
+  return { page: Number.isInteger(v.page) && v.page! >= 0 ? v.page! : 0, zoom: v.zoom === 'fit' || v.zoom === 'text' || (typeof v.zoom === 'number' && v.zoom > 0) ? v.zoom : null }
 }
 export const keepView = (file: string, view: View) => write(`renplay:guide-view:${file}`, view)

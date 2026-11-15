@@ -7,6 +7,7 @@ import type { PDFDocumentProxy } from '../../lib/pdfjs'
 import { isTouchDevice } from '../../lib/platform'
 import { keepFile, keepView, keptView, type Zoom } from './keep'
 import PdfPage, { CSS_UNITS } from './PdfPage'
+import { textColumn, type Column } from './column'
 import { useGestures, type Focal } from './useGestures'
 
 type Walkthrough = Game['walkthroughs'][number]
@@ -32,18 +33,21 @@ type Size = [number, number]
 
 /**
  * One file. A PDF is drawn by PDF.js, page under page, a picture is one page, and a text file is wrapped text.
- * Fit means the width of the window. On a phone a PDF opens at 100 percent, which is readable, and is panned.
+ * Fit means the width of the window. On a phone a PDF opens fitted to its text column, scrolled to where the text
+ * starts, so that it is readable, and Fit and a double tap switch between that and the whole page.
  */
 function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | null> }) {
   const touch = useMemo(isTouchDevice, [])
   const kept = useMemo(() => keptView(w.file), [w.file])
   const view = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
-  const [zoom, setZoom] = useState<Zoom>(kept.zoom ?? (w.kind === 'pdf' && touch ? 1 : 'fit'))
+  const [zoom, setZoom] = useState<Zoom>(kept.zoom ?? (w.kind === 'pdf' && touch ? 'text' : 'fit'))
   const [page, setPage] = useState(kept.page)
   // Each page's size at 100 percent, in CSS pixels. Null until the first is known.
   const [sizes, setSizes] = useState<Size[] | null>(null)
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
+  // Where the text is across the pages, at 100 percent, on a phone: null when the pages have none.
+  const [column, setColumn] = useState<Column | null>(null)
   const [text, setText] = useState<string | null>(null)
   // Every page's size is known: until then the rest are the first page's, so a place far down is not found yet.
   const [measured, setMeasured] = useState(false)
@@ -75,6 +79,11 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
         task = opening
         const doc = await opening.promise
         const all: Size[] = []
+        // Read before the first page shows, so that it opens at its text and is not moved after.
+        if (touch) {
+          const found = await textColumn(doc, CSS_UNITS)
+          if (!stopped) setColumn(found)
+        }
         for (let i = 1; i <= doc.numPages; i++) {
           const v = (await doc.getPage(i)).getViewport({ scale: CSS_UNITS })
           if (stopped) return
@@ -93,7 +102,7 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
       stopped = true
       void task?.destroy()
     }
-  }, [w.kind, w.url])
+  }, [w.kind, w.url, touch])
 
   // The width the pages fit to.
   useEffect(() => {
@@ -109,7 +118,9 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
   const first = sizes?.[0]?.[0] ?? 0
   // A small picture is not stretched to a window.
   const fit = first && width ? Math.max(MIN, Math.min(MAX, (width - 2 * PAD) / first, w.kind === 'image' ? 1 : MAX)) : 1
-  const scale = zoom === 'fit' ? fit : Math.max(MIN, Math.min(MAX, zoom))
+  // The text column fills the window, and is never smaller than the whole page.
+  const columnScale = column && width ? Math.max(MIN, Math.min(MAX, (width - 2 * PAD) / (column.right - column.left))) : fit
+  const scale = zoom === 'fit' ? fit : zoom === 'text' ? Math.max(fit, columnScale) : Math.max(MIN, Math.min(MAX, zoom))
   const offsets = useMemo(() => {
     let y = PAD
     return (sizes ?? []).map((s) => {
@@ -137,16 +148,24 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
   useLayoutEffect(() => {
     const el = view.current
     const a = anchor.current
-    if (!el || !a) return
     anchor.current = null
-    el.scrollLeft = a.rx * el.scrollWidth - a.fx
-    el.scrollTop = a.ry * el.scrollHeight - a.fy
-  }, [scale])
+    if (!el) return
+    // The text column starts at the left edge.
+    if (zoom === 'text' && column) el.scrollLeft = column.left * scale
+    else if (a) el.scrollLeft = a.rx * el.scrollWidth - a.fx
+    if (a) el.scrollTop = a.ry * el.scrollHeight - a.fy
+    // The zoom changes through `scale`, and the column is placed again when the window's width is known.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale, width, sizes === null])
 
   const scaleNow = useRef(scale)
   scaleNow.current = scale
   const zoomBy = useCallback((factor: number, at?: Focal) => zoomTo(Math.max(MIN, Math.min(MAX, scaleNow.current * factor)), at), [zoomTo])
-  const toggle = useCallback((at?: Focal) => zoomTo(remember.current.zoom === 'fit' ? 1 : 'fit', at), [zoomTo])
+  // Where Fit and a double tap go from the whole page: the text column on a phone, 100 percent elsewhere.
+  const home: Zoom = column ? 'text' : 1
+  const homeNow = useRef(home)
+  homeNow.current = home
+  const toggle = useCallback((at?: Focal) => zoomTo(remember.current.zoom === 'fit' ? homeNow.current : 'fit', at), [zoomTo])
   useGestures(view, content, () => scaleNow.current, zoomBy, toggle, w.kind !== 'text' && sizes !== null)
 
   const reading = useRef(0)
@@ -184,7 +203,7 @@ function DocReader({ w, handle }: { w: Walkthrough; handle: Ref<ReaderHandle | n
     scroll: (dx, dy) => view.current?.scrollBy({ left: dx, top: dy }),
     page: (step) => goTo(reading.current + step),
     zoom: (step) => zoomBy(step > 0 ? STEP : 1 / STEP),
-    fit: () => zoomTo('fit'),
+    fit: () => (column ? toggle() : zoomTo('fit')),
     cycle,
   }
   const apiNow = useRef(api)

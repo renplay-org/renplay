@@ -44,12 +44,16 @@ export class SaveStore {
   private static locks = new Map<string, Promise<unknown>>()
   private acceptingWrites = true
 
-  /** `pinned` says whether a save is pinned: its history keeps every version. */
+  /**
+   * `pinned` says whether a save is pinned: its history keeps every version. `written` hears of
+   * every write that changed a file, with the bytes it held before (null for a new file) and now.
+   */
   constructor(
     readonly root: string,
     readonly historyRoot: string,
     private readonly keepVersions = 20,
     private readonly pinned: (saveDir: string, rel: string) => boolean = () => false,
+    private readonly written: (saveDir: string, rel: string, before: Buffer | null, after: Buffer) => Promise<void> = async () => {},
   ) {}
 
   private dir(saveDir: string): string {
@@ -152,10 +156,12 @@ export class SaveStore {
         }
         await this.snapshot(saveDir, rel, old, 'conflict')
         await writeFileAtomic(full, data, new Date(mtime))
+        await this.written(saveDir, rel, old, data)
         return { name: rel, size: data.length, mtimeMs: mtime, outcome: 'replaced', conflict: 'replaced' }
       }
       if (old) await this.snapshot(saveDir, rel, old, opts.reason ?? 'overwrite')
       await writeFileAtomic(full, data, new Date(mtime))
+      await this.written(saveDir, rel, old, data)
       return { name: rel, size: data.length, mtimeMs: mtime, outcome: old ? 'replaced' : 'added' }
     })
   }
