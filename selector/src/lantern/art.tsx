@@ -3,6 +3,7 @@ import { thumbHashToDataURL } from 'thumbhash'
 import type { ArtCredit, ArtFormat, ArtSet } from '@shared/art'
 import type { ArtKind } from '@shared/recipe'
 import { useAdultView } from '../lib/adult'
+import './Tile.css'
 
 /** A game (or recipe) as the art system needs it. */
 export type ArtGame = { title: string; art?: ArtSet; nsfw?: boolean }

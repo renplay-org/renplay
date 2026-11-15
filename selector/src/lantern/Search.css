@@ -144,10 +144,17 @@
   display: block;
 }
 /* While a search is typed the list moves under a pointer that rests on it: the tile under it does not lift (see useTypingCalm). */
-[data-typing] .card:hover:not(:focus-visible):not(.on) .frame {
-  transform: none;
-  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.8);
+[data-typing] .card:hover:not(:focus-visible):not(.on) {
   z-index: auto;
+}
+[data-typing] .card:hover:not(:focus-visible):not(.on) .tilt {
+  transform: none !important;
+}
+[data-typing] .card:hover:not(:focus-visible):not(.on) .frame {
+  box-shadow: var(--tile-rest);
+}
+[data-typing] .card:hover:not(:focus-visible):not(.on) .frame::after {
+  opacity: 0.55;
 }
 /* Matched letters in a title: brighter and underlined in the tile's own colour, not a block of yellow. */
 .card .ct mark {

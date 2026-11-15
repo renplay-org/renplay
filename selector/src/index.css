@@ -9,12 +9,8 @@
   --font-mono: var(--mono);
 }
 
-/* The app's own layout tokens. The corners are today's values: the pull request that gives tiles, plates and sheets
-   Lamplight's --r-2 to --r-4 replaces them. */
+/* The app's own layout tokens. Corners are Lamplight's (design/tokens.css). */
 :root {
-  --r-tile: 10px;
-  --r-plate: 18px;
-  --r-sheet: 24px;
   --gutter: 20px;
   --cols: 3;
   --gap: 10px;
@@ -32,7 +28,6 @@
     --gutter: 32px;
     --cols: 4;
     --gap: 14px;
-    --r-tile: 14px;
     --top-h: 64px;
   }
 }
@@ -118,7 +113,7 @@ code {
   color: var(--fg-2);
   background: var(--plate);
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--r-1);
 }
 .muted {
   color: var(--fg-3);
@@ -733,28 +728,24 @@ main.mid {
   height: 13px;
 }
 .pill.pink {
-  background: rgba(244, 80, 138, 0.2);
   color: var(--pink-2);
 }
 .pill.vio {
-  background: rgba(139, 107, 255, 0.22);
   color: var(--violet-2);
 }
 .pill.green {
-  background: rgba(74, 222, 128, 0.16);
   color: var(--green);
 }
 .pill.amber {
-  background: rgba(251, 191, 36, 0.16);
   color: var(--amber);
 }
 .pill.red {
-  background: rgba(248, 113, 113, 0.16);
   color: var(--red);
 }
+/* Over art the plate is glass, so the word reads on any cover. */
 .pill.dark {
-  background: rgba(8, 8, 12, 0.6);
-  color: #fff;
+  background: var(--glass);
+  color: var(--fg);
   backdrop-filter: blur(8px);
 }
 .tag {
@@ -931,7 +922,7 @@ select.input option {
 /* Surfaces. Plates sit on the room. Glass is only for things that float over art. */
 .panel {
   background: var(--plate);
-  border-radius: var(--r-plate);
+  border-radius: var(--r-3);
   padding: var(--s4);
 }
 @media (min-width: 720px) {
@@ -1058,7 +1049,7 @@ select.input option {
   gap: var(--s3);
   align-items: flex-start;
   padding: var(--s4);
-  border-radius: 14px;
+  border-radius: var(--r-3);
   background: var(--plate);
   font-size: 14px;
   color: var(--fg-2);
@@ -1242,7 +1233,7 @@ select.input option {
   gap: var(--s3);
   min-height: 48px;
   padding: 0 var(--s3);
-  border-radius: 12px;
+  border-radius: var(--r-2);
   background: var(--plate);
   font-weight: 600;
   font-size: 14px;
@@ -1259,7 +1250,7 @@ select.input option {
 .empty-filter {
   text-align: center;
   padding: 40px 20px;
-  border-radius: var(--r-plate);
+  border-radius: var(--r-3);
   background: var(--plate);
   margin-top: var(--s3);
 }
@@ -1267,208 +1258,12 @@ select.input option {
   margin-bottom: 6px;
 }
 
-/* The tile: the grid, 2:3, and the wide grid, 920x430. Art fills the frame, the title sits below. Focus grows it and lights the ring. */
-.frame {
-  position: relative;
-  aspect-ratio: 2/3;
-  border-radius: var(--r-tile);
-  overflow: hidden;
-  background: var(--tint-ink);
-  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.8);
-  transform-origin: center;
-  isolation: isolate;
-}
-.frame.wide {
-  aspect-ratio: 920/430;
-}
-.frame.hero {
-  aspect-ratio: 1920/620;
-}
-.frame.sq {
-  aspect-ratio: 1;
-}
-.frame .ph,
-.frame img.art {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.frame img.art {
-  opacity: 1;
-  transition: opacity var(--t-pane) var(--out);
-}
-.frame img.art.loading {
-  opacity: 0;
-}
-.frame .tag18 {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-}
-.frame .corner {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  display: flex;
-  gap: 5px;
-}
-.frame .prog {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 8px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0));
-  font-size: 10.5px;
-  color: #fff;
-}
-.frame .prog .bar {
-  margin-top: 5px;
-}
-.frame.dim img.art,
-.frame.dim .ph {
-  opacity: 0.45;
-}
-.frame .mono {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: flex-end;
-  padding: 9%;
-  background: linear-gradient(160deg, rgba(244, 80, 138, 0.22), rgba(139, 107, 255, 0.18) 60%, var(--ink));
-  font-weight: 800;
-  font-size: clamp(13px, 13cqw, 36px);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  color: var(--fg);
-}
-.frame.wide .mono {
-  font-size: clamp(13px, 7cqw, 36px);
-}
-.card {
-  display: block;
-  min-width: 0;
-  outline: none;
-  -webkit-tap-highlight-color: transparent;
-  border-radius: var(--r-tile);
-}
-.card .frame {
-  transition:
-    transform var(--t-focus) var(--out),
-    box-shadow var(--t-focus) var(--out);
-  will-change: transform;
-}
-.card:hover .frame,
-.card:focus-visible .frame,
-.card.focus .frame,
-/* The tile the stage shows: lifted and lit in its own colour. The white ring is keyboard focus only. */
-.card.on .frame {
-  transform: scale(1.04);
-  box-shadow:
-    0 18px 40px -14px rgba(0, 0, 0, 0.9),
-    0 0 0 2px var(--tint-soft),
-    0 0 36px 6px var(--tint-soft);
-  z-index: 2;
-}
-.card.on:focus-visible .frame {
-  box-shadow:
-    0 18px 40px -14px rgba(0, 0, 0, 0.9),
-    0 0 0 2px var(--ink),
-    0 0 0 4px #fff,
-    0 0 36px 6px var(--tint-soft);
-}
-.card:hover .frame {
-  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.9);
-}
-.card:focus-visible {
-  box-shadow: none;
-}
-.card:active .frame {
-  transform: scale(0.97);
-  transition-duration: var(--t-press);
-}
-.card .ct {
-  margin-top: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.card .cm {
-  margin-top: 2px;
-  font-size: 11.5px;
-  color: var(--fg-3);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-.card .cm svg {
-  width: 12px;
-  height: 12px;
-  flex: none;
-}
-.card .cm .vio {
-  color: var(--violet-2);
-}
-@media (min-width: 720px) {
-  .card .ct {
-    font-size: 14px;
-    margin-top: 9px;
-  }
-  .card .cm {
-    font-size: 12.5px;
-  }
-  .frame .tag18,
-  .frame .corner {
-    top: 8px;
-  }
-  .frame .tag18 {
-    right: 8px;
-  }
-  .frame .corner {
-    left: 8px;
-  }
-}
-@media (max-width: 719px) {
-  .frame .corner .pill .lbl {
-    display: none;
-  }
-  .frame .corner .pill {
-    padding: 0 6px;
-  }
-}
 .grid {
   display: grid;
   grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
   gap: 20px var(--gap);
   padding: 8px 0;
 }
-.shelf {
-  display: flex;
-  gap: var(--gap);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  margin: 0 calc(-1 * var(--gutter));
-  padding: 8px var(--gutter) 12px;
-}
-.shelf::-webkit-scrollbar {
-  display: none;
-}
-.shelf .card {
-  flex: none;
-  width: var(--tile-w);
-  scroll-snap-align: start;
-  scroll-margin-left: var(--gutter);
-}
-
 /* The stage: the game's door. The hero across the top on desktop, the wide grid on phones, the grid sunk into the bottom edge, the logo or title beside it, actions below. */
 .stage {
   position: relative;
@@ -1517,11 +1312,6 @@ select.input option {
   margin-top: -58px;
   position: relative;
   z-index: 2;
-}
-.stage .cover .frame {
-  box-shadow:
-    0 18px 40px -14px rgba(0, 0, 0, 0.95),
-    0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 .stage .tb {
   min-width: 0;
@@ -1791,7 +1581,7 @@ select.input option {
 .r .ic {
   width: 46px;
   height: 46px;
-  border-radius: 12px;
+  border-radius: var(--r-2);
   background: var(--plate-2);
   display: flex;
   align-items: center;
@@ -1829,7 +1619,7 @@ select.input option {
   flex: none;
 }
 .r .mini .frame {
-  border-radius: 10px;
+  border-radius: var(--r-2);
   aspect-ratio: 1;
 }
 .r .mini .tag18 {
@@ -1882,7 +1672,7 @@ select.input option {
 }
 .save {
   display: block;
-  border-radius: 14px;
+  border-radius: var(--r-3);
   overflow: hidden;
   background: var(--plate);
   transition:
@@ -1920,7 +1710,7 @@ select.input option {
 .scene {
   position: relative;
   aspect-ratio: 16/9;
-  border-radius: 12px;
+  border-radius: var(--r-3);
   overflow: hidden;
   background: var(--tint-ink);
   container-type: inline-size;
@@ -1998,7 +1788,7 @@ select.input option {
   bottom: 0;
   background: var(--glass-sheet);
   backdrop-filter: blur(30px) saturate(140%);
-  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  border-radius: var(--r-4) var(--r-4) 0 0;
   padding: 10px 20px calc(22px + var(--sab));
   max-height: calc(100dvh - 24px - var(--sat));
   overflow: auto;
@@ -2023,7 +1813,7 @@ select.input option {
 .sheet .grip {
   width: 38px;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--r-round);
   background: var(--plate-3);
   margin: 2px auto 14px;
   flex: none;
@@ -2061,7 +1851,7 @@ select.input option {
     width: min(540px, 100vw - 32px);
     max-height: calc(100dvh - 32px);
     transform: translate(-50%, -50%);
-    border-radius: var(--r-sheet);
+    border-radius: var(--r-4);
     padding: 24px 26px;
     animation: pop var(--t-pane) var(--out) both;
   }
@@ -2105,7 +1895,7 @@ select.input option {
   padding: 6px 10px;
   font-size: 15px;
   font-weight: 600;
-  border-radius: 12px;
+  border-radius: var(--r-2);
   text-align: left;
   transition: background var(--t-press);
 }
@@ -2135,7 +1925,7 @@ select.input option {
   width: min(390px, 100vw - 32px);
   background: var(--glass-sheet);
   backdrop-filter: blur(30px) saturate(140%);
-  border-radius: 18px;
+  border-radius: var(--r-2);
   padding: 16px 18px;
   box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.9);
   animation: pop2 var(--t-pane) var(--out) both;
@@ -2201,7 +1991,7 @@ select.input option {
   align-items: flex-start;
   padding: 12px 14px;
   margin-top: 12px;
-  border-radius: 14px;
+  border-radius: var(--r-3);
   background: var(--plate);
   line-height: 1.45;
   font-size: 13.5px;
@@ -2347,9 +2137,8 @@ select.input option {
   padding: 12px 16px;
   background: var(--glass);
   backdrop-filter: blur(20px);
-  border-radius: 18px;
-  font-size: 13.5px;
-  line-height: 1.45;
+  border-radius: var(--r-2);
+  font: 400 13.5px/1.45 var(--sans);
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8);
   animation: up 0.4s var(--out) both;
 }
@@ -2367,6 +2156,11 @@ select.input option {
   height: 36px;
   padding: 0 12px;
   font-size: 12.5px;
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.toast .btn:hover {
+  box-shadow: inset 0 0 0 1px var(--hair-lit);
 }
 @media (min-width: 720px) {
   .toasts {
@@ -2419,7 +2213,6 @@ select.input option {
 .ghost {
   position: fixed;
   z-index: 200;
-  border-radius: var(--r-tile);
   overflow: hidden;
   pointer-events: none;
   transform-origin: top left;
@@ -2439,7 +2232,6 @@ select.input option {
 }
 .skel {
   background: var(--plate);
-  border-radius: var(--r-tile);
   position: relative;
   overflow: hidden;
 }
@@ -2460,7 +2252,6 @@ select.input option {
 }
 .skeleton {
   background: var(--plate);
-  border-radius: var(--r-tile);
   position: relative;
   overflow: hidden;
 }
@@ -2485,7 +2276,7 @@ select.input option {
 }
 .drop {
   border: 1.5px dashed var(--plate-3-flat);
-  border-radius: var(--r-plate);
+  border-radius: var(--r-3);
   padding: 28px 20px;
   margin-top: 22px;
 }
@@ -2601,7 +2392,7 @@ input[type="range"] {
 .pk-head .seg { margin-left: auto; }
 .picker { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); min-width: 0; }
 @media (min-width: 1000px) { .picker.side { grid-template-columns: 320px minmax(0, 1fr); gap: var(--s5); } }
-.picker .prev { position: relative; border-radius: 16px; overflow: hidden; background: var(--tint-ink); padding: var(--s4); align-self: start; min-width: 0; }
+.picker .prev { position: relative; border-radius: var(--r-3); overflow: hidden; background: var(--tint-ink); padding: var(--s4); align-self: start; min-width: 0; }
 .picker .prev .pbd { position: absolute; inset: -20%; filter: blur(30px) saturate(125%) brightness(.7); opacity: .4; transition: opacity var(--t-pane); -webkit-mask-image: linear-gradient(180deg, #000, transparent 90%); mask-image: linear-gradient(180deg, #000, transparent 90%); }
 .picker .prev .pbd img, .picker .prev .pbd canvas { width: 100%; height: 100%; object-fit: cover; }
 .picker .prev .pin { position: relative; }
@@ -2621,10 +2412,10 @@ input[type="range"] {
 .picker .prow { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--line); }
 .picker .prow:first-of-type { border-top: 0; padding-top: 0; }
 .picker .prow .frame { width: 46px; flex: none; }
-.picker .prow.dh .frame { width: 48px; border-radius: 12px; }
+.picker .prow.dh .frame { width: 48px; border-radius: var(--r-2); }
 .picker .prow .t { font-size: 15px; font-weight: 650; } .picker .prow .m { font-size: 12.5px; color: var(--fg-3); margin-top: 1px; }
 .picker .choices { display: flex; flex-wrap: wrap; gap: var(--s4) var(--gap); align-items: flex-start; }
-.picker .choice { display: block; text-align: left; border-radius: var(--r-tile); min-width: 0; width: var(--tile-w); flex: none; }
+.picker .choice { display: block; text-align: left; min-width: 0; width: var(--tile-w); flex: none; }
 .picker .choice.wide-c { width: calc(var(--tile-w) * 2 + var(--gap)); }
 .picker .choice.hero-c, .picker .choice.logo-c { width: 100%; }
 @media (min-width: 1000px) { .picker .choice.hero-c, .picker .choice.logo-c { width: calc(50% - var(--gap) / 2); } }
@@ -2659,7 +2450,7 @@ input[type="range"] {
 .pk-logo img { max-height: 46%; max-width: 50%; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
 .pk-logo img.inv { filter: invert(1) drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
 .pk-logo span { font-size: clamp(16px, 5cqw, 34px); font-weight: 800; letter-spacing: -.02em; }
-.pk-focal { position: relative; max-width: 420px; border-radius: 12px; overflow: hidden; cursor: crosshair; }
+.pk-focal { position: relative; max-width: 420px; border-radius: var(--r-3); overflow: hidden; cursor: crosshair; }
 .pk-focal img { display: block; width: 100%; height: auto; }
 .pk-focal:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .picker .choice[aria-disabled="true"] { opacity: .6; }
@@ -2775,7 +2566,7 @@ input[type="range"] {
 .frows {
   display: flex;
   flex-direction: column;
-  border-radius: 14px;
+  border-radius: var(--r-3);
   overflow: hidden;
   background: var(--plate);
 }

@@ -64,6 +64,7 @@
   --serif: Fraunces, 'Fraunces fallback', Georgia, serif;
   --sans: Inter, 'Inter fallback', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  /* The optical size of a large title (h1, the stage's). A small title leaves it to the size (font-optical-sizing: auto). */
   --opsz-title: 144;
   --opsz-text: 14;
 

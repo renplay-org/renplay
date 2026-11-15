@@ -49,6 +49,12 @@ export function travelSource(art: ArtSet | undefined, hidden: boolean): string |
   return (!hidden && grid?.url1x) || hashUrl(grid?.thumbhash)
 }
 
+/** A tile's corner in pixels: --r-2 on a phone, --r-3 from 720 px (index.css). */
+function tileRadius(): number {
+  const token = matchMedia('(min-width: 720px)').matches ? '--r-3' : '--r-2'
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token)) || 8
+}
+
 /** The longest the ghost waits at its end for what lands under it to be ready. */
 const READY_MS = 400
 
@@ -77,7 +83,7 @@ export function flyGhost(t: Travel, target: Box, done: () => void, ms = 480, rea
   if (sameShape) {
     // Sized as the larger end and scaled down at the other, so the picture is never scaled up and blurred.
     const big = from.w >= target.w ? from : target
-    const radius = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--r-tile')) || 10
+    const radius = tileRadius()
     const at = (b: Box) => ({ transform: `translate(${b.x}px, ${b.y}px) scale(${b.w / big.w})`, borderRadius: `${radius / (b.w / big.w)}px` })
     el.style.cssText = `left:0;top:0;width:${big.w}px;height:${big.h}px;`
     frames = [at(from), at(target)]

@@ -130,7 +130,7 @@
   padding: calc(8px + var(--pi-top, 0px)) 12px calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
   background: var(--ink);
   box-shadow: 1px 0 0 var(--line), 24px 0 60px -12px rgba(0, 0, 0, 0.6);
-  border-radius: 0 var(--r-sheet) var(--r-sheet) 0;
+  border-radius: 0 var(--r-4) var(--r-4) 0;
   animation: pm-in var(--t-pane) var(--out) both;
 }
 .pm.bottom {
@@ -140,7 +140,7 @@
   max-height: 82dvh;
   padding: 8px calc(12px + var(--pi-right, 0px)) calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
   box-shadow: 0 -1px 0 var(--line), 0 -24px 60px -12px rgba(0, 0, 0, 0.6);
-  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  border-radius: var(--r-4) var(--r-4) 0 0;
   animation-name: pm-up;
 }
 /* The guide inside the sheet on an upright phone: tall, with the reader filling what is under the Back row. */
@@ -178,11 +178,10 @@
 .pm-title {
   min-width: 0;
   font-family: var(--serif);
-  font-variation-settings: "opsz" var(--opsz-title);
+  font-optical-sizing: auto;
   font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  word-spacing: 0.08em;
+  letter-spacing: -0.01em;
 }
 .pm-clock {
   flex: none;
@@ -211,7 +210,7 @@
   width: 100%;
   min-height: var(--pm-row);
   padding: 0 12px;
-  border-radius: 12px;
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--fg);
   font-size: 15px;
@@ -388,7 +387,7 @@
   width: 100%;
   height: 64px;
   padding: 0 12px 0 8px;
-  border-radius: 12px;
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--fg);
   text-align: left;
@@ -401,7 +400,7 @@
 .pm-thumb {
   width: 96px;
   flex: none;
-  border-radius: 8px;
+  border-radius: var(--r-2);
 }
 .pm-thumb .lbl,
 .pm-thumb .hid {

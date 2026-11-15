@@ -12,7 +12,7 @@ export const rememberShape = (stage: boolean) => {
 /** A tile: the picture's 2:3 and the two lines under it. */
 const Tile = () => (
   <div className="card">
-    <div className="skel" style={{ aspectRatio: '2/3', borderRadius: 'var(--r-tile)' }} />
+    <div className="skel" style={{ aspectRatio: '2/3' }} />
     <div className="skel skel-line ct" style={{ width: '70%' }} />
     <div className="skel skel-line cm" style={{ width: '45%' }} />
   </div>
@@ -25,7 +25,7 @@ const Stage = (
     <div className="art wide-a skel" />
     <div className="in">
       <div className="cover">
-        <div className="skel" style={{ aspectRatio: '2/3', borderRadius: 'var(--r-tile)' }} />
+        <div className="skel" style={{ aspectRatio: '2/3' }} />
       </div>
       <div className="tb skel-tb">
         <div className="in-t">

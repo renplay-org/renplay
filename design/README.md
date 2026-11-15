@@ -36,8 +36,10 @@ The art is the light, ink is the room, and the person holds a lamp.
   Reduced motion zeroes them.
 - **Covers are the developers' art**, never cropped into a shape, never recoloured, never under grain. At Blurred they
   are blurred and nothing else.
-- **The app is still under the hand.** The light follows the pointer on the website, the docs home, the sign-in page
-  and the empty library. Nowhere a person is using something.
+- **The app is still under the hand, but for a game's tile.** The light follows the pointer on the website, the docs
+  home, the sign-in page and the empty library. A tile is the website's shelf card: a border and a sheen in the game's
+  colour, and under the hand or the focus a lean toward the pointer, a lift and the colour's long shadow. A press leans
+  it on a touch screen. Reduced motion keeps the colour and drops the lean and the lift. Nothing else moves under the hand.
 - **Density, touch and speed are not the language's to change.** Sizes and spaces (`--s1` to `--s6`, `--hit`), the
   44 px hit area, the adult blur and the game page's weight stay as they are.
 

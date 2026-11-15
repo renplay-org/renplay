@@ -33,7 +33,7 @@
     padding: 4px var(--gutter) 6px;
   }
   .carousel .stage .art.wide-a {
-    border-radius: 14px;
+    border-radius: var(--r-3);
   }
   .carousel .stage .in {
     padding: 0;

@@ -3,3 +3,11 @@
   margin: 14px 0 0;
   font-size: 13.5px;
 }
+/* The cover on the stage is lit in the game's colour as its tile is, at rest. */
+.stage .cover .frame {
+  border: 1px solid color-mix(in srgb, var(--tint) 60%, #fff 10%);
+  box-shadow:
+    0 20px 44px -16px color-mix(in srgb, var(--tint) 85%, transparent),
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 40px -10px color-mix(in srgb, var(--tint) 55%, transparent);
+}

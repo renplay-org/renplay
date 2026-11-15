@@ -108,7 +108,7 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. B
   src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
   src/lantern/       The design system, the only UI kit: Tile, Stage, the room, Sheet, controls (Pill,
                      IconBtn, Bar, Seg, switches), ui.tsx (Spinner, Empty, Confirm, Menu, toasts),
-                     focus, travel
+                     focus, travel, lean (the tile's tilt)
                      (tokens and styles in src/index.css)
   src/components/    AppShell (header, tab bar, footer), AuthGuard, SaveGallery, FileBrowser, ActionMenu
   src/lib/           api.ts (fetching), queries.ts, display.ts (screen geometry), platform.ts (what

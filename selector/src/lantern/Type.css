@@ -1,6 +1,7 @@
-/* Type scale: 13, 15, 17, 20, 26, 34, 44, 60. No uppercase. A title is Fraunces at its largest optical size, tracked in;
-   h3 is a heading to use, so it stays Inter. At that size Fraunces closes the space between words, so the titles take a
-   little of it back. */
+/* Type scale: 13, 15, 17, 20, 26, 34, 44, 60. No uppercase. A large title (h1 and the stage's) is Fraunces at its largest
+   optical size, tracked in. At that size Fraunces closes the space between words, so it takes a little of it back. A small
+   title (h2 and the others) lets the optical size follow its size, as the website's card titles do: the largest cut is too
+   tight at 20 px. h3 is a heading to use, so it stays Inter. */
 .h1 {
   font-family: var(--serif);
   font-variation-settings: "opsz" var(--opsz-title);
@@ -25,11 +26,10 @@
 }
 .h2 {
   font-family: var(--serif);
-  font-variation-settings: "opsz" var(--opsz-title);
+  font-optical-sizing: auto;
   font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  word-spacing: 0.08em;
+  letter-spacing: -0.01em;
 }
 .h3 {
   font-size: 17px;
