@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
 
 /**
  * The pill: the one button shape. Primary is the brand gradient (one lit pill per visible task),
@@ -28,6 +29,7 @@ export function Pill({
   rel?: string
   children?: ReactNode
 }) {
+  const embed = useDemoEmbed()
   const cls = `btn ${variant} ${size ?? ''} ${className ?? ''}`.replace(/\s+/g, ' ').trim()
   const body = (
     <>
@@ -37,7 +39,7 @@ export function Pill({
   )
   if (to) {
     return (
-      <Link to={to} className={cls} {...(rest as Record<string, unknown>)}>
+      <Link to={to} className={cls} {...(rest as Record<string, unknown>)} target={(to.startsWith('/play/') && demoPlayTarget(embed)) || rest.target}>
         {body}
       </Link>
     )

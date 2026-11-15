@@ -18,7 +18,7 @@ const LARGER = {
   'selector/src/index.css': 2949,
   'runtime/renplay-runtime.js': 1638,
   'server/src/art/store.ts': 839,
-  'selector/src/pages/GamePage.tsx': 627,
+  'selector/src/pages/GamePage.tsx': 621,
 }
 
 const problems = []

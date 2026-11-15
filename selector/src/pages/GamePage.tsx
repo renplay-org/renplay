@@ -41,7 +41,6 @@ export default function GamePage() {
   // Manage saves in the player's menu lands here.
   const [tab, setTab] = useState<Tab>(() => (window.location.hash === '#saves' ? 'saves' : 'play'))
   const [picker, setPicker] = useState<ArtKind | null>(null)
-  const navigate = useNavigate()
   const view = useAdultView()
   const actsRef = useRef<HTMLDivElement>(null)
   const { data: saves } = useSaves(gameId, !!game?.saveDir)
@@ -70,11 +69,6 @@ export default function GamePage() {
   const renpy = isRenpy(game)
   const hidden = game.nsfw && view !== 'shown'
   const credits = hidden ? [] : (['grid', 'hero'] as const).map((kind) => ({ kind, credit: game.art[kind]?.credit, made: game.art[kind]?.made })).filter((c, i, all) => c.credit && all.findIndex((o) => JSON.stringify(o.credit) === JSON.stringify(c.credit)) === i)
-  const primary = () => navigate(playLink(gameId, latest?.file))
-  const resume = (menu: boolean) => {
-    travelToDoor(game, hidden)
-    navigate(menu ? playLink(gameId) : playLink(gameId, latest?.file))
-  }
 
   // The parts the game has, with a separator between each two.
   const metaParts = [
@@ -128,7 +122,7 @@ export default function GamePage() {
     <>
       {installed ? (
         <>
-          <Pill variant="p" size="lg" icon={<Play />} onClick={() => resume(false)}>
+          <Pill variant="p" size="lg" icon={<Play />} to={playLink(gameId, latest?.file)} onClick={() => travelToDoor(game, hidden)}>
             {latest ? 'Resume' : 'Play'}
           </Pill>
         </>
@@ -191,7 +185,7 @@ export default function GamePage() {
         <ActionBar watch={actsRef}>
           {installed ? (
             <>
-              <Pill variant="p" onClick={primary}>{latest ? 'Resume' : 'Play'}</Pill>
+              <Pill variant="p" to={playLink(gameId, latest?.file)}>{latest ? 'Resume' : 'Play'}</Pill>
             </>
           ) : (
             <InstallButton game={game} />

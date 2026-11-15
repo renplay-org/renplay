@@ -16,6 +16,7 @@ import { Seg, Pill, IconBtn } from '../lantern/controls'
 import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveVersions, SyncDownloaded } from '@shared/api'
 import Sheet from '../lantern/Sheet'
+import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
 
 type Kind = 'all' | 'manual' | 'auto' | 'quick'
 
@@ -35,6 +36,8 @@ export default function SaveGallery({ game }: { game: Game }) {
   const qc = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
+  const embed = useDemoEmbed()
+  const openSave = (file: string) => demoPlayTarget(embed) ? window.top!.location.assign(playLink(game.id, file)) : navigate(playLink(game.id, file))
   const fileRef = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState<Kind>('all')
   const [importing, setImporting] = useState(false)
@@ -98,7 +101,7 @@ export default function SaveGallery({ game }: { game: Game }) {
     <div key={s.file} className={`save ${s.pinnedAt ? 'pinned' : ''}`.trim()}>
       <button
         className="relative block w-full"
-        onClick={() => game.playUrl && navigate(playLink(game.id, s.file))}
+        onClick={() => game.playUrl && openSave(s.file)}
         disabled={!game.playUrl}
         title={game.playUrl ? 'Load this save' : 'Install the game to load saves'}
         aria-label={game.playUrl ? `Load ${s.name || s.label}` : 'Install the game to load saves'}
@@ -126,7 +129,7 @@ export default function SaveGallery({ game }: { game: Game }) {
         >
           {(close) => (
             <>
-              <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); navigate(playLink(game.id, s.file)) }}>Load</MenuItem>
+              <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); openSave(s.file) }}>Load</MenuItem>
               <MenuItem icon={<Pin />} onClick={() => { close(); void saveMeta(s, { pinned: !s.pinnedAt }, s.pinnedAt ? 'Unpinned' : 'Pinned. Every previous version is kept.') }}>
                 {s.pinnedAt ? 'Unpin' : 'Pin'}
               </MenuItem>

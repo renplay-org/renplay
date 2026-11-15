@@ -370,6 +370,8 @@ export interface Me {
   auth: boolean
   /** The demo's shared guest. */
   demo: boolean
+  /** Present only in the public demo. The sole allowed website origin. */
+  demoEmbedder?: string
   unclaimed: boolean
   hasPassword: boolean
 }
