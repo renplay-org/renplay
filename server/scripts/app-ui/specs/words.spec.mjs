@@ -1,4 +1,4 @@
-import { test, expect, only } from './fixtures.mjs'
+import { test, expect, only, where } from './fixtures.mjs'
 
 /** The tab's underline as drawn: its colour, and how much of it is drawn (1 whole, 0 none): the lamp under the chosen one and nothing under the others. */
 const underline = (tab) =>
@@ -95,7 +95,8 @@ const lines = (root) =>
     }),
   )
 
-test('the line under a tab, a choice and a header link is exactly as wide as its text, never the hit area that makes the control 44 px', async ({ page }) => {
+test('the line under a tab, a choice and a header link is exactly as wide as its text, never the hit area that makes the control 44 px', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], "The header's links are on a desktop and the tabs' fonts are WebKit's on a phone: landscape shows neither")
   await page.goto('/game/game-000')
   const tabs = page.getByRole('tablist', { name: 'Game page sections' })
   await expect(tabs).toBeVisible()
@@ -120,6 +121,7 @@ test('the line under a tab, a choice and a header link is exactly as wide as its
 })
 
 test('the line grows in on the chosen tab and on hover, and goes out on the one that is left, and under reduced motion it simply appears', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Hover is the desktop and the growing line is drawn by each engine: landscape is the same as portrait')
   await page.goto('/game/game-000')
   const tabs = page.getByRole('tablist', { name: 'Game page sections' }).getByRole('tab')
   const drawn = (tab, which) => tab.locator('.u').evaluate((u, w) => new DOMMatrix(getComputedStyle(u, w).transform).a, which)
