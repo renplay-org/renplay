@@ -70,12 +70,12 @@ export default function LibrarySkeleton() {
         <div className="sec-h" style={{ minHeight: 29 }}>
           <div className="skel skel-line" style={{ width: 130, height: 24 }} />
         </div>
-        <div className="toolbar" style={{ position: 'static' }}>
-          <div className="skel" style={{ flex: '1 1 200px', maxWidth: 360, height: 44, borderRadius: 'var(--r-1)' }} />
-          <div className="skel" style={{ width: 110, height: 44, borderRadius: 'var(--r-1)', flex: 'none' }} />
-        </div>
-        <div className="chip-bar" style={{ marginBottom: 16, minHeight: 48 }}>
-          <div className="skel" style={{ width: 150, height: 40, borderRadius: 'var(--r-1)' }} />
+        <div className="toolbar line" style={{ position: 'static' }}>
+          <div className="skel skel-search" />
+          <div className="line-words">
+            <div className="skel" style={{ width: 150, height: 24, borderRadius: 'var(--r-1)', flex: 'none' }} />
+          </div>
+          <div className="skel" style={{ width: 44, height: 24, borderRadius: 'var(--r-1)', flex: 'none' }} />
         </div>
         <div className="grid">
           {Array.from({ length: cols * 2 }, (_, i) => (

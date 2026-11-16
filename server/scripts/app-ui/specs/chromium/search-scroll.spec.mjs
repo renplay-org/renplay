@@ -33,7 +33,7 @@ const startSampling = (page) =>
         // Where the toolbar rests, on the screen: it moves with the page and keeps its place when the shelves above it go.
         anchor: top('.toolbar-top'),
         toolbar: top('.toolbar[role="search"]'),
-        chips: top('.chip-bar'),
+        chips: top('.line-words'),
         tile: top('.grid[data-row] .card'),
         doc: document.documentElement.scrollHeight,
         vh: innerHeight,

@@ -31,3 +31,15 @@
     min-height: 54px;
   }
 }
+/* The toolbar's line: the search is a field on a computer and an icon on a phone. */
+.skel-search {
+  width: 300px;
+  height: 24px;
+  flex: none;
+  border-radius: var(--r-1);
+}
+@media (max-width: 719px) {
+  .skel-search {
+    width: 44px;
+  }
+}

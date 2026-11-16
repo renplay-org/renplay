@@ -243,8 +243,27 @@ code {
   background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 92%, transparent), color-mix(in srgb, var(--ink) 72%, transparent) 60%, color-mix(in srgb, var(--ink) 0%, transparent));
   pointer-events: none;
 }
+/* Once the page has scrolled (AppShell sets data-scrolled) the header is solid ink with a hairline under it, and nothing reads
+   through it. At the top of a page it keeps its look over the art. A stuck toolbar carries the hairline (lantern/Search.css). */
+.top::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  box-shadow: 0 1px 0 var(--line);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-focus) var(--out);
+}
+html[data-scrolled] .top::after {
+  opacity: 1;
+}
+html[data-bar-stuck] .top::after {
+  box-shadow: none;
+}
 .top-in {
   position: relative;
+  z-index: 1;
   max-width: var(--maxw);
   margin: 0 auto;
   height: var(--top-h);
@@ -690,24 +709,6 @@ main.mid {
   background: var(--glass);
   color: var(--fg);
   backdrop-filter: blur(8px);
-}
-.sort {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 44px;
-  padding: 0 14px;
-  border-radius: var(--r-1);
-  box-shadow: inset 0 0 0 1px var(--hair);
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--fg-2);
-  flex: none;
-  white-space: nowrap;
-}
-.sort svg {
-  width: 16px;
-  height: 16px;
 }
 .input {
   display: flex;
@@ -2126,8 +2127,7 @@ input[type="range"] {
 }
 /* On a phone these rows scroll sideways: their right edge fades, so a cut word reads as more to come. */
 @media (max-width: 719px) {
-  .chip-bar > .chips:first-child:not(:only-child),
-  .toolbar:not(.wrap) {
+  .chip-bar > .chips:first-child:not(:only-child) {
     mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
   }
 }

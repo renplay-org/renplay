@@ -1,9 +1,12 @@
 import { Search, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { isApple, isTouchDevice } from '../lib/platform'
+import { Chip } from './controls'
 import { reducedMotion } from './travel'
 import './Search.css'
 
+/** Where the line turns the search into an icon: the app's phone width. */
+const PHONE = '(max-width: 719px)'
 /** The field on screen, which Ctrl K, ⌘K or / goes to. */
 let field: HTMLInputElement | null = null
 /** A shortcut was pressed on a page with no search: the next one takes the focus. */
@@ -218,13 +221,12 @@ export function useSearchScroll(engaged: boolean): boolean {
 }
 
 /**
- * The search and the controls beside it, stuck under the header while the results scroll beneath. It is a
- * search landmark; the results below it are not part of it. The anchor in front marks where it rests. While it
- * is stuck the rows above it are hidden (they keep their space) and a see-through bar like the header's, with
- * its blur, runs from the top of the screen down to the toolbar's bottom: nothing of the page reads through
- * the header or between the controls, and tiles go soft as they pass under it.
+ * The search, the tags and the sort in one line, stuck under the header while the results scroll beneath. It is a
+ * search landmark; the results below it are not. The anchor in front marks where it rests. While it is stuck, one
+ * solid area of the page's ink runs from the top of the screen down to the line's bottom, with a hairline under it:
+ * nothing of the page reads through the header or between the words. The line does not change when it sticks.
  */
-export function Toolbar({ label, wrap, style, children }: { label: string; wrap?: boolean; style?: CSSProperties; children: ReactNode }) {
+export function Toolbar({ label, style, children }: { label: string; style?: CSSProperties; children: ReactNode }) {
   const bar = useRef<HTMLDivElement>(null)
   const glass = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
@@ -232,6 +234,7 @@ export function Toolbar({ label, wrap, style, children }: { label: string; wrap?
     const cover = glass.current
     const page = toolbar?.parentElement
     if (!toolbar || !cover || !page) return
+    const root = document.documentElement
     const settle = () => {
       const top = toolbar.getBoundingClientRect().top
       const at = stickAt(toolbar)
@@ -240,6 +243,7 @@ export function Toolbar({ label, wrap, style, children }: { label: string; wrap?
       const stuck = Math.abs(top - at) <= 0.5
       cover.toggleAttribute('data-stuck', stuck)
       page.toggleAttribute('data-stuck', stuck)
+      root.toggleAttribute('data-bar-stuck', stuck)
     }
     settle()
     const watcher = new ResizeObserver(settle)
@@ -250,16 +254,59 @@ export function Toolbar({ label, wrap, style, children }: { label: string; wrap?
       watcher.disconnect()
       window.removeEventListener('scroll', settle)
       page.removeAttribute('data-stuck')
+      root.removeAttribute('data-bar-stuck')
     }
   }, [])
   return (
     <>
       <div className="toolbar-top" aria-hidden="true" />
       <div className="toolbar-glass" aria-hidden="true" ref={glass} />
-      <div role="search" aria-label={label} className={`toolbar ${wrap ? 'wrap' : ''}`.trim()} style={style} ref={bar}>
+      <div role="search" aria-label={label} className="toolbar line" style={style} ref={bar}>
         {children}
       </div>
     </>
+  )
+}
+
+/**
+ * The words of the line: what scrolls between the search and the sort. A line with more words than fit scrolls sideways
+ * and its end fades (`data-more`), and a word the controller or the keyboard lands on is brought into the line. `reset`
+ * takes it back to its start when it changes (a chosen tag moves to the front).
+ */
+export function LineWords({ reset, children }: { reset?: string; children: ReactNode }) {
+  const row = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = row.current
+    if (el) el.toggleAttribute('data-more', el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+  })
+  useEffect(() => {
+    row.current?.scrollTo({ left: 0, behavior: 'instant' })
+  }, [reset])
+  useEffect(() => {
+    const el = row.current
+    if (!el) return
+    const settle = () => el.toggleAttribute('data-more', el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+    // The ends are read from the word's own box: the fade covers the last 28 px.
+    const reveal = (e: FocusEvent) => {
+      const word = (e.target as HTMLElement).getBoundingClientRect()
+      const line = el.getBoundingClientRect()
+      if (word.left < line.left + 8) el.scrollLeft += word.left - line.left - 8
+      else if (word.right > line.right - 36) el.scrollLeft += word.right - line.right + 36
+    }
+    const watcher = new ResizeObserver(settle)
+    watcher.observe(el)
+    el.addEventListener('scroll', settle, { passive: true })
+    el.addEventListener('focusin', reveal)
+    return () => {
+      watcher.disconnect()
+      el.removeEventListener('scroll', settle)
+      el.removeEventListener('focusin', reveal)
+    }
+  }, [])
+  return (
+    <div className="line-words" ref={row}>
+      {children}
+    </div>
   )
 }
 
@@ -284,13 +331,16 @@ export function Marked({ text, marks }: { text: string; marks?: number[] }) {
 }
 
 /**
- * The search: one field above a list, filtering it as you type. A pill like the controls beside it, with
- * its shortcut shown on a desktop (a phone has no keyboard shortcuts) and a clear button while it holds text.
- * `label` names the field and is its hint. While the toolbar is stuck the heading with the count is out of
- * sight, so the field says the count at its right end while it holds text. A screen reader hears the count
- * once the person pauses, not on every key.
+ * The search: one field in the line, filtering the list as you type. On a computer it is always there, underlined, with its
+ * shortcut shown. On a phone it is an icon until it is pressed, and then it opens over the whole line (the line keeps its
+ * size and its place, so nothing moves) and takes the keyboard. It closes when it loses focus or on Escape, and while it
+ * still holds text a word stays in the line: the search, with a way to clear it. It is one input throughout, so the browser's
+ * own press-to-focus raises a phone's keyboard. `always` keeps it open (a library with no tags has nothing else to show).
+ * `label` names the field and is its hint. While the toolbar is stuck the heading with the count is out of sight, so the
+ * field says the count at its right end while it holds text. A screen reader hears the count once the person pauses, not
+ * on every key.
  */
-export default function SearchField({ value, onChange, label, count }: { value: string; onChange: (text: string) => void; label: string; count: { shown: number; total: number; narrowed: boolean } }) {
+export default function SearchField({ value, onChange, label, count, always }: { value: string; onChange: (text: string) => void; label: string; count: { shown: number; total: number; narrowed: boolean }; always?: boolean }) {
   const input = useRef<HTMLInputElement>(null)
   const typing = useTypingCalm()
   const text = countText(count.shown, count.total, count.narrowed)
@@ -316,42 +366,53 @@ export default function SearchField({ value, onChange, label, count }: { value: 
     parkResults()
   }
   return (
-    <div className="search-field">
-      <Search aria-hidden="true" />
-      <input
-        ref={input}
-        type="text"
-        inputMode="search"
-        enterKeyHint="search"
-        autoComplete="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        aria-label={label}
-        aria-keyshortcuts={isApple() ? 'Meta+K /' : 'Control+K /'}
-        placeholder={label}
-        value={value}
-        onChange={(e) => change(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && isTouchDevice()) input.current?.blur()
-          if (e.key !== 'Escape') return
-          if (value) change('')
-          else input.current?.blur()
-        }}
-      />
+    <div className="search-field" data-always={always || undefined}>
+      <span className="search-slot" aria-hidden="true" />
+      <div className="search-box">
+        <Search aria-hidden="true" />
+        <input
+          ref={input}
+          type="text"
+          inputMode="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          aria-label={label}
+          aria-keyshortcuts={isApple() ? 'Meta+K /' : 'Control+K /'}
+          placeholder={label}
+          value={value}
+          onChange={(e) => change(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && isTouchDevice()) input.current?.blur()
+            if (e.key !== 'Escape') return
+            // An icon on a phone: Escape closes the field and the search stays as a word. A field that is always shown clears first.
+            const closes = !always && matchMedia(PHONE).matches
+            if (value && !closes) change('')
+            else input.current?.blur()
+          }}
+        />
+        {value && (
+          <span className="field-count tnum" aria-hidden="true" style={{ minWidth: `${String(count.total).length * 2 + 4}ch` }}>
+            {text}
+          </span>
+        )}
+        <p role="status" className="sr-only">
+          {heard} {count.total === 1 ? 'game' : 'games'}
+        </p>
+        {value ? (
+          // A press on it keeps the focus in the field (Safari gives a button none), or the field would close under the finger.
+          <button type="button" className="clear" aria-label="Clear the search" onMouseDown={(e) => e.preventDefault()} onClick={() => { change(''); input.current?.focus({ preventScroll: true }) }}>
+            <X aria-hidden="true" />
+          </button>
+        ) : (
+          <kbd className="shortcut" aria-hidden="true">{isApple() ? '⌘K' : 'Ctrl K'}</kbd>
+        )}
+      </div>
       {value && (
-        <span className="field-count tnum" aria-hidden="true" style={{ minWidth: `${String(count.total).length * 2 + 4}ch` }}>
-          {text}
-        </span>
-      )}
-      <p role="status" className="sr-only">
-        {heard} {count.total === 1 ? 'game' : 'games'}
-      </p>
-      {value ? (
-        <button type="button" className="clear" aria-label="Clear the search" onClick={() => { change(''); input.current?.focus({ preventScroll: true }) }}>
-          <X aria-hidden="true" />
-        </button>
-      ) : (
-        <kbd className="shortcut" aria-hidden="true">{isApple() ? '⌘K' : 'Ctrl K'}</kbd>
+        <Chip on className="search-kept" after={<X aria-hidden="true" />} aria-label={`Search for ${value}, clear the search`} onClick={() => change('')}>
+          <span className="kept-text">“{value.trim()}”</span>
+        </Chip>
       )}
     </div>
   )

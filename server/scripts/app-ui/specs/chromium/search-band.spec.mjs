@@ -1,7 +1,6 @@
 // Once a search has put the toolbar under the header, nothing of the page reads in the band from the top of the screen to
-// the bottom of the toolbar, at rest and at scrolls where tiles pass under it: the rows above the toolbar are out of
-// sight (and keep their space), and what passes under it shows only as a soft shade. At the top of the page, with no
-// search, the glass is not there.
+// the bottom of the toolbar, at rest and at scrolls where tiles pass under it: the header and the toolbar are one solid
+// area of ink, and what passes under it is gone. At the top of the page, with no search, the area is not there.
 import sharp from 'sharp'
 import { test, expect, check, until } from '../fixtures.mjs'
 import { fieldOf, ready, SEARCH_PAGES } from '../helpers.mjs'
@@ -33,23 +32,20 @@ async function sharpest(a, b) {
   return most
 }
 
-/** The glass fades out over its last 16 px, where the page comes out from under it: that is not in the band. */
-const FADE = 16
-
-/** The most that may show of the page in the band, as `sharpest` measures it. Without the glass the edges are above 100. */
+/** The most that may show of the page in the band, as `sharpest` measures it. Without the solid area the edges are above 100. */
 const FAINT = 20
 
 const nextFrames = (page) => page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 
 for (const [name, path, field, , letter] of SEARCH_PAGES) {
-  test(`${name}: nothing of the page reads between the top of the screen and the bottom of the toolbar`, async ({ page }) => {
+  test(`${name}: nothing of the page reads between the top of the screen and the bottom of the toolbar`, async ({ page }, testInfo) => {
     const glass = () => page.evaluate(() => { const v = document.querySelector('.toolbar-glass'); return { stuck: v.hasAttribute('data-stuck'), opacity: Number(getComputedStyle(v).opacity) } })
     const settle = () => page.waitForFunction(() => document.getAnimations().every((a) => a.playState === 'finished'))
-    // The rows above the toolbar, in the toolbar's own parent: whether any is visible, and where the toolbar is.
+    // The rows above the toolbar, in the toolbar's own parent: whether any is visible, and where the toolbar is. The header is solid once the page has scrolled.
     const above = () => page.evaluate(() => {
       const toolbar = document.querySelector('.toolbar[role="search"]')
       const rows = [...toolbar.parentElement.children].filter((e) => e.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING && !e.matches('.toolbar-top, .toolbar-glass'))
-      return { rows: rows.length, visible: rows.filter((e) => getComputedStyle(e).visibility !== 'hidden' && Number(getComputedStyle(e).opacity) > 0).length, top: toolbar.getBoundingClientRect().top }
+      return { rows: rows.length, visible: rows.filter((e) => getComputedStyle(e).visibility !== 'hidden' && Number(getComputedStyle(e).opacity) > 0).length, top: toolbar.getBoundingClientRect().top, solid: getComputedStyle(document.querySelector('.top'), '::after').opacity === '1' }
     })
     await ready(page, path)
     const rest = await glass()
@@ -67,10 +63,10 @@ for (const [name, path, field, , letter] of SEARCH_PAGES) {
       await page.evaluate((y) => window.scrollTo({ top: y, behavior: 'instant' }), parkedAt.y + offset)
       await nextFrames(page)
       await settle()
-      const clip = await page.evaluate((fadeEdge) => {
-        const toolbar = document.querySelector('.toolbar[role="search"]').getBoundingClientRect()
-        return { x: 0, y: 0, width: innerWidth, height: Math.ceil(toolbar.bottom) - fadeEdge }
-      }, FADE)
+      const clip = await page.evaluate(() => {
+        // To the bottom of the solid area, whole pixels: the hairline under it is not in the band, and a toolbar a hundredth of a pixel lower than its place does not move it.
+        return { x: 0, y: 0, width: innerWidth, height: Math.floor(document.querySelector('.toolbar-glass').getBoundingClientRect().bottom) }
+      })
       const shown = await page.screenshot({ clip, scale: 'css' })
       const style = await page.addStyleTag({ content: 'main :not(.toolbar):not(.toolbar *):not(.toolbar-glass) { visibility: hidden !important } .toolbar, .toolbar *, .toolbar-glass { visibility: visible !important }' })
       const bare = await page.screenshot({ clip, scale: 'css' })
@@ -78,14 +74,15 @@ for (const [name, path, field, , letter] of SEARCH_PAGES) {
       const edge = await sharpest(shown, bare)
       const state = await glass()
       const rows = await above()
-      if (edge > FAINT || !state.stuck || state.opacity !== 1 || rows.visible) bad.push(`at ${offset} px: edges of ${edge.toFixed(0)} show${state.stuck ? '' : ', no glass'}${rows.visible ? `, ${rows.visible} rows above the toolbar are visible` : ''}`)
+      if (edge > FAINT || !state.stuck || state.opacity !== 1 || !rows.solid) bad.push(`at ${offset} px: edges of ${edge.toFixed(0)} show${state.stuck ? '' : ', no glass'}${rows.solid ? '' : ', the header is not solid'}`)
     }
     check(!bad.length, `${name}: nothing of the page reads between the top of the screen and the bottom of the toolbar, at rest and with tiles passing under it${bad.length ? ` (${bad.join('; ')})` : ''}`)
     const after = await page.evaluate(() => document.querySelector('.toolbar[role="search"]').getBoundingClientRect().top)
     check(Math.abs(after - parkedAt.top) <= 1, `${name}: the toolbar stays under the header while the glass is on (${Math.round(parkedAt.top)} then ${Math.round(after)} px)`)
     // With the search cleared and the page back at the top the toolbar is not stuck, and the glass goes. The page keeps the
     // toolbar where it is for half a second after the shelves come back: the top is asked for until it holds.
-    await page.click('.search-field .clear')
+    // On a phone the field is closed (it was blurred above): the search is cleared by its word.
+    await page.click(testInfo.project.use.hasTouch ? '.search-kept' : '.search-field .clear')
     let gone
     let back
     await until(async () => {

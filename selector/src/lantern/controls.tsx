@@ -92,9 +92,9 @@ export function U({ children }: { children: ReactNode }) {
 }
 
 /** Filter chips: 40 px words, the one included lit with the underline, excluded red with a strike, dim when nothing would show. `after` is an icon, outside the underline. */
-export function Chip({ on, ex, n, dim, after, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number; dim?: boolean; after?: ReactNode }) {
+export function Chip({ on, ex, n, dim, after, className, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number; dim?: boolean; after?: ReactNode }) {
   return (
-    <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''} ${dim ? 'dim' : ''}`} {...rest}>
+    <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''} ${dim ? 'dim' : ''} ${className ?? ''}`.trim()} {...rest}>
       <U>
         {children}
         {n != null && ' '}

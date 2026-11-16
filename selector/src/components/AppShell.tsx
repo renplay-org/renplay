@@ -118,6 +118,20 @@ function useScrollMemory() {
   }, [entry, type])
 }
 
+/** Tells the page's styles that it has scrolled (`data-scrolled` on the document): the header is solid from then on. */
+function useScrolledHeader() {
+  useEffect(() => {
+    const root = document.documentElement
+    const settle = () => root.toggleAttribute('data-scrolled', window.scrollY > 0)
+    settle()
+    window.addEventListener('scroll', settle, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', settle)
+      root.removeAttribute('data-scrolled')
+    }
+  }, [])
+}
+
 /** Where typing goes to a field of its own: a key that is a shortcut elsewhere is not one here. */
 const typesInto = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
 
@@ -179,6 +193,7 @@ function usePadBack() {
 
 function Shell() {
   useScrollMemory()
+  useScrolledHeader()
   usePadBack()
   useSearchShortcut()
   useFlightBack()
