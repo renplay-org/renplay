@@ -10,6 +10,7 @@ release notes say what).
 ### Added
 
 - The public demo can also be built as plain files for a static host, with no server behind it (`demo/static/`). A service worker in the browser answers what the demo asks of the server, and the visitor's saves, history, names and play progress stay in that browser. It needs https or localhost. A server demo (`RENPLAY_DEMO`) works as before. The demo's notice in the static demo says "This is a demo. Your saves stay in this browser." and the library leaves out what it cannot do without a server: Keep offline, exporting and importing saves, copying a save to another game and choosing other art.
+- The docs have an `llms.txt` at `docs.renplay.org/llms.txt`, with one line for each page and a link to that page as plain Markdown, and `llms-small.txt` and `llms-full.txt` with the whole docs in one file, for assistants and coding agents that help someone install Renplay.
 
 ### Changed
 
@@ -23,6 +24,7 @@ release notes say what).
 - Tags are small text in the label face, separated by slashes, instead of filled badges. The tags you filter by in the Catalog and the Library are words too: a tag you include is underlined and a tag you leave out is struck through.
 - The game page's and the settings' sections are divided by thin lines, with their titles in the book face, instead of filled rounded cards. Cards you press or drop a file on keep their fill. The sort button, the account page's links and the notices lose their fill too.
 - On a phone's game page the heart is a small quiet button beside Play, Change art is a quiet link with the art credits, and the line with the developer, the state and the version breaks between its parts and never leaves a dot at the end of a line.
+- The demo, built as plain files or as its image, now says in every answer that search engines should leave it out, and its robots.txt lets them in to read that. Its page has the title "Renplay demo" and a description, instead of only "Renplay".
 
 ### Fixed
 
