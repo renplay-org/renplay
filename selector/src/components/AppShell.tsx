@@ -1,4 +1,4 @@
-import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, Sparkles, User } from 'lucide-react'
+import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
 import { keptGames, removeKept, useOnline } from '../lib/offline'
 import ChooseArtwork from './ChooseArtwork'
 import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
@@ -233,13 +233,10 @@ function Shell() {
       </header>
       <main className="rise">
         {data?.demo && !embed && (
-          <p className="notice" role="note" style={{ margin: '12px 16px 0' }}>
-            <Sparkles aria-hidden />
+          <p className="demo-note" role="note">
             <span>
               This is a demo of Renplay with free games. It starts fresh every few hours, so nothing you do here is kept. The demo has adult games turned off.{' '}
-              <a className="link" href="https://renplay.org/#install">
-                Install your own
-              </a>
+              <a href="https://renplay.org/#install">Install your own</a>
             </span>
           </p>
         )}

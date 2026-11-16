@@ -36,8 +36,10 @@
   font-weight: 650;
   letter-spacing: -0.01em;
 }
-/* A label that introduces a section: mono, with the lamp's dot before it. */
-.eyebrow {
+/* A label that introduces a section: mono, with the lamp before it, the website's lantern (a small flame-coloured body with
+   its cap and a glow). The demo's note is one too. */
+.eyebrow,
+.demo-note {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -45,13 +47,35 @@
   letter-spacing: 0.02em;
   color: var(--fg-3);
 }
-.eyebrow::before {
+.eyebrow::before,
+.demo-note::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 9px;
+  height: 11px;
   flex: none;
-  border-radius: var(--r-round);
+  border-radius: var(--r-1) var(--r-1) var(--r-2) var(--r-2);
   background: var(--lamp);
+  /* The cap, a strip above the body, and the glow. */
+  box-shadow:
+    0 -6px 0 -3px var(--fg-4),
+    0 0 7px 0 color-mix(in srgb, var(--lamp) 50%, transparent);
+}
+/* The note at the top of the demo: a line of the website's voice, not a plate, with room above the stage under it. */
+.demo-note {
+  align-items: flex-start;
+  margin: 12px 0 14px;
+  line-height: 1.5;
+}
+.demo-note::before {
+  margin-top: 5px;
+}
+.demo-note a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.demo-note a:hover {
+  color: var(--pink-3);
 }
 /* The story voice: where there is nothing to use yet, the page speaks to the reader. */
 .story {
