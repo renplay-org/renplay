@@ -113,7 +113,7 @@ export default function GamePage() {
   )
 
   const actions = game.job ? (
-    <div className="plate" style={{ maxWidth: 440, width: '100%' }}>
+    <div className="sect" style={{ maxWidth: 440, width: '100%' }}>
       <div className="row between small" style={{ marginBottom: 8 }}>
         <span className="muted-2">{jobStage(game.job, 'Working')}</span>
         <span className="tnum muted">{game.job.status === 'running' ? pct(game.job.progress) : ''}</span>
@@ -298,9 +298,10 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
 
       {section === 'walkthroughs' && (
         <div className="stack">
-          {game.walkthroughs.length ? (
-            game.walkthroughs.map((w, i) => (
-              <div key={w.file} className="plate walk-row">
+          {game.walkthroughs.length || game.recipe?.links.walkthrough ? (
+            <div className="rows">
+            {game.walkthroughs.map((w, i) => (
+              <div key={w.file} className="r walk-row">
                 <div className="grow" style={{ minWidth: 0 }}>
                   <p className="truncate" style={{ fontWeight: 650 }}>{w.title}</p>
                   <p className="small muted">
@@ -324,20 +325,21 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
                   )}
                 </div>
               </div>
-            ))
+            ))}
+            {game.recipe?.links.walkthrough && (
+              <div className="r walk-row">
+                <div className="grow">
+                  <p style={{ fontWeight: 650 }}>The guide the catalog links</p>
+                  <p className="small muted">On the web</p>
+                </div>
+                <Pill variant="s" size="sm" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer" onClick={popupClick(game.recipe.links.walkthrough)}>
+                  Open
+                </Pill>
+              </div>
+            )}
+            </div>
           ) : (
             <p className="small muted">{admin ? 'No walkthrough yet. Add a PDF, a picture or a text file.' : 'No walkthrough yet.'}</p>
-          )}
-          {game.recipe?.links.walkthrough && (
-            <div className="plate walk-row">
-              <div className="grow">
-                <p style={{ fontWeight: 650 }}>The guide the catalog links</p>
-                <p className="small muted">On the web</p>
-              </div>
-              <Pill variant="s" size="sm" icon={<ExternalLink />} href={game.recipe.links.walkthrough} target="_blank" rel="noreferrer" onClick={popupClick(game.recipe.links.walkthrough)}>
-                Open
-              </Pill>
-            </div>
           )}
           {admin && (
             <div>

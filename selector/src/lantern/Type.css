@@ -77,6 +77,16 @@
 .demo-note a:hover {
   color: var(--pink-3);
 }
+/* A label or a small fact in mono, as the website's .label: a noun over a field, a time, a size, a count. */
+.label,
+.fact {
+  font: 400 12px/1.45 var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--fg-3);
+}
+.label {
+  display: block;
+}
 /* The story voice: where there is nothing to use yet, the page speaks to the reader. */
 .story {
   font-family: var(--serif);

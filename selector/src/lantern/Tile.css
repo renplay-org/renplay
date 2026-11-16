@@ -75,11 +75,8 @@
   display: flex;
   align-items: flex-end;
   padding: 9%;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--pink) 22%, transparent), color-mix(in srgb, var(--violet) 18%, transparent) 60%, var(--ink));
-  font-weight: 800;
-  font-size: clamp(13px, 13cqw, 36px);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
+  font: 700 clamp(13px, 13cqw, 36px) / 1.05 var(--serif);
+  font-variation-settings: "opsz" 24;
   color: var(--fg);
 }
 .frame.wide .mono {

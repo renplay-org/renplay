@@ -13,6 +13,7 @@ import { slotInfo } from '@shared/saveslot'
 import { useGames, useSaves } from '../lib/queries'
 import { groupSaves, saveName, versionReason } from '../lib/saves'
 import { playLink } from '../lib/links'
+import { tintOf } from '../lantern/art'
 import { useStaticDemo } from '../lib/auth'
 import { Seg, Pill, IconBtn } from '../lantern/controls'
 import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
@@ -100,10 +101,11 @@ export default function SaveGallery({ game }: { game: Game }) {
   }
 
   const { pinned, recent } = groupSaves(slots)
+  const tint = { ['--tint' as string]: tintOf(game.art) }
   const card = (s: SaveSlot) => (
     <div key={s.file} className={`save ${s.pinnedAt ? 'pinned' : ''}`.trim()}>
       <button
-        className="relative block w-full"
+        className="save-open"
         onClick={() => game.playUrl && openSave(s.file)}
         disabled={!game.playUrl}
         title={game.playUrl ? 'Load this save' : 'Install the game to load saves'}
@@ -118,7 +120,7 @@ export default function SaveGallery({ game }: { game: Game }) {
             <span className="truncate">{s.title || s.name || <span className="muted">Untitled</span>}</span>
           </div>
           {s.note && <p className="note">{s.note}</p>}
-          <div className="m" title={dateTime(s.ctime)}>
+          <div className="m fact" title={dateTime(s.ctime)}>
             {ago(s.ctime)}
             {duration(s.runtime) ? ` · ${duration(s.runtime)} played` : ''}
           </div>
@@ -226,10 +228,10 @@ export default function SaveGallery({ game }: { game: Game }) {
         </Empty>
       ) : (
         <>
-          {pinned.length > 0 && <h3 className="pm-group-title">Pinned</h3>}
-          {pinned.length > 0 && <div className="saves">{pinned.map(card)}</div>}
-          {pinned.length > 0 && recent.length > 0 && <h3 className="pm-group-title">Recent</h3>}
-          {recent.length > 0 && <div className="saves">{recent.map(card)}</div>}
+          {pinned.length > 0 && <h3 className="label" style={{ margin: '4px 0 10px' }}>Pinned</h3>}
+          {pinned.length > 0 && <div className="saves" style={tint}>{pinned.map(card)}</div>}
+          {pinned.length > 0 && recent.length > 0 && <h3 className="label" style={{ margin: '24px 0 10px' }}>Recent</h3>}
+          {recent.length > 0 && <div className="saves" style={tint}>{recent.map(card)}</div>}
         </>
       )}
 
@@ -298,7 +300,7 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
       <p className="small muted" style={{ marginBottom: 14 }}>
         For sequels that continue from an earlier season. The save keeps its slot if it is free, otherwise it goes into the next free slot.
       </p>
-      <div className="stack" style={{ gap: 8 }}>
+      <div className="rows">
         {targets.length === 0 && <p className="small muted">No other game with a known save folder.</p>}
         {targets.map((g) => (
           <button
@@ -316,11 +318,10 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
                 setBusy(null)
               }
             }}
-            className="row between plate flat"
-            style={{ width: '100%', textAlign: 'left', padding: '12px 16px' }}
+            className="r between pick"
           >
             <span className="small">{g.title}</span>
-            {busy === g.id ? <Spinner /> : <span className="xs muted">{g.saveDir}</span>}
+            {busy === g.id ? <Spinner /> : <span className="fact">{g.saveDir}</span>}
           </button>
         ))}
       </div>
@@ -354,7 +355,7 @@ function HistoryDialog({ game, slot, onClose, onRestored }: { game: Game; slot?:
             <div key={v.id} className="row between small" style={{ gap: 12 }}>
               <div className="grow">
                 <div className="truncate">{slot ? versionReason(v.reason) : nameOf(v)}</div>
-                <div className="xs muted">
+                <div className="fact">
                   {slot ? '' : `${versionReason(v.reason)} · `}
                   {dateTime(v.savedAt)} · {bytes(v.size)}
                 </div>
