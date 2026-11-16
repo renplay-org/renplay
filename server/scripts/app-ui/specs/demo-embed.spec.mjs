@@ -1,11 +1,9 @@
 import { test, expect } from '@playwright/test'
-import { execFileSync } from 'node:child_process'
 import { demoEmbedServer } from '../demo-embed-server.mjs'
 import { where } from './fixtures.mjs'
 
 let demo
 test.beforeAll(async () => {
-  execFileSync(process.execPath, ['node_modules/typescript/bin/tsc', '-p', '.'])
   demo = await demoEmbedServer()
 })
 test.afterAll(async () => { await demo?.close() })

@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test'
-import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { renpySave, staticDemo } from '../static-demo-fixture.mjs'
@@ -20,7 +19,6 @@ const real = !!process.env.STATIC_DEMO_DIR
 let demo
 test.beforeAll(async () => {
   test.setTimeout(real ? 240000 : 120000)
-  if (!real) execFileSync(process.execPath, ['node_modules/typescript/bin/tsc', '-p', '.'])
   demo = await staticDemo({ dir: process.env.STATIC_DEMO_DIR })
 })
 test.afterAll(async () => { await demo?.close() })
