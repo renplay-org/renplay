@@ -2,6 +2,19 @@ import { test as base, expect } from '@playwright/test'
 import { mock } from '../../app-mock.mjs'
 
 export const test = base.extend({
+  // A worker's browser starts together with every other worker's, on a machine of four vCPUs: the first page it draws can wait seconds
+  // for its first frame, and what a test reads in that time (an entrance that has not started) is the start-up, not the page.
+  // The first test begins once the browser has drawn the library and its entrance has finished.
+  warm: [async ({ browser }, use, workerInfo) => {
+    const context = await browser.newContext({ baseURL: workerInfo.project.use.baseURL, serviceWorkers: 'block' })
+    const page = await context.newPage()
+    await mock(page, [], 'warm', { titled: true })
+    await page.goto('/')
+    await expect(page.locator('.grid[data-row] .card').first()).toBeAttached({ timeout: 30000 })
+    await expect.poll(() => page.evaluate(() => document.getAnimations().every((a) => a.playState === 'finished')), { timeout: 30000 }).toBe(true)
+    await context.close()
+    await use()
+  }, { scope: 'worker', auto: true, timeout: 60000 }],
   // What the made-up API answers with (app-mock.mjs): the 12 titles by default, `{}` for the 130 games and 120 recipes.
   mockOptions: [{ titled: true }, { option: true }],
   page: async ({ page, context, baseURL, mockOptions }, use) => {
@@ -46,7 +59,15 @@ export async function openClocked(page, path = '/') {
 }
 
 export async function settled(page) {
-  await expect.poll(() => page.evaluate(() => document.getAnimations().every((a) => a.playState === 'finished') && document.querySelectorAll('.bd .l').length <= 1), { message: 'Page entrance and background have settled' }).toBe(true)
+  const unsettled = () => page.evaluate(() => ({
+    running: document.getAnimations().filter((a) => a.playState !== 'finished').map((a) => `${a.effect?.target?.className || a.effect?.target?.tagName} ${a.animationName ?? a.transitionProperty ?? ''} ${a.playState} ${Math.round(a.currentTime)}/${Math.round(a.effect?.getComputedTiming().endTime)}`),
+    layers: document.querySelectorAll('.bd .l').length,
+  }))
+  let last = null
+  await expect.poll(async () => {
+    last = await unsettled()
+    return last.running.length === 0 && last.layers <= 1
+  }, { message: 'Page entrance and background have settled' }).toBe(true).catch((error) => { error.message += `\nUnsettled: ${JSON.stringify(last)}`; throw error })
 }
 
 /** A check that says what it found when it fails, and lets the test go on to its other checks. */
