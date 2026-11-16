@@ -44,7 +44,7 @@ and matching Playwright packages. Only this container run counts for acceptance.
 are useful for quick tries, not acceptance. The suite uses mock games and blocks external requests.
 Never point it at a real library.
 
-The Playwright suite has three workers and five projects: Chromium at 1440 px, touch WebKit at 390 px in
+The Playwright suite runs up to five workers (three in each WebKit project) over five projects: Chromium at 1440 px, touch WebKit at 390 px in
 portrait and at 844 by 390 px in landscape, desktop WebKit for the static demo, and Chromium at 390 px with touch
 for the library's own checks in `server/scripts/app-ui/specs/chromium/`. A spec says in its first line which
 projects run it and why, so a test runs where it shows something new. It retains failure traces and writes JSON

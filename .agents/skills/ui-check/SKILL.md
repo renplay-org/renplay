@@ -18,7 +18,7 @@ container with Node 24 and matching package versions. Only this container run co
 Never re-run a passing suite to make sure. A doubt about a test is a flake to report, not a reason
 to repeat acceptance. Native Mac browsers below are for quick tries and visual review, not acceptance.
 
-The Playwright suite uses three workers and five projects: desktop Chromium at 1440 px, touch WebKit at 390 by
+The Playwright suite runs up to five workers (three in each WebKit project) over five projects: desktop Chromium at 1440 px, touch WebKit at 390 by
 844 px and 844 by 390 px, desktop WebKit for the static demo, and Chromium at 390 px with touch for the library's
 own checks in `specs/chromium/`. A spec says in its first line which projects run it and why. JSON, timings and retained failure traces are in `ui-test-results/`. Read the text
 or JSON failure first, then the trace. A pass only on retry warns locally and fails CI. Never
