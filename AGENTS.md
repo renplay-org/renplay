@@ -293,7 +293,7 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
    a passing suite to make sure. A doubt about a test is a flake to report, and the **Flake hunt**
    workflow repeats it without retries (by hand, or nightly on `dev`). Stop the warm container with
    `mise run test:ui:stop`. Results and failure traces are in `ui-test-results/`.
-   A retry-only pass warns locally and fails CI. No PR screenshots.
+   A test that passes only on its retry does not fail a pull request: the job summary lists it under "Flaky, to fix from the flake hunt" and CI warns once for each. A test that fails every attempt fails the job, and the nightly flake hunt, which runs without retries, fails on any failure. No PR screenshots.
    Never loosen a test without stopping to report it and getting a maintainer's approval: no removed assertions,
    wider tolerances, added or longer fixed waits, skips, quarantine or changes only to make it pass.
    Moving an assertion needs equivalent or stronger coverage in the new runner, not less coverage.

@@ -21,7 +21,7 @@ to repeat acceptance. Native Mac browsers below are for quick tries and visual r
 The Playwright suite runs up to five workers (three in each WebKit project) over five projects: desktop Chromium at 1440 px, touch WebKit at 390 by
 844 px and 844 by 390 px, desktop WebKit for the static demo, and Chromium at 390 px with touch for the library's
 own checks in `specs/chromium/`. A spec says in its first line which projects run it and why. JSON, timings and retained failure traces are in `ui-test-results/`. Read the text
-or JSON failure first, then the trace. A pass only on retry warns locally and fails CI. Never
+or JSON failure first, then the trace. A test that passes only on its retry is listed in the summary as flaky and warned about in CI, and does not fail the job. Never
 point the suite at a real library. No screenshots in pull requests.
 
 For app changes, choose the affected behavior explicitly:

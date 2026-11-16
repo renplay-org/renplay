@@ -61,8 +61,8 @@ if [ "$mode" = all ] || [ "$mode" = layout ]; then
 fi
 if [ "$mode" = all ] || [ "$mode" = playwright ]; then
   args=()
-  if [ "${CI:-}" ]; then args+=(--fail-on-flaky-tests); fi
-  if [ "${UI_REPEAT:-0}" -gt 0 ]; then args+=(--repeat-each="$UI_REPEAT" --retries=0); fi
+  # A test that passes only on its retry is listed and warned about (summary-reporter.mjs), not failed. The flake hunt has no retries.
+  if [ "${UI_REPEAT:-0}" -gt 0 ]; then args+=(--repeat-each="$UI_REPEAT" --retries=0 --fail-on-flaky-tests); fi
   tag=playwright
   for arg in "$@"; do case "$arg" in --project=*) tag=${arg#--project=} ;; esac; done
   rm -f /out/report.json /out/summary.md "/out/$tag-report.json" "/out/$tag-summary.md"

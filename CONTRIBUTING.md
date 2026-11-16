@@ -48,7 +48,7 @@ The Playwright suite runs up to five workers (three in each WebKit project, and 
 portrait and at 844 by 390 px in landscape, desktop WebKit for the static demo, and Chromium at 390 px with touch
 for the library's own checks in `server/scripts/app-ui/specs/chromium/`. A spec says in its first line which
 projects run it and why, so a test runs where it shows something new. It retains failure traces and writes JSON
-and a text summary into `ui-test-results/`. A pass only on retry warns locally and fails CI. The normal complete browser
+and a text summary into `ui-test-results/`. A test that passes only on its retry does not fail a pull request: the job summary lists it as flaky, to fix from the flake hunt, and CI warns once for each. The normal complete browser
 suite must finish in under five minutes. There are no screenshots in pull requests.
 
 While working, run only the tests a change touches. `--warm` starts a container for this worktree
