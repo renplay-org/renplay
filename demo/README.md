@@ -91,7 +91,9 @@ frame are both controlled by it, so the game's save requests reach it too, and t
    and the runtime. It reads only. Each catalog entry keeps only its grid picture, the one the Catalog page shows.
    The pictures the answers name are the only art copied (`api/art/`).
 3. `snapshot.mjs` writes the files, and takes each game's build files from `--seed`, the demo image's seed stage:
-   `docker buildx build --target games --output type=local,dest=<dir> demo` (see `Dockerfile`).
+   `docker buildx build --build-arg IMAGE=<the image the demo was built from> --target games --output type=local,dest=<dir> demo`
+   (see `Dockerfile`). Every seed run installs with a new build name, so the export must be the build the demo image holds: the
+   same image and context make Docker reuse that build.
 4. `headers.mjs` writes `_headers`: `frame-ancestors` for the demo itself and the embedder only (the policy of the
    server demo), `index.html`, `sw.js` and `/demo/*` checked each time, hashed assets and art kept for good.
 5. Checks the output against Cloudflare's static asset limits (20,000 files, 25 MiB a file) and fails if it does not fit.
@@ -102,7 +104,7 @@ time, `https://renplay.org` by default.
 To try it, with the demo image running as in "To try a released demo locally" above:
 
 ```sh
-docker buildx build --target games --output type=local,dest=/tmp/demo-seed demo
+docker buildx build --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> --target games --output type=local,dest=/tmp/demo-seed demo
 node demo/static/build.mjs /tmp/static-demo --seed /tmp/demo-seed --base http://127.0.0.1:8080 --embedder http://localhost:5190
 node server/scripts/app-ui/static-demo-server.mjs /tmp/static-demo 5191    # http://localhost:5191
 ```

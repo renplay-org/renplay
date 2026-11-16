@@ -106,11 +106,15 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
+      # The games stage is built from the same image and context as the demo above, so its seed is the one cached there:
+      # the build the capture names is the build the files come from. Another image would seed another build.
       - name: The static demo
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           npm ci --prefix selector
           npm ci --prefix server
-          docker buildx build --target games --output type=local,dest=/tmp/demo-seed demo
+          docker buildx build --build-arg IMAGE="ghcr.io/renplay-org/renplay:$VERSION" --target games --output type=local,dest=/tmp/demo-seed demo
           docker run -d --name demo-capture -e PORT=10000 -p 8080:8080 --memory 512m "$IMAGE"
           for _ in $(seq 1 60); do curl -fs -o /dev/null http://127.0.0.1:8080/api/health && break; sleep 2; done
           node demo/static/build.mjs demo/static/dist --seed /tmp/demo-seed --base http://127.0.0.1:8080

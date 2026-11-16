@@ -18,7 +18,7 @@ ENV RENPLAY_ADULT_GAMES=off \
 RUN cd /games/_archives && node /tmp/seed.mjs *.zip
 
 # The built games of the seed stage alone: the static demo (static/) takes the files of their builds from here, as
-#   docker build --target games --output type=local,dest=<dir> demo
+#   docker buildx build --build-arg IMAGE=<the demo's image> --target games --output type=local,dest=<dir> demo
 FROM scratch AS games
 COPY --from=seed /games /games
 

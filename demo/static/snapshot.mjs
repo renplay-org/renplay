@@ -2,9 +2,9 @@
 // the demo shows (api/art/*), the runtime, and for each Ren'Py game its page and the files of its build:
 // g/<id>/<build>/{index.html,game.zip,game/*}. The engine is not copied: the page points at engines.renplay.org.
 //
-// The build's files are read from the demo image's seed output (`docker build --target export`, see demo.yml):
+// The build's files are read from the demo image's seed output (`docker buildx build --target games`, see demo.yml):
 // <seed>/games/<id>/<build>/{game.zip,assets.pack,assets.json}. Nothing is read from a running container.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { capture } from './capture.mjs'
 
@@ -25,6 +25,9 @@ export async function writeSnapshot({ out, base, seed, embedder }) {
     const dir = `g/${id}/${build}`
     write(`${dir}/index.html`, html)
     const from = join(seed, 'games', id, build)
+    if (!existsSync(join(from, 'game.zip'))) {
+      throw new Error(`The seed has no build ${build} of ${id}. Export it from the image the demo was built from: pass the same --build-arg IMAGE to docker buildx build --target games`)
+    }
     write(`${dir}/game.zip`, readFileSync(join(from, 'game.zip')))
     // The streamed assets: the server cuts them out of assets.pack by range, so here each is a file.
     const pack = readFileSync(join(from, 'assets.pack'))
