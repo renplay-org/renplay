@@ -302,7 +302,9 @@ write(ADULT_OUT, 'index.html', render(read('pages/catalog.html'), {
   }),
 }))
 write(ADULT_OUT, '404.html', notFound(SITE))
-write(ADULT_OUT, 'robots.txt', 'User-agent: *\nDisallow: /\n')
+// Crawlers are let in on purpose: a page that robots.txt blocks is never fetched, so its noindex (the header below and
+// the meta of each page) is never read, and the address can still be listed. check-website.mjs keeps it so.
+write(ADULT_OUT, 'robots.txt', 'User-agent: *\nAllow: /\n')
 write(ADULT_OUT, '_headers', `/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
