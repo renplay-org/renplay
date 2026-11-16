@@ -65,7 +65,8 @@ test('Tiles: the tile under the mouse is tilted and lit, the others at rest are 
   const lit = await look(under)
   expect(lit.lifted, 'It lifts').toBe(true)
   expect(lit.shadow, 'It casts the colour of its art, which a tile at rest does not').not.toBe(restShadow)
-  expect(lit.sheen, 'Its sheen is whole').toBe('1')
+  // The sheen eases in: its end state, read until it is there, not one sample of the way.
+  await expect.poll(async () => (await look(under)).sheen, { message: 'Its sheen is whole' }).toBe('1')
   expect((await look(cards.nth(2))).sheen, 'The sheen of a tile that is not under the mouse is faint').toBe('0.55')
   const away = await look(far)
   expect(away.lifted, 'A tile far from the mouse does not lift').toBe(false)
@@ -120,9 +121,9 @@ test('Tiles: the focused tile is lifted and lit with the white ring, and is not 
   await arrived(tile)
   const lit = await look(tile)
   expect(lit.tilted, 'With no pointer it does not tilt').toBe(false)
-  expect(lit.sheen, 'Its sheen is whole').toBe('1')
+  await expect.poll(async () => (await look(tile)).sheen, { message: 'Its sheen is whole' }).toBe('1')
   expect(lit.shadow, 'It glows').not.toBe(restShadow)
-  expect(lit.shadow, 'The white ring is there').toContain('rgb(255, 255, 255)')
+  await expect.poll(async () => (await look(tile)).shadow, { message: 'The white ring is there' }).toContain('rgb(255, 255, 255)')
   expect((await look(cards.nth(2))).lifted, 'The next tile stays down').toBe(false)
 })
 
