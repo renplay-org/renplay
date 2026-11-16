@@ -1,8 +1,9 @@
-import { test, expect, open, settled } from './fixtures.mjs'
+import { test, expect, open, settled, where } from './fixtures.mjs'
 import { ringAt } from '../focus-ring.mjs'
 
 for (const [name, path, label] of [['Library', '/', 'Search your games'], ['Catalog', '/catalog', 'Search the catalog']]) {
   test(`${name}: shortcuts focus a whole ring, Escape clears then leaves`, async ({ page }, testInfo) => {
+    where(testInfo, ['chromium-desktop', 'webkit-portrait'], "The ring is the search field's: landscape is as wide as a tablet and shows no other cut")
     for (const how of ['shortcut', '/', 'pointer']) {
       await open(page, path)
       await settled(page)

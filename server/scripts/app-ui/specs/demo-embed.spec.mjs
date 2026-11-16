@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { demoEmbedServer } from '../demo-embed-server.mjs'
+import { where } from './fixtures.mjs'
 
 let demo
 test.beforeAll(async () => {
@@ -10,6 +11,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await demo?.close() })
 
 test('demo embed shares a Lax guest session, reports saves, refreshes and nudges across two frames', async ({ page, context }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Landscape is the same engine and the same cookies as portrait')
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto(demo.url)
@@ -61,6 +63,7 @@ test('demo embed shares a Lax guest session, reports saves, refreshes and nudges
 })
 
 test('demo embed Play leaves the website on touch and stays framed on desktop', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Landscape is touch like portrait')
   await page.goto(demo.url)
   const phone = page.frameLocator('#phone')
   await expect.poll(() => page.evaluate(() => messages.filter((m) => m.type === 'renplay-embed:ready').length)).toBe(2)
@@ -75,7 +78,8 @@ test('demo embed Play leaves the website on touch and stays framed on desktop', 
   }
 })
 
-test('demo embed refuses an unapproved parent origin', async ({ page }) => {
+test('demo embed refuses an unapproved parent origin', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop'], "The page's own check of the parent: the same in every browser")
   const violations = []
   page.on('console', (message) => { if (/frame-ancestors|Refused to frame|ancestor violates/i.test(message.text())) violations.push(message.text()) })
   await page.goto(demo.wrongUrl)

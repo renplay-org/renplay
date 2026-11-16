@@ -47,5 +47,8 @@ export const check = (ok, what) => expect.soft(ok, what).toBe(true)
 /** Runs once, in the project that shows the behaviour. Said where a test does not depend on the screen or the input. */
 export const only = (testInfo, project, why) => test.skip(testInfo.project.name !== project, why)
 
+/** Runs in these projects only, and says why the others add nothing: the same engine and input, or a size that shows nothing new. */
+export const where = (testInfo, projects, why) => test.skip(!projects.includes(testInfo.project.name), why)
+
 /** Waits until `read` answers `true`, looking every 50 ms at first: for an end state the page comes to in a moment. */
 export const until = (read, message) => expect.poll(read, { message, intervals: [50, 50, 100, 100, 250] }).toBe(true)

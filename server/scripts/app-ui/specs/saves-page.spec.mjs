@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.mjs'
+import { test, expect, where } from './fixtures.mjs'
 import { play, slot } from './player-fixture.mjs'
 
 const touch = (testInfo) => !!testInfo.project.use.hasTouch
@@ -102,6 +102,7 @@ const opacity = (locator) =>
   })
 
 test('every sheet and menu reads with no blur: what is behind it does not show through', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], "A blur is the engine's: landscape is the same engine as portrait")
   await play(page, {
     path: '/game/game-000#saves',
     slots: [{ ...slot(1, 5), title: 'Meeting Diya', note: 'Before the first lunch scene' }, slot(2, 30), slot(3, 60)],
@@ -146,6 +147,7 @@ test('every sheet and menu reads with no blur: what is behind it does not show t
 })
 
 test('Start from the main menu sits under Resume and opens the game without a save', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'What the page offers: landscape adds no other layout')
   await play(page, { path: '/game/game-000' })
   const resume = page.getByRole('link', { name: 'Resume' }).first()
   const link = page.getByRole('link', { name: 'Start from the main menu' })
@@ -158,12 +160,14 @@ test('Start from the main menu sits under Resume and opens the game without a sa
 })
 
 test('Resume loads the newest save, which is what Start from the main menu is not', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'What the page offers: landscape adds no other layout')
   await play(page, { path: '/game/game-000' })
   await press(testInfo, page.getByRole('link', { name: 'Resume' }).first())
   await expect(page).toHaveURL(/\/play\/game-000\?resume=quick-2$/)
 })
 
-test('a game with no saves has no Start from the main menu', async ({ page }) => {
+test('a game with no saves has no Start from the main menu', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'What the page offers: landscape adds no other layout')
   await play(page, { path: '/game/game-000', slots: [] })
   await expect(page.getByRole('link', { name: 'Play' }).first()).toBeVisible()
   await expect(page.getByRole('link', { name: 'Start from the main menu' })).toHaveCount(0)

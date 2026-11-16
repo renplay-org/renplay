@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.mjs'
+import { test, expect, only } from './fixtures.mjs'
 
 /** The tab's underline as drawn: its colour, and how much of it is drawn (1 whole, 0 none): the lamp under the chosen one and nothing under the others. */
 const underline = (tab) =>
@@ -7,7 +7,8 @@ const underline = (tab) =>
     return { colour: line.backgroundColor, drawn: new DOMMatrix(line.transform).a }
   })
 
-test("the game page's sections are real tabs, drawn as words with a lamp underline on the chosen one", async ({ page }) => {
+test("the game page's sections are real tabs, drawn as words with a lamp underline on the chosen one", async ({ page }, testInfo) => {
+  only(testInfo, 'chromium-desktop', 'What the tabs are: the same in every browser and size')
   await page.goto('/game/game-000')
   const list = page.getByRole('tablist', { name: 'Game page sections' })
   await expect(list).toBeVisible()
@@ -30,7 +31,8 @@ test("the game page's sections are real tabs, drawn as words with a lamp underli
   }
 })
 
-test('the arrow keys move between the tabs, Home and End go to the ends, and Enter or Space opens the one with focus', async ({ page }) => {
+test('the arrow keys move between the tabs, Home and End go to the ends, and Enter or Space opens the one with focus', async ({ page }, testInfo) => {
+  only(testInfo, 'chromium-desktop', 'A keyboard: the same in every browser')
   await page.goto('/game/game-000')
   const tabs = page.getByRole('tablist', { name: 'Game page sections' }).getByRole('tab')
   await tabs.first().focus()

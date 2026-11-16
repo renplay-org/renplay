@@ -1,10 +1,11 @@
-import { test, expect } from './fixtures.mjs'
+import { test, expect, where } from './fixtures.mjs'
 import { ringShown } from '../focus-ring.mjs'
 import { GUIDE, play, slot } from './player-fixture.mjs'
 
 const touch = (testInfo) => !!testInfo.project.use.hasTouch
 
-test('the backquote key opens and closes the menu, Escape goes back and then closes, and Tab never reaches the door', async ({ page }) => {
+test('the backquote key opens and closes the menu, Escape goes back and then closes, and Tab never reaches the door', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Keys: landscape is the same engine and input as portrait')
   await play(page)
   // The door's buttons are inert once the game is ready.
   await expect(page.locator('.door')).toHaveAttribute('inert', '')
@@ -38,6 +39,7 @@ test('the backquote key opens and closes the menu, Escape goes back and then clo
 })
 
 test('a tap on a save saves where you are first and loads it, and Save now puts the new quick save on top', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Landscape is the same engine and input as portrait')
   const engine = await play(page)
   await page.locator('.rp-pill').first().click()
   const menu = page.getByRole('dialog', { name: /the player menu/ })
@@ -58,7 +60,8 @@ test('a tap on a save saves where you are first and loads it, and Save now puts 
   expect(await engine.sent('renplay:load')).toHaveLength(0)
 })
 
-test('going offline with the game ready keeps the game and shows the cloud', async ({ page, context }) => {
+test('going offline with the game ready keeps the game and shows the cloud', async ({ page, context }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'The same in landscape')
   await play(page)
   await expect(page.locator('iframe')).toHaveCount(1)
   await context.setOffline(true)
@@ -382,6 +385,7 @@ async function nameIt(testInfo, menu) {
 }
 
 test('after Save now the row offers Name it, which names the save with Enter or Done and with touch or a click', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Landscape is the same engine and input as portrait')
   const engine = await play(page)
   await press(testInfo, page.locator('.rp-pill').first())
   const menu = page.getByRole('dialog', { name: /the player menu/ })
