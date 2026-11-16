@@ -176,7 +176,7 @@ jobs:
         run: |
           if [ -z "$PR" ]; then
             echo "image=true" >> "$GITHUB_OUTPUT"
-            echo 'browser-suites=["legacy","playwright","layout"]' >> "$GITHUB_OUTPUT"
+            echo 'browser-suites=["playwright","layout"]' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' > files.txt

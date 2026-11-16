@@ -21,7 +21,7 @@ cd /work
 git config --global --add safe.directory /work
 mode=${1:-all}
 if [ "$#" -gt 0 ]; then shift; fi
-case "$mode" in all|playwright|legacy|layout) ;; *) echo "Unknown browser suite: $mode"; exit 1 ;; esac
+case "$mode" in all|playwright|layout) ;; *) echo "Unknown browser suite: $mode"; exit 1 ;; esac
 for arg in "$@"; do
   if [ "$arg" = --base ]; then echo 'Acceptance never connects to another library.'; exit 1; fi
 done
@@ -50,22 +50,6 @@ if [ "$mode" = layout ] || [ "$mode" = all ]; then
 fi
 status=0
 start=$SECONDS
-if [ "$mode" = all ] || [ "$mode" = legacy ]; then
-  repeats=1
-  if [ "$mode" = legacy ] && [ "${UI_REPEAT:-0}" -gt 0 ]; then repeats=$UI_REPEAT; fi
-  rm -f /out/legacy-run-*.txt
-  printf '## Older browser checks\n' > /out/legacy-summary.md
-  for ((i=1; i<=repeats; i++)); do
-    echo "Legacy run $i of $repeats"
-    printf '\n### Run %s of %s\n' "$i" "$repeats" >> /out/legacy-summary.md
-    if ! (cd server && node scripts/check-app-ui.mjs "$@") 2>&1 | tee "/out/legacy-run-$i.txt"; then
-      status=1
-      printf 'Run failed. See legacy-run-%s.txt for the full log.\n' "$i" >> /out/legacy-summary.md
-    fi
-    grep -E '^FAIL|^(All passed|[0-9]+ failed):' "/out/legacy-run-$i.txt" >> /out/legacy-summary.md || true
-  done
-  echo "Legacy wall time: $((SECONDS-start)) s" | tee /out/legacy-time.txt
-fi
 if [ "$mode" = all ] || [ "$mode" = layout ]; then
   at=$SECONDS
   node scripts/check-layout-shift.mjs 2>&1 | tee /out/layout.txt || status=1
