@@ -23,8 +23,11 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium-desktop', use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } } },
-    { name: 'webkit-portrait', use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
-    { name: 'webkit-landscape', testIgnore: /static-demo\.spec/, use: { browserName: 'webkit', viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+    // The library's own checks (specs/chromium/) run on a desktop and on a phone's size in Chromium, which has what they read:
+    // layout shift, a finger drawn with touch events, the clock. The phone is what an iPhone is to the page.
+    { name: 'chromium-phone', testMatch: /specs\/chromium\//, use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+    { name: 'webkit-portrait', testIgnore: /specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+    { name: 'webkit-landscape', testIgnore: /static-demo\.spec|specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
     // The static demo's service worker has its own WebKit fixes: it is also checked at desktop size.
     { name: 'webkit-desktop', testMatch: /static-demo\.spec/, use: { browserName: 'webkit', viewport: { width: 1440, height: 900 } } },
   ],
