@@ -76,8 +76,11 @@ jobs:
           docker run -d --name demo -e PORT=10000 -p 8080:8080 --memory 512m "$IMAGE"
           for _ in $(seq 1 60); do curl -fs -o /dev/null http://127.0.0.1:8080/api/health && break; sleep 2; done
           curl -fsS http://127.0.0.1:8080/api/auth/providers | grep -q '"demo":true'
-          curl -fsS -c /tmp/jar -X POST -H 'Sec-Fetch-Site: same-origin' http://127.0.0.1:8080/api/auth/demo > /dev/null
-          curl -fsS -b /tmp/jar http://127.0.0.1:8080/api/games/the-question | grep -q '"status":"installed"'
+          curl -fsS -D /tmp/head -o /dev/null -X POST -H 'Sec-Fetch-Site: same-origin' http://127.0.0.1:8080/api/auth/demo
+          # Behind the host's HTTPS edge the session cookie must be Secure, which takes RENPLAY_PUBLIC_URL.
+          grep -qi '^set-cookie: renplay_session=.*; secure' /tmp/head
+          cookie=$(grep -i '^set-cookie: renplay_session=' /tmp/head | cut -d ' ' -f 2 | cut -d ';' -f 1)
+          curl -fsS -H "Cookie: $cookie" http://127.0.0.1:8080/api/games/the-question | grep -q '"status":"installed"'
           docker logs demo | tail -20
           docker rm -f demo
 

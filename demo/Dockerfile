@@ -33,7 +33,12 @@ USER 1000:1000
 COPY --from=seed --chown=1000:1000 /data /data
 COPY --from=seed --chown=1000:1000 /games /games
 COPY --chmod=755 start.sh /app/deploy/demo-start.sh
+# RENPLAY_PUBLIC_URL is how Renplay knows it is served over HTTPS: nginx passes its own scheme,
+# which is http behind the host's TLS edge. It makes the cookies Secure, lets a frame of another
+# site keep its session (Partitioned) and names the origin that requests may come from. A run on
+# plain HTTP, such as localhost, sets it empty: -e RENPLAY_PUBLIC_URL=
 ENV RENPLAY_DEMO=on \
+    RENPLAY_PUBLIC_URL=https://demo.renplay.org \
     RENPLAY_ADULT_GAMES=off \
     RENPLAY_BACKUP_DIR=off \
     RENPLAY_SAVE_HISTORY=3 \
