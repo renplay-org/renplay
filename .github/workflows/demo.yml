@@ -76,11 +76,22 @@ jobs:
           docker run -d --name demo -e PORT=10000 -p 8080:8080 --memory 512m "$IMAGE"
           for _ in $(seq 1 60); do curl -fs -o /dev/null http://127.0.0.1:8080/api/health && break; sleep 2; done
           curl -fsS http://127.0.0.1:8080/api/auth/providers | grep -q '"demo":true'
-          curl -fsS -D /tmp/head -o /dev/null -X POST -H 'Sec-Fetch-Site: same-origin' http://127.0.0.1:8080/api/auth/demo
-          # Behind the host's HTTPS edge the session cookie must be Secure, which takes RENPLAY_PUBLIC_URL.
-          grep -qi '^set-cookie: renplay_session=.*; secure' /tmp/head
-          cookie=$(grep -i '^set-cookie: renplay_session=' /tmp/head | cut -d ' ' -f 2 | cut -d ';' -f 1)
+          # Behind the host's HTTPS edge a frame's session cookie must be Secure and partitioned, which takes
+          # RENPLAY_PUBLIC_URL. A visitor key makes that form.
+          key=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')
+          curl -fsS -D /tmp/head -o /dev/null -X POST -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -d "{\"visitor\":\"$key\"}" http://127.0.0.1:8080/api/auth/demo
+          grep -qi '^set-cookie: renplay_session_framed=.*; secure' /tmp/head
+          grep -qi '^set-cookie: renplay_session_framed=.*; partitioned' /tmp/head
+          cookie=$(grep -i '^set-cookie: renplay_session_framed=' /tmp/head | cut -d ' ' -f 2 | cut -d ';' -f 1)
           curl -fsS -H "Cookie: $cookie" http://127.0.0.1:8080/api/games/the-question | grep -q '"status":"installed"'
+          # nginx checks a game's files with the session, and keeps its answer for a minute. Whoever has no session must
+          # not get a framed visitor's answer.
+          build=$(curl -fsS -H "Cookie: $cookie" http://127.0.0.1:8080/api/games/the-question | grep -o '"build":"[^"]*"' | cut -d '"' -f 4)
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: $cookie" "http://127.0.0.1:8080/g/the-question/$build/build.json")" = 200 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080/g/the-question/$build/build.json")" = 401 ]
+          # The same visitor directly, with no key, gets the plain Secure cookie.
+          curl -fsS -D /tmp/head2 -o /dev/null -X POST -H 'Sec-Fetch-Site: same-origin' http://127.0.0.1:8080/api/auth/demo
+          grep -qi '^set-cookie: renplay_session=.*; secure' /tmp/head2
           docker logs demo | tail -20
           docker rm -f demo
 
