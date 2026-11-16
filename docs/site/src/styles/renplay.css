@@ -46,8 +46,11 @@ body { -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 4px; }
 .header { backdrop-filter: blur(24px) saturate(140%); }
 .docs-header { display: flex; align-items: center; gap: 2rem; height: 100%; }
-.docs-brand { display: flex; align-items: center; gap: .65rem; text-decoration: none; color: var(--sl-color-white); font-size: 1.1rem; font-weight: 700; letter-spacing: -.035em; white-space: nowrap; }
+.docs-brand { display: flex; align-items: center; gap: .65rem; text-decoration: none; color: var(--sl-color-white); font-size: 1.1rem; white-space: nowrap; }
 .docs-brand img { border-radius: 10px; box-shadow: 0 8px 26px -8px rgb(244 80 138 / .5); }
+/* The drawn wordmark, in the shade the theme asks for. 22 px is the height at which its capitals match a 17 px Inter's. */
+.docs-brand .wordmark { width: auto; height: 22px; border-radius: 0; box-shadow: none; }
+:root[data-theme='dark'] .wordmark-light, :root[data-theme='light'] .wordmark-dark { display: none; }
 .docs-label { border-left: 1px solid var(--sl-color-hairline); padding-left: .7rem; margin-left: .15rem; color: var(--sl-color-gray-2); font-size: .95rem; font-weight: 450; letter-spacing: 0; }
 .docs-search { flex: 1; max-width: 26rem; }
 .docs-links { display: flex; align-items: center; gap: 1.5rem; margin-left: auto; font-size: .85rem; }

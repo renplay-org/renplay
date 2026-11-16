@@ -39,7 +39,7 @@ function ContentChoice() {
       </p>
       <div className="starters" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         {options.map((option) => (
-          <button key={option.mode} disabled={!!busy} onClick={() => void choose(option.mode)} className="panel" style={{ textAlign: 'left', minHeight: 44 }}>
+          <button key={option.mode} disabled={!!busy} onClick={() => void choose(option.mode)} className="plate" style={{ textAlign: 'left', minHeight: 44 }}>
             <h2 className="h3">{option.title}</h2>
             <p className="small muted" style={{ marginTop: 8 }}>{busy === option.mode ? 'Saving' : option.hint}</p>
           </button>
@@ -74,7 +74,7 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
         Let us fix that. Start with a story, or add a game you already have.
       </p>
       {starter && (
-        <div className="panel" style={{ marginTop: 26, display: 'flex', gap: 18, textAlign: 'left', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="plate" style={{ marginTop: 26, display: 'flex', gap: 18, textAlign: 'left', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ width: 110, flex: 'none' }}>
             <Frame game={starter} kind="grid" />
           </div>
@@ -100,13 +100,13 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
         </div>
       )}
       <div className="starters">
-        <Link to="/add" className="panel" style={{ textAlign: 'left' }}>
+        <Link to="/add" className="plate" style={{ textAlign: 'left' }}>
           <h2 className="h3">Upload a game you have</h2>
           <p className="small muted" style={{ marginTop: 8 }}>
             Pick its normal PC download. Renplay prepares it for your browser.
           </p>
         </Link>
-        <div className="panel" style={{ textAlign: 'left' }}>
+        <div className="plate" style={{ textAlign: 'left' }}>
           <h2 className="h3">Copy it to the server</h2>
           <p className="small muted" style={{ marginTop: 8 }}>
             Put downloads in the archives folder, then open Add games.

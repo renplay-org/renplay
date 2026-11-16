@@ -49,19 +49,20 @@
   flex: none;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: var(--r-1);
+  border-bottom: 2px solid transparent;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--fg-3);
   position: relative;
 }
 .gw-tabs button::before {
   content: "";
   position: absolute;
-  inset: -4px 0;
+  /* The underline is a border, so the box this is measured from is 2 px shorter: 5 px each way keeps the 44. */
+  inset: -5px 0;
 }
 .gw-tabs button.on {
-  background: var(--plate-2);
+  border-bottom-color: var(--lamp);
   color: var(--fg);
 }
 .gw-grip {

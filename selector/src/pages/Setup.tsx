@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { Pill } from '../lantern/controls'
+import { Logo } from '../lantern/Logo'
 import { errorText } from '../lantern/ui'
 import { post } from '../lib/api'
 import { useProviders } from '../lib/auth'
@@ -13,8 +14,7 @@ export default function Setup() {
   return (
     <AuthLayout wide>
       <div className="logo" style={{ justifyContent: 'center', marginBottom: 18 }}>
-        <img src="/favicon.svg" alt="" />
-        Renplay
+        <Logo />
       </div>
       <div className="steps" style={{ justifyContent: 'center', marginBottom: 18 }}>
         <b>1 Claim the server</b>
@@ -29,7 +29,7 @@ export default function Setup() {
       <p className="lead center" style={{ margin: '8px auto 0' }}>
         {grant ? 'This account owns every save made before sign-in was turned on.' : 'Renplay printed a one-time setup code when it started. Paste it here.'}
       </p>
-      <div className="panel" style={{ marginTop: 20 }}>
+      <div className="plate" style={{ marginTop: 20 }}>
         <form
           className="stack"
           onSubmit={async (event) => {

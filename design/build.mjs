@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Writes the icons from logo/mark.svg, so no icon is ever edited by hand. sharp comes from the server's packages.
+// Writes the icons from logo/mark.svg and copies the wordmark beside them, so no icon is ever edited by hand. sharp comes from the server's packages.
 //
 //   node design/build.mjs [folder]    (folder: where the repository's public folders are written, the repository by default)
 //
@@ -35,8 +35,8 @@ const ico = async (sizes) => {
 }
 
 const targets = {
-  'selector/public': ['favicon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
-  'docs/site/public': ['favicon.svg', 'favicon.ico', 'favicon-48.png', 'apple-touch-icon.png'],
+  'selector/public': ['favicon.svg', 'wordmark.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
+  'docs/site/public': ['favicon.svg', 'wordmark.svg', 'wordmark-on-paper.svg', 'favicon.ico', 'favicon-48.png', 'apple-touch-icon.png'],
   website: ['favicon.ico', 'favicon-48.png', 'apple-touch-icon.png', 'logo.png'],
   docs: ['logo-1024.png'],
 }
@@ -47,6 +47,7 @@ for (const [folder, names] of Object.entries(targets)) {
   for (const name of names) {
     const file = join(out, folder, name)
     if (name === 'favicon.svg') copyFileSync(join(here, 'logo/mark.svg'), file)
+    else if (name.startsWith('wordmark')) copyFileSync(join(here, 'logo', name), file)
     else if (name === 'favicon.ico') writeFileSync(file, await ico([16, 32, 48]))
     else writeFileSync(file, await png(sizes[name]))
     console.log(`${folder}/${name}`)

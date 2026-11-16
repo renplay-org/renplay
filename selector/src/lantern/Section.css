@@ -1,0 +1,33 @@
+/* Surfaces. A plate sits on the room, and is for what you press or drop on: a card with its own edges. Glass is only for
+   things that float over art. A section is the website's way, as in its facts: a hairline across the top, no fill, and
+   its title in the book face. */
+.plate {
+  background: var(--plate);
+  border-radius: var(--r-3);
+  padding: var(--s4);
+}
+@media (min-width: 720px) {
+  .plate {
+    padding: var(--s5);
+  }
+}
+.plate.flat {
+  background: rgba(255, 255, 255, 0.03);
+}
+.panel {
+  padding: var(--s5) 0 var(--s3);
+  border-top: 1px solid var(--hair);
+}
+@media (min-width: 720px) {
+  .panel {
+    padding-top: var(--s6);
+  }
+}
+.panel h2.h3 {
+  font-family: var(--serif);
+  font-variation-settings: "opsz" 36;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}

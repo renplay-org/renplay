@@ -1,7 +1,7 @@
 # Lamplight
 
 Renplay's design language, on one page. The tokens are in `tokens.css`, the fonts in `fonts.css` and `fonts/`, the mark
-in `logo/`, and `grain.webp` is the soft-light tile for paper. The app, the demo, the docs and the website take all of
+and the wordmark (the name, drawn in soft Fraunces, on ink and on paper) in `logo/`, and `grain.webp` is the soft-light tile for paper. The app, the demo, the docs and the website take all of
 these from here and nowhere else.
 
 | Consumer | How it takes them |
@@ -28,6 +28,9 @@ changes, not the website.
   that is a name does not. Labels are sentence case, never uppercase.
 - **One lit control per screen.** The thing to do next is paper (`--paper`, `--on-paper`), flat, no shadow. Everything
   else is a hairline (`--hair`) or quiet text.
+- **Words, not strips.** A tab, a choice and a filter are plain text, and the one chosen is lit white with a `--lamp`
+  underline. A tag is a small mono fact, separated from the next by a slash. A section is a hairline across its top
+  with its title in Fraunces, never a filled rounded card. A plate (`.plate`) is for a card you press or drop on.
 - **The brand gradient has three homes.** The logo, the avatar without a picture, and the room's glow. Never on a
   control, never behind text.
 - **Three corners, the website's.** `--r-1` (4 px) for a control and a tile, `--r-2` (6) for a row, `--r-3` (10) for a
@@ -58,4 +61,4 @@ and the story voice speaks to the reader in the second person only where there i
 
 A new token goes in `tokens.css` with its job in a comment. A new face does not happen. A new colour needs a job no
 token does, which has not happened since the website. The icons are written from `logo/mark.svg` by
-`node design/build.mjs`, never edited by hand. Give it a folder to try it out without touching the repository's own icons.
+`node design/build.mjs`, which also copies the wordmark beside them. Never edit them by hand. Give it a folder to try it out without touching the repository's own icons.
