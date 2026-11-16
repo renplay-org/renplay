@@ -20,7 +20,15 @@ export { expect }
 export async function freeze(page) {
   const time = new Date('2026-11-11T12:00:00Z')
   await page.clock.install({ time })
-  await page.clock.pauseAt(time)
+  // The clock runs from the moment it is installed until it is paused, so a time that is asked for in the very next call may be past
+  // by then on a busy machine: ask for one a little ahead, and for a later one if that has passed too.
+  for (let ahead = 100; ; ahead *= 4) {
+    try {
+      return await page.clock.pauseAt(new Date(time.getTime() + ahead))
+    } catch (error) {
+      if (!/past/.test(error.message) || ahead > 10000) throw error
+    }
+  }
 }
 
 export async function open(page, path = '/') {
