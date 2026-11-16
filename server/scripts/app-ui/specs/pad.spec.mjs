@@ -195,21 +195,24 @@ test.describe('the bumpers', () => {
     desktopOnly(testInfo)
     await library(page)
     const path = () => page.evaluate(() => location.pathname)
-    for (const next of ['/catalog', '/add', '/activity', '/account', '/']) {
-      await tap(page, 'rb', 60)
+    // The address changes at once, but the page before stays up until the next one's code has come, and a bumper goes on from the page
+    // that is drawn (its listener is bound a frame after that). The next press waits for the new page to be there.
+    const bump = async (button, next) => {
+      const before = await page.evaluateHandle(() => document.querySelector('main').firstElementChild)
+      await tap(page, button, 60)
       await expect.poll(path).toBe(next)
+      await expect.poll(() => page.evaluate((el) => document.querySelector('main').firstElementChild !== el, before), { message: `The page for ${next} is drawn` }).toBe(true)
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
     }
-    await tap(page, 'lb', 60)
-    await expect.poll(path).toBe('/account')
+    for (const next of ['/catalog', '/add', '/activity', '/account', '/']) await bump('rb', next)
+    await bump('lb', '/account')
     // A page of one's own: the game page belongs to the Library, and the history to You.
     await page.goto('/game/game-000')
     await expect(page.locator('.stage')).toBeVisible()
-    await tap(page, 'rb', 60)
-    await expect.poll(path).toBe('/catalog')
+    await bump('rb', '/catalog')
     await page.goto('/history')
     await expect(page.locator('main')).toContainText(/\w/)
-    await tap(page, 'lb', 60)
-    await expect.poll(path).toBe('/activity')
+    await bump('lb', '/activity')
   })
 })
 
