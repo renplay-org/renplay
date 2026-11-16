@@ -28,7 +28,7 @@ export default defineConfig({
   // WebKit goes first: it draws in software and takes twice as long to do the same, so its tests get twice the time, and the
   // Chromium tests that wait more than they work fill the cores it leaves when it is done.
   projects: [
-    { name: 'webkit-portrait', workers: 3, timeout: 40000, testIgnore: /static-demo\.spec|specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+    { name: 'webkit-portrait', workers: 3, timeout: 40000, testIgnore: /specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
     { name: 'webkit-landscape', workers: 3, timeout: 40000, testIgnore: /static-demo\.spec|specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
     // The static demo's service worker has its own WebKit fixes: it is also checked at desktop size.
     { name: 'webkit-desktop', workers: 3, timeout: 40000, testMatch: /static-demo\.spec/, use: { browserName: 'webkit', viewport: { width: 1440, height: 900 } } },
