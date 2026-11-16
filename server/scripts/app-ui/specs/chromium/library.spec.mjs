@@ -1,7 +1,7 @@
 // The app's lists and pages, in a browser, against the built library and a made-up API (no server, no games: every /api answer
 // comes from app-mock.mjs):
-//   - whole rows: at every width from 360 to 1920 (step 40), the Library's and the Catalog's grids hold a whole number of
-//     rows after every batch, until the list ends
+//   - whole rows: at every column count (3, 4, 5, 6 and 8) and on both sides of each change, the Library's and the Catalog's
+//     grids hold a whole number of rows after every batch, until the list ends
 //   - scroll memory: scroll far, open a game, go back: the same place and the same tiles. The Catalog's search is in the
 //     address, and an open game is a history entry that back closes
 //   - layout shift under 0.02 on the Library, the Catalog and a game page (Chromium only: WebKit does not report it)
@@ -14,14 +14,20 @@ import { gridOf, growBy, onGamePage, parked, quiet, scrollToEnd, settledGrid } f
 
 test.use({ mockOptions: {} })
 
-const WIDTHS = Array.from({ length: 29 }, (_, i) => 360 + i * 40)
+// The grid's columns are the layout's (--cols, which the grid's tracks and the batch both come from): 3 below 720 px, 4 from 720,
+// 5 from 1000, 6 from 1280 and 8 from 1680. A width in each, and both sides of every change.
+const WIDTHS = [360, 540, 719, 720, 860, 999, 1000, 1140, 1279, 1280, 1480, 1679, 1680, 1920]
 
-// Eight lanes of widths, each its own test, so that they run side by side.
-for (const lane of [0, 1, 2, 3, 4, 5, 6, 7]) {
-  test(`grids hold whole rows at 360 to 1920 px, every batch (widths ${lane + 1} of 8)`, async ({ page }, testInfo) => {
+// Four lanes of widths, each its own test, so that they run side by side.
+for (const lane of [0, 1, 2, 3]) {
+  test(`grids hold whole rows at every column count and on both sides of each change, every batch (widths ${lane + 1} of 4)`, async ({ page }, testInfo) => {
     only(testInfo, 'chromium-desktop', 'The widths are set here, whatever the project')
+    // A lane loads each of its widths twice, and a busy machine takes its time over every load.
+    test.slow()
+    // The rows are the grid's, not the pictures': none is asked for.
+    await page.route('**/api/art/**', (route) => route.abort())
     const bad = []
-    for (const width of WIDTHS.filter((_, i) => i % 8 === lane)) {
+    for (const width of WIDTHS.filter((_, i) => i % 4 === lane)) {
       await page.setViewportSize({ width, height: 800 })
       for (const [path, total] of [['/', GAMES], ['/catalog', RECIPES]]) {
         await page.goto(path)
