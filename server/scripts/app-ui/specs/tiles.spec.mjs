@@ -229,7 +229,9 @@ test('Tiles: a press leans the tile toward the finger and back, and scrolling mo
   const leaning = await tilt.evaluate((el) => el.style.transform)
   expect(leaning, 'It leans toward a finger at its lower right').toMatch(/rotateY\([0-9.]+deg\) rotateX\(-[0-9.]+deg\)/)
   await arrived(tile)
-  await expect.poll(async () => { const lit = await look(tile); return lit.pressed && lit.sheen === '1' }, { message: 'It is lit while pressed' }).toBe(true)
+  // The sheen eases in: its end state, read until it is there (a transition that a slow machine has not drawn a frame of looks as still as one that is done).
+  await expect.poll(async () => (await look(tile)).sheen, { message: 'It is lit while pressed' }).toBe('1')
+  expect((await look(tile)).pressed, 'It is marked as pressed while the finger is on it').toBe(true)
   await send('pointerup')
   await expect.poll(async () => (await look(tile)).tilted || (await look(tile)).pressed, { message: 'It leans back when the finger lifts' }).toBe(false)
   // Scrolling moves no tile.
