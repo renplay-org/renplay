@@ -117,7 +117,7 @@ async function choose(page, tag) {
 for (const [name, path, field] of SEARCH_PAGES) {
   test(`${name}: the tag chips, their counts and order, and All tags`, async ({ page }, testInfo) => {
     const touch = !!testInfo.project.use.hasTouch
-    const chips = () => page.evaluate(() => [...document.querySelectorAll('.chip-bar .chips.wrap .chip')].filter((c) => !c.textContent.includes('Clear filters')).map((c) => ({ label: c.childNodes[0].textContent.trim(), n: Number(c.querySelector('.n')?.textContent), dim: c.classList.contains('dim'), on: c.getAttribute('aria-pressed') === 'true', width: c.getBoundingClientRect().width })))
+    const chips = () => page.evaluate(() => [...document.querySelectorAll('.chip-bar .chips.wrap .chip')].filter((c) => !c.textContent.includes('Clear filters')).map((c) => ({ label: c.querySelector('.u').childNodes[0].textContent.trim(), n: Number(c.querySelector('.n')?.textContent), dim: c.classList.contains('dim'), on: c.getAttribute('aria-pressed') === 'true', width: c.getBoundingClientRect().width })))
     const order = (list) => list.map((c) => c.label).join(', ')
     await ready(page, path)
     const before = await chips()
