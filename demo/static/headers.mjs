@@ -11,11 +11,13 @@ function checkEmbedder(value) {
 /**
  * - Frames: the demo is framed by itself and by the website's origin only, the policy the server demo sends
  *   (shared/demo-embed.ts).
+ * - Search engines: every answer says noindex (the demo is for trying, not for results), and robots.txt lets crawlers in
+ *   to read it (seo.mjs).
  * - Caching: index.html and the worker are checked each time, files named by their content are kept for good.
  */
 export function headersFor(embedder) {
   const rules = {
-    '/*': { 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': `frame-ancestors 'self' ${checkEmbedder(embedder)}` },
+    '/*': { 'X-Content-Type-Options': 'nosniff', 'X-Robots-Tag': 'noindex', 'Content-Security-Policy': `frame-ancestors 'self' ${checkEmbedder(embedder)}` },
     '/index.html': { 'Cache-Control': 'no-cache' },
     '/sw.js': { 'Cache-Control': 'no-cache' },
     '/demo/*': { 'Cache-Control': 'no-cache' },

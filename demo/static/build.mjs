@@ -11,6 +11,7 @@ import { readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { headersFor } from './headers.mjs'
+import { ROBOTS_TXT, demoHead } from './seo.mjs'
 import { writeSnapshot } from './snapshot.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -91,12 +92,13 @@ async function build({ out, seed, base, embedder }) {
   // 3. What the demo shows: the answers, the pictures and the games.
   const games = await writeSnapshot({ out, base, seed, embedder })
 
-  // 4. The page that waits for the worker, and the headers.
+  // 4. The page that waits for the worker, what search engines read, and the headers.
   const indexPath = join(out, 'index.html')
   const index = readFileSync(indexPath, 'utf8')
   const entry = index.match(/<script type="module"[^>]*src="([^"]+)"[^>]*><\/script>/)
   if (!entry) throw new Error('The built index.html has no module script')
-  writeFileSync(indexPath, index.replace(entry[0], loader(entry[1], version)))
+  writeFileSync(indexPath, demoHead(index.replace(entry[0], loader(entry[1], version))))
+writeFileSync(join(out, 'robots.txt'), ROBOTS_TXT)
   writeFileSync(join(out, '_headers'), headers)
 
   // 5. It must fit the host.

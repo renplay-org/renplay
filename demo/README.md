@@ -101,7 +101,11 @@ frame are both controlled by it, so the game's save requests reach it too, and t
    (see `Dockerfile`). Every seed run installs with a new build name, so the export must be the build the demo image holds: the
    same image and context make Docker reuse that build.
 4. `headers.mjs` writes `_headers`: `frame-ancestors` for the demo itself and the embedder only (the policy of the
-   server demo), `index.html`, `sw.js` and `/demo/*` checked each time, hashed assets and art kept for good.
+   server demo), `X-Robots-Tag: noindex` on every answer, `index.html`, `sw.js` and `/demo/*` checked each time,
+   hashed assets and art kept for good. `seo.mjs` gives `index.html` the title "Renplay demo", a description and a
+   robots meta with noindex, and writes a `robots.txt` that lets crawlers in. They are let in on purpose: a page that
+   robots.txt blocks is never fetched, so its noindex is never read, and the address can still be listed. The server
+   demo's image (`Dockerfile`) does the same.
 5. Checks the output against Cloudflare's static asset limits (20,000 files, 25 MiB a file) and fails if it does not fit.
 
 `--embedder` is the one origin the embed bridge talks to and ignores messages from anything else. It is set at build
