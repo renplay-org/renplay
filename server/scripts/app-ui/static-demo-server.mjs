@@ -25,9 +25,15 @@ const matches = (pattern, path) => (pattern.endsWith('*') ? path.startsWith(patt
 export async function serveStatic(dir, port = 0) {
   const rules = readRules(dir)
   const requests = []
+  /** Paths whose answer is held back, in milliseconds: a slow download. */
+  const delays = new Map()
   const server = createServer((req, res) => {
     const path = decodeURIComponent(new URL(req.url, 'http://x').pathname)
     requests.push(path)
+    if (delays.has(path)) setTimeout(() => respond(req, res, path), delays.get(path))
+    else respond(req, res, path)
+  })
+  const respond = (req, res, path) => {
     let file = join(dir, normalize(path).replace(/^(\.\.[/\\])+/, ''))
     if (path.endsWith('/')) file = join(file, 'index.html')
     let servedPath = path
@@ -50,9 +56,9 @@ export async function serveStatic(dir, port = 0) {
     res.writeHead(200, { ...headers, 'content-length': size })
     if (req.method === 'HEAD') return void res.end()
     createReadStream(file).pipe(res)
-  })
+  }
   await new Promise((done) => server.listen(port, '127.0.0.1', done))
-  return { port: server.address().port, requests, close: () => new Promise((done) => server.close(done)) }
+  return { port: server.address().port, requests, delays, close: () => new Promise((done) => server.close(done)) }
 }
 
 // node static-demo-server.mjs <dir> [port]: the same server by hand, at http://localhost:<port> (a secure context).

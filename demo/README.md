@@ -69,15 +69,21 @@ frame are both controlled by it, so the game's save requests reach it too, and t
 - `answer.ts` answers `/api/`: the session, the guest, games, the catalog (read only), saves with history, names and
   pins, progress, play time. What it reads of the server's answers is a snapshot made at build time
   (`/demo/snapshot.json`). Its saves and progress live in a store (`idb.ts` in the browser, `memory-store.ts` in tests).
-- A save's metadata and picture are read in the browser (`zip.ts`). The limits are the server demo's: 2 MB a file,
-  32 MB in all, 1,000 files and 3 earlier versions of each.
+- A save's metadata and picture are read in the browser (`zip.ts`), within the server's limits for a save file
+  (`server/src/util/zip.ts`): 2,048 entries, 64 MiB an entry and in all. The whole directory is checked first, and the bytes
+  that come out are counted and stopped at what it declared. The limits of the guest's saves are the server demo's: 2 MB a
+  file, and 32 MB and 1,000 files in all, with the earlier versions counted too (a pinned save keeps every version, so
+  the total is its end), and 3 earlier versions of each unpinned save. Changes to the saves wait for one another.
+- A change from another site is refused (`origin.ts`): a form on another site can send a navigation to `/api/` that
+  this worker answers.
 - Every other route is refused the way the server demo refuses it. What the server demo refuses is one list,
   `server/src/shared/demo-refusals.ts`, which `accounts/access.ts` and the stand-in both read.
 - A change tells every open page, through `postMessage`, and the page's loader turns it into
   `renplay:saves-changed`, which the embed bridge already hears. The website's messages (`ready`, `engaged`,
   `saved`, `nudge`, `refresh`) are the same as the server demo's.
-- The built `index.html` has a small loader that registers the worker and waits for it to control the page, since the
-  first request is `/api/me`. WebKit sometimes leaves a page uncontrolled: the loader reloads up to 3 times. WebKit's
+- The built `index.html` has a small loader that registers the worker and starts the library when the stand-in of the
+  same build says it is ready, since the first request is `/api/me`. A worker that controls the page is not enough: a
+  visitor who has been to the server demo still has its worker, at the same `/sw.js`, until the new one takes over. WebKit sometimes leaves a page uncontrolled: the loader reloads up to 3 times. WebKit's
   `Blob.stream()` fails in a service worker, so `zip.ts` makes its own stream.
 - The game's page, `game.zip`, the runtime and the streamed files of a build are plain files in `g/<id>/<build>/`. The
   engine is not copied: the page points at the engines host.

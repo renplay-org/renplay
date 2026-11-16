@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { renpySave, staticDemo } from '../static-demo-fixture.mjs'
 
@@ -185,5 +186,35 @@ test('a form on another site cannot change the visitor\'s progress', async ({ co
     expect((await progress())[0]).not.toBeNull()
   } finally {
     await new Promise((done) => other.close(done))
+  }
+})
+
+test('a returning visitor whose browser still has the server demo\'s worker is answered by the stand-in from the first request', async ({ browser }) => {
+  test.setTimeout(real ? 240000 : 60000)
+  const file = `${demo.dir}/sw.js`
+  const standIn = readFileSync(file)
+  const context = await browser.newContext({ serviceWorkers: 'allow' })
+  const page = await context.newPage()
+  const errors = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  try {
+    // An earlier visit, when this address was the demo with a server: the library's own worker controls the page.
+    writeFileSync(file, readFileSync(new URL('../../../../selector/public/sw.js', import.meta.url)))
+    await page.goto(`${demo.origin}/demo/snapshot.json`)
+    await page.evaluate(() => navigator.serviceWorker.register('/sw.js', { scope: '/' }))
+    await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? ''), { timeout: 15000 }).toContain('/sw.js')
+    // The address is the static demo now, and its worker is slow to arrive.
+    writeFileSync(file, standIn)
+    demo.delays.set('/sw.js', 2500)
+    demo.requests.length = 0
+    await page.goto(demo.origin)
+    await expect(page.locator('.card[data-id="the-question"]')).toBeVisible({ timeout: 30000 })
+    // Every answer came from the stand-in: the old worker would have asked the host, which has no such file.
+    expect(demo.requests.filter((path) => path.startsWith('/api/'))).toEqual([])
+    expect(errors).toEqual([])
+  } finally {
+    demo.delays.clear()
+    writeFileSync(file, standIn)
+    await context.close()
   }
 })

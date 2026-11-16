@@ -12,6 +12,8 @@ import { fromElsewhere } from './origin'
 import type { Snapshot } from './types'
 
 declare const self: ServiceWorkerGlobalScope
+/** Names the build this worker is of. The build writes the same into the page that starts the library (build.mjs). */
+declare const __STAND_IN_VERSION__: string
 
 let snapshot: Promise<Snapshot> | null = null
 const answer = createAnswer({
@@ -24,6 +26,11 @@ const answer = createAnswer({
 
 self.addEventListener('install', () => void self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+// The page asks which worker controls it before it starts the library. This is the only message the worker takes, and it
+// only says what it is.
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'renplay-demo:hello') event.source?.postMessage({ type: 'renplay-demo:ready', version: __STAND_IN_VERSION__ })
+})
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
   if (url.origin !== location.origin || !url.pathname.startsWith('/api/')) return
