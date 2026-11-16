@@ -36,12 +36,10 @@ test.describe('one press is one move', () => {
     await library(page)
     await tap(page, 'down', 60)
     expect((await moves(page)).length, 'a 60 ms tap').toBe(1)
-    await page.evaluate(() => { window.__hold('down', true); window.__stick(0, 0.9) })
-    await page.waitForTimeout(120)
-    await page.evaluate(() => { window.__hold('down', false) })
-    await page.waitForTimeout(120)
-    await page.evaluate(() => { window.__stick(0, 0) })
-    await page.waitForTimeout(100)
+    // Each change is waited for in frames, not in time: a slow machine that draws a frame late is not a longer hold, which repeats.
+    await page.evaluate(async () => { window.__hold('down', true); window.__stick(0, 0.9); await window.__seen() })
+    await page.evaluate(async () => { window.__hold('down', false); await window.__seen() })
+    await page.evaluate(async () => { window.__stick(0, 0); await window.__seen() })
     expect((await moves(page)).length, 'the d-pad and the stick together are one press').toBe(2)
   })
 
@@ -70,6 +68,8 @@ const place = (page) => page.evaluate(() => {
 test.describe('reaching every game', () => {
   test('the d-pad goes down through All games to the last tile, each one whole and clear of the toolbar, and A opens it', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
+    // A press for each of dozens of tiles, each seen by the page: a busy machine takes its time.
+    test.slow()
     await library(page)
     const seen = []
     let last = null
@@ -94,6 +94,8 @@ test.describe('reaching every game', () => {
 
   test('right and left across the rows keep each tile whole and clear of the header, the stuck toolbar and the bottom', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
+    // A press for each of dozens of tiles, each seen by the page: a busy machine takes its time.
+    test.slow()
     await library(page)
     for (const button of ['right', 'left']) {
       for (let i = 0; i < (button === 'right' ? 40 : 30); i++) {

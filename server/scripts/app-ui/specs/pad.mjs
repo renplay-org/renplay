@@ -11,6 +11,15 @@ export const padScript = () => {
   window.__hold = (name, on) => { buttons[names[name]].pressed = on }
   /** `__stick(x, y, rx, ry)` puts the sticks where they are: -1 to 1, up and left negative. */
   window.__stick = (x = 0, y = 0, rx = 0, ry = 0) => { pad.axes[0] = x; pad.axes[1] = y; pad.axes[2] = rx; pad.axes[3] = ry }
+  /**
+   * The page reads the controller once a frame, in two reads in a row. A change has been seen once two frames have been drawn and
+   * two reads have come after it: a press that lets go before that is no press. `__seen()` waits for it.
+   */
+  window.__seen = () => {
+    const frames = new Promise((ok) => { let n = 2; const step = () => (n-- > 0 ? requestAnimationFrame(step) : ok()); step() })
+    const reads = new Promise((ok) => { const from = window.__polls; const look = () => (window.__polls >= from + 2 ? ok() : requestAnimationFrame(look)); look() })
+    return Promise.all([frames, reads])
+  }
   window.dispatchEvent(new Event('gamepadconnected'))
 }
 
@@ -18,34 +27,35 @@ export const padScript = () => {
 export const withPad = (page) => page.addInitScript(padScript)
 
 /**
- * Presses a button for `ms` and until the page has read the controller with it pressed, then lets go and waits for the page to
- * have read it let go. The page reads it once a frame, so a press that lets go before a frame has seen it is no press, and a slow
- * machine that draws a frame late must still be seen to have pressed. A press is no longer than a frame, though, however slow
- * the frame: a longer one would be a hold, which repeats.
+ * Presses a button for `ms` and until the page has read the controller with it pressed, then lets go and waits for the page to have
+ * read it let go. A slow machine that draws a frame late must still be seen to have pressed, but a press is no longer than a frame,
+ * however slow the frame: a longer one would be a hold, which repeats.
  */
-export const tap = (page, name, ms = 100) => page.evaluate(([n, t]) => new Promise((done) => {
-  // A frame reads the controller twice in a row, so two reads after a change include one that saw it.
-  const read = () => new Promise((ok) => { const from = window.__polls; const look = () => (window.__polls >= from + 2 ? ok() : requestAnimationFrame(look)); look() })
+export const tap = (page, name, ms = 100) => page.evaluate(async ([n, t]) => {
   window.__hold(n, true)
-  Promise.all([new Promise((ok) => setTimeout(ok, t)), read()]).then(() => {
-    window.__hold(n, false)
-    read().then(done)
-  })
-}), [name, ms])
+  await Promise.all([new Promise((ok) => setTimeout(ok, t)), window.__seen()])
+  window.__hold(n, false)
+  await window.__seen()
+}, [name, ms])
 
 /**
- * Puts the stick through these positions, one every 16 ms (a frame at 60 Hz), then lets it go. By the clock, not by
- * the page's frames: a slow machine draws fewer frames, and the stick must still be held as long as the test says.
+ * Puts the stick through these positions, one every 16 ms (a frame at 60 Hz), then lets it go. By the clock, not by the page's
+ * frames or its timers: a machine that is slow to run a timer skips the positions it has no time for, and the stick is held as long as
+ * the test says (a hold longer than that is a hold, which repeats).
  */
-export const feed = (page, frames) => page.evaluate((list) => new Promise((done) => {
-  let i = 0
-  const step = () => {
-    if (i >= list.length) { window.__stick(0, 0, 0, 0); return setTimeout(done, 100) }
-    window.__stick(...list[i++])
-    setTimeout(step, 16)
-  }
-  step()
-}), frames)
+export const feed = (page, frames) => page.evaluate(async (list) => {
+  await new Promise((done) => {
+    const from = performance.now()
+    const step = () => {
+      const i = Math.floor((performance.now() - from) / 16)
+      if (i >= list.length) { window.__stick(0, 0, 0, 0); return done() }
+      window.__stick(...list[i])
+      setTimeout(step, 16)
+    }
+    step()
+  })
+  await window.__seen()
+}, frames)
 
 /** Counts every focus change from here on: `moves` says how many and to what. */
 export const watchFocus = (page) => page.evaluate(() => {
