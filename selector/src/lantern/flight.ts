@@ -67,6 +67,15 @@ function note(): void {
   leaving = { id, src: img?.currentSrc || img?.src || null, rect, short: swiped || (browserEngine() === 'webkit' && !ownBack) }
 }
 
+/**
+ * A pointer left over the tile the picture landed on does not lift it until the pointer moves: the lift would
+ * pop in under a hand that did nothing, and the picture landed on the tile at rest.
+ */
+function stayAtRest(card: HTMLElement): void {
+  card.dataset['still'] = ''
+  window.addEventListener('pointermove', () => delete card.dataset['still'], { once: true, capture: true })
+}
+
 function land(l: Leaving): void {
   // The cover of the carousel's slide first (the Library's top), then the game's tiles.
   const places = [...document.querySelectorAll<HTMLElement>('main .carousel .slide:not(.copy) .stage[data-id], main .card[data-id]')].filter((t) => t.dataset['id'] === l.id)
@@ -83,7 +92,10 @@ function land(l: Leaving): void {
       rect,
       () => {
         frame.style.visibility = ''
-        if (card) delete card.dataset['rest']
+        if (card) {
+          delete card.dataset['rest']
+          stayAtRest(card)
+        }
       },
       l.short ? SHORT_MS : 480,
     )

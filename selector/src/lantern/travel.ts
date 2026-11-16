@@ -49,10 +49,9 @@ export function travelSource(art: ArtSet | undefined, hidden: boolean): string |
   return (!hidden && grid?.url1x) || hashUrl(grid?.thumbhash)
 }
 
-/** A tile's corner in pixels: --r-2 on a phone, --r-3 from 720 px (index.css). */
+/** A tile's corner in pixels: --r-1 (design/tokens.css). */
 function tileRadius(): number {
-  const token = matchMedia('(min-width: 720px)').matches ? '--r-3' : '--r-2'
-  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token)) || 8
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--r-1')) || 4
 }
 
 /** The longest the ghost waits at its end for what lands under it to be ready. */

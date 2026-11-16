@@ -273,7 +273,7 @@ code {
 .logo img {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--r-2);
 }
 .nav {
   display: none;
@@ -1347,14 +1347,11 @@ select.input option {
 .stage .tb .logo-t.inv {
   filter: invert(1) drop-shadow(0 6px 18px rgba(0, 0, 0, 0.5));
 }
+/* Running text, with each dot tied to the word before it, so a line that wraps ends with its dot and never starts with one. */
 .stage .tb .meta {
   font-size: 13px;
   color: var(--fg-2);
   margin-top: 6px;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
 }
 .stage .tb .meta .sep {
   color: var(--fg-4);
@@ -1374,10 +1371,8 @@ select.input option {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.stage .more .tags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+/* The game's tags, under the actions as the summary is under them. */
+.stage .more > .row.wrap {
   margin-top: 12px;
 }
 @media (min-width: 720px) {
@@ -1788,7 +1783,7 @@ select.input option {
   bottom: 0;
   background: var(--glass-sheet);
   backdrop-filter: blur(30px) saturate(140%);
-  border-radius: var(--r-4) var(--r-4) 0 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;
   padding: 10px 20px calc(22px + var(--sab));
   max-height: calc(100dvh - 24px - var(--sat));
   overflow: auto;
@@ -1851,7 +1846,7 @@ select.input option {
     width: min(540px, 100vw - 32px);
     max-height: calc(100dvh - 32px);
     transform: translate(-50%, -50%);
-    border-radius: var(--r-4);
+    border-radius: var(--r-3);
     padding: 24px 26px;
     animation: pop var(--t-pane) var(--out) both;
   }
@@ -2518,12 +2513,13 @@ input[type="range"] {
   flex: 1;
   min-width: 0;
 }
-.chip-bar > .chips + .chips {
+.chip-bar > .chips + .chips,
+.chip-bar > .chips:only-child {
   flex: none;
 }
 /* On a phone these rows scroll sideways: their right edge fades, so a cut word reads as more to come. */
 @media (max-width: 719px) {
-  .chip-bar > .chips:first-child,
+  .chip-bar > .chips:first-child:not(:only-child),
   .toolbar:not(.wrap) {
     mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
   }

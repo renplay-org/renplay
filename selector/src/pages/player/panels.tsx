@@ -7,7 +7,7 @@ export function SidePanel({ title, onClose, children, top, narrow }: { title: st
   return (
     <div className="absolute inset-0 z-40" style={{ top }}>
       <div className="absolute inset-0 bg-[rgba(0,0,0,0.3)]" onClick={onClose} />
-      <aside className={cx('safe-x safe-bottom absolute bg-(--ink-2)/95 backdrop-blur-xl bottom-0 right-0 max-h-[85%] sm:max-h-none sm:top-0 flex w-full animate-rise flex-col rounded-t-(--r-4) sm:rounded-[0] border-l border-(color:--line)', narrow ? 'sm:w-96' : 'sm:w-[440px]')}>
+      <aside className={cx('safe-x safe-bottom absolute bg-(--ink-2)/95 backdrop-blur-xl bottom-0 right-0 max-h-[85%] sm:max-h-none sm:top-0 flex w-full animate-rise flex-col rounded-t-(--r-3) sm:rounded-[0] border-l border-(color:--line)', narrow ? 'sm:w-96' : 'sm:w-[440px]')}>
         <div className="flex items-center justify-between px-5 py-4">
           <h2 className="text-[15px] font-semibold">{title}</h2>
           <IconBtn label="Close" onClick={onClose}>

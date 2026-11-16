@@ -1,9 +1,11 @@
 import { reducedMotion } from './travel'
 
 /**
- * The lean: the tile under a mouse tilts toward it in 3D and the tiles around it lean a little, as the website's
- * shelf does. A press on a touch screen leans the tile toward the finger, and back when it lifts. What is lit (the
- * border, the glow, the sheen and the lift) is CSS (Tile.css). This module sets the tilt, and where the sheen is.
+ * The lean, the website's shelf: every tile in view leans toward the hand, the one under it more, and the sheen
+ * looks that way too. The hand is the pointer a little late and a tile is its goal a little late (the shelf's two
+ * easings), so it all settles instead of snapping. The game under the hand also lights the grid behind it in its colour.
+ * A press on a touch screen leans the tile toward the finger, and back when it lifts. What is lit (the border, the glow,
+ * the sheen and the lift) is CSS (Tile.css). This module sets the tilt, where the sheen is, and the grid's light.
  *
  * One set of listeners for the page and one frame loop. The loop runs only while the pointer moves or a tile is
  * still settling, and only over the tiles in view: a tile that scrolls out of view is put back at once. Scrolling
@@ -14,6 +16,8 @@ import { reducedMotion } from './travel'
 interface Tile {
   card: HTMLElement
   tilt: HTMLElement
+  /** The soft-light disc over the picture. Its own element, so that moving it restyles one element and not the tile. */
+  sheen: HTMLElement
   rx: number
   ry: number
   gx: number
@@ -27,23 +31,34 @@ interface Tile {
 /** The sheen's place when nothing is near, as in Tile.css. */
 const REST_X = 50
 const REST_Y = 30
-/** The most a tile under the pointer tilts, and the most a neighbour does, in degrees. */
-const UNDER = 6
-const NEIGHBOUR = 7
-/** A tile this many of its own widths and heights from the pointer no longer leans. */
-const REACH_X = 3.2
-const REACH_Y = 2.4
-/** The loop's settling time: a tile covers about two thirds of its way each time. */
-const EASE_MS = 80
+/** The shelf's lean: a tile leans by the hand's offset over these, at most 1, times these degrees. */
+const SPAN_X = 520
+const SPAN_Y = 420
+const LEAN_Y = 9
+const LEAN_X = 7
+/** The tile under the hand leans this much more. */
+const UNDER = 1.7
+/** The sheen's reach, in percent, from where it sits at rest. */
+const SHEEN = 45
+/** A touch press leans the tile it is on by this many degrees at the tile's edge. */
+const PRESS = 6
+/** Settling times in ms. The shelf moves 10 percent of the way a frame to the hand and 12 to the goal at 60 fps. */
+const HAND_MS = 158
+const EASE_MS = 130
 /** How long after the last move the loop keeps going, for the pointer's own pause. */
 const IDLE_MS = 120
 
 const tiles = new Map<HTMLElement, Tile>()
 const seen = new Set<Tile>()
 let observer: IntersectionObserver | null = null
-/** A mouse or a pen: where it is, and the tile it is over. */
+/** A mouse or a pen: where it is, and the tile it is over. The hand is where the tiles lean to, the pointer eased. */
 let pointer: { x: number; y: number } | null = null
+const hand = { x: 0, y: 0 }
 let over: Tile | null = null
+/** The tile that lights its grid or shelf now, and that grid or shelf. `wanted` is the next one, done in the next frame. */
+let litTile: Tile | null = null
+let lit: HTMLElement | null = null
+let wanted: Tile | null | undefined
 /** A press: the tile and where on the screen. */
 let press: { tile: Tile; x: number; y: number } | null = null
 let moved = 0
@@ -59,37 +74,33 @@ function put(t: Tile): void {
   if (flat && t !== over && t !== press?.tile) {
     if (!t.live) return
     t.tilt.style.transform = ''
-    t.tilt.style.removeProperty('--gx')
-    t.tilt.style.removeProperty('--gy')
+    t.sheen.style.removeProperty('--gx')
+    t.sheen.style.removeProperty('--gy')
     t.live = false
     return
   }
-  t.tilt.style.transform = `rotateY(${t.ry.toFixed(2)}deg) rotateX(${t.rx.toFixed(2)}deg)`
-  t.tilt.style.setProperty('--gx', `${t.gx.toFixed(0)}%`)
-  t.tilt.style.setProperty('--gy', `${t.gy.toFixed(0)}%`)
+  t.tilt.style.transform = `perspective(900px) rotateY(${t.ry.toFixed(2)}deg) rotateX(${t.rx.toFixed(2)}deg)`
+  t.sheen.style.setProperty('--gx', `${t.gx.toFixed(0)}%`)
+  t.sheen.style.setProperty('--gy', `${t.gy.toFixed(0)}%`)
   t.live = true
 }
 
 /** Where a tile wants to be: [rotateX, rotateY, sheenX, sheenY]. */
 function aim(t: Tile, r: DOMRect): [number, number, number, number] {
-  const at = press?.tile === t ? press : over === t ? pointer : null
   const cx = r.left + r.width / 2
   const cy = r.top + r.height / 2
-  if (at) {
-    // Under the hand: toward it by where it is on the tile, the sheen right under it.
-    const lx = clamp((at.x - cx) / (r.width / 2))
-    const ly = clamp((at.y - cy) / (r.height / 2))
-    return [-ly * UNDER, lx * UNDER, 50 + lx * 45, 50 + ly * 45]
+  if (press) {
+    if (press.tile !== t) return [0, 0, REST_X, REST_Y]
+    // A finger on it: toward the finger by where it is on the tile, the sheen right under it.
+    const lx = clamp((press.x - cx) / (r.width / 2))
+    const ly = clamp((press.y - cy) / (r.height / 2))
+    return [-ly * PRESS, lx * PRESS, 50 + lx * SHEEN, 50 + ly * SHEEN]
   }
-  if (!pointer || press) return [0, 0, REST_X, REST_Y]
-  const dx = pointer.x - cx
-  const dy = pointer.y - cy
-  // Falling to nothing a little before the edge of its reach, so what is far from the pointer is at rest, not nearly.
-  const near = Math.max(0, (1 - Math.hypot(dx / (r.width * REACH_X), dy / (r.height * REACH_Y)) - 0.15) / 0.85)
-  if (!near) return [0, 0, REST_X, REST_Y]
-  const nx = clamp(dx / (r.width * 1.5))
-  const ny = clamp(dy / (r.height * 1.5))
-  return [-ny * NEIGHBOUR * near, nx * NEIGHBOUR * near, REST_X + nx * 45 * near, REST_Y + ny * 45 * near]
+  if (!pointer) return [0, 0, REST_X, REST_Y]
+  const nx = clamp((hand.x - cx) / SPAN_X)
+  const ny = clamp((hand.y - cy) / SPAN_Y)
+  const k = over === t ? UNDER : 1
+  return [-ny * LEAN_X * k, nx * LEAN_Y * k, REST_X + nx * SHEEN, 35 + ny * SHEEN]
 }
 
 function step(now: number): void {
@@ -97,14 +108,32 @@ function step(now: number): void {
   const dt = Math.min(64, now - last)
   last = now
   const k = 1 - Math.exp(-dt / EASE_MS)
+  let settling = false
+  if (pointer) {
+    const hk = 1 - Math.exp(-dt / HAND_MS)
+    const gx = pointer.x - hand.x
+    const gy = pointer.y - hand.y
+    if (Math.abs(gx) > 0.5 || Math.abs(gy) > 0.5) {
+      hand.x += gx * hk
+      hand.y += gy * hk
+      aimed = true
+      settling = true
+    } else {
+      hand.x = pointer.x
+      hand.y = pointer.y
+    }
+  }
   const list = [...seen]
+  // Every read before any write, so the loop costs one layout at most.
+  const rects = aimed ? list.map((t) => t.card.getBoundingClientRect()) : []
+  if (wanted !== undefined) {
+    light(wanted)
+    wanted = undefined
+  }
   if (aimed) {
     aimed = false
-    // Every read before any write, so the loop costs one layout at most.
-    const rects = list.map((t) => t.card.getBoundingClientRect())
     list.forEach((t, i) => (t.goal = aim(t, rects[i]!)))
   }
-  let settling = false
   for (const t of list) {
     const keys = ['rx', 'ry', 'gx', 'gy'] as const
     keys.forEach((key, n) => {
@@ -136,12 +165,57 @@ function reset(t: Tile): void {
   put(t)
 }
 
+/**
+ * The grid or shelf behind a tile lights up in the tile's colour, where the tile is, and fades when nothing is lit
+ * (Tile.css). It has two lamps that take turns, so a move from tile to tile is a crossfade.
+ */
+function light(t: Tile | null): void {
+  litTile = t
+  const row = t?.card.closest<HTMLElement>('[data-row]') ?? null
+  if (lit && lit !== row) delete lit.dataset['glow']
+  lit = row
+  if (!t || !row) return
+  const r = t.card.getBoundingClientRect()
+  const h = row.getBoundingClientRect()
+  const lamp = row.dataset['glow'] === 'a' ? 'b' : 'a'
+  const x = r.left - h.left + row.scrollLeft + r.width / 2
+  const y = r.top - h.top + row.scrollTop + r.height / 2
+  row.style.setProperty(`--glow-${lamp}`, t.card.style.getPropertyValue('--tint'))
+  row.style.setProperty(`--glow-${lamp}-x`, `${x.toFixed(0)}px`)
+  row.style.setProperty(`--glow-${lamp}-y`, `${y.toFixed(0)}px`)
+  row.dataset['glow'] = lamp
+}
+
+const tileAt = (target: EventTarget | null) => tiles.get((target as Element | null)?.closest<HTMLElement>('.card') as HTMLElement)
+
 function onMove(e: PointerEvent): void {
-  if (e.pointerType === 'touch' || reducedMotion()) return
+  if (e.pointerType === 'touch') return
   // The browser repeats the last position after a scroll: that is not the pointer moving.
   if (pointer && pointer.x === e.clientX && pointer.y === e.clientY) return
+  const under = tileAt(e.target) ?? null
+  // The tiles lean toward a pointer that is over a grid or a shelf, in a tile or in a gap. Over anything else (the header,
+  // the stage, a sheet) the pointer is as good as gone: they rest and the light goes out.
+  const inRow = !!(e.target as Element | null)?.closest('[data-row]')
+  if (under !== litTile && (under || !inRow)) {
+    wanted = under
+    run()
+  }
+  if (reducedMotion()) return
+  if (!inRow) {
+    if (pointer) {
+      pointer = null
+      over = null
+      aimed = true
+      run()
+    }
+    return
+  }
+  if (!pointer) {
+    hand.x = e.clientX
+    hand.y = e.clientY
+  }
   pointer = { x: e.clientX, y: e.clientY }
-  over = tiles.get((e.target as Element | null)?.closest<HTMLElement>('.card') as HTMLElement) ?? null
+  over = under
   // A tile under the pointer is in view, whether or not the observer has said so yet.
   if (over) seen.add(over)
   moved = performance.now()
@@ -151,15 +225,32 @@ function onMove(e: PointerEvent): void {
 
 function onLeave(e: PointerEvent): void {
   if (e.relatedTarget || e.pointerType === 'touch') return
+  wanted = null
   pointer = null
   over = null
   aimed = true
   run()
 }
 
+/** The keyboard and a controller light the grid behind the focused tile too, until the pointer has a tile of its own. */
+function onFocus(e: FocusEvent): void {
+  const tile = tileAt(e.target)
+  if (tile && (e.target as Element).matches(':focus-visible')) {
+    wanted = tile
+    run()
+  }
+}
+
+function onBlur(e: FocusEvent): void {
+  if (litTile && e.target === litTile.card) {
+    wanted = over
+    run()
+  }
+}
+
 function onDown(e: PointerEvent): void {
   if (reducedMotion() || (e.pointerType === 'mouse' && e.button !== 0)) return
-  const tile = tiles.get((e.target as Element | null)?.closest<HTMLElement>('.card') as HTMLElement)
+  const tile = tileAt(e.target)
   if (!tile) return
   press = { tile, x: e.clientX, y: e.clientY }
   seen.add(tile)
@@ -183,6 +274,8 @@ function listen(on: boolean): void {
   act('pointerdown', onDown as EventListener, { passive: true })
   act('pointerup', onUp)
   act('pointercancel', onUp)
+  act('focusin', onFocus as EventListener)
+  act('focusout', onBlur as EventListener)
 }
 
 /**
@@ -190,8 +283,9 @@ function listen(on: boolean): void {
  */
 export function leanTile(card: HTMLElement): () => void {
   const tilt = card.querySelector<HTMLElement>('.tilt')
-  if (!tilt) return () => {}
-  const tile: Tile = { card, tilt, rx: 0, ry: 0, gx: REST_X, gy: REST_Y, goal: [0, 0, REST_X, REST_Y], live: false }
+  const sheen = card.querySelector<HTMLElement>('.sheen')
+  if (!tilt || !sheen) return () => {}
+  const tile: Tile = { card, tilt, sheen, rx: 0, ry: 0, gx: REST_X, gy: REST_Y, goal: [0, 0, REST_X, REST_Y], live: false }
   if (!tiles.size) {
     listen(true)
     observer = new IntersectionObserver(
@@ -216,6 +310,7 @@ export function leanTile(card: HTMLElement): () => void {
     seen.delete(tile)
     reset(tile)
     tiles.delete(card)
+    if (litTile === tile) light(null)
     if (!tiles.size) {
       listen(false)
       observer?.disconnect()

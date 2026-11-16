@@ -111,19 +111,24 @@ export default function CatalogTags({ games, all = games, vocabulary, prefs, onC
       </Chip>
     )
   }
+  // Games with no tags have nothing to filter by, and All tags would open an empty list.
+  if (!counts.size) return null
   return (
     <>
       <div className="chip-bar" style={{ marginBottom: 16 }}>
-        <div className="chips wrap" ref={row}>
-          {onClear && (
-            <Chip onClick={onClear}>
-              Clear filters
-              <X aria-hidden="true" />
-            </Chip>
-          )}
-          {chosen.map((id) => chip(id, counts.get(id)?.count ?? 0))}
-          {common.slice(0, Math.max(0, 8 - chosen.length - (onClear ? 2 : 0))).map((t) => chip(t.id, t.count))}
-        </div>
+        {/* With no chip to show the row is not there, and All tags stands at the start of the bar, not alone at its far end. */}
+        {(onClear || chosen.length > 0 || common.length > 0) && (
+          <div className="chips wrap" ref={row}>
+            {onClear && (
+              <Chip onClick={onClear}>
+                Clear filters
+                <X aria-hidden="true" />
+              </Chip>
+            )}
+            {chosen.map((id) => chip(id, counts.get(id)?.count ?? 0))}
+            {common.slice(0, Math.max(0, 8 - chosen.length - (onClear ? 2 : 0))).map((t) => chip(t.id, t.count))}
+          </div>
+        )}
         <div className="chips">
           {mode === 'exclude' && chosen.length > 0 && <Chip onClick={() => onChange({ include: [], exclude: [] })}>Clear tags</Chip>}
           <Chip onClick={() => setSheet(true)}>All tags</Chip>

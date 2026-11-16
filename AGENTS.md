@@ -51,6 +51,7 @@ These decide most review comments. Follow them without being asked.
 - **Lamplight, the one look.** Colours, faces, corners and durations come only from `design/tokens.css`, fonts from
   `design/fonts.css`, the mark from `design/logo/`. Titles are Fraunces, controls Inter, labels mono. One paper button
   per screen, and the brand gradient only on the logo, the avatar and the room. The rules are in `design/README.md`.
+  The website's design is the reference: where the app differs from it, the app changes, tiles and corners first.
   `node scripts/check-design.mjs` checks them in CI: today's exceptions are counted there and only shrink.
 - **Adult games have three levels.** Off (they do not exist for that person), Blurred (they show,
   but no picture of them is ever sent) and Shown, set by the installation, the person's account (an
