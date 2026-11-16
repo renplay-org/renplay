@@ -17,15 +17,18 @@ export const withPad = (page) => page.addInitScript(padScript)
 /** Presses a button for `ms`, then lets go and waits a little for the page to see it. */
 export const tap = (page, name, ms = 100) => page.evaluate(([n, t]) => new Promise((done) => { window.__hold(n, true); setTimeout(() => { window.__hold(n, false); setTimeout(done, 100) }, t) }), [name, ms])
 
-/** Puts the stick through these positions, one per frame, then lets it go. */
+/**
+ * Puts the stick through these positions, one every 16 ms (a frame at 60 Hz), then lets it go. By the clock, not by
+ * the page's frames: a slow machine draws fewer frames, and the stick must still be held as long as the test says.
+ */
 export const feed = (page, frames) => page.evaluate((list) => new Promise((done) => {
   let i = 0
   const step = () => {
     if (i >= list.length) { window.__stick(0, 0, 0, 0); return setTimeout(done, 100) }
     window.__stick(...list[i++])
-    requestAnimationFrame(step)
+    setTimeout(step, 16)
   }
-  requestAnimationFrame(step)
+  step()
 }), frames)
 
 /** Counts every focus change from here on: `moves` says how many and to what. */
