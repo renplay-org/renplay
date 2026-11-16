@@ -14,6 +14,10 @@ these from here and nowhere else.
 
 The art is the light, ink is the room, and the person holds a lamp.
 
+**The website is the reference.** Its stylesheets and the shelf's script (`website/prototypes-2/` in the plans, copied to
+`design-system/reference/`) say what the look is: corners, the game card, the type. Where the app differs, the app
+changes, not the website.
+
 ## The rules
 
 - **Everything that is a colour, a face, a corner or a duration is a token.** `node scripts/check-design.mjs` fails on a
@@ -26,8 +30,8 @@ The art is the light, ink is the room, and the person holds a lamp.
   else is a hairline (`--hair`) or quiet text.
 - **The brand gradient has three homes.** The logo, the avatar without a picture, and the room's glow. Never on a
   control, never behind text.
-- **Four corners.** `--r-1` (4 px) for a control, `--r-2` (8) for a row, `--r-3` (12) for a plate or a tile, `--r-4`
-  (16) for a sheet. `--r-round` for a dot, an avatar, a switch, a bar. No pills on buttons.
+- **Three corners, the website's.** `--r-1` (4 px) for a control and a tile, `--r-2` (6) for a row, `--r-3` (10) for a
+  plate, a sheet and the player's menu. `--r-round` for a dot, an avatar, a switch, a bar. No pills on buttons.
 - **Three surfaces.** A plate sits on the room, glass floats over art, paper is the lit control. A plate has no border.
 - **Status colours are words.** `--green`, `--amber` and `--red` colour a word, an icon or a dot, never a surface.
 - **The lamp is a few pixels.** `--lamp` is the dot before a label, a caret, the fill of a progress bar. Never a surface.
@@ -37,9 +41,11 @@ The art is the light, ink is the room, and the person holds a lamp.
 - **Covers are the developers' art**, never cropped into a shape, never recoloured, never under grain. At Blurred they
   are blurred and nothing else.
 - **The app is still under the hand, but for a game's tile.** The light follows the pointer on the website, the docs
-  home, the sign-in page and the empty library. A tile is the website's shelf card: a border and a sheen in the game's
-  colour, and under the hand or the focus a lean toward the pointer, a lift and the colour's long shadow. A press leans
-  it on a touch screen. Reduced motion keeps the colour and drops the lean and the lift. Nothing else moves under the hand.
+  home, the sign-in page and the empty library. A tile is the website's shelf card: 4 px corners, a border and a glow in
+  the game's colour, a sheen toward the pointer, and under the hand a lean (every tile in view leans toward the pointer,
+  the one under it more), a lift and the colour's long shadow. The game under the hand or the focus also lights the grid
+  behind it. A press leans a tile on a touch screen. Reduced motion keeps the colour and drops the lean and the lift.
+  Nothing else moves under the hand.
 - **Density, touch and speed are not the language's to change.** Sizes and spaces (`--s1` to `--s6`, `--hit`), the
   44 px hit area, the adult blur and the game page's weight stay as they are.
 

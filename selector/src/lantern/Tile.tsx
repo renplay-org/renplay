@@ -67,7 +67,17 @@ export default function Card({
       onClick={travel}
     >
       <div className="tilt">
-        <Frame game={game} dim={dim} hidden={hidden} extra={extra} />
+        <Frame
+          game={game}
+          dim={dim}
+          hidden={hidden}
+          extra={
+            <>
+              {extra}
+              <i className="sheen" aria-hidden="true" />
+            </>
+          }
+        />
         <div className="ct">{title ?? game.title}</div>
         {meta && <div className="cm">{meta}</div>}
       </div>

@@ -1,7 +1,8 @@
 import { test, expect, open, settled } from './fixtures.mjs'
 
 // The tile is the website's shelf card (lantern/Tile.css, lantern/lean.ts): a border and a sheen in the game's colour,
-// and under the hand a tilt and a lift with the colour's long shadow. Each test says an end state of the tile.
+// and under the hand a tilt and a lift with the colour's long shadow. Every tile in view leans toward the hand over its grid, as the
+// website's shelf does, and the one under it lifts. Each test says an end state of the tile.
 
 /** What the eye sees of a tile: its tilt and lift, its shadow, its sheen and its border. */
 const look = (card) =>
@@ -13,7 +14,7 @@ const look = (card) =>
       tilted: tilt.transform !== 'none',
       lifted: tilt.translate !== 'none',
       shadow: style.boxShadow,
-      sheen: getComputedStyle(frame, '::after').opacity,
+      sheen: getComputedStyle(el.querySelector('.sheen')).opacity,
       border: `${style.borderTopWidth} ${style.borderTopColor}`,
       pressed: el.hasAttribute('data-press'),
     }
@@ -67,8 +68,11 @@ test('Tiles: the tile under the mouse is tilted and lit, the others at rest are 
   expect(lit.sheen, 'Its sheen is whole').toBe('1')
   expect((await look(cards.nth(2))).sheen, 'The sheen of a tile that is not under the mouse is faint').toBe('0.55')
   const away = await look(far)
-  expect(away.tilted || away.lifted, 'A tile far from the mouse is at rest').toBe(false)
+  expect(away.lifted, 'A tile far from the mouse does not lift').toBe(false)
   expect(away.shadow, 'Its shadow is the one at rest').toBe(restShadow)
+  expect(away.sheen, 'Its sheen is the faint one').toBe('0.55')
+  // It leans toward the mouse, as every tile in a grid does. The mouse is to its left.
+  expect(await far.locator('.tilt').evaluate((el) => el.style.transform), 'A tile far from the mouse leans toward it').toMatch(/rotateY\(-[0-9.]+deg\)/)
   // The lean stops when the mouse rests: it has come to its place, and nothing changes any more.
   const tilt = () => under.locator('.tilt').evaluate((el) => el.style.transform)
   let before = ''

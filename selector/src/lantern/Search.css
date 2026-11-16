@@ -153,7 +153,7 @@
 [data-typing] .card:hover:not(:focus-visible):not(.on) .frame {
   box-shadow: var(--tile-rest);
 }
-[data-typing] .card:hover:not(:focus-visible):not(.on) .frame::after {
+[data-typing] .card:hover:not(:focus-visible):not(.on) .frame .sheen {
   opacity: 0.55;
 }
 /* Matched letters in a title: brighter and underlined in the tile's own colour, not a block of yellow. */
