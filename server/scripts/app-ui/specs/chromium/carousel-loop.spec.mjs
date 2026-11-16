@@ -8,10 +8,12 @@ import { atSlide, carouselState, oneWay, rests, unwatch, watch } from '../carous
 test.use({ mockOptions: {} })
 
 /**
- * Waits until the carousel rests on a real slide. Where `scrollend` is missing the jump off a copy waits on a timer of the
+ * Waits until the carousel, which was at `from` (its `scrollLeft`), has moved and rests on a real slide. Where `scrollend` is missing the jump off a copy waits on a timer of the
  * page's clock, which is run once the scrolling has really stopped (on a slide's edge, and there for two reads).
  */
-async function restsOnSlide(page, n) {
+async function restsOnSlide(page, n, from) {
+  // A move that has not begun leaves the carousel still, on a slide's edge: it is waited for to leave `from`.
+  await until(() => page.evaluate((x) => document.querySelector('.carousel').scrollLeft !== x, from), 'The carousel starts to move')
   const place = () => page.evaluate(() => { const c = document.querySelector('.carousel'); return c.scrollLeft % c.clientWidth === 0 ? c.scrollLeft : -1 })
   let last = -2
   await until(async () => {
@@ -27,6 +29,8 @@ async function restsOnSlide(page, n) {
     return Number.isInteger(at) && at >= 1 && at <= n
   }, n), 'The carousel is on a real slide, not a copy')
 }
+
+const scrollAt = (page) => page.evaluate(() => document.querySelector('.carousel').scrollLeft)
 
 /** A finger drawn across the carousel, `dir` 1 to the left (the next slide). */
 async function swipeAcross(page, cdp, dir) {
@@ -84,23 +88,26 @@ for (const noScrollEnd of [false, true]) {
     // The automatic turn after the last slide goes on to the first, forward, never back across the others.
     await atSlide(page, last)
     await watch(page)
+    let from = await scrollAt(page)
     await page.clock.runFor(7500)
-    await restsOnSlide(page, n)
+    await restsOnSlide(page, n, from)
     await rests(page, 0)
     let moved = oneWay(await unwatch(page), n, 1)
     let state = await carouselState(page)
     check(state.current === 0 && state.x === 0, `the automatic turn after the last slide shows the first (dot ${state.current + 1}, at ${state.x} px)`)
     check(moved.back === 0 && moved.jumps === 1, `it moved on to the copy and jumped silently (${moved.back} scrolls went back, ${moved.jumps} silent jump)`)
+    from = await scrollAt(page)
     await page.clock.runFor(7000)
-    await restsOnSlide(page, n)
+    await restsOnSlide(page, n, from)
     await rests(page, 1, 'The jump did not stop the automatic turns: the next turn came')
 
     /** Moves to `from`, does `move`, and checks it landed on `to`, going `dir` all the way. */
     const wrap = async (what, from, to, dir, move) => {
       await atSlide(page, from)
       await watch(page)
+      const at = await scrollAt(page)
       await move()
-      await restsOnSlide(page, n)
+      await restsOnSlide(page, n, at)
       await rests(page, to)
       const frames = await unwatch(page)
       const moved = oneWay(frames, n, dir)
@@ -121,8 +128,9 @@ for (const noScrollEnd of [false, true]) {
       await atSlide(page, last - 1)
       const seen = []
       for (let i = 0; i < n + 2; i++) {
+        const at = await scrollAt(page)
         await pushed(1)
-        await restsOnSlide(page, n)
+        await restsOnSlide(page, n, at)
         seen.push((await carouselState(page)).current)
       }
       const want = Array.from({ length: n + 2 }, (_, i) => (last - 1 + i + 1) % n)
@@ -144,8 +152,9 @@ for (const noScrollEnd of [false, true]) {
       await wrap('the Left key at the first slide', 0, last, -1, () => page.keyboard.press('ArrowLeft'))
       // A dot goes straight to its slide.
       await atSlide(page, last)
+      const at = await scrollAt(page)
       await page.locator('.dots .dot').nth(2).click()
-      await restsOnSlide(page, n)
+      await restsOnSlide(page, n, at)
       await rests(page, 2)
       state = await carouselState(page)
       check(state.current === 2 && state.x === 2 * state.w, `a dot goes to its slide from the last one (dot ${state.current + 1}, at ${state.x} px)`)
