@@ -45,7 +45,8 @@ const touchOnly = (testInfo) => test.skip(!testInfo.project.use.hasTouch, 'A fin
 async function grid(page) {
   await open(page)
   await settled(page)
-  await page.evaluate(() => window.scrollTo(0, document.querySelector('.grid[data-row]').getBoundingClientRect().top + scrollY - 140))
+  // At once, not the page's smooth scroll: a check that starts while it is still moving reads a tile on its way.
+  await page.evaluate(() => window.scrollTo({ top: document.querySelector('.grid[data-row]').getBoundingClientRect().top + scrollY - 140, behavior: 'instant' }))
   return page.locator('.grid[data-row] .card')
 }
 
@@ -219,8 +220,7 @@ test('Tiles: a press leans the tile toward the finger and back, and scrolling mo
   const leaning = await tilt.evaluate((el) => el.style.transform)
   expect(leaning, 'It leans toward a finger at its lower right').toMatch(/rotateY\([0-9.]+deg\) rotateX\(-[0-9.]+deg\)/)
   await arrived(tile)
-  const lit = await look(tile)
-  expect(lit.pressed && lit.sheen === '1', 'It is lit while pressed').toBe(true)
+  await expect.poll(async () => { const lit = await look(tile); return lit.pressed && lit.sheen === '1' }, { message: 'It is lit while pressed' }).toBe(true)
   await send('pointerup')
   await expect.poll(async () => (await look(tile)).tilted || (await look(tile)).pressed, { message: 'It leans back when the finger lifts' }).toBe(false)
   // Scrolling moves no tile.
