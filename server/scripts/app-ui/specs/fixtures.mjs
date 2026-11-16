@@ -62,6 +62,8 @@ export async function settled(page) {
   const unsettled = () => page.evaluate(() => ({
     running: document.getAnimations().filter((a) => a.playState !== 'finished').map((a) => `${a.effect?.target?.className || a.effect?.target?.tagName} ${a.animationName ?? a.transitionProperty ?? ''} ${a.playState} ${Math.round(a.currentTime)}/${Math.round(a.effect?.getComputedTiming().endTime)}`),
     layers: document.querySelectorAll('.bd .l').length,
+    visible: document.visibilityState,
+    clock: Math.round(document.timeline.currentTime),
   }))
   let last = null
   await expect.poll(async () => {
