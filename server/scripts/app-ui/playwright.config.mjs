@@ -20,7 +20,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4179',
     serviceWorkers: 'block',
-    trace: 'retain-on-failure',
+    trace: { mode: 'retain-on-failure', screenshots: false },
     locale: 'en-US',
     timezoneId: 'UTC',
   },

@@ -103,6 +103,8 @@ test('back from a game restores the Library, and the Catalog keeps its search, i
 
 test('layout shift stays under 0.02 on the Library, the Catalog and a game page', async ({ page }, testInfo) => {
   only(testInfo, 'chromium-desktop', 'Chromium reports layout shift, at the size the website and docs are measured at')
+  // Three pages are loaded and scrolled through to their end.
+  test.slow()
   await page.addInitScript(() => {
     window.__cls = 0
     new PerformanceObserver((list) => {

@@ -43,6 +43,8 @@ async function swipeAcross(page, cdp, dir) {
 
 for (const noScrollEnd of [false, true]) {
   test(`the carousel goes round${noScrollEnd ? ' without scrollend' : ''}`, async ({ page }, testInfo) => {
+    // Every move waits for the browser to scroll, a swipe is a finger drawn in steps: a busy machine takes its time.
+    test.slow()
     const phone = !!testInfo.project.use.hasTouch
     test.skip(phone && !noScrollEnd, 'A phone with scrollend turns on the same code as a desktop with it, and what a swipe adds is the swipe: that is checked without scrollend, as an iPhone before Safari 26.2 has it')
     // Without `scrollend` the quiet after the last scroll event stands in for it.
