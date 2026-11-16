@@ -5,7 +5,11 @@ import { Refusal, fail, json, sha1 } from './http'
 import type { Env, FileRow, NoteRow, VersionRow } from './types'
 import { readSave, type SaveMeta } from './zip'
 
-/** The demo's own limits for the guest: a save file, all saves, the files kept, and the versions of each. */
+/**
+ * The demo's own limits for the guest: a save file, all saves, the files kept, and the versions of each. As on the
+ * demo server (saves/routes.ts) the total and the files count the earlier versions too, since the browser keeps
+ * those as well, so a pinned save's history, which has no count of its own, still has an end.
+ */
 const LIMITS = { file: 2 << 20, total: 32 << 20, files: 1000, versions: 3 }
 /** The folders every game of a person shares. */
 const SHARED = ['tokens', 'persistent']
@@ -37,6 +41,20 @@ const base64 = (data: ArrayBuffer) => {
   for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   return btoa(out)
 }
+
+/** What the browser keeps of the guest's saves: the current files and every earlier version. */
+async function held(env: Env): Promise<{ bytes: number; entries: number }> {
+  const rows = [...(await env.store.all('files')), ...(await env.store.all('versions'))]
+  return { bytes: rows.reduce((n, r) => n + r.data.byteLength, 0), entries: rows.length }
+}
+
+/** Whether `bytes` more, in one more file, fit: the demo server's check, which counts the history. */
+async function fits(env: Env, bytes: number): Promise<boolean> {
+  const now = await held(env)
+  return now.bytes + bytes <= LIMITS.total && now.entries < LIMITS.files
+}
+
+const FULL = 'The saves here are full. Clear this site\'s data to start again'
 
 /** Earlier copies of a file, newest first, at most three: the guest's limit on the demo server. */
 async function keepVersion(env: Env, row: FileRow, reason: string): Promise<void> {
@@ -117,12 +135,11 @@ export async function savesRoute(env: Env, req: Request, url: URL, game: Game, r
     const { dir: d, name } = resolve()
     const data = await req.arrayBuffer()
     if (data.byteLength > LIMITS.file) return fail(413, `A save here can be at most ${LIMITS.file >> 20} MB`)
-    const all = await env.store.all('files')
-    const used = all.reduce((n, f) => n + f.data.byteLength, 0)
-    if (used + data.byteLength > LIMITS.total || all.length >= LIMITS.files) return fail(507, 'The saves here are full until the next fresh start')
     const key = `${d}/${name}`
-    const before = all.find((f) => f.key === key)
-    if (before && (await sha1(before.data)) !== (await sha1(data))) await keepVersion(env, before, 'game')
+    const before = await env.store.get('files', key)
+    const same = !!before && (await sha1(before.data)) === (await sha1(data))
+    if (!same && !(await fits(env, data.byteLength))) return fail(507, FULL)
+    if (before && !same) await keepVersion(env, before, 'game')
     const mtime = Number(req.headers.get('x-mtime')) || Date.now()
     await env.store.put('files', { key, dir: d, name, data, mtime } satisfies FileRow)
     env.notify()
@@ -173,6 +190,8 @@ export async function savesRoute(env: Env, req: Request, url: URL, game: Game, r
     if (typeof body.id !== 'string') return fail(400, 'Missing version id')
     const version = await env.store.get('versions', body.id)
     if (!version) return fail(404, 'Version not found')
+    // The version stays in the history, so the restored copy is one more of what the browser keeps.
+    if (!(await fits(env, version.data.byteLength))) return fail(507, FULL)
     const now = await env.store.get('files', version.key)
     if (now) await keepVersion(env, now, 'restore')
     const mtime = Date.now()
