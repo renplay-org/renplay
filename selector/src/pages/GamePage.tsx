@@ -309,7 +309,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
                   </p>
                 </div>
                 <div className="actions">
-                  <Pill variant={i === 0 ? 'p' : 's'} size="sm" icon={<BookOpen />} href={w.url} target="_blank" rel="noreferrer">
+                  <Pill variant="s" size="sm" icon={<BookOpen />} href={w.url} target="_blank" rel="noreferrer">
                     Open
                   </Pill>
                   {admin && (
