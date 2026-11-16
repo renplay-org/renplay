@@ -146,6 +146,20 @@ test('only the allowed website may frame the demo', async ({ page }) => {
   }
 })
 
+test('search engines may read the demo and are told to leave it out', async () => {
+  const get = (path) => fetch(`http://127.0.0.1:${demo.port}${path}`, { headers: { accept: 'text/html' } })
+  const robots = await get('/robots.txt')
+  expect(robots.headers.get('content-type')).toContain('text/plain')
+  const rules = (await robots.text()).split('\n').map((line) => line.trim().toLowerCase())
+  expect(rules).toContain('allow: /')
+  expect(rules.filter((line) => /^disallow:\s*\S/.test(line))).toEqual([])
+  for (const path of ['/', '/robots.txt', '/sw.js', '/game/the-question']) expect((await get(path)).headers.get('x-robots-tag'), path).toBe('noindex')
+  const page = await (await get('/')).text()
+  expect(page).toContain('<title>Renplay demo</title>')
+  expect(page).toMatch(/<meta name="description" content="[^"]+"/)
+  expect(page).toContain('<meta name="robots" content="noindex" />')
+})
+
 test('a form on another site cannot change the visitor\'s progress', async ({ context, page }) => {
   await page.goto(demo.embedderOrigin)
   await expect.poll(() => ready(page), { timeout: 30000 }).toBe(2)

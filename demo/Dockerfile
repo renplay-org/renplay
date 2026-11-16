@@ -34,6 +34,13 @@ RUN sed -i -e 's/^worker_processes auto;/worker_processes 1;/' \
  && grep -q '^worker_processes 1;' /app/deploy/nginx.conf.template \
  && grep -q '^  real_ip_header CF-Connecting-IP;' /app/deploy/nginx.conf.template \
  && grep -q ', from $remote_addr' /app/deploy/nginx.conf.template
+# The demo is for trying, not for search results: every answer says noindex, and robots.txt lets crawlers in to read it
+# (a blocked page never shows its noindex). The library page gets the title and description of the static demo (static/seo.mjs).
+RUN sed -i 's|^\( *\)add_header X-Content-Type-Options "nosniff" always;|&\n\1add_header X-Robots-Tag "noindex" always;|' /app/deploy/nginx.conf.template \
+ && [ "$(grep -c 'add_header X-Robots-Tag "noindex" always;' /app/deploy/nginx.conf.template)" = "$(grep -c 'add_header X-Content-Type-Options' /app/deploy/nginx.conf.template)" ] \
+ && printf 'User-agent: *\nAllow: /\n' > /app/web/robots.txt \
+ && sed -i 's|<title>Renplay</title>|<title>Renplay demo</title><meta name="description" content="Try Renplay, the self-hosted Ren’Py player, in your browser. Play a free sample game." /><meta name="robots" content="noindex" />|' /app/web/index.html \
+ && grep -q '<title>Renplay demo</title>' /app/web/index.html
 USER 1000:1000
 COPY --from=seed --chown=1000:1000 /data /data
 COPY --from=seed --chown=1000:1000 /games /games

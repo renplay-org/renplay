@@ -1,9 +1,50 @@
 import { defineConfig } from 'astro/config'
 import starlight from '@astrojs/starlight'
 import starlightLinksValidator from 'starlight-links-validator'
+import starlightLlmsTxt from 'starlight-llms-txt'
+import { pageSets } from './scripts/llms-sets.mjs'
 import remarkInclude from './scripts/remark-include.mjs'
 import remarkVersion from './scripts/remark-version.mjs'
 import { unified } from '@astrojs/markdown-remark'
+
+const sidebar = [
+  {
+    label: 'Start here',
+    items: [
+      'start-here/what-is-renplay',
+      'start-here/quick-start',
+      'start-here/adult-games',
+    ],
+  },
+  {
+    label: 'Install',
+    items: [
+      'install/docker',
+      'install/kubernetes',
+      'install/reverse-proxy',
+      'install/truenas',
+      'install/unraid',
+      'install/synology',
+      'install/ugreen',
+      'install/qnap',
+      'install/other-platforms',
+    ],
+  },
+  { label: 'Guides', items: ['guides/adding-games', 'guides/playing', 'guides/dashboards'] },
+  'accounts',
+  'configuration',
+  'telemetry',
+  'upgrading',
+  'stability',
+  'catalog',
+  'engines',
+  'troubleshooting',
+  'faq',
+  {
+    label: 'Developers',
+    items: ['developers/architecture', 'developers/accounts-api', 'developers/contributing'],
+  },
+]
 
 export default defineConfig({
   site: 'https://docs.renplay.org',
@@ -68,45 +109,15 @@ export default defineConfig({
         { icon: 'github', label: 'GitHub', href: 'https://renplay.org/github' },
         { icon: 'heart', label: 'Support', href: 'https://renplay.org/support' },
       ],
-      plugins: [starlightLinksValidator({ errorOnRelativeLinks: false })],
-      sidebar: [
-        {
-          label: 'Start here',
-          items: [
-            'start-here/what-is-renplay',
-            'start-here/quick-start',
-            'start-here/adult-games',
-          ],
-        },
-        {
-          label: 'Install',
-          items: [
-            'install/docker',
-            'install/kubernetes',
-            'install/reverse-proxy',
-            'install/truenas',
-            'install/unraid',
-            'install/synology',
-            'install/ugreen',
-            'install/qnap',
-            'install/other-platforms',
-          ],
-        },
-        { label: 'Guides', items: ['guides/adding-games', 'guides/playing', 'guides/dashboards'] },
-        'accounts',
-        'configuration',
-        'telemetry',
-        'upgrading',
-        'stability',
-        'catalog',
-        'engines',
-        'troubleshooting',
-        'faq',
-        {
-          label: 'Developers',
-          items: ['developers/architecture', 'developers/accounts-api', 'developers/contributing'],
-        },
+      plugins: [
+        starlightLinksValidator({ errorOnRelativeLinks: false }),
+        // llms.txt, llms-small.txt and llms-full.txt, written from the docs at build time.
+        starlightLlmsTxt({
+          projectName: 'Renplay',
+          customSets: pageSets(sidebar),
+        }),
       ],
+      sidebar,
     }),
   ],
 })

@@ -2,9 +2,11 @@
 /**
  * The built website (website/dist and website/dist-adult, `sh website/build.sh`): every local link and picture in its
  * pages is a file there, a folder with an index.html, or one of the stable addresses in _redirects. The sitemap lists only pages.
+ * The adult site stays out of search results in a way crawlers can read (noindex-host.mjs).
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { noindexProblems } from './noindex-host.mjs'
 
 const site = (name) => new URL(`../website/${name}/`, import.meta.url).pathname
 const broken = []
@@ -53,8 +55,14 @@ for (const [, loc] of readFileSync(join(site('dist'), 'sitemap.xml'), 'utf8').ma
   if (!exists(new URL(loc).pathname)) broken.push(`sitemap.xml: ${loc}`)
 }
 
+const problems = noindexProblems(site('dist-adult'), 'adult.renplay.org')
+
 if (broken.length) {
   console.error(`Links to nothing in the website:\n${broken.join('\n')}`)
   process.exit(1)
 }
-console.log('Every link in the website leads somewhere.')
+if (problems.length) {
+  console.error(`The adult site is not kept out of search results:\n${problems.join('\n')}`)
+  process.exit(1)
+}
+console.log('Every link in the website leads somewhere, and the adult site says noindex where crawlers can read it.')

@@ -19,6 +19,9 @@ describe('the static demo headers', () => {
     expect(all['Content-Security-Policy']).toBe(demoFrameAncestors(true, 'https://renplay.org'))
     expect(all['X-Content-Type-Options']).toBe('nosniff')
   })
+  it('say noindex on every answer, so that crawlers that are let in leave the demo out of their results', () => {
+    expect(rules(headersFor('https://renplay.org'))['/*']!['X-Robots-Tag']).toBe('noindex')
+  })
   it('check the page and the worker each time and keep what is named by its content for good', () => {
     const file = rules(headersFor('https://renplay.org'))
     for (const path of ['/index.html', '/sw.js', '/demo/*']) expect(file[path]).toEqual({ 'Cache-Control': 'no-cache' })

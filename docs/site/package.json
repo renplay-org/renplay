@@ -10,6 +10,7 @@
     "test": "node --test scripts/*.test.mjs",
     "gen": "node scripts/gen-config.mjs",
     "check:config": "node scripts/gen-config.mjs --check",
+    "check:llms": "node scripts/check-llms.mjs",
     "dev": "npm run gen && astro dev",
     "build": "npm run gen && astro build",
     "preview": "astro preview"
@@ -19,6 +20,7 @@
     "@astrojs/starlight": "0.42.8",
     "astro": "7.4.5",
     "sharp": "0.35.5",
-    "starlight-links-validator": "0.27.0"
+    "starlight-links-validator": "0.27.0",
+    "starlight-llms-txt": "0.12.0"
   }
 }
