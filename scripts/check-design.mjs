@@ -1,6 +1,6 @@
 // Checks that the look comes from design/tokens.css (Lamplight, design/README.md): no colour, gradient, face or corner
-// written as a literal anywhere else, and no Tailwind colour or radius utility. White and black at any alpha,
-// transparent and currentColor are fine (shadows, hairlines, text on paper).
+// written as a literal anywhere else, no Tailwind colour or radius utility, and in the library no duration. White and black at
+// any alpha, transparent and currentColor are fine (shadows, hairlines, text on paper).
 //
 //   node scripts/check-design.mjs [repository folder] [--counts]
 //
@@ -25,18 +25,9 @@ const SCAN = [
 
 /** Places that may keep this many literals for now, each one to move to a token. Counts only go down. */
 const ALLOWED = {
-  'selector/src/index.css': 28,
   'website/site.css': 76,
   'docs/site/src/styles/renplay.css': 37,
   'website/catalog.css': 36,
-  'selector/src/components/guide/Guide.css': 7,
-  'selector/src/lantern/Carousel.css': 7,
-  'selector/src/pages/player/Player.css': 4,
-  'selector/src/lantern/Search.css': 4,
-  'selector/src/components/PadLegend.css': 1,
-  'selector/src/components/SceneCard.tsx': 2,
-  'selector/src/lantern/Room.tsx': 2,
-  'selector/src/lantern/art.tsx': 1,
   'website/partials/footer.html': 1,
   'website/partials/nav.html': 1,
 }
@@ -62,7 +53,10 @@ const GRADIENT = /\b(?:linear|radial|conic)-gradient\(((?:[^()]|\([^()]*\))*)\)/
 const FACE = /(?<![\w-])font-family\s*:\s*([^;}]+)|(?<![\w-])font\s*:\s*([^;}]+)/g
 const CORNER = /(?<![\w-])border-radius\s*:\s*([^;}"'`]+)/g
 const INLINE_CORNER = /\bborderRadius\s*:\s*([^,}]+)/g
-const UTILITY = /\b(?:bg|text|border|from|via|to|ring|outline|fill|stroke|decoration|shadow|accent|caret|divide)-(?:red|green|blue|white|black|gray|zinc|neutral|slate|stone|orange|amber|yellow|lime|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose|ink|accent)(?:-\d+)?(?:\/\d+)?(?![\w-])|(?<![\w-])rounded(?:-(?:t|b|l|r|tl|tr|bl|br|s|e|ss|se|es|ee))?(?:-(?:none|sm|md|lg|xl|2xl|3xl|4xl|full))?(?![\w-])/g
+const DURATION = /(?<![\w-])(?:transition|animation)(?:-duration|-delay)?\s*:\s*([^;}`]+)/g
+const TIME = /(?<![\w.-])(\d*\.?\d+)(ms|s)\b/g
+const NAMED_IN_CODE = new RegExp(`\\b(?:color|background|backgroundColor|fill|stroke|borderColor)\\s*[:=]\\s*['"](?:${NAMED})['"]`, 'g')
+const UTILITY = /\b(?:bg|text|border|from|via|to|ring|outline|fill|stroke|decoration|shadow|accent|caret|divide)-(?:red|green|blue|white|black|gray|zinc|neutral|slate|stone|orange|amber|yellow|lime|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose|ink|accent)(?:-\d+)?(?:\/\d+)?(?![\w-])|(?<![\w-])rounded(?:-(?:t|b|l|r|tl|tr|bl|br|s|e|ss|se|es|ee))?(?:-(?:none|sm|md|lg|xl|2xl|3xl|4xl|full))?(?![\w-])|(?<![\w-])rounded(?:-(?:t|b|l|r|tl|tr|bl|br|s|e|ss|se|es|ee))?-\[(?!0(?:px)?\])/g
 
 /** Black or white at any alpha, written any of the usual ways, and the colours that are no colour. */
 const neutral = (s) => /^(?:#(?:fff|ffff|000|0000|ffffff|000000|ffffff[0-9a-f]{2}|000000[0-9a-f]{2})|(?:rgba?|hsla?)\(\s*(?:255\s*,?\s*255\s*,?\s*255|0\s*,?\s*0\s*,?\s*0|0\s+0%\s+100%|0\s+0%\s+0%)\b[^)]*\)|transparent|currentcolor)$/i.test(s.trim())
@@ -115,7 +109,16 @@ for (const file of files) {
   }
   for (const m of text.matchAll(FACE)) if (!faceOk(m[1] ?? m[2])) report(m.index, 'face', m[0])
   for (const m of text.matchAll(CORNER)) if (!cornerOk(m[1])) report(m.index, 'corner', m[1])
+  // A duration is a token (--t-press, --t-focus, --t-pane, --t-travel, --t-room). Nothing is a literal in the library, which has
+  // none now: the website's and the docs' stylesheets are held to the rest until they move.
+  if (rel.startsWith('selector/src/')) {
+    for (const m of text.matchAll(DURATION)) {
+      for (const t of m[1].matchAll(TIME)) if (Number(t[1]) !== 0) report(m.index, 'duration', `${t[1]}${t[2]}`)
+    }
+    for (const m of text.matchAll(/(?<![\w-])duration-\d+/g)) report(m.index, 'duration', m[0])
+  }
   if (code) {
+    for (const m of text.matchAll(NAMED_IN_CODE)) report(m.index, 'named colour', m[0])
     for (const m of text.matchAll(INLINE_CORNER)) if (!cornerOk(m[1])) report(m.index, 'corner', m[1])
     for (const m of text.matchAll(UTILITY)) report(m.index, 'Tailwind utility', m[0])
   } else {

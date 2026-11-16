@@ -34,7 +34,7 @@ export default function PlayerPill({
     // HTML games often put their own menu in the top left (SugarCube's sidebar toggle): their pills are at the right.
     <div className={cx('rp-pills', fresh && 'fresh', guide?.over && 'over')} style={style}>
       <button type="button" className="rp-pill" onClick={onMenu} aria-label="Menu">
-        <span className="mark" aria-hidden="true" />
+        <img className="mark" src="/favicon.svg" alt="" />
         Menu
         {pad && <PadMenuGlyph />}
       </button>

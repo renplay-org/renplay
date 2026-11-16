@@ -57,7 +57,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   }, [art?.src])
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--tint', target.brand ? '#8b6bff' : (art?.tint ?? '#5a5a7a'))
+    document.documentElement.style.setProperty('--tint', target.brand ? 'var(--violet)' : (art?.tint ?? 'var(--tint-default)'))
   }, [art?.tint, target.brand])
 
   return (

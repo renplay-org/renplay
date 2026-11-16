@@ -28,6 +28,10 @@ test('a look made of tokens, white, black and transparent passes', () => {
 .c { font-family: inherit; border-radius: 50%; } /* #ff00aa and 12px in a comment */`
   assert.deepEqual(check({ 'selector/src/a.css': css }), { ok: true, said: '' })
   assert.equal(check({ 'website/pages/a.html': '<a href="#add">Add</a> &#169;' }).ok, true)
+  // A duration is a token in the library, with 0 and a token as the ones allowed (the website keeps its own for now).
+  assert.equal(check({ 'selector/src/a.css': '.a { transition: color var(--t-focus), visibility 0s var(--t-pane); animation-duration: 0ms; }' }).ok, true)
+  assert.equal(check({ 'website/a.css': '.a { transition: color .25s; }' }).ok, true)
+  assert.equal(check({ 'selector/src/a.tsx': 'const a = <b className="sm:rounded-[0] rounded-t-(--r-3)" />' }).ok, true)
   assert.equal(check({ 'selector/src/a.tsx': 'const r = `${radius}px`; const s = { borderRadius: `${r / 2}px`, color: "var(--fg)" }' }).ok, true)
 })
 
@@ -44,6 +48,12 @@ test('a colour, gradient, face or corner written as a literal fails, with its pl
     ['selector/src/a.tsx', 'const a = <b style={{ borderRadius: 12 }} />', 'corner: 12'],
     ['selector/src/a.tsx', 'const a = <b className="text-zinc-400 rounded-xl" />', 'Tailwind utility: text-zinc-400'],
     ['selector/src/a.tsx', 'const a = <b className="bg-white/10" />', 'Tailwind utility: bg-white/10'],
+    ['selector/src/a.tsx', 'const a = <b className="rounded-[12px]" />', 'Tailwind utility: rounded-['],
+    ['selector/src/a.tsx', 'const a = <b style={{ color: "salmon" }} />', 'named colour: color: "salmon"'],
+    ['selector/src/a.css', '.a { transition: width 0.5s var(--out); }', 'duration: 0.5s'],
+    ['selector/src/a.css', '.a { animation: up 400ms var(--out) both; }', 'duration: 400ms'],
+    ['selector/src/a.tsx', 'const a = <b style={{ transition: \'opacity .7s\' }} />', 'duration: .7s'],
+    ['selector/src/a.tsx', 'const a = <b className="duration-300" />', 'duration: duration-300'],
   ]) {
     const result = check({ [file]: text })
     assert.equal(result.ok, false, text)

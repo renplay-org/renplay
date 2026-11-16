@@ -47,8 +47,7 @@
 .rp-pill .mark {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, #d62a68, #7556f0);
+  border-radius: var(--r-2);
 }
 /* The controller's Menu button, after the word, while one is connected. */
 .rp-pill .pad-menu {

@@ -7,13 +7,13 @@
   flex-direction: column;
   border-radius: var(--r-3);
   overflow: hidden;
-  background: #0e0e14;
+  background: var(--ink-2);
   box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
 }
 /* In its own window the guide is the page. */
 .gw-popped {
   margin: 0;
-  background: #0b0b10;
+  background: var(--ink);
   color: var(--fg);
   font: 15px/1.45 var(--sans);
 }
@@ -85,7 +85,7 @@
   bottom: 0;
   display: flex;
   flex-direction: column;
-  background: #0e0e14;
+  background: var(--ink-2);
 }
 .gw-sheet {
   border-radius: var(--r-3) var(--r-3) 0 0;
@@ -168,13 +168,13 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  background: #16161c;
+  background: var(--ink-2);
   touch-action: pan-x pan-y;
   overscroll-behavior: contain;
   outline: none;
 }
 .gr-view:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--accent-400, #d62a68);
+  box-shadow: inset 0 0 0 2px var(--pink);
 }
 .gr-content {
   display: flex;
@@ -199,7 +199,7 @@
 .gr-text {
   padding: 16px;
   background: var(--plate-ink);
-  background-color: #111116;
+  background-color: var(--ink-2);
 }
 .gr-text pre {
   margin: 0;
@@ -224,7 +224,7 @@
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  background: #0b0b10;
+  background: var(--ink);
 }
 .gw-popup-title {
   flex: none;
