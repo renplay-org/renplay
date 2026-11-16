@@ -18,7 +18,6 @@ const LARGER = {
   'selector/src/index.css': 2653,
   'runtime/renplay-runtime.js': 1638,
   'server/src/art/store.ts': 839,
-  'selector/src/pages/GamePage.tsx': 619,
 }
 
 const problems = []
@@ -45,6 +44,8 @@ function target(from, spec) {
   if (spec.startsWith('@shared/')) base = join(SHARED, spec.slice('@shared/'.length))
   else if (spec.startsWith('.')) base = resolve(dirname(from), spec)
   else return null
+  // The static demo (demo/) is outside the graph. Its tests in the server import it.
+  if (!base.startsWith(SERVER) && !base.startsWith(SELECTOR)) return null
   // Styles, scripts and data files are not part of the code's graph.
   if (/\.(css|mjs|json)$/.test(base) && existsSync(base)) return null
   for (const p of [base.replace(/\.js$/, '.ts'), base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts')]) if (text.has(p)) return p

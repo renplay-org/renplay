@@ -13,6 +13,7 @@ import { slotInfo } from '@shared/saveslot'
 import { useGames, useSaves } from '../lib/queries'
 import { groupSaves, saveName, versionReason } from '../lib/saves'
 import { playLink } from '../lib/links'
+import { useStaticDemo } from '../lib/auth'
 import { Seg, Pill, IconBtn } from '../lantern/controls'
 import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveVersions, SyncDownloaded } from '@shared/api'
@@ -38,6 +39,7 @@ export default function SaveGallery({ game }: { game: Game }) {
   const toast = useToast()
   const navigate = useNavigate()
   const embed = useDemoEmbed()
+  const staticDemo = useStaticDemo()
   const openSave = (file: string) => demoPlayTarget(embed) ? window.top!.location.assign(playLink(game.id, file)) : navigate(playLink(game.id, file))
   const fileRef = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState<Kind>('all')
@@ -140,9 +142,11 @@ export default function SaveGallery({ game }: { game: Game }) {
               <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.id}/download?file=${encodeURIComponent(s.file)}`))}>
                 Download
               </MenuItem>
-              <MenuItem icon={<Copy />} onClick={() => (close(), setCopying(s))}>
-                Copy to another game
-              </MenuItem>
+              {!staticDemo && (
+                <MenuItem icon={<Copy />} onClick={() => (close(), setCopying(s))}>
+                  Copy to another game
+                </MenuItem>
+              )}
               <MenuItem icon={<History />} onClick={() => (close(), setHistory(s))}>
                 Previous versions
               </MenuItem>
@@ -194,12 +198,16 @@ export default function SaveGallery({ game }: { game: Game }) {
         />
         <span className="grow" />
         <input ref={fileRef} type="file" multiple accept=".save,.zip,application/zip" className="hidden" onChange={(e) => void onImport(e.target.files)} />
-        <Pill size="sm" icon={<Upload />} loading={importing} onClick={() => fileRef.current?.click()}>
-          Import
-        </Pill>
-        <Pill size="sm" icon={<FileArchive />} href={`/api/saves/${game.id}/export`}>
-          Export all
-        </Pill>
+        {!staticDemo && (
+          <>
+            <Pill size="sm" icon={<Upload />} loading={importing} onClick={() => fileRef.current?.click()}>
+              Import
+            </Pill>
+            <Pill size="sm" icon={<FileArchive />} href={`/api/saves/${game.id}/export`}>
+              Export all
+            </Pill>
+          </>
+        )}
         <Pill size="sm" variant="q" icon={<History />} onClick={() => setHistory('all')}>
           History
         </Pill>

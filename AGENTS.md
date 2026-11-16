@@ -123,7 +123,9 @@ image/             The image's own files: nginx.conf.template and entrypoint.sh 
 charts/renplay/    The Helm chart
 deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
                      these files (a code block marked file=deploy/<path>), CI checks them (tests/examples.sh)
-demo/              The public demo's image (demo.renplay.org)
+demo/              The public demo: its image (demo.renplay.org), and static/, the same demo as plain files for a static host,
+                     answered in the browser by a service worker (demo/README.md). A new server route needs a line in
+                     server/src/__tests__/demo-static-routes.ts
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
 website/           renplay.org and adult.renplay.org: plain HTML and CSS, built by `build.mjs` (`sh build.sh`) into

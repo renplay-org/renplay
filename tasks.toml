@@ -55,10 +55,10 @@ description = "Everything CI checks, except the image"
 depends = ["check:server", "check:structure", "check:design", "check:runtime", "check:copy", "check:ui", "test:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
 
 ["check:server"]
-description = "Server type check, the tests' type check, and the tests"
+description = "Server type check, the tests' and the static demo's type check, and the tests"
 dir = "server"
 # Vitest runs the tests without checking their types: tsconfig.test.json does.
-run = ["npx tsc --noEmit", "npx tsc -p tsconfig.test.json", "npx vitest run"]
+run = ["npx tsc --noEmit", "npx tsc -p tsconfig.test.json", "npx tsc -p ../demo/static/tsconfig.json", "npx vitest run"]
 
 ["check:structure"]
 description = "No import cycles, layers in order, no unused exports, files within the size budget"
@@ -70,7 +70,7 @@ run = "node scripts/check-design.mjs"
 
 ["check:types"]
 description = "Type checks of the server, its tests and the library"
-run = ["cd server && npx tsc --noEmit && npx tsc -p tsconfig.test.json", "cd selector && npx tsc -b --noEmit"]
+run = ["cd server && npx tsc --noEmit && npx tsc -p tsconfig.test.json && npx tsc -p ../demo/static/tsconfig.json", "cd selector && npx tsc -b --noEmit"]
 
 ["check:fast"]
 description = "What the pre-push hook runs: types, structure, the look, the runtimes and the writing rule"

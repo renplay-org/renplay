@@ -235,7 +235,7 @@ function Shell() {
         {data?.demo && !embed && (
           <p className="demo-note" role="note">
             <span>
-              This is a demo of Renplay with free games. It starts fresh every few hours, so nothing you do here is kept. The demo has adult games turned off.{' '}
+              {data?.demoStatic ? 'This is a demo. Your saves stay in this browser.' : 'This is a demo of Renplay with free games. It starts fresh every few hours, so nothing you do here is kept. The demo has adult games turned off.'}{' '}
               <a href="https://renplay.org/#install">Install your own</a>
             </span>
           </p>
