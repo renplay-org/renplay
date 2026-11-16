@@ -187,7 +187,7 @@
 .card[data-press] .frame .sheen {
   opacity: 1;
 }
-/* The lift. Not under reduced motion, not while the flight measures or lands on the tile, and under a mouse not while
+/* The lift. Not under reduced motion, not while the flight measures or lands on the tile (nor under a pointer it left there, until it moves), and under a mouse not while
    a search is typed (Search.css), when the list moves under a pointer that is still. Under a mouse it is the shelf's:
    the lift comes and goes at once, and the lean (lean.ts) eases. Focus eases it in, and a press pushes in a little. */
 @media (prefers-reduced-motion: no-preference) {
@@ -195,7 +195,7 @@
     .card .tilt {
       transition: none;
     }
-    html:not([data-typing]) .card:not([data-rest]):hover .tilt {
+    html:not([data-typing]) .card:not([data-rest], [data-still]):hover .tilt {
       translate: 0 -6px;
       scale: var(--lift);
     }
