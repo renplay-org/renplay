@@ -14,8 +14,19 @@ export const padScript = () => {
 /** Gives the page a controller, before it loads. */
 export const withPad = (page) => page.addInitScript(padScript)
 
-/** Presses a button for `ms`, then lets go and waits a little for the page to see it. */
-export const tap = (page, name, ms = 100) => page.evaluate(([n, t]) => new Promise((done) => { window.__hold(n, true); setTimeout(() => { window.__hold(n, false); setTimeout(done, 100) }, t) }), [name, ms])
+/**
+ * Presses a button for `ms` and for at least two frames, then lets go and waits for two frames more: the page reads the
+ * controller once a frame, so a press that lets go before a frame has seen it is no press, and a slow machine that draws a
+ * frame late must still be seen to have been pressed.
+ */
+export const tap = (page, name, ms = 100) => page.evaluate(([n, t]) => new Promise((done) => {
+  const frames = (count) => new Promise((ok) => { const step = () => (count-- > 0 ? requestAnimationFrame(step) : ok()); step() })
+  window.__hold(n, true)
+  Promise.all([new Promise((ok) => setTimeout(ok, t)), frames(2)]).then(() => {
+    window.__hold(n, false)
+    frames(2).then(done)
+  })
+}), [name, ms])
 
 /**
  * Puts the stick through these positions, one every 16 ms (a frame at 60 Hz), then lets it go. By the clock, not by

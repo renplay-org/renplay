@@ -5,7 +5,7 @@
 //   - it lands with no flicker: every frame from the tap to the end of the flight shows either the flying picture or a cover
 //     that is fully there (opaque, its picture in and shown, not its placeholder), from a plain tile and from a search result
 //   - Resume on a slide of the carousel flies the artwork from that slide's cover
-import { test, expect, check } from '../fixtures.mjs'
+import { test, expect, check, until } from '../fixtures.mjs'
 import { fieldOf, onGamePage, quiet, ready, recordGhost, shapeOk, takeGhost } from '../helpers.mjs'
 
 test.use({ mockOptions: {} })
@@ -40,6 +40,13 @@ test('the picture flies from a tile to the game page and back, in its own shape,
     await page.waitForSelector('.grid[data-row] .card')
     const back = await takeGhost(page)
     check(shapeOk(back.frames), `back to ${where} the picture keeps a 2:3 shape on every frame seen`)
+    // The pointer is where the tap was: a tile it is over leans and lifts, and its place is measured at rest, with the pointer away.
+    await page.mouse.move(2, 2)
+    await until(() => page.evaluate((id) => {
+      const tilt = document.querySelector(`.grid[data-row] .card[data-id="${id}"] .tilt, .carousel .stage[data-id="${id}"] .cover`)
+      const style = tilt && getComputedStyle(tilt)
+      return !!style && style.transform === 'none' && style.translate === 'none'
+    }, gameId), 'The tile it landed on is at rest')
     const home = await rectOf(homeOf[selector](gameId))
     check(!!back.end && near(back.end, home) && (await page.evaluate(() => document.querySelectorAll('.ghost').length)) === 0, `back to ${where} it lands on the tile and leaves no picture behind${back.end && !near(back.end, home) ? ` (ends at ${JSON.stringify(back.end)}, tile ${JSON.stringify(home)})` : ''}`)
   }
