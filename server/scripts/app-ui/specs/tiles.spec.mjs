@@ -248,11 +248,13 @@ test('Tiles: the flight lands on a tile at rest', async ({ page }, testInfo) => 
   const tile = page.locator(`.grid[data-row] .card[data-id="${id}"]`)
   await rest(page, tile)
   await expect.poll(async () => (await look(tile)).tilted, { message: 'The mouse leaves the tile tilted and lifted' }).toBe(true)
+  // The picture of the flight forward is seen to fly and land first, and it may start a moment after the page's address changes:
+  // what is noted below is then only the one back.
+  await recordGhost(page)
   await tile.click()
   await expect(page).toHaveURL(/\/game\//)
+  expect((await takeGhost(page)).frames.length, 'The picture flew to the game page').toBeGreaterThan(0)
   await settled(page)
-  // The picture of the flight forward is gone: the one noted below is the one back.
-  await expect(page.locator('.ghost')).toHaveCount(0)
   // Where the picture's animation ends, and what the tile it lands on is while it flies: noted the moment the picture is added
   // to the page and on every frame, so a machine that draws no frame during the flight still shows both.
   await recordGhost(page)
