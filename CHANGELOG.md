@@ -25,6 +25,7 @@ release notes say what).
 - The game page's and the settings' sections are divided by thin lines, with their titles in the book face, instead of filled rounded cards. Cards you press or drop a file on keep their fill. The sort button, the account page's links and the notices lose their fill too.
 - On a phone's game page the heart is a small quiet button beside Play, Change art is a quiet link with the art credits, and the line with the developer, the state and the version breaks between its parts and never leaves a dot at the end of a line.
 - The demo, built as plain files or as its image, now says in every answer that search engines should leave it out, and its robots.txt lets them in to read that. Its page has the title "Renplay demo" and a description, instead of only "Renplay".
+- Every screen follows the website's look. A save is a card like a game's tile, with its picture in the same corner and border and its name in the book face. Labels such as Admin, Installed or Changed are plain coloured words instead of filled chips, and the walkthroughs, the saves you can copy to and the files of a mod are thin-lined rows instead of filled cards. The line under a tab, a choice, a filter or a link in the header is exactly as wide as its word and draws in from the left. Under the pointer only a tile's picture leans and lifts, its title stays still, and nothing dark shows behind it. **Settings → This browser** has a new switch, **Move cards with the pointer**, which is on until you turn it off.
 
 ### Fixed
 
