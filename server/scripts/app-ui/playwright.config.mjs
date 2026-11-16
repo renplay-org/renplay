@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 export default defineConfig({
   testDir: './specs',
   // The container has four CPUs. A Chromium test waits more than it works, so five of them side by side fit. A WebKit test keeps
-  // three cores busy (it draws in software), so its projects take two workers at most. Every test has its own page, so the
-  // tests of one file run side by side too.
+  // three cores busy (it draws in software), so each WebKit project takes three workers at most. Every test has its own page, so
+  // the tests of one file run side by side too.
   workers: 5,
   fullyParallel: true,
   retries: 1,
