@@ -11,16 +11,11 @@ import type { Snapshot } from './types'
 
 declare const self: ServiceWorkerGlobalScope
 
-const CHANNEL = 'renplay-demo'
-
 let snapshot: Promise<Snapshot> | null = null
 const answer = createAnswer({
   store: idbStore(),
   snapshot: () => (snapshot ??= fetch('/demo/snapshot.json').then((r) => r.json() as Promise<Snapshot>)),
   notify() {
-    const channel = new BroadcastChannel(CHANNEL)
-    channel.postMessage('changed')
-    channel.close()
     void self.clients.matchAll({ includeUncontrolled: true }).then((all) => all.forEach((c) => c.postMessage({ type: 'renplay-demo:changed' })))
   },
 })

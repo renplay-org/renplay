@@ -74,6 +74,8 @@ test('a save made in one frame appears in the other, survives a reload and stays
   const { phone } = frames(page)
   await expect.poll(() => ready(page), { timeout: 30000 }).toBe(2)
   await expect(phone.getByRole('link', { name: 'Play', exact: true }).first()).toBeVisible()
+  // What needs a server is left out, not shown and refused.
+  await expect(phone.getByRole('heading', { name: 'Offline', exact: true })).toHaveCount(0)
   if (touch(testInfo)) await runtimeSaves(page)
   else await playAndSave(page)
   // The website's relay of `saved` as `refresh` is all that tells the phone.

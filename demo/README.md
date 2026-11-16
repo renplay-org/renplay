@@ -73,7 +73,7 @@ frame are both controlled by it, so the game's save requests reach it too, and t
   32 MB in all, 1,000 files and 3 earlier versions of each.
 - Every other route is refused the way the server demo refuses it. What the server demo refuses is one list,
   `server/src/shared/demo-refusals.ts`, which `accounts/access.ts` and the stand-in both read.
-- A change tells every open page, through `postMessage` and a `BroadcastChannel`, and the page turns it into
+- A change tells every open page, through `postMessage`, and the page's loader turns it into
   `renplay:saves-changed`, which the embed bridge already hears. The website's messages (`ready`, `engaged`,
   `saved`, `nudge`, `refresh`) are the same as the server demo's.
 - The built `index.html` has a small loader that registers the worker and waits for it to control the page, since the
