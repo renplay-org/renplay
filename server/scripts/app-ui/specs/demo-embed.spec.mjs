@@ -58,7 +58,6 @@ test('demo embed shares a Lax guest session, reports saves, refreshes and nudges
   await phone.getByRole('button', { name: 'All saves', exact: true }).click()
   await expect(phone.getByText('A shared scene').first()).toBeVisible()
   await expect.poll(() => phone.locator('body').evaluate(() => document.getAnimations().every((a) => a.playState === 'finished'))).toBe(true)
-  await page.screenshot({ path: testInfo.outputPath('demo-two-frames.png'), fullPage: true })
   expect(errors).toEqual([])
 })
 

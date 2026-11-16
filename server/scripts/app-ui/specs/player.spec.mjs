@@ -133,7 +133,6 @@ test('every control in the menu, Saves and Options is tall enough and no text is
       await expect(menu.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
     }
     if (name === 'Options') await expect(menu.getByText('Text size')).toBeVisible()
-    await page.screenshot({ path: testInfo.outputPath(`menu-${name}.png`) })
     const found = await menu.evaluate((el) => {
       const small = []
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
@@ -158,7 +157,6 @@ test('every control in the menu, Saves and Options is tall enough and no text is
     await expect(menu.getByText('Some saves have not reached the server yet.')).toBeVisible()
     expect(await menu.locator('.pm-body').evaluate((b) => b.scrollHeight - b.clientHeight)).toBeLessThanOrEqual(0)
     expect(await menu.evaluate((m) => m.getBoundingClientRect().bottom)).toBeLessThanOrEqual(390)
-    await page.screenshot({ path: testInfo.outputPath(`menu-the-list-waiting.png`) })
     await context.setOffline(false)
   }
 })
@@ -258,7 +256,6 @@ test('the guide opens beside the menu, which stays open, and Back to the game le
   await expect.poll(async () => (await place()).x).toBeGreaterThanOrEqual(edge)
   expect((await place()).x + (await place()).width).toBeLessThanOrEqual(page.viewportSize().width)
   await expect(guide.locator('[data-reader]')).toBeFocused()
-  await page.screenshot({ path: testInfo.outputPath('guide-beside-the-menu.png') })
   // A tap in the guide does not close the menu.
   await press(testInfo, guide.locator('.gw-bar'))
   await expect(menu).toBeVisible()
@@ -283,7 +280,6 @@ test('the guide opens beside the menu, which stays open, and Back to the game le
   await expect(menu).toBeHidden()
   await expect(guide).toBeVisible()
   expect(await place()).toEqual(where)
-  await page.screenshot({ path: testInfo.outputPath('guide-left-over-the-game.png') })
   // The key and the scrim close the menu the same way.
   await page.keyboard.press('Backquote')
   await expect(menu).toBeVisible()
@@ -366,7 +362,6 @@ test('the home screen tip goes the moment the menu opens, so it never lies over 
   const menu = page.getByRole('dialog', { name: /the player menu/ })
   await expect(menu).toBeVisible()
   await expect(tip).toHaveCount(0)
-  await page.screenshot({ path: testInfo.outputPath('menu-without-the-tip.png') })
   // It is shown once: not again after the menu closes, and the menu keeps its own row about the home screen.
   await expect(menu.getByRole('button', { name: /^Full screen/ })).toBeVisible()
   await page.keyboard.press('Backquote')
@@ -393,7 +388,6 @@ test('after Save now the row offers Name it, which names the save with Enter or 
   await expect(menu.getByRole('button', { name: 'Name it' })).toHaveCount(0)
   const field = await nameIt(testInfo, menu)
   await expect(field).toBeFocused()
-  await page.screenshot({ path: testInfo.outputPath('name-it-open.png') })
   await field.fill('Meeting Diya')
   await page.keyboard.press('Enter')
   await expect(page.getByText('Named', { exact: true })).toBeVisible()
@@ -402,7 +396,6 @@ test('after Save now the row offers Name it, which names the save with Enter or 
   await expect(menu.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
   await expect(menu.getByRole('button', { name: 'Name it' })).toHaveCount(0)
   await expect(menu.getByRole('button', { name: 'Save now' })).toBeFocused()
-  await page.screenshot({ path: testInfo.outputPath('name-it-saved.png') })
   // The menu's list shows the name.
   await press(testInfo, menu.getByRole('button', { name: /^Saves/ }))
   await expect(menu.locator('.pm-save').first()).toContainText('Meeting Diya')
@@ -460,7 +453,6 @@ test('with a controller the menu shows its buttons: Menu on Back to the game, th
   await expect(menu.getByRole('button', { name: 'Save now' })).toBeFocused()
   await expect(menu.getByRole('button', { name: 'Save now' }).locator('.pm-a')).toHaveCount(1)
   await expect(menu.locator('.pm-a')).toHaveCount(1)
-  await page.screenshot({ path: testInfo.outputPath('menu-glyphs.png') })
   // Inside a list the Back row has B.
   await menu.getByRole('button', { name: /Saves/ }).focus()
   await hold('a')
@@ -515,7 +507,6 @@ test('the turn line goes the moment the menu opens, so it never lies over a row'
   await expect(page.getByRole('dialog', { name: /the player menu/ })).toBeVisible()
   // Gone with the menu, well before a toast's own four seconds are up.
   await expect(turn).toHaveCount(0, { timeout: 1000 })
-  await page.screenshot({ path: testInfo.outputPath('menu-without-the-turn-line.png') })
 })
 
 test('the portrait gate is only there while the game loads, and the toast comes once', async ({ page }, testInfo) => {
@@ -525,12 +516,10 @@ test('the portrait gate is only there while the game loads, and the toast comes 
   const toast = page.locator('.toast', { hasText: 'Turn your phone sideways for a bigger picture' })
   await expect(gate).toBeVisible()
   await expect(toast).toHaveCount(0)
-  await page.screenshot({ path: testInfo.outputPath('gate.png') })
   await engine.ready()
   await expect(page.locator('.rp-pill').first()).toBeVisible()
   await expect(gate).toHaveCount(0)
   await expect(toast).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('gate-toast.png') })
   // Once: the next game on this phone says nothing.
   await page.reload()
   await expect(gate).toBeVisible()
@@ -549,12 +538,10 @@ test('on an iPhone held upright one message shows at a time: the turn line, then
   await expect(turn).toBeVisible()
   await expect(tip).toHaveCount(0)
   await expect(page.locator('.toast')).toHaveCount(1)
-  await page.screenshot({ path: testInfo.outputPath('iphone-turn-toast.png') })
   // When the turn line has gone, the tip follows, on its own.
   await expect(tip).toBeVisible()
   await expect(turn).toHaveCount(0)
   await expect(page.locator('.toast')).toHaveCount(1)
-  await page.screenshot({ path: testInfo.outputPath('iphone-home-screen-tip.png') })
   expect(await page.evaluate(() => localStorage.getItem('renplay:home-screen-tip'))).toBe('1')
 })
 
@@ -593,7 +580,6 @@ test('the menu shows the time in full screen and not otherwise', async ({ page }
   const box = await clock.boundingBox()
   expect(box.height, 'One line').toBeLessThan(24)
   expect(await clock.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(13)
-  await page.screenshot({ path: testInfo.outputPath('clock.png') })
   await menu.getByRole('switch', { name: 'Full screen' }).click()
   await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(false)
   await expect(clock).toHaveCount(0)

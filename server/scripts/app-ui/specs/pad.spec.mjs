@@ -195,7 +195,6 @@ test.describe('the legend', () => {
     await tap(page, 'down', 60)
     await expect(legend).toBeVisible()
     await expect(legend).toHaveText(/Select\s*Back\s*LBRB\s*Pages|Select.*Back.*Pages/)
-    await page.screenshot({ path: testInfo.outputPath('legend.png') })
     await page.mouse.move(300, 300)
     await page.mouse.move(340, 320)
     await expect(legend, 'gone with the mouse').toHaveCount(0)

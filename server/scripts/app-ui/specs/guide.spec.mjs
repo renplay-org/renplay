@@ -94,14 +94,12 @@ test('on a phone held upright a PDF shows page 1 drawn, goes to page 2, and the 
   const screen = await page.evaluate(() => innerHeight)
   const height = async () => (await sheet.boundingBox()).height
   expect(Math.abs((await height()) - screen * 0.58)).toBeLessThan(3)
-  await page.screenshot({ path: testInfo.outputPath('sheet-58.png') })
   const handle = await sheet.getByRole('button', { name: 'Make the guide taller' }).boundingBox()
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
   await page.mouse.down()
   await page.mouse.move(handle.x + handle.width / 2, handle.y - 120, { steps: 6 })
   await page.mouse.up()
   await expect.poll(async () => Math.abs((await height()) - screen * 0.92), { message: 'The sheet is 92 percent' }).toBeLessThan(3)
-  await page.screenshot({ path: testInfo.outputPath('sheet-92.png') })
   // And down again to 58.
   const down = await sheet.getByRole('button', { name: 'Make the guide shorter' }).boundingBox()
   await page.mouse.move(down.x + down.width / 2, down.y + down.height / 2)
@@ -147,7 +145,6 @@ test('on a phone a PDF with wide margins opens at its text column, larger than F
   const box = await textBox(sheet)
   expect(box.left).toBeGreaterThanOrEqual(view.x)
   expect(box.right, 'The text column ends inside the window').toBeLessThanOrEqual(view.x + view.width)
-  await page.screenshot({ path: testInfo.outputPath('guide-text-column.png') })
   // Fit shows the whole page, and pressed again goes back to the column.
   await sheet.getByRole('button', { name: 'Fit' }).tap()
   await expect.poll(width).toBeCloseTo(fit, -1)
@@ -192,7 +189,6 @@ test('on a phone held sideways the guide fills the screen, and the Guide pill br
   const { width, height } = page.viewportSize()
   expect(await cover.boundingBox()).toEqual({ x: 0, y: 0, width, height })
   await expect.poll(() => ink(pageCanvas(cover, 1))).toBeGreaterThan(50)
-  await page.screenshot({ path: testInfo.outputPath('cover.png') })
   // The Menu pill stays over it too, and its menu opens above the guide, which stays under it.
   await page.locator('.rp-pills').getByRole('button', { name: 'Menu' }).tap()
   const menu = page.getByRole('dialog', { name: /the player menu/ })
@@ -205,7 +201,6 @@ test('on a phone held sideways the guide fills the screen, and the Guide pill br
   await pill.tap()
   await expect(cover).toBeHidden()
   await expect(pill).toHaveAttribute('aria-pressed', 'false')
-  await page.screenshot({ path: testInfo.outputPath('guide-pill.png') })
   await pill.tap()
   await expect(cover).toBeVisible()
   // Back to the game, in the guide's own bar, does the same.
@@ -225,10 +220,8 @@ test('a first open is wide enough to read, Fit shows 10 point text at 9 px, plus
   const width = async () => (await guide.locator('.gr-page').first().boundingBox()).width
   const fit = await width()
   expect((fit / 816) * (10 * 96) / 72, 'The 10 point text at Fit, in px').toBeGreaterThanOrEqual(9)
-  await page.screenshot({ path: testInfo.outputPath('pdf-fit.png') })
   await guide.getByRole('button', { name: 'Zoom in' }).click()
   await expect.poll(width, { message: 'Zoom in makes the page larger' }).toBeGreaterThan(fit * 1.2)
-  await page.screenshot({ path: testInfo.outputPath('pdf-zoomed.png') })
   await guide.getByRole('button', { name: 'Fit' }).click()
   await expect.poll(width).toBeCloseTo(fit, 0)
   // Focus is in the guide after a click on its button: Escape closes it.
@@ -289,7 +282,6 @@ test('with focus in the guide the keys scroll, turn pages, zoom and fit, and the
   await expect(text).toBeVisible()
   expect(await text.evaluate((el) => getComputedStyle(el).fontSize)).toBe('15px')
   expect(await text.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
-  await page.screenshot({ path: testInfo.outputPath('text.png') })
 })
 
 test('a picture fits the width, and the same bar and keys zoom it', async ({ page }, testInfo) => {
@@ -307,7 +299,6 @@ test('a picture fits the width, and the same bar and keys zoom it', async ({ pag
   await expect(guide.getByRole('button', { name: 'Next page' })).toHaveCount(0)
   await guide.getByRole('button', { name: 'Zoom in' }).click()
   await expect.poll(async () => (await img.boundingBox()).width).toBeGreaterThan(fit * 1.2)
-  await page.screenshot({ path: testInfo.outputPath('picture.png') })
 })
 
 test('the see-through toggle is kept, and a kept 85 percent from before is on', async ({ page }, testInfo) => {
@@ -324,7 +315,6 @@ test('the see-through toggle is kept, and a kept 85 percent from before is on', 
   await openGuide(page, testInfo)
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
   expect(await opacity()).toBe('0.7')
-  await page.screenshot({ path: testInfo.outputPath('see-through.png') })
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-pressed', 'false')
   expect(await opacity()).toBe('1')
@@ -348,7 +338,6 @@ test('the controller scrolls, turns pages, switches files and toggles see-throug
   const guide = guideOf(page)
   await expect(guide).toBeVisible()
   await expect.poll(() => ink(pageCanvas(guide, 1))).toBeGreaterThan(50)
-  await page.screenshot({ path: testInfo.outputPath('pad-guide.png') })
   // The guide holds the pad: the game was told to give it up.
   await expect.poll(async () => (await lastPads())?.toGame).toBe(false)
   const view = guide.locator('.gr-view')
@@ -426,7 +415,6 @@ test('pop out moves the reader to a Picture-in-Picture window, Bring back and cl
   // The in-page window is away, the controller is the game's again, and the button reads Bring back.
   await expect(guide).toHaveCount(0)
   await expect.poll(async () => (await lastPads())?.toGame).toBe(true)
-  await pip.screenshot({ path: testInfo.outputPath('popped-out.png') })
   await small.getByRole('button', { name: 'Bring back' }).click()
   await expect(guide).toBeVisible()
   // Closing the small window brings it back as well.
