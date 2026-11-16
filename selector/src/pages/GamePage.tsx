@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, Download, ExternalLink, Info, MoreHorizontal, Play, RefreshCw, Save } from 'lucide-react'
+import { BookOpen, ExternalLink, Info, MoreHorizontal, Play, RefreshCw, Save } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import FileBrowser from '../components/FileBrowser'
@@ -7,6 +7,7 @@ import ActionBar from '../components/ActionBar'
 import SceneCard from '../components/SceneCard'
 import UpdateCard from '../components/UpdateCard'
 import OfflineCard from '../components/OfflineCard'
+import InstallButton from '../components/InstallButton'
 import { Seg, Pill, Stars, Bar, IconBtn } from '../lantern/controls'
 import Stage, { travelToDoor } from '../lantern/Stage'
 import { useRoom } from '../lantern/Room'
@@ -27,7 +28,7 @@ import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
 import { isRenpy } from '@shared/family'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
-import { useAuth } from '../lib/auth'
+import { useAuth, useStaticDemo } from '../lib/auth'
 import { phoneLabel, stateLabel } from '../lib/tags'
 import type { HistoryPage } from '@shared/api'
 import Sheet from '../lantern/Sheet'
@@ -36,6 +37,7 @@ type Tab = 'play' | 'saves' | 'walkthroughs' | 'files' | 'details' | 'manage'
 
 export default function GamePage() {
   const admin = useAuth().data?.user.role === 'admin'
+  const staticDemo = useStaticDemo()
   const { id: gameId = '' } = useParams()
   const { data: game, isLoading, error } = useGame(gameId)
   const { data: catalog } = useCatalog()
@@ -70,6 +72,8 @@ export default function GamePage() {
   const installed = game.status === 'installed'
   const renpy = isRenpy(game)
   const hidden = game.nsfw && view !== 'shown'
+  // The picture a person chooses is kept by the server.
+  const noPicker = hidden || staticDemo
   const credits = hidden ? [] : (['grid', 'hero'] as const).map((kind) => ({ kind, credit: game.art[kind]?.credit, made: game.art[kind]?.made })).filter((c, i, all) => c.credit && all.findIndex((o) => JSON.stringify(o.credit) === JSON.stringify(c.credit)) === i)
 
   // The parts the game has, with a separator between each two.
@@ -88,7 +92,7 @@ export default function GamePage() {
       <GameTags game={game} vocabulary={catalog?.vocabulary ?? {}} />
       {game.summary && <p className="sum">{game.summary}</p>}
       {game.recipe?.continuesFrom.length ? <p className="small muted" style={{ marginTop: 10 }}>Continues from {game.recipe.continuesFrom.join(', ')}. The game finds those saves itself.</p> : null}
-      {(credits.length > 0 || !hidden) && (
+      {(credits.length > 0 || !noPicker) && (
         <p className="xs muted" style={{ marginTop: 10, lineHeight: 1.6 }}>
           {credits.map((c) => (
             <span key={c.kind} style={{ display: 'block' }}>
@@ -97,7 +101,7 @@ export default function GamePage() {
               {c.made ? ', fitted by Renplay' : ''}
             </span>
           ))}
-          {!hidden && (
+          {!noPicker && (
             <button className="link" onClick={() => setPicker('grid')}>
               Change art
             </button>
@@ -178,8 +182,8 @@ export default function GamePage() {
       )}
       {admin && renpy && tab === 'files' && <FileBrowser game={game} />}
       {tab === 'walkthroughs' && <Details game={game} section="walkthroughs" />}
-      {tab === 'details' && <Details game={game} section="details" onChangeArt={hidden ? undefined : setPicker} />}
-      {!hidden && <ArtPicker game={game} open={!!picker} initialKind={picker ?? 'grid'} onClose={() => setPicker(null)} />}
+      {tab === 'details' && <Details game={game} section="details" onChangeArt={noPicker ? undefined : setPicker} />}
+      {!noPicker && <ArtPicker game={game} open={!!picker} initialKind={picker ?? 'grid'} onClose={() => setPicker(null)} />}
       {admin && tab === 'manage' && <Details game={game} section="manage" />}
       {!game.job && (
         <ActionBar watch={actsRef}>
@@ -191,43 +195,6 @@ export default function GamePage() {
         </ActionBar>
       )}
     </div>
-  )
-}
-
-function InstallButton({ game }: { game: Game }) {
-  const toast = useToast()
-  const qc = useQueryClient()
-  const [busy, setBusy] = useState(false)
-  const admin = useAuth().data?.user.role === 'admin'
-  if (!admin) return <span className="small muted">Ask an admin to install this game.</span>
-  if (!game.canReinstall)
-    return (
-      <Pill variant="p" size="lg" icon={<Download />} to="/add">
-        Add an archive to install
-      </Pill>
-    )
-  return (
-    <Pill
-      variant="p"
-      size="lg"
-      disabled={busy}
-      icon={<Download />}
-      onClick={async () => {
-        setBusy(true)
-        try {
-          await post(`/api/games/${game.id}/reinstall`, { reapplyMods: true })
-          toast('Installing', 'info')
-          void qc.invalidateQueries({ queryKey: ['game', game.id] })
-          void qc.invalidateQueries({ queryKey: ['jobs'] })
-        } catch (e) {
-          toast(errorText(e), 'error')
-        } finally {
-          setBusy(false)
-        }
-      }}
-    >
-      Install
-    </Pill>
   )
 }
 
@@ -262,6 +229,7 @@ const STATUS_OPTIONS = [
 
 /** Play: your progress, your status and rating, updates, and the last sessions of this game. */
 function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
+  const staticDemo = useStaticDemo()
   const qc = useQueryClient()
   const toast = useToast()
   const history = useQuery({ queryKey: ['history', game.id], queryFn: () => api<HistoryPage>(`/api/history?game=${encodeURIComponent(game.id)}&days=30&tz=${encodeURIComponent(timeZone())}`) })
@@ -321,7 +289,7 @@ function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
       </div>
       <div className="stack">
         <UpdateCard game={game} />
-        <OfflineCard game={game} />
+        {!staticDemo && <OfflineCard game={game} />}
         <section className="panel">
           <div className="row between" style={{ marginBottom: 10 }}>
             <h2 className="h3">History</h2>
