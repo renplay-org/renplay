@@ -24,7 +24,9 @@ export default defineConfig({
   projects: [
     { name: 'chromium-desktop', use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } } },
     { name: 'webkit-portrait', use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
-    { name: 'webkit-landscape', use: { browserName: 'webkit', viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+    { name: 'webkit-landscape', testIgnore: /static-demo\.spec/, use: { browserName: 'webkit', viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+    // The static demo's service worker has its own WebKit fixes: it is also checked at desktop size.
+    { name: 'webkit-desktop', testMatch: /static-demo\.spec/, use: { browserName: 'webkit', viewport: { width: 1440, height: 900 } } },
   ],
   webServer: {
     command: 'node scripts/app-ui/serve.mjs',
