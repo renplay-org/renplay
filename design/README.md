@@ -28,6 +28,9 @@ changes, not the website.
   that is a name does not. Labels are sentence case, never uppercase.
 - **One lit control per screen.** The thing to do next is paper (`--paper`, `--on-paper`), flat, no shadow. Everything
   else is a hairline (`--hair`) or quiet text.
+- **Words, not strips.** A tab, a choice and a filter are plain text, and the one chosen is lit white with a `--lamp`
+  underline. A tag is a small mono fact, separated from the next by a slash. A section is a hairline across its top
+  with its title in Fraunces, never a filled rounded card. A plate (`.plate`) is for a card you press or drop on.
 - **The brand gradient has three homes.** The logo, the avatar without a picture, and the room's glow. Never on a
   control, never behind text.
 - **Three corners, the website's.** `--r-1` (4 px) for a control and a tile, `--r-2` (6) for a row, `--r-3` (10) for a

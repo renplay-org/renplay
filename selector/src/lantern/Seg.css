@@ -1,8 +1,0 @@
-/* A group with more than fits goes on a second line, so that no label is cut. */
-.seg.wrap {
-  height: auto;
-  flex-wrap: wrap;
-}
-.seg.wrap > button {
-  min-height: 40px;
-}

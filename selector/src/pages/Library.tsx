@@ -274,7 +274,7 @@ export default function Library() {
           </Shelf>
           <Shelf title="Not finished installing" count={failedShown.length} href="/?filter=failed">
             {failedShown.slice(0, 12).map((job) => (
-              <div key={job.id} className="panel" style={{ width: 'calc(var(--tile-w) * 2 + var(--gap))', flex: 'none' }}>
+              <div key={job.id} className="plate" style={{ width: 'calc(var(--tile-w) * 2 + var(--gap))', flex: 'none' }}>
                 <p className="t" style={{ fontWeight: 650 }}>{jobSubject(job) || 'Install interrupted'}</p>
                 <p className="small muted" style={{ margin: '8px 0 12px' }}>{job.error || 'The install was interrupted. Your saves are kept.'}</p>
                 <Pill

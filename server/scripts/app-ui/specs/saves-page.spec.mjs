@@ -44,10 +44,16 @@ test('the game page\'s Saves tab, its action sheet and its history sheet have no
     path: '/game/game-000#saves',
     slots: [{ ...slot(1, 5), title: 'Meeting Diya', note: 'Before the first lunch scene', pinnedAt: '2026-11-10T10:00:00Z' }, slot(2, 30), slot(3, 60)],
   })
-  const tabs = page.getByRole('group', { name: 'Game page sections' })
+  const tabs = page.getByRole('tablist', { name: 'Game page sections' })
   await expect(tabs).toBeVisible()
   await expect(page.getByText('Meeting Diya').first()).toBeVisible()
-  expect(await cut(tabs), 'The tab strip').toEqual([])
+  // A strip that does not fit scrolls sideways: each tab is whole inside it once it is brought into view.
+  for (const tab of await tabs.getByRole('tab').all()) {
+    await tab.scrollIntoViewIfNeeded()
+    const [row, box] = [await tabs.boundingBox(), await tab.boundingBox()]
+    expect(box.x >= row.x - 1 && box.x + box.width <= row.x + row.width + 1, `The ${await tab.textContent()} tab is inside the strip`).toBe(true)
+    expect(await cut(tab), `The ${await tab.textContent()} tab`).toEqual([])
+  }
   const toolbar = page.locator('.toolbar')
   expect(await cut(toolbar), 'The toolbar').toEqual([])
   expect(await toolbar.evaluate((el) => el.scrollWidth - el.clientWidth), 'The toolbar does not scroll').toBeLessThanOrEqual(1)

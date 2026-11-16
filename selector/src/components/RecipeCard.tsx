@@ -48,7 +48,7 @@ export default function RecipeCard({ recipe: r }: { recipe: CatalogGame }) {
         </p>
       )}
       {!!primary.length && (
-        <div className="row wrap" style={{ gap: 6, marginTop: 10 }}>
+        <div className="tags" style={{ marginTop: 10 }}>
           {primary.map((t) => (
             <span key={t.id} className="tag">
               {t.label}

@@ -2,7 +2,9 @@ import { Loader2 } from 'lucide-react'
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
-import './Seg.css'
+import './Rows.css'
+import './Section.css'
+import './Words.css'
 
 /**
  * The button: Primary is paper (one lit button per visible task), secondary a hairline, quiet text,
@@ -92,7 +94,7 @@ export function Chip({ on, ex, n, dim, children, ...rest }: ButtonHTMLAttributes
   )
 }
 
-/** Segmented control: buttons on a plate, 44 px (40 small), every button at least 44 wide. */
+/** A choice among a few, as words: the chosen one lit with an underline, every word at least 44 wide and tall. Tabs are `Tabs`. */
 export function Seg<T extends string>({
   value,
   onChange,
@@ -100,7 +102,6 @@ export function Seg<T extends string>({
   label,
   small,
   scroll,
-  wrap,
   className,
   disabled,
 }: {
@@ -110,13 +111,11 @@ export function Seg<T extends string>({
   label?: string
   small?: boolean
   scroll?: boolean
-  /** A group with more than fits goes on a second line, so that no label is cut. */
-  wrap?: boolean
   className?: string
   disabled?: boolean
 }) {
   return (
-    <div role="group" aria-label={label} className={`seg ${small ? 'sm' : ''} ${scroll ? 'scroll' : ''} ${wrap ? 'wrap' : ''} ${className ?? ''}`.trim()}>
+    <div role="group" aria-label={label} className={`seg ${small ? 'sm' : ''} ${scroll ? 'scroll' : ''} ${className ?? ''}`.trim()}>
       {options.map((o) => (
         <button
           key={o.value}

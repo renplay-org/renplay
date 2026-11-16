@@ -1,14 +1,13 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, ExternalLink, Info, MoreHorizontal, Play, RefreshCw, Save } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { BookOpen, ExternalLink, MoreHorizontal, Play, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import FileBrowser from '../components/FileBrowser'
 import ActionBar from '../components/ActionBar'
-import SceneCard from '../components/SceneCard'
-import UpdateCard from '../components/UpdateCard'
-import OfflineCard from '../components/OfflineCard'
 import InstallButton from '../components/InstallButton'
-import { Seg, Pill, Stars, Bar, IconBtn } from '../lantern/controls'
+import { PlayPane } from './PlayPane'
+import { Pill, Bar, IconBtn } from '../lantern/controls'
+import { Tabs, panelId, tabId } from '../lantern/Tabs'
 import Stage, { travelToDoor } from '../lantern/Stage'
 import { useRoom } from '../lantern/Room'
 import { creditText } from '../lantern/art'
@@ -21,7 +20,7 @@ import { api, del, post } from '../lib/api'
 import type { Game } from '@shared/api'
 import type { ArtKind } from '@shared/recipe'
 import ArtPicker from '../components/ArtPicker'
-import { ago, capitalize, duration, jobStage, pct, playedTime, timeZone } from '../lib/format'
+import { ago, capitalize, jobStage, pct } from '../lib/format'
 import { bytes } from '@shared/format'
 import { recipeLinks, playLink, popupClick } from '../lib/links'
 import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
@@ -30,7 +29,6 @@ import { useCatalog, useGame, useSaves } from '../lib/queries'
 
 import { useAuth, useStaticDemo } from '../lib/auth'
 import { phoneLabel, stateLabel } from '../lib/tags'
-import type { HistoryPage } from '@shared/api'
 import Sheet from '../lantern/Sheet'
 
 type Tab = 'play' | 'saves' | 'walkthroughs' | 'files' | 'details' | 'manage'
@@ -76,16 +74,17 @@ export default function GamePage() {
   const noPicker = hidden || staticDemo
   const credits = hidden ? [] : (['grid', 'hero'] as const).map((kind) => ({ kind, credit: game.art[kind]?.credit, made: game.art[kind]?.made })).filter((c, i, all) => c.credit && all.findIndex((o) => JSON.stringify(o.credit) === JSON.stringify(c.credit)) === i)
 
-  // The parts the game has, with a separator between each two.
-  const metaParts = [
-    game.developer && <span key="by">By {game.developer}</span>,
-    game.state && <span key="m0">{stateLabel[game.state]}</span>,
-    game.version && <span key="m1">{game.version}</span>,
-    game.free && <span key="m2">Free</span>,
-    game.phone && <span key="m3">{phoneLabel[game.phone]}</span>,
-    !isRenpy(game) && <BetaBadge key="m4" engine={game.family} />,
-  ].filter(Boolean)
-  const meta = metaParts.flatMap((part, i) => (i ? [<span key={`sep${i}`} className="sep">{'\u00a0·'}</span>, ' ', part] : [part]))
+  // The parts the game has. The line draws the mark between them, so none is left at the end of a wrapped line.
+  const meta = (
+    <div className="sepline">
+      {game.developer && <span>By {game.developer}</span>}
+      {game.state && <span>{stateLabel[game.state]}</span>}
+      {game.version && <span>{game.version}</span>}
+      {game.free && <span>Free</span>}
+      {game.phone && <span>{phoneLabel[game.phone]}</span>}
+      {!isRenpy(game) && <span><BetaBadge engine={game.family} /></span>}
+    </div>
+  )
 
   const body = (
     <>
@@ -93,26 +92,28 @@ export default function GamePage() {
       {game.summary && <p className="sum">{game.summary}</p>}
       {game.recipe?.continuesFrom.length ? <p className="small muted" style={{ marginTop: 10 }}>Continues from {game.recipe.continuesFrom.join(', ')}. The game finds those saves itself.</p> : null}
       {(credits.length > 0 || !noPicker) && (
-        <p className="xs muted" style={{ marginTop: 10, lineHeight: 1.6 }}>
+        <div className="sepline xs muted" style={{ marginTop: 10, lineHeight: 1.6 }}>
           {credits.map((c) => (
-            <span key={c.kind} style={{ display: 'block' }}>
+            <span key={c.kind}>
               {credits.length > 1 ? `${c.kind === 'grid' ? 'Poster' : 'Background'} ` : 'Art '}
               {creditText(c.credit)}
               {c.made ? ', fitted by Renplay' : ''}
             </span>
           ))}
           {!noPicker && (
-            <button className="link" onClick={() => setPicker('grid')}>
-              Change art
-            </button>
+            <span>
+              <button className="link-q" onClick={() => setPicker('grid')}>
+                Change art
+              </button>
+            </span>
           )}
-        </p>
+        </div>
       )}
     </>
   )
 
   const actions = game.job ? (
-    <div className="panel" style={{ maxWidth: 440, width: '100%' }}>
+    <div className="plate" style={{ maxWidth: 440, width: '100%' }}>
       <div className="row between small" style={{ marginBottom: 8 }}>
         <span className="muted-2">{jobStage(game.job, 'Working')}</span>
         <span className="tnum muted">{game.job.status === 'running' ? pct(game.job.progress) : ''}</span>
@@ -157,34 +158,36 @@ export default function GamePage() {
       <Stage game={game} under={installed && !game.job && renpy && latest ? <Link className="link-q" to={playLink(gameId)} target={demoPlayTarget(embed)} onClick={() => travelToDoor(game, hidden)}>Start from the main menu</Link> : undefined} eyebrow={installed ? 'In your library' : game.status === 'installing' ? 'Installing' : 'Not installed'} back={{ to: '/', label: 'Library' }} meta={meta} body={body} actions={actions} actsRef={actsRef} />
 
       <div style={{ marginTop: 32, marginBottom: 24 }}>
-        <Seg<Tab>
-          wrap
+        <Tabs<Tab>
           label="Game page sections"
+          group="game"
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'play' as const, label: <><Play /> Play</> },
+            { value: 'play' as const, label: 'Play' },
             // Save slots and mods are Ren'Py's; other engines' games keep their saves themselves.
-            ...(renpy ? [{ value: 'saves' as const, label: <><Save /> Saves</> }] : []),
-            { value: 'walkthroughs' as const, label: <><BookOpen /> Walkthroughs</> },
+            ...(renpy ? [{ value: 'saves' as const, label: 'Saves' }] : []),
+            { value: 'walkthroughs' as const, label: 'Walkthroughs' },
             ...(admin && renpy ? [{ value: 'files' as const, label: 'Mods and files' }] : []),
-            { value: 'details' as const, label: <><Info /> Details</> },
+            { value: 'details' as const, label: 'Details' },
             ...(admin ? [{ value: 'manage' as const, label: 'Manage' }] : []),
           ]}
         />
       </div>
-      {tab === 'play' && <PlayPane game={game} onSaves={renpy ? () => setTab('saves') : undefined} />}
-      {renpy && tab === 'saves' && (
-        <>
-          {!installed && <p className="small muted" style={{ marginBottom: 16 }}>Install the game to load your saves.</p>}
-          <SaveGallery game={game} />
-        </>
-      )}
-      {admin && renpy && tab === 'files' && <FileBrowser game={game} />}
-      {tab === 'walkthroughs' && <Details game={game} section="walkthroughs" />}
-      {tab === 'details' && <Details game={game} section="details" onChangeArt={noPicker ? undefined : setPicker} />}
+      <div role="tabpanel" id={panelId('game', tab)} aria-labelledby={tabId('game', tab)}>
+        {tab === 'play' && <PlayPane game={game} onSaves={renpy ? () => setTab('saves') : undefined} />}
+        {renpy && tab === 'saves' && (
+          <>
+            {!installed && <p className="small muted" style={{ marginBottom: 16 }}>Install the game to load your saves.</p>}
+            <SaveGallery game={game} />
+          </>
+        )}
+        {admin && renpy && tab === 'files' && <FileBrowser game={game} />}
+        {tab === 'walkthroughs' && <Details game={game} section="walkthroughs" />}
+        {tab === 'details' && <Details game={game} section="details" onChangeArt={noPicker ? undefined : setPicker} />}
+        {admin && tab === 'manage' && <Details game={game} section="manage" />}
+      </div>
       {!noPicker && <ArtPicker game={game} open={!!picker} initialKind={picker ?? 'grid'} onClose={() => setPicker(null)} />}
-      {admin && tab === 'manage' && <Details game={game} section="manage" />}
       {!game.job && (
         <ActionBar watch={actsRef}>
           {installed ? (
@@ -219,99 +222,6 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 const ART_ROWS: Array<[ArtKind, string]> = [['grid', 'Grid'], ['wide', 'Wide'], ['hero', 'Hero'], ['logo', 'Logo'], ['icon', 'Icon']]
-
-const STATUS_OPTIONS = [
-  { value: 'playing', label: 'Playing' },
-  { value: 'stalled', label: 'Stalled' },
-  { value: 'dropped', label: 'Dropped' },
-  { value: 'finished', label: 'Finished' },
-] as const
-
-/** Play: your progress, your status and rating, updates, and the last sessions of this game. */
-function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }) {
-  const staticDemo = useStaticDemo()
-  const qc = useQueryClient()
-  const toast = useToast()
-  const history = useQuery({ queryKey: ['history', game.id], queryFn: () => api<HistoryPage>(`/api/history?game=${encodeURIComponent(game.id)}&days=30&tz=${encodeURIComponent(timeZone())}`) })
-  const sessions = (history.data?.days ?? []).flatMap((d) => d.sessions).slice(0, 4)
-  const save = async (path: string, json: unknown) => {
-    try {
-      await api(`/api/games/${game.id}/${path}`, { method: 'PUT', json })
-      void qc.invalidateQueries({ queryKey: ['game', game.id] })
-      void qc.invalidateQueries({ queryKey: ['games'] })
-    } catch (error) {
-      toast(errorText(error), 'error')
-    }
-  }
-  return (
-    <div className="grid2">
-      <div className="stack">
-        <section className="panel">
-          <div className="row between" style={{ marginBottom: 14 }}>
-            <h2 className="h3">Your progress</h2>
-            {onSaves && (
-              <button className="link small" onClick={onSaves} style={{ alignSelf: 'start' }}>
-                All saves
-              </button>
-            )}
-          </div>
-          <div className="row" style={{ alignItems: 'center', gap: 16 }}>
-            <SceneCard game={game} save={game.latestSave} style={{ width: 112, flex: 'none' }} />
-            <div className="grow small muted">
-              <p className="muted-2" style={{ fontSize: 15, fontWeight: 650 }}>
-                {game.latestSave ? `${game.latestSave.label} · ${ago(game.latestSave.ctime)}` : game.lastPlayedAt ? `Last played ${ago(game.lastPlayedAt)}` : 'Not played yet'}
-              </p>
-              <p style={{ marginTop: 4 }}>
-                {playedTime(game.playTime, game.saves.count > 0 || !!game.lastPlayedAt)} · {game.saves.count} {game.saves.count === 1 ? 'save' : 'saves'}
-                {game.saves.count > 0 && navigator.onLine ? ' · Synced' : ''}
-              </p>
-            </div>
-          </div>
-          <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }} className="stack">
-            <div>
-              <h3 className="small muted-2" style={{ fontWeight: 650, marginBottom: 8 }}>Status</h3>
-              <Seg
-                small
-                scroll
-                label="Status"
-                value={(game.playStatus ?? '') as string}
-                onChange={(value) => void save('status', { status: value === game.playStatus ? '' : value })}
-                options={STATUS_OPTIONS.map((o) => ({ value: o.value as string, label: o.label }))}
-              />
-              <p className="xs muted" style={{ marginTop: 8 }}>Stalled, Dropped and Finished leave Up next. Your saves are kept.</p>
-            </div>
-            <div>
-              <h3 className="small muted-2" style={{ fontWeight: 650, marginBottom: 4 }}>Your rating</h3>
-              <Stars value={game.rating ?? 0} onChange={(rating) => void save('rating', { rating })} />
-            </div>
-          </div>
-        </section>
-      </div>
-      <div className="stack">
-        <UpdateCard game={game} />
-        {!staticDemo && <OfflineCard game={game} />}
-        <section className="panel">
-          <div className="row between" style={{ marginBottom: 10 }}>
-            <h2 className="h3">History</h2>
-            <Link to="/history" className="link small">All history</Link>
-          </div>
-          {sessions.length ? (
-            <div className="list tight">
-              {sessions.map((s) => (
-                <div key={s.startedAt} className="row between small">
-                  <span className="muted-2">{capitalize(ago(s.startedAt))}</span>
-                  <span className="muted tnum">{s.seconds < 60 ? 'Under a minute' : duration(s.seconds)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="small muted">{history.isPending ? 'Loading' : 'Nothing played yet.'}</p>
-          )}
-        </section>
-      </div>
-    </div>
-  )
-}
 
 /** The Details, Walkthroughs and Manage panes: one component, so the shared actions and dialogs stay in one place. */
 function Details({ game, section, onChangeArt }: { game: Game; section: 'details' | 'walkthroughs' | 'manage'; onChangeArt?: (kind: ArtKind) => void }) {
@@ -390,7 +300,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
         <div className="stack">
           {game.walkthroughs.length ? (
             game.walkthroughs.map((w, i) => (
-              <div key={w.file} className="panel walk-row">
+              <div key={w.file} className="plate walk-row">
                 <div className="grow" style={{ minWidth: 0 }}>
                   <p className="truncate" style={{ fontWeight: 650 }}>{w.title}</p>
                   <p className="small muted">
@@ -419,7 +329,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
             <p className="small muted">{admin ? 'No walkthrough yet. Add a PDF, a picture or a text file.' : 'No walkthrough yet.'}</p>
           )}
           {game.recipe?.links.walkthrough && (
-            <div className="panel walk-row">
+            <div className="plate walk-row">
               <div className="grow">
                 <p style={{ fontWeight: 650 }}>The guide the catalog links</p>
                 <p className="small muted">On the web</p>

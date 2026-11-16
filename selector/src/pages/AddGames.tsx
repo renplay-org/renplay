@@ -340,7 +340,7 @@ function UploadZone() {
         const f = e.dataTransfer.files[0]
         if (f && !up) start(f)
       }}
-      className="panel"
+      className="plate"
       style={{ border: drag ? '1.5px dashed var(--pink)' : '1.5px dashed var(--plate-3-flat)', textAlign: 'center', padding: '28px 18px' }}
     >
       {up ? (

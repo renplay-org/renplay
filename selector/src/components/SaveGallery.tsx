@@ -316,7 +316,7 @@ function CopyDialog({ game, slot, onClose }: { game: Game; slot: SaveSlot; onClo
                 setBusy(null)
               }
             }}
-            className="row between panel flat"
+            className="row between plate flat"
             style={{ width: '100%', textAlign: 'left', padding: '12px 16px' }}
           >
             <span className="small">{g.title}</span>

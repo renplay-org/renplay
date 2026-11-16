@@ -29,7 +29,7 @@ export default function Setup() {
       <p className="lead center" style={{ margin: '8px auto 0' }}>
         {grant ? 'This account owns every save made before sign-in was turned on.' : 'Renplay printed a one-time setup code when it started. Paste it here.'}
       </p>
-      <div className="panel" style={{ marginTop: 20 }}>
+      <div className="plate" style={{ marginTop: 20 }}>
         <form
           className="stack"
           onSubmit={async (event) => {
