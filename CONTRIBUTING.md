@@ -38,15 +38,17 @@ Put a game's PC zip into `/tmp/rp/games/_archives/` and install it from the libr
 
 ## Browser tests
 
-Run `mise run test:ui` with Docker. It runs the old library checks, website/docs layout checks and
-Playwright Test suite in the same official Linux container as CI, pinned by digest with Node 24
+Run `mise run test:ui` with Docker. It runs the website/docs layout checks and the Playwright Test
+suite in the same official Linux container as CI, pinned by digest with Node 24
 and matching Playwright packages. Only this container run counts for acceptance. Native Mac browsers
 are useful for quick tries, not acceptance. The suite uses mock games and blocks external requests.
 Never point it at a real library.
 
-The Playwright suite runs one worker: Chromium at 1440 px and touch WebKit at 390 px in portrait, then 844 by
-390 px in landscape. It retains failure traces and writes JSON and a text summary into
-`ui-test-results/`. A pass only on retry warns locally and fails CI. The normal complete browser
+The Playwright suite has three workers and five projects: Chromium at 1440 px, touch WebKit at 390 px in
+portrait and at 844 by 390 px in landscape, desktop WebKit for the static demo, and Chromium at 390 px with touch
+for the library's own checks in `server/scripts/app-ui/specs/chromium/`. A spec says in its first line which
+projects run it and why, so a test runs where it shows something new. It retains failure traces and writes JSON
+and a text summary into `ui-test-results/`. A pass only on retry warns locally and fails CI. The normal complete browser
 suite must finish in under five minutes. There are no screenshots in pull requests.
 
 While working, run only the tests a change touches. `--warm` starts a container for this worktree
@@ -61,8 +63,8 @@ sh scripts/test-ui.sh --warm playwright --project=chromium-desktop --grep 'Libra
 sh scripts/test-ui.sh --warm playwright --only-changed=origin/dev
 # Re-run the failures from the last Playwright run.
 sh scripts/test-ui.sh --warm playwright --last-failed
-# One subject from the older checks (names are in server/scripts/app-ui/).
-sh scripts/test-ui.sh --warm legacy --only search
+# One subject, in one project.
+sh scripts/test-ui.sh --warm playwright --project=chromium-phone search-cues
 mise run test:ui:stop
 ```
 
@@ -73,11 +75,11 @@ app, select the relevant tests explicitly. Keep `origin/dev` current with `git f
 Run the whole suite once at the end, in the container, and push only after it passes. Never re-run
 a passing suite to make sure. A doubt about a test is a flake to report. Use the **Flake hunt**
 workflow for repeats instead of repeating the whole suite in the working loop. Run it by hand on
-your branch with a repeat count (default 10). It also runs nightly against `dev`. Both the older
-checks and Playwright run without retries, and each job's summary lists every test that failed
-at least once. Reports and failure traces are kept as artifacts.
+your branch with a repeat count (default 10). It also runs nightly against `dev`. Playwright runs
+without retries, and the job's summary lists every test that failed at least once. Reports and
+failure traces are kept as artifacts.
 
-`mise run check:app-ui` and `mise run check:layout` run their respective old checks in the container.
+`mise run check:app-ui` and `mise run check:layout` run the Playwright specs and the layout check in the container.
 For a slow-phone layout investigation, use
 `UI_CPUS=0.5 LAYOUT_ONLY=adult LAYOUT_RUNS=15 LAYOUT_DEBUG=1 sh scripts/test-ui.sh --warm layout`.
 The container never writes source files in the checkout. Only results go to `ui-test-results/`.
@@ -85,8 +87,8 @@ It caches Linux dependencies in Docker volumes `rp-server-nm`, `rp-selector-nm`,
 and `rp-ui-tools`. Stop warm containers before deleting those volumes to reclaim space. The Mac's
 `node_modules` are not used or modified. To change `UI_CPUS`, stop the warm container first.
 
-CI runs the older checks, layout checks and Playwright in parallel, only when their inputs changed.
-Workflow or shared runner changes select all three. The **Browser suite** summary reports on every
+CI runs the layout checks and Playwright in parallel, only when their inputs changed.
+Workflow or shared runner changes select both. The **Browser suite** summary reports on every
 pull request, including when no browser inputs changed. Superseded runs of a pull request are cancelled.
 
 Do not loosen a test without stopping to report it and getting a maintainer's approval. This includes removing
