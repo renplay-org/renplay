@@ -11,8 +11,10 @@
     padding: var(--s5);
   }
 }
-.plate.flat {
-  background: rgba(255, 255, 255, 0.03);
+/* A block on a page that is not pressed and not dropped on: the website's hairline across the top, no fill. */
+.sect {
+  padding: var(--s4) 0 0;
+  border-top: 1px solid var(--hair);
 }
 .panel {
   padding: var(--s5) 0 var(--s3);

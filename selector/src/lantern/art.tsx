@@ -31,7 +31,7 @@ export function hue(s: string): number {
 
 /** The game's colour: the most vivid tint its art carries, the room's and the focus ring's colour. */
 export function tintOf(art: ArtSet | undefined): string {
-  return art?.grid?.tint ?? art?.wide?.tint ?? art?.hero?.tint ?? art?.icon?.tint ?? '#5a5a7a'
+  return art?.grid?.tint ?? art?.wide?.tint ?? art?.hero?.tint ?? art?.icon?.tint ?? 'var(--tint-default)'
 }
 
 /** The format for a place, with the fallbacks the making order guarantees. */

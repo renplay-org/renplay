@@ -39,7 +39,13 @@ export default function CodeEditor({ value, onChange, onSave, language }: { valu
           ]),
           language === 'python' ? python() : [],
           oneDark,
-          EditorView.theme({ '&': { height: '100%', fontSize: '13px' }, '.cm-scroller': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' } }),
+          // The syntax colours are oneDark's. The ground, the gutter and the face are the app's own.
+          EditorView.theme({
+            '&': { height: '100%', fontSize: '13px', backgroundColor: 'var(--ink-2)' },
+            '.cm-scroller': { fontFamily: 'var(--mono)' },
+            '.cm-gutters': { backgroundColor: 'var(--ink-2)', color: 'var(--fg-4)', border: 'none' },
+            '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'var(--plate-2)' },
+          }),
           EditorView.updateListener.of((u) => u.docChanged && onChange(u.state.doc.toString())),
         ],
       }),
@@ -48,5 +54,5 @@ export default function CodeEditor({ value, onChange, onSave, language }: { valu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return <div ref={host} className="h-full overflow-hidden rounded-(--r-3) ring-1 ring-(color:--line)" />
+  return <div ref={host} className="h-full overflow-hidden rounded-(--r-1) ring-1 ring-(color:--line)" />
 }

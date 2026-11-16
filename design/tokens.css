@@ -48,8 +48,9 @@
   /* The brand gradient: the logo, the avatar and the room's glow. Never a control. */
   --brand: linear-gradient(135deg, #d62a68, #7556f0);
 
-  /* The game in focus lights its surroundings in its own colour (from the catalog's art) */
-  --tint: #5a5a7a;
+  /* The game in focus lights its surroundings in its own colour (from the catalog's art). A game with no colour is lit with the default. */
+  --tint-default: #5a5a7a;
+  --tint: var(--tint-default);
   --tint-soft: color-mix(in oklab, var(--tint) 45%, transparent);
   --tint-ink: color-mix(in oklab, var(--tint) 14%, var(--ink));
 

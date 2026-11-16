@@ -120,9 +120,8 @@ export default function CatalogTags({ games, all = games, vocabulary, prefs, onC
         {(onClear || chosen.length > 0 || common.length > 0) && (
           <div className="chips wrap" ref={row}>
             {onClear && (
-              <Chip onClick={onClear}>
+              <Chip onClick={onClear} after={<X aria-hidden="true" />}>
                 Clear filters
-                <X aria-hidden="true" />
               </Chip>
             )}
             {chosen.map((id) => chip(id, counts.get(id)?.count ?? 0))}
@@ -149,7 +148,7 @@ export default function CatalogTags({ games, all = games, vocabulary, prefs, onC
               if (!tags.length) return null
               return (
                 <section key={group}>
-                  <h3 className="small" style={{ fontWeight: 650, marginBottom: 6 }}>{title}</h3>
+                  <h3 className="label" style={{ marginBottom: 6 }}>{title}</h3>
                   <div className="list tight">
                     {tags.map((t) => {
                       const state = stateOf(prefs, t.id)

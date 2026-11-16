@@ -9,7 +9,8 @@ import { startTravel, travelSource } from './travel'
  * line under it. Every tile in a grid or a shelf has this one shape, so the
  * picture that flies from it to the stage never changes shape on the way.
  * It is the website's shelf card: a border and a sheen in the game's colour, and under the hand a tilt (lean.ts) and a
- * lift with the colour's long shadow. Focus lifts it too, with the white ring.
+ * lift with the colour's long shadow. Only the cover moves, with its border, glow and sheen: the title and the line under it
+ * stay still. Focus lifts the cover too, with the white ring.
  */
 export default function Card({
   game,
@@ -78,9 +79,9 @@ export default function Card({
             </>
           }
         />
-        <div className="ct">{title ?? game.title}</div>
-        {meta && <div className="cm">{meta}</div>}
       </div>
+      <div className="ct">{title ?? game.title}</div>
+      {meta && <div className="cm">{meta}</div>}
     </Link>
   )
 }

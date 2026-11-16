@@ -118,7 +118,7 @@ function Downloads() {
 function RowGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginTop: 14 }}>
-      <h3 className="small muted" style={{ fontWeight: 650, marginBottom: 4 }}>
+      <h3 className="label" style={{ marginBottom: 4 }}>
         {title}
       </h3>
       <div className="rows">{children}</div>

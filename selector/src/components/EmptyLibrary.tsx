@@ -74,7 +74,7 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
         Let us fix that. Start with a story, or add a game you already have.
       </p>
       {starter && (
-        <div className="plate" style={{ marginTop: 26, display: 'flex', gap: 18, textAlign: 'left', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="sect" style={{ marginTop: 26, display: 'flex', gap: 18, textAlign: 'left', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ width: 110, flex: 'none' }}>
             <Frame game={starter} kind="grid" />
           </div>
@@ -106,7 +106,7 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
             Pick its normal PC download. Renplay prepares it for your browser.
           </p>
         </Link>
-        <div className="plate" style={{ textAlign: 'left' }}>
+        <div className="sect" style={{ textAlign: 'left' }}>
           <h2 className="h3">Copy it to the server</h2>
           <p className="small muted" style={{ marginTop: 8 }}>
             Put downloads in the archives folder, then open Add games.

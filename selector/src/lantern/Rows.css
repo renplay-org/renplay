@@ -14,6 +14,17 @@
 .rows > .r:first-child {
   border-top: 0;
 }
+.rows > .r.pick {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--s3) 0;
+  text-align: left;
+}
+@media (hover: hover) {
+  .rows > .r.pick:hover {
+    background: var(--plate);
+  }
+}
 .r .ic {
   width: 28px;
   height: 28px;

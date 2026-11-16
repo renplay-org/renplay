@@ -75,11 +75,8 @@
   display: flex;
   align-items: flex-end;
   padding: 9%;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--pink) 22%, transparent), color-mix(in srgb, var(--violet) 18%, transparent) 60%, var(--ink));
-  font-weight: 800;
-  font-size: clamp(13px, 13cqw, 36px);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
+  font: 700 clamp(13px, 13cqw, 36px) / 1.05 var(--serif);
+  font-variation-settings: "opsz" 24;
   color: var(--fg);
 }
 .frame.wide .mono {
@@ -96,13 +93,15 @@
 /* The tile is the website's shelf card. It has a border in the game's own
    colour mixed with white, a glow in the same colour at rest and a long one under the hand, and a sheen that follows the
    pointer. Under the hand or the focus it lifts. The lean, a tilt toward the pointer, is lantern/lean.ts: it sets a
-   transform on .tilt and where the sheen is. */
+   transform on .tilt and where the sheen is. Only the cover moves: .tilt holds the frame and nothing else, so the title and
+   the line under it stay where they are. Nothing dark is drawn on or around the cover: no black ring, and what shows behind
+   the picture is the game's own colour. */
 .card {
-  --tile-rest: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --tile-rest: none;
   /* The lift comes toward the viewer by 14 px (6 px for a press) under the lean's 900 px of perspective, which is this much bigger. */
   --lift: 1.0158;
   --press-lift: 1.0067;
-  --tile-lit: 0 30px 64px -16px var(--tint), 0 0 0 1px rgba(0, 0, 0, 0.4), 0 0 70px -6px color-mix(in srgb, var(--tint) 80%, transparent);
+  --tile-lit: 0 30px 64px -16px var(--tint), 0 0 70px -6px color-mix(in srgb, var(--tint) 80%, transparent);
 }
 .card .tilt {
   position: relative;
@@ -111,7 +110,8 @@
     scale var(--t-focus) var(--out);
 }
 .card .frame {
-  border: 1px solid color-mix(in srgb, var(--tint) 60%, #fff 10%);
+  background: var(--tint);
+  border: 1px solid color-mix(in srgb, var(--tint) 86%, #fff);
   box-shadow: var(--tile-rest);
   transition: box-shadow var(--t-travel) var(--out);
 }
@@ -124,17 +124,19 @@
   opacity: 0.55;
   transition: opacity var(--t-pane);
 }
-/* The glow of a tile at rest is not the frame's shadow but a copy of the frame's box that does not lean. A wide shadow in the
-   leaning layer makes every tile that leans a layer a few times its size to draw, and the whole grid leans. */
+/* The glow of a tile at rest is not the frame's shadow but a box that does not lean. A wide shadow in the leaning layer makes
+   every tile that leans a layer a few times its size to draw, and the whole grid leans. A shadow is never drawn inside its own
+   box, so that box is smaller than the cover by more than the lean can show (10 px at the sides, 15 at the top and bottom,
+   which the spread takes back): where a cover has leaned away from its place nothing dark is left in the glow. */
 .card:has(> .tilt > .frame:not(.wide, .hero, .sq))::before {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
+  left: 10px;
+  right: 10px;
+  top: 15px;
   aspect-ratio: 2/3;
   border-radius: var(--r-1);
-  box-shadow: 0 22px 50px -18px color-mix(in srgb, var(--tint) 85%, transparent), 0 0 44px -10px color-mix(in srgb, var(--tint) 60%, transparent);
+  box-shadow: 0 22px 50px -6px color-mix(in srgb, var(--tint) 85%, transparent), 0 0 44px 2px color-mix(in srgb, var(--tint) 60%, transparent);
   pointer-events: none;
   opacity: var(--rest-glow, 1);
   transition: opacity var(--t-travel) var(--out);
@@ -187,7 +189,7 @@
 .card[data-press] .frame .sheen {
   opacity: 1;
 }
-/* The lift. Not under reduced motion, not while the flight measures or lands on the tile (nor under a pointer it left there, until it moves), and under a mouse not while
+/* The lift. Not under reduced motion, nor when this browser turned the movement off (Settings, This browser), not while the flight measures or lands on the tile (nor under a pointer it left there, until it moves), and under a mouse not while
    a search is typed (Search.css), when the list moves under a pointer that is still. Under a mouse it is the shelf's:
    the lift comes and goes at once, and the lean (lean.ts) eases. Focus eases it in, and a press pushes in a little. */
 @media (prefers-reduced-motion: no-preference) {
@@ -195,20 +197,20 @@
     .card .tilt {
       transition: none;
     }
-    html:not([data-typing]) .card:not([data-rest], [data-still]):hover .tilt {
+    html:not([data-typing], [data-cards="still"]) .card:not([data-rest], [data-still]):hover .tilt {
       translate: 0 -6px;
       scale: var(--lift);
     }
   }
-  .card.on:not([data-rest]) .tilt,
-  .card:focus-visible:not([data-rest]) .tilt {
+  html:not([data-cards="still"]) .card.on:not([data-rest]) .tilt,
+  html:not([data-cards="still"]) .card:focus-visible:not([data-rest]) .tilt {
     translate: 0 -6px;
     scale: var(--lift);
     transition:
       translate var(--t-focus) var(--out),
       scale var(--t-focus) var(--out);
   }
-  .card[data-press]:not([data-rest]) .tilt {
+  html:not([data-cards="still"]) .card[data-press]:not([data-rest]) .tilt {
     translate: 0 -2px;
     scale: var(--press-lift);
     transition:
@@ -231,11 +233,15 @@
 .card[data-rest] .frame .sheen {
   opacity: 0.55 !important;
 }
-/* Reduced motion keeps the border, the glow and the sheen, and takes the tilt away (lean.ts does not make one). */
+/* Reduced motion keeps the border, the glow and the sheen, and takes the tilt away (lean.ts does not make one). So does a
+   browser that turned the movement off. */
 @media (prefers-reduced-motion: reduce) {
   .card .tilt {
     transform: none !important;
   }
+}
+html[data-cards="still"] .card .tilt {
+  transform: none !important;
 }
 /* Above the frame's shadow, which spills over what is under it. */
 .card .ct,

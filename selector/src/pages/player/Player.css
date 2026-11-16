@@ -47,8 +47,7 @@
 .rp-pill .mark {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, #d62a68, #7556f0);
+  border-radius: var(--r-2);
 }
 /* The controller's Menu button, after the word, while one is connected. */
 .rp-pill .pad-menu {
@@ -308,15 +307,12 @@
   color: var(--fg-3);
   font-size: 13px;
 }
-.pm-group,
-.pm-group-title {
+.pm-group {
   padding: 12px 12px 4px;
   color: var(--fg-3);
-  font-size: 13px;
-  font-weight: 650;
-}
-.pm-group-title {
-  padding: 4px 0 10px;
+  /* 13 px, not 12: nothing in the menu is smaller, so a hand and a controller can read it. */
+  font: 400 13px/1.45 var(--mono);
+  letter-spacing: 0.02em;
 }
 .pm .seg {
   height: 48px;
