@@ -300,7 +300,7 @@ describe('accounts authentication and security', () => {
     expect(benId).toBeGreaterThan(anna)
   })
 
-  it('runs as a demo: Try the demo signs in the shared guest, who plays but changes nothing of the server', async () => {
+  it('runs as a demo: Try the demo signs in a guest of one visitor, who plays but changes nothing of the server', async () => {
     // Not a demo: no guest, no route.
     const plain = await start()
     expect((await request(plain.app).get('/api/auth/providers').expect(200)).body.demo).toBe(false)
@@ -316,7 +316,7 @@ describe('accounts authentication and security', () => {
     const res = await request(a.app).post('/api/auth/demo').set(site).expect(200)
     const guest = ([] as string[]).concat(res.headers['set-cookie']).map((c) => c.split(';')[0]!).find((c) => c.startsWith('renplay_session='))!
     const me = (await request(a.app).get('/api/me').set('Cookie', guest).expect(200)).body
-    expect(me).toMatchObject({ demo: true, user: { username: 'demo', role: 'player' } })
+    expect(me).toMatchObject({ demo: true, user: { username: expect.stringMatching(/^guest-[0-9a-f]{12}$/), role: 'player' } })
     expect((await request(a.app).get('/api/me/adult').set('Cookie', guest).expect(200)).body).toMatchObject({ choice: 'blurred', ceiling: { level: 'blurred' } })
     // A visitor plays: lists games, rates, saves a small file.
     await request(a.app).get('/api/games').set('Cookie', guest).expect(200)
@@ -338,19 +338,22 @@ describe('accounts authentication and security', () => {
       ['post', '/api/saves/safe/import', undefined],
       ['post', '/api/saves/safe/copy', { from: 'safe', to: 'other' }],
       ['post', '/api/saves/safe/save-dir', { saveDir: 'x', screen: [19999, 19999] }],
-      // Choices every visitor would share.
-      ['put', '/api/me/tags', { include: [], exclude: ['romance'] }],
-      ['put', '/api/me/adult', { level: 'off' }],
     ] as const) await (request(a.app) as any)[method](path).set(site).set('Cookie', guest).send(body).expect(403)
+    // The guest's own choices are theirs to change. They are no other visitor's.
+    await request(a.app).put('/api/me/tags').set(site).set('Cookie', guest).send({ include: [], exclude: ['romance'] }).expect(200)
+    await request(a.app).put('/api/me/adult').set(site).set('Cookie', guest).send({ level: 'off' }).expect(200)
+    const other = ([] as string[]).concat((await request(a.app).post('/api/auth/demo').set(site).set('X-Forwarded-For', '10.1.1.1').expect(200)).headers['set-cookie']).map((c) => c.split(';')[0]!).find((c) => c.startsWith('renplay_session='))!
+    expect((await request(a.app).get('/api/me/adult').set('Cookie', other).expect(200)).body).toMatchObject({ choice: 'blurred' })
     // No other way in: not even the admin's password works in a demo.
     await request(a.app).post('/api/auth/login').set(site).send({ username: 'admin', password: 'correct password' }).expect(403)
     await request(a.app).post('/api/auth/setup/verify').set(site).send({ code: 'X' }).expect(403)
     // Admin pages stay closed, as for any player.
     await request(a.app).get('/api/system').set('Cookie', guest).expect(403)
     await request(a.app).post('/api/imports').set(site).set('Cookie', guest).send({}).expect(403)
-    // The guest is made once.
+    // A start makes no guest: each visitor makes their own.
     const again = await createApp(cfg, { startJobs: false }); apps.push(again)
-    expect(again.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE username = 'demo'").get()).toMatchObject({ n: 1 })
+    expect(again.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE username LIKE 'guest-%'").get()).toMatchObject({ n: 2 })
+    expect(again.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE username = 'demo'").get()).toMatchObject({ n: 0 })
   })
 
   it('maps all management route families to admins and keeps the last admin', async () => {

@@ -10,7 +10,7 @@ async function main() {
   routeConsole()
   if (process.env['RENPLAY_LOG_LEVEL'] && !parseLogLevel(process.env['RENPLAY_LOG_LEVEL'])) console.warn(`config: RENPLAY_LOG_LEVEL=${process.env['RENPLAY_LOG_LEVEL']} is not error, warn, info or debug. Using info.`)
   const cfg = loadConfig()
-  const { app, close, summary } = await createApp(cfg)
+  const { app, close, summary, accounts } = await createApp(cfg)
   const server = app.listen(cfg.port, '127.0.0.1', () => {
     for (const item of summary()) log('server', item)
     log('server', `Ready, logging at ${logLevel()}`)
@@ -33,6 +33,8 @@ async function main() {
       if (!/^\/api\/(health|keepalive)\b/.test(req.url ?? '')) lastRequest = Date.now()
     })
     const started = Date.now()
+    // Guests nobody has seen for a while go, with their saves.
+    setInterval(() => { void accounts.sweepGuests() }, 60_000).unref()
     setInterval(() => {
       const ran = Date.now() - started
       if (ran < 4 * 3600_000 || (Date.now() - lastRequest < 60_000 && ran < 4.25 * 3600_000)) return

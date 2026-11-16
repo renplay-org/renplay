@@ -55,14 +55,14 @@ export async function createServices(cfg: Config): Promise<Services> {
   const progress = new ProgressStore(db)
   const saveStores = new SaveStores(cfg, db)
   const art = new ArtStore(cfg, db, content)
-  const accounts = new Accounts(db, cfg, content, saveStores)
+  const purger = new Purger(cfg.purgeDir)
+  const accounts = new Accounts(db, cfg, content, saveStores, { progress, art, purger })
   try {
     await accounts.init()
   } catch (error) {
     db.close()
     throw error
   }
-  const purger = new Purger(cfg.purgeDir)
   catalog = new Catalog(cfg, db, content, art)
   await catalog.init()
   const s: Services = {

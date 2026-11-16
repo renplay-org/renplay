@@ -88,6 +88,18 @@ export interface SaveLimits {
   files: number
 }
 
+/** What a public demo spends on its guests: each visitor has one, and these bound them. */
+export interface DemoGuestLimits {
+  /** How long a guest may go unseen before it is removed (ms). */
+  idleMs: number
+  /** How many guests at most. A new one removes the longest unseen when the demo is full. */
+  max: number
+  /** How many new guests one address may make in an hour. */
+  newPerHour: number
+  /** How many browsers (sessions) one guest keeps. */
+  sessions: number
+}
+
 export interface Config {
   auth: '' | 'on' | 'off'
   authUser: number
@@ -145,9 +157,10 @@ export interface Config {
   catalogUrls: string[]
   /** RENPLAY_ADULT_GAMES: a level fixes the installation; empty leaves it to the stored setting (content/mode.ts). */
   adultGames: '' | AdultLevel
-  /** A public demo: a shared guest, no uploads or account changes, a stop after 4 hours (RENPLAY_DEMO). */
+  /** A public demo: a guest for each visitor, no uploads or account changes, a stop after 4 hours (RENPLAY_DEMO). */
   demo: boolean
   demoEmbedder: string
+  demoGuests: DemoGuestLimits
   /** How much one person may store in saves: a file, and all files with their history. Limited in a demo. */
   saveLimits: SaveLimits
   /** Pin every build to this engine version instead of the latest 8.x. */
@@ -244,6 +257,7 @@ export function loadConfig(): Config {
     adultGames: adultGames(),
     demo: bool('RENPLAY_DEMO'),
     demoEmbedder: bool('RENPLAY_DEMO') ? demoEmbedderOrigin(demoEmbedder) : '',
+    demoGuests: { idleMs: 2 * 3600_000, max: 100, newPerHour: 20, sessions: 20 },
     saveLimits: bool('RENPLAY_DEMO') ? { file: 2 << 20, total: 32 << 20, files: 1000 } : { file: SAVE_FILE_BYTES, total: Infinity, files: Infinity },
     defaultEngine: text('RENPLAY_ENGINE'),
     keepaliveUrl: text('RENPLAY_KEEPALIVE_URL'),

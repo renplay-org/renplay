@@ -18,6 +18,7 @@ import { readDefaults } from '../defaults/defaults.js'
 import { PASSWORD_PREFIX, equal, hash, passwordHash, passwordMatches, random, secretHash } from './passwords.js'
 import { parseGamePath } from '../play/path.js'
 import { demoCheck, playerRoute } from './access.js'
+import { DemoGuests, type GuestParts } from './demo-guests.js'
 import { publicUser, validName, validUsername } from './users.js'
 import type { AdultState, Identities, Me, Providers, Session, Sessions, SwitchPeople, TagPrefs, Token, TokenCreated, Tokens } from '../shared/api.js'
 
@@ -34,7 +35,10 @@ export class Accounts {
   private readonly limits = new Map<string, { count: number; until: number }>()
   private readonly sessionCache = new Map<string, { id: number; expires: number; touched: number; checked: number }>()
   private dummyPassword = ''
-  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly saveStores: SaveStores) {
+  /** The demo's guests, one for each visitor. Outside a demo there are none. */
+  private readonly guests: DemoGuests | null
+  constructor(readonly db: Db, readonly cfg: Config, private readonly content: ContentMode, private readonly saveStores: SaveStores, forgetting: Omit<GuestParts, 'saveStores' | 'forgetSessions'>) {
+    this.guests = cfg.demo ? new DemoGuests(db, cfg, { ...forgetting, saveStores, forgetSessions: () => this.invalidate() }) : null
     // A demo needs its guest, so sign-in is always on there.
     this.enabled = cfg.demo || (cfg.auth || db.getSetting('auth_default', 'on')) === 'on'
     this.providers = new SignInProviders(cfg)
@@ -66,23 +70,11 @@ export class Accounts {
     if (this.unclaimed && this.cfg.adminUsername) await this.claim(this.cfg.adminUsername, this.cfg.adminUsername, this.cfg.adminPassword)
     if (this.enabled && this.cfg.authLocal && this.unclaimed) always('sign-in', `Setup code: ${this.setupCode}`)
     if (!this.enabled && this.user(this.cfg.authUser).disabled) throw new Error('RENPLAY_AUTH_USER is disabled')
-    if (this.cfg.demo) this.ensureGuest()
+    this.guests?.init()
     for (const u of this.db.raw.prepare('SELECT * FROM users').all() as unknown as User[]) await this.tag(u)
   }
-  /**
-   * The demo's guest: a player everyone signs in as with Try the demo. It has no password, and its
-   * level for adult games is Blurred, so the catalog shows adult games without a picture of them.
-   */
-  private ensureGuest(): void {
-    if (this.demoGuest()) return
-    const id = Number(this.db.raw.prepare("INSERT INTO users (username, name, role, created_at) VALUES ('demo', 'Guest', 'player', ?)").run(new Date().toISOString()).lastInsertRowid)
-    this.writeLevels(id, { ceiling: 'blurred', choice: 'blurred' })
-  }
-  demoGuest(): number | null {
-    if (!this.cfg.demo) return null
-    const row = this.db.raw.prepare("SELECT id FROM users WHERE username = 'demo'").get() as { id: number } | undefined
-    return row?.id ?? null
-  }
+  /** Removes the demo's idle guests. Returns how many went. */
+  sweepGuests = (): Promise<number> => this.guests?.sweep() ?? Promise.resolve(0)
   /** Writes a person's ceiling and choice. */
   writeLevels(id: number, patch: { ceiling?: AdultLevel; choice?: AdultLevel }): void {
     const u = this.user(id)
@@ -118,14 +110,16 @@ export class Accounts {
     this.limits.set(key, bucket)
   }
   private secure(req: Request): boolean { return req.secure || this.cfg.publicUrl.startsWith('https://') }
-  private cookie(req: Request, res: Response, value: string): void {
-    res.cookie('renplay_session', value, { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/', maxAge: value ? DAYS30 : 0 })
+  private cookie(req: Request, res: Response, value: string, partitioned = false): void {
+    const maxAge = value ? DAYS30 : 0
+    // A frame of another site keeps its own copy of this cookie (CHIPS), where it is allowed only so.
+    res.cookie('renplay_session', value, partitioned ? { httpOnly: true, sameSite: 'none', secure: true, partitioned: true, path: '/', maxAge } : { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/', maxAge })
   }
-  private newSession(req: Request, res: Response, id: number): void {
+  private newSession(req: Request, res: Response, id: number, partitioned = false): void {
     log('sign-in', `Signed in: ${this.user(id).username}`)
     const token = random(), now = Date.now()
     this.db.raw.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?)').run(hash(token), id, now, now, now + DAYS30, (req.get('user-agent') ?? '').slice(0, 200))
-    this.cookie(req, res, token)
+    this.cookie(req, res, token, partitioned)
     this.db.raw.prepare('INSERT OR REPLACE INTO device_people VALUES (?, ?, ?)').run(this.device(req, res), id, now)
   }
   /**
@@ -157,6 +151,7 @@ export class Accounts {
     if (now - cached.touched >= 300_000) {
       this.db.raw.prepare('UPDATE sessions SET touched_at = ?, expires_at = ? WHERE hash = ?').run(now, now + DAYS30, key)
       cached.touched = now; cached.expires = now + DAYS30
+      this.guests?.seen(u.id, now)
     }
     return { user: u, session: key, bearer: false }
   }
@@ -179,7 +174,8 @@ export class Accounts {
     const token = req.get('cookie')?.match(/(?:^|;\s*)renplay_session=([^;]+)/)?.[1]
     if (!token) return null
     const found = this.session(hash(token))
-    if (found) this.cookie(req, res, token)
+    // A guest's cookie is not renewed: it outlasts the demo, and a renewed one would lose its form.
+    if (found && !this.guests) this.cookie(req, res, token)
     return found
   }
   /** Cookie authentication does not constrain body type: raw, multipart and empty deletes work. */
@@ -217,7 +213,7 @@ export class Accounts {
         const runtimeUser = req.get('x-renplay-user')
         if (runtimeUser !== undefined && runtimeUser !== String(v.user.id)) throw new HttpError(401, 'You were signed out')
         if (req.path !== '/api/auth/check' && v.user.role !== 'admin' && !playerRoute(req.method, req.path)) throw new HttpError(403, 'Only an admin can do this')
-        if (this.cfg.demo && v.user.id === this.demoGuest()) demoCheck(req)
+        if (this.guests?.isGuest(v.user.id)) demoCheck(req)
         next()
       } catch (e) { next(e) }
     })
@@ -348,12 +344,15 @@ export class Accounts {
     if (this.cfg.demo) {
       r.use((req, _res, next) => next(/^\/auth\/(login|setup(\/verify)?|oidc\/(start|callback))$/.test(req.path) ? new HttpError(403, 'The demo signs you in with Try the demo') : undefined))
     }
-    /** Try the demo: a session as the shared guest, no password. Only in a demo. */
-    r.post('/auth/demo', (req, res) => {
-      const guest = this.demoGuest()
-      if (!guest) throw new HttpError(404, 'This is not a demo')
-      this.limit(`ip:${req.ip}`)
-      this.newSession(req, res, guest)
+    /** Try the demo: a session as the visitor's own guest, no password. A visitor key from the website's frames names the guest. Only in a demo. */
+    r.post('/auth/demo', async (req, res) => {
+      if (!this.guests) throw new HttpError(404, 'This is not a demo')
+      const arrived = await this.guests.arrive(req.body, viewer()?.user.id, req.ip ?? '', () => this.limit(`ip:${req.ip}`))
+      if (arrived) {
+        this.newSession(req, res, arrived.guest, arrived.keyed && this.secure(req))
+        this.guests.trimSessions(arrived.guest)
+        await this.tag(this.user(arrived.guest))
+      }
       res.json({ ok: true })
     })
     r.get('/auth/oidc/start', (req, res) => res.redirect(this.beginOidc(req, res)))
@@ -522,9 +521,10 @@ export class Accounts {
     r.post('/auth/logout', (req, res) => {
       if (viewer()?.session) this.db.raw.prepare('DELETE FROM sessions WHERE hash = ?').run(viewer()!.session)
       this.invalidate(); this.cookie(req, res, '')
+      if (this.guests) this.cookie(req, res, '', true)
       res.json({ ok: true })
     })
-    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: this.cfg.demo && this.current().id === this.demoGuest(), ...(this.cfg.demo ? { demoEmbedder: this.cfg.demoEmbedder } : {}), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) } satisfies Me))
+    r.get('/me', (_req, res) => res.json({ user: publicUser(this.current()), auth: this.enabled, demo: !!this.guests?.isGuest(this.current().id), ...(this.cfg.demo ? { demoEmbedder: this.cfg.demoEmbedder } : {}), unclaimed: this.unclaimed, hasPassword: !!this.db.raw.prepare("SELECT 1 FROM identities WHERE user_id = ? AND provider = 'local'").get(this.current().id) } satisfies Me))
     r.put('/me', async (req, res) => {
       this.db.raw.prepare('UPDATE users SET name = ? WHERE id = ?').run(validName(req.body?.name), this.current().id)
       await this.tag(this.user(this.current().id)); res.json({ ok: true })
