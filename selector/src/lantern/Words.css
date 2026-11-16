@@ -47,9 +47,10 @@
   max-width: 100%;
 }
 .seg > button {
-  /* A word never shrinks below its label: a long group scrolls (.seg.scroll) instead. Its hit area is 44 px (index.css), the
-     word is its text, so that the line under it is. */
+  /* A word never shrinks below its label: a long group scrolls (.seg.scroll) instead. The control is 44 px at least, the word in it
+     is its text, and so is the line under it. */
   flex: none;
+  min-width: 44px;
   min-height: 44px;
   padding: 0;
   display: inline-flex;

@@ -49,6 +49,7 @@ test('a colour, gradient, face or corner written as a literal fails, with its pl
     ['selector/src/a.tsx', 'const a = <b className="text-zinc-400 rounded-xl" />', 'Tailwind utility: text-zinc-400'],
     ['selector/src/a.tsx', 'const a = <b className="bg-white/10" />', 'Tailwind utility: bg-white/10'],
     ['selector/src/a.tsx', 'const a = <b className="rounded-[12px]" />', 'Tailwind utility: rounded-['],
+    ['selector/src/a.tsx', "const a = <b style={{ fontFamily: 'ui-monospace, Menlo' }} />", 'face: fontFamily'],
     ['selector/src/a.tsx', 'const a = <b style={{ color: "salmon" }} />', 'named colour: color: "salmon"'],
     ['selector/src/a.css', '.a { transition: width 0.5s var(--out); }', 'duration: 0.5s'],
     ['selector/src/a.css', '.a { animation: up 400ms var(--out) both; }', 'duration: 400ms'],

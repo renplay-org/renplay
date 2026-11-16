@@ -114,7 +114,7 @@ async function tags(browser, base, errors, options, label) {
   const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
   const page = await ctx.newPage()
   await mock(page, errors, label, { titled: true })
-  const chips = () => page.evaluate(() => [...document.querySelectorAll('.chip-bar .chips.wrap .chip')].filter((c) => !c.textContent.includes('Clear filters')).map((c) => ({ label: c.childNodes[0].textContent.trim(), n: Number(c.querySelector('.n')?.textContent), dim: c.classList.contains('dim'), on: c.getAttribute('aria-pressed') === 'true', width: c.getBoundingClientRect().width })))
+  const chips = () => page.evaluate(() => [...document.querySelectorAll('.chip-bar .chips.wrap .chip')].filter((c) => !c.textContent.includes('Clear filters')).map((c) => ({ label: c.querySelector('.u').childNodes[0].textContent.trim(), n: Number(c.querySelector('.n')?.textContent), dim: c.classList.contains('dim'), on: c.getAttribute('aria-pressed') === 'true', width: c.getBoundingClientRect().width })))
   const order = (list) => list.map((c) => c.label).join(', ')
   for (const [name, path, field] of SEARCH_PAGES) {
     await ready(page, base, path)

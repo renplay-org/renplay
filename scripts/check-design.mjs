@@ -52,6 +52,7 @@ const FUNCTION = /\b(?:rgba?|hsla?|oklch|oklab|color)\(([^)]*)\)/gi
 const GRADIENT = /\b(?:linear|radial|conic)-gradient\(((?:[^()]|\([^()]*\))*)\)/gi
 const FACE = /(?<![\w-])font-family\s*:\s*([^;}]+)|(?<![\w-])font\s*:\s*([^;}]+)/g
 const CORNER = /(?<![\w-])border-radius\s*:\s*([^;}"'`]+)/g
+const INLINE_FACE = /\bfontFamily\s*:\s*([^}]+)/g
 const INLINE_CORNER = /\bborderRadius\s*:\s*([^,}]+)/g
 const DURATION = /(?<![\w-])(?:transition|animation)(?:-duration|-delay)?\s*:\s*([^;}`]+)/g
 const TIME = /(?<![\w.-])(\d*\.?\d+)(ms|s)\b/g
@@ -119,6 +120,7 @@ for (const file of files) {
   }
   if (code) {
     for (const m of text.matchAll(NAMED_IN_CODE)) report(m.index, 'named colour', m[0])
+    for (const m of text.matchAll(INLINE_FACE)) if (!faceOk(m[1])) report(m.index, 'face', m[0])
     for (const m of text.matchAll(INLINE_CORNER)) if (!cornerOk(m[1])) report(m.index, 'corner', m[1])
     for (const m of text.matchAll(UTILITY)) report(m.index, 'Tailwind utility', m[0])
   } else {

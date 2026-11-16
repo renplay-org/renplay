@@ -755,10 +755,10 @@ select.input option {
 }
 .field > span {
   display: block;
-  font-size: 13.5px;
-  color: var(--fg-2);
+  font: 400 12px/1.45 var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--fg-3);
   margin-bottom: 6px;
-  font-weight: 600;
 }
 .hint {
   font-size: 12.5px;
@@ -2196,16 +2196,15 @@ input[type="range"] {
 .frows {
   display: flex;
   flex-direction: column;
-  border-radius: var(--r-3);
-  overflow: hidden;
-  background: var(--plate);
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--line);
 }
 .frow {
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 48px;
-  padding: 4px 6px 4px 14px;
+  padding: 4px 6px 4px 4px;
   text-align: left;
   font-size: 14px;
   color: var(--fg);

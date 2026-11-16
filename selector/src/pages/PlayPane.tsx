@@ -59,7 +59,7 @@ export function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }
           </div>
           <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }} className="stack">
             <div>
-              <h3 className="small muted-2" style={{ fontWeight: 650, marginBottom: 8 }}>Status</h3>
+              <h3 className="label" style={{ marginBottom: 8 }}>Status</h3>
               <Seg
                 small
                 scroll
@@ -71,7 +71,7 @@ export function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }
               <p className="xs muted" style={{ marginTop: 8 }}>Stalled, Dropped and Finished leave Up next. Your saves are kept.</p>
             </div>
             <div>
-              <h3 className="small muted-2" style={{ fontWeight: 650, marginBottom: 4 }}>Your rating</h3>
+              <h3 className="label" style={{ marginBottom: 4 }}>Your rating</h3>
               <Stars value={game.rating ?? 0} onChange={(rating) => void save('rating', { rating })} />
             </div>
           </div>
