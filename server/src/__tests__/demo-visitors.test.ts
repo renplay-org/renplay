@@ -230,9 +230,42 @@ describe('the demo bounds its guests', () => {
     expect(await userId(app, visits[2]!.cookie)).toBe(ids[2])
     expect(await userId(app, fourth.cookie)).not.toBe(ids[1])
     // Never more than the cap, however many come.
-    for (let i = 5; i < 12; i++) await enter(app, newKey(), `10.0.1.${i}`)
+    for (let i = 5; i < 12; i++) { vi.setSystemTime(Date.now() + 11 * 60_000); await enter(app, newKey(), `10.0.1.${i}`) }
     expect(app.db.raw.prepare('SELECT COUNT(*) n FROM demo_guests').get()).toMatchObject({ n: 3 })
     expect(app.db.raw.prepare("SELECT COUNT(*) n FROM users WHERE username LIKE 'guest-%'").get()).toMatchObject({ n: 3 })
+  })
+
+  it('protects guests seen in the last ten minutes: a full demo refuses a new arrival instead of evicting them', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-16T10:00:00Z'))
+    const app = await start(true, { max: 3, newPerHour: 2 })
+    const keys = [newKey(), newKey(), newKey()], visits: Visit[] = []
+    for (const [i, key] of keys.entries()) { visits.push(await enter(app, key, `10.0.0.${i + 1}`)); vi.setSystemTime(Date.now() + 60_000) }
+    const ids = await Promise.all(visits.map((v) => userId(app, v.cookie)))
+    // Everyone was seen a few minutes ago: nobody goes, whoever asks and however they ask.
+    const full = /The demo is full right now\. Try again in a few minutes\./
+    const late = newKey()
+    for (const body of [{ visitor: late }, {}]) {
+      const refused = await request(app.app).post('/api/auth/demo').set(site).set('X-Forwarded-For', '10.0.1.1').send(body).expect(503)
+      expect(refused.body.error).toMatch(full)
+      expect(refused.headers['set-cookie']).toBeUndefined()
+    }
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM demo_guests').get()).toMatchObject({ n: 3 })
+    for (const [i, v] of visits.entries()) expect(await userId(app, v.cookie)).toBe(ids[i])
+    // A visitor that already has a guest is let in, and a refusal does not use up the address's allowance of new guests.
+    await enter(app, keys[0], '10.0.1.1')
+    // Ten minutes on, one guest is seen and two are not: the one unseen the longest goes, and only it.
+    // (The first has just come back with its key, so the third is the one unseen the longest.)
+    vi.setSystemTime(new Date('2026-11-16T10:14:00Z'))
+    await request(app.app).get('/api/games').set('Cookie', visits[1]!.cookie).expect(200)
+    const arrived = await enter(app, late, '10.0.1.1')
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM demo_guests').get()).toMatchObject({ n: 3 })
+    await request(app.app).get('/api/me').set('Cookie', visits[2]!.cookie).expect(401)
+    expect(await userId(app, visits[0]!.cookie)).toBe(ids[0])
+    expect(await userId(app, visits[1]!.cookie)).toBe(ids[1])
+    expect(await userId(app, arrived.cookie)).not.toBe(ids[2])
+    // The arrival just made is protected in its turn.
+    await request(app.app).post('/api/auth/demo').set(site).set('X-Forwarded-For', '10.0.1.1').send({ visitor: newKey() }).expect(503)
   })
 
   it('limits how many guests one address makes an hour, and counts only new ones', async () => {
@@ -269,6 +302,18 @@ describe('the demo bounds its guests', () => {
     await request(app.app).post('/api/auth/demo').set(site).set('X-Forwarded-For', '10.0.0.1').send({ visitor: key }).expect(429)
     await enter(app, key, '10.0.0.2')
     expect(app.db.raw.prepare('SELECT COUNT(*) n FROM demo_guests').get()).toMatchObject({ n: 1 })
+  })
+
+  it('keeps no record of a guest\'s browser: repeated sign-ins with no cookie add no device rows', async () => {
+    const app = await start(true)
+    const key = newKey()
+    const first = await enter(app, key)
+    let last = first
+    for (let i = 0; i < 30; i++) last = await enter(app, key)
+    await enter(app)
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM device_people').get()).toMatchObject({ n: 0 })
+    expect(first.headers.some((c) => c.startsWith('renplay_device='))).toBe(false)
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id = ?').get(await userId(app, last.cookie))).toMatchObject({ n: 20 })
   })
 
   it('gives the session cookie a partitioned form only over https, for a frame with a key', async () => {

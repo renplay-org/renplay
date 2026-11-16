@@ -92,7 +92,9 @@ export interface SaveLimits {
 export interface DemoGuestLimits {
   /** How long a guest may go unseen before it is removed (ms). */
   idleMs: number
-  /** How many guests at most. A new one removes the longest unseen when the demo is full. */
+  /** A guest seen within this time (ms) is playing: a full demo never removes it. */
+  activeMs: number
+  /** How many guests at most. A new one removes the longest unseen idle guest when the demo is full, or waits. */
   max: number
   /** How many new guests one address may make in an hour. */
   newPerHour: number
@@ -257,7 +259,7 @@ export function loadConfig(): Config {
     adultGames: adultGames(),
     demo: bool('RENPLAY_DEMO'),
     demoEmbedder: bool('RENPLAY_DEMO') ? demoEmbedderOrigin(demoEmbedder) : '',
-    demoGuests: { idleMs: 2 * 3600_000, max: 100, newPerHour: 20, sessions: 20 },
+    demoGuests: { idleMs: 2 * 3600_000, activeMs: 10 * 60_000, max: 100, newPerHour: 20, sessions: 20 },
     saveLimits: bool('RENPLAY_DEMO') ? { file: 2 << 20, total: 32 << 20, files: 1000 } : { file: SAVE_FILE_BYTES, total: Infinity, files: Infinity },
     defaultEngine: text('RENPLAY_ENGINE'),
     keepaliveUrl: text('RENPLAY_KEEPALIVE_URL'),

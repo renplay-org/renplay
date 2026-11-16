@@ -18,7 +18,7 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
   const providers = useProviders()
   // The demo's visitor signs in as their own guest, in the website's frames and when a key is given.
   const guest = useDemoGuest(providers.data?.demo, me)
-  if (guest) return guest === 'failed' ? <p className="p-6">Could not open the demo. Reload to try again, and check that your browser allows cookies for this page.</p> : <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
+  if (guest) return typeof guest === 'object' ? <p role="alert" className="p-6">{guest.failed}</p> : <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
   if (providers.data?.setup && !providers.data.oidc && !providers.data.ldap && !me.isPending && !(me.data?.user.role === 'admin' && me.data.user.id !== 1)) return <Navigate to="/setup" replace />
   if (me.isPending || providers.isPending) return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
   if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />

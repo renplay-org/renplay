@@ -120,7 +120,8 @@ export class Accounts {
     const token = random(), now = Date.now()
     this.db.raw.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?)').run(hash(token), id, now, now, now + DAYS30, (req.get('user-agent') ?? '').slice(0, 200))
     this.cookie(req, res, token, partitioned)
-    this.db.raw.prepare('INSERT OR REPLACE INTO device_people VALUES (?, ?, ?)').run(this.device(req, res), id, now)
+    // A demo guest has no PIN to switch with, and a frame without cookies would add a record every time.
+    if (!this.guests?.isGuest(id)) this.db.raw.prepare('INSERT OR REPLACE INTO device_people VALUES (?, ?, ?)').run(this.device(req, res), id, now)
   }
   /**
    * This browser, for Who is playing: a cookie of its own that outlives sign-out, stored hashed.

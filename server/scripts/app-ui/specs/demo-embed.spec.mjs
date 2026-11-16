@@ -135,3 +135,26 @@ test('demo embed finds the visitor again from the key alone, with no cookie', as
   expect(await guestOf(page.frameLocator('#phone'))).toBe(mine)
   expect(await savesOf(page.frameLocator('#phone'))).toContain('1-1-LT1.save')
 })
+
+test('demo embed says plainly that the demo is full when every guest is playing', async ({ page, browser }, testInfo) => {
+  const full = await demoEmbedServer({ demoGuests: { max: 1 } })
+  const visitor = await browser.newContext({ hasTouch: testInfo.project.use.hasTouch }), direct = await browser.newContext({ hasTouch: testInfo.project.use.hasTouch })
+  try {
+    // The only guest is playing in the first visitor's frames.
+    await page.goto(full.url)
+    await expect.poll(() => page.evaluate(() => messages.filter((m) => m.type === 'renplay-embed:ready').length)).toBe(2)
+    const message = /The demo is full right now\. Try again in a few minutes\./
+    // A second visitor, with a key of their own, is refused in both frames.
+    const other = await visitor.newPage()
+    await other.goto(full.url)
+    for (const selector of ['#laptop', '#phone']) await expect(other.frameLocator(selector).getByRole('alert')).toHaveText(message)
+    expect(await other.evaluate(() => messages.filter((m) => m.type === 'renplay-embed:ready').length)).toBe(0)
+    // And so is someone who opens the demo directly and tries it.
+    const page3 = await direct.newPage()
+    await page3.goto(`${full.demoUrl}/`)
+    await page3.getByRole('button', { name: 'Try the demo' }).click()
+    await expect(page3.getByRole('alert')).toHaveText(message)
+    // The guest who is playing is untouched.
+    expect(await guestOf(page.frameLocator('#laptop'))).toBeGreaterThan(1)
+  } finally { await Promise.all([visitor.close(), direct.close()]); await full.close() }
+})

@@ -79,8 +79,10 @@ export class DemoGuests {
     return this.serial(async () => {
       const existing = key && this.find(key)
       if (existing) { this.seen(existing); return existing }
-      this.spend(address)
-      while ((this.db.raw.prepare('SELECT COUNT(*) n FROM demo_guests').get() as { n: number }).n >= this.cfg.demoGuests.max) await this.removeOldest()
+      const bucket = this.bucket(address)
+      await this.makeRoom()
+      bucket.count++
+      this.made.set(address, bucket)
       return this.create(key)
     })
   }
@@ -111,14 +113,22 @@ export class DemoGuests {
     return next
   }
 
-  /** Counts a new guest against the address, an hour at a time. */
-  private spend(address: string): void {
+  /** The address's count of new guests this hour, refused when it is used up. Counting is up to the caller. */
+  private bucket(address: string): { count: number; until: number } {
     const now = Date.now()
     for (const [k, bucket] of this.made) if (bucket.until <= now) this.made.delete(k)
     const bucket = this.made.get(address) ?? { count: 0, until: now + 3600_000 }
     if (bucket.count >= this.cfg.demoGuests.newPerHour) throw new HttpError(429, 'Too many new guests from this address. Try again in an hour.')
-    bucket.count++
-    this.made.set(address, bucket)
+    return bucket
+  }
+
+  /** A full demo removes the guest unseen the longest, but never one that is playing: then the newcomer waits. */
+  private async makeRoom(): Promise<void> {
+    while ((this.db.raw.prepare('SELECT COUNT(*) n FROM demo_guests').get() as { n: number }).n >= this.cfg.demoGuests.max) {
+      const oldest = this.db.raw.prepare('SELECT user_id FROM demo_guests WHERE seen_at < ? ORDER BY seen_at, user_id LIMIT 1').get(Date.now() - this.cfg.demoGuests.activeMs) as { user_id: number } | undefined
+      if (!oldest) throw new HttpError(503, 'The demo is full right now. Try again in a few minutes.')
+      await this.remove(oldest.user_id)
+    }
   }
 
   private create(key: string | null): number {
@@ -130,12 +140,6 @@ export class DemoGuests {
       this.db.raw.exec('COMMIT')
       return id
     } catch (e) { this.db.raw.exec('ROLLBACK'); throw e }
-  }
-
-  private async removeOldest(): Promise<void> {
-    const oldest = this.db.raw.prepare('SELECT user_id FROM demo_guests ORDER BY seen_at, user_id LIMIT 1').get() as { user_id: number } | undefined
-    if (!oldest) return
-    await this.remove(oldest.user_id)
   }
 
   /** A guest goes with everything of theirs: saves, progress, choices and sessions. */

@@ -6,7 +6,7 @@ import express from 'express'
 import yazl from 'yazl'
 
 /** Real accounts, cookies and saves with an isolated library. No deployed server is reachable. */
-export async function demoEmbedServer() {
+export async function demoEmbedServer({ demoGuests = {} } = {}) {
   const { createApp } = await import('../../dist/app.js')
   const { loadConfig } = await import('../../dist/config.js')
   const root = await mkdtemp(join(tmpdir(), 'renplay-embed-browser-'))
@@ -27,7 +27,8 @@ export async function demoEmbedServer() {
   </body></html>`.replaceAll('DEMO_ORIGIN', demoUrl)))
   await new Promise((done) => host.listen(0, '127.0.0.1', done))
   const hostUrl = `http://127.0.0.1:${host.address().port}`
-  const cfg = { ...loadConfig(), demo: true, demoEmbedder: hostUrl, auth: 'on', adultGames: 'off', dataDir: join(root, 'data'), gamesDir: join(root, 'games'), internalDir: join(root, 'internal'), workDir: join(root, 'work'), purgeDir: join(root, 'purge'), uploadsDir: join(root, 'uploads'), enginesDir: join(root, 'engines'), archivesDir: join(root, 'archives'), recipesDir: join(root, 'recipes'), walkthroughsDir: join(root, 'walkthroughs'), overlaysDir: join(root, 'overlays'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', backupDir: null, telemetry: 'off' }
+  const base = loadConfig()
+  const cfg = { ...base, demoGuests: { ...base.demoGuests, ...demoGuests }, demo: true, demoEmbedder: hostUrl, auth: 'on', adultGames: 'off', dataDir: join(root, 'data'), gamesDir: join(root, 'games'), internalDir: join(root, 'internal'), workDir: join(root, 'work'), purgeDir: join(root, 'purge'), uploadsDir: join(root, 'uploads'), enginesDir: join(root, 'engines'), archivesDir: join(root, 'archives'), recipesDir: join(root, 'recipes'), walkthroughsDir: join(root, 'walkthroughs'), overlaysDir: join(root, 'overlays'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', backupDir: null, telemetry: 'off' }
   const app = await createApp(cfg, { startJobs: false })
   app.db.insertGame({ id: 'the-question', title: 'The Question', recipe_id: 'the-question', adult: 0, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'the-question' })
   app.app.use(express.static(new URL('../../../selector/dist/', import.meta.url).pathname))

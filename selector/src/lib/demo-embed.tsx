@@ -20,6 +20,7 @@ function demoEmbedMode(search: string): EmbedMode | null {
   return mode === 'laptop' || mode === 'phone' ? mode : null
 }
 
+const COULD_NOT_OPEN = 'Could not open the demo. Reload to try again, and check that your browser allows cookies for this page.'
 const VISITOR_STORED = 'renplay-demo-visitor'
 
 /**
@@ -40,13 +41,13 @@ function visitorKey(): string | null {
  * Signs the visitor in as their own guest in the demo. With a visitor key (the website's frames
  * have one) the key names the guest, so both frames are one guest, even with no cookie shared
  * between them. A plain embedded visit makes a guest when nobody is signed in. Returns what to
- * show while it works, or null.
+ * show while it works, or null. A demo that is full says so, in the server's words.
  */
-export function useDemoGuest(demo: boolean | undefined, me: UseQueryResult<unknown>): 'working' | 'failed' | null {
+export function useDemoGuest(demo: boolean | undefined, me: UseQueryResult<unknown>): 'working' | { failed: string } | null {
   const key = useMemo(() => demo ? visitorKey() : null, [demo])
   const embedded = useRef(demoEmbedMode(location.search) !== null).current
   const exchanged = useRef(false)
-  const [state, setState] = useState<'idle' | 'working' | 'failed'>('idle')
+  const [state, setState] = useState<'idle' | 'working' | { failed: string }>('idle')
   const unauthorized = me.error instanceof ApiError && me.error.status === 401
   const wanted = !!demo && state === 'idle' && (key !== null && !exchanged.current || (key !== null || embedded) && unauthorized)
   useEffect(() => {
@@ -55,9 +56,9 @@ export function useDemoGuest(demo: boolean | undefined, me: UseQueryResult<unkno
     setState('working')
     void post('/api/auth/demo', key ? { visitor: key } : {})
       .then(() => me.refetch())
-      .then((result) => setState(result.isError ? 'failed' : 'idle'), () => setState('failed'))
+      .then((result) => setState(result.isError ? { failed: COULD_NOT_OPEN } : 'idle'), (e) => setState({ failed: e instanceof ApiError && e.status === 503 ? e.message : COULD_NOT_OPEN }))
   }, [wanted, key, me.refetch])
-  return wanted || state === 'working' ? 'working' : state === 'failed' ? 'failed' : null
+  return wanted || state === 'working' ? 'working' : state === 'idle' ? null : state
 }
 
 /** Only the authenticated public demo enables the website bridge. */
