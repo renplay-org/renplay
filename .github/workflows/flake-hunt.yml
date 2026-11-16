@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [legacy, playwright]
+        suite: [playwright]
     env:
       UI_REPEAT: ${{ github.event_name == 'schedule' && 10 || inputs.repeats }}
       UI_TIMEOUT: '3000'
@@ -45,7 +45,6 @@ jobs:
             exit 1
           fi
           # UI_REPEAT maps to --repeat-each and --retries=0 for Playwright.
-          # The older runner keeps going after a failed run and retains each run's log.
           sh scripts/test-ui.sh "$SUITE"
       - name: Every test that failed at least once
         if: always()

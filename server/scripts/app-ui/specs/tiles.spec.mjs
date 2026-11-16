@@ -1,4 +1,5 @@
-import { test, expect, open, settled } from './fixtures.mjs'
+import { test, expect, open, settled, only, where } from './fixtures.mjs'
+import { recordGhost, takeGhost } from './helpers.mjs'
 
 // The tile is the website's shelf card (lantern/Tile.css, lantern/lean.ts): a border and a sheen in the game's colour,
 // and under the hand a tilt and a lift with the colour's long shadow. Every tile in view leans toward the hand over its grid, as the
@@ -47,6 +48,12 @@ async function grid(page) {
   await settled(page)
   // At once, not the page's smooth scroll: a check that starts while it is still moving reads a tile on its way.
   await page.evaluate(() => window.scrollTo({ top: document.querySelector('.grid[data-row]').getBoundingClientRect().top + scrollY - 140, behavior: 'instant' }))
+  // The tiles learn which of them are in view from an observer, in the frame after a scroll: one that has not reported yet
+  // lets go of a press that comes first. This waits for that frame, as the tiles' own observer does.
+  await page.evaluate(() => new Promise((done) => {
+    const watch = new IntersectionObserver(() => requestAnimationFrame(() => { watch.disconnect(); done() }))
+    watch.observe(document.body)
+  }))
   return page.locator('.grid[data-row] .card')
 }
 
@@ -118,7 +125,8 @@ test('Tiles: reduced motion keeps the border, the glow and the sheen and takes t
   }
 })
 
-test('Tiles: the focused tile is lifted and lit with the white ring, and is not tilted', async ({ page }) => {
+test('Tiles: the focused tile is lifted and lit with the white ring, and is not tilted', async ({ page }, testInfo) => {
+  only(testInfo, 'chromium-desktop', 'The focus is set here, with the key a keyboard or a controller sends: no engine or screen shows another')
   const cards = await grid(page)
   const tile = cards.nth(1)
   const restShadow = (await look(tile)).shadow
@@ -208,6 +216,7 @@ test('Tiles: reduced motion keeps the tiles still whatever the switch says', asy
 })
 
 test('Tiles: a press leans the tile toward the finger and back, and scrolling moves nothing', async ({ page }, testInfo) => {
+  where(testInfo, ['webkit-portrait'], "A finger's lean is the same in landscape")
   touchOnly(testInfo)
   const cards = await grid(page)
   const tile = cards.nth(1)
@@ -220,7 +229,9 @@ test('Tiles: a press leans the tile toward the finger and back, and scrolling mo
   const leaning = await tilt.evaluate((el) => el.style.transform)
   expect(leaning, 'It leans toward a finger at its lower right').toMatch(/rotateY\([0-9.]+deg\) rotateX\(-[0-9.]+deg\)/)
   await arrived(tile)
-  await expect.poll(async () => { const lit = await look(tile); return lit.pressed && lit.sheen === '1' }, { message: 'It is lit while pressed' }).toBe(true)
+  // The sheen eases in: its end state, read until it is there (a transition that a slow machine has not drawn a frame of looks as still as one that is done).
+  await expect.poll(async () => (await look(tile)).sheen, { message: 'It is lit while pressed' }).toBe('1')
+  expect((await look(tile)).pressed, 'It is marked as pressed while the finger is on it').toBe(true)
   await send('pointerup')
   await expect.poll(async () => (await look(tile)).tilted || (await look(tile)).pressed, { message: 'It leans back when the finger lifts' }).toBe(false)
   // Scrolling moves no tile.
@@ -237,41 +248,45 @@ test('Tiles: the flight lands on a tile at rest', async ({ page }, testInfo) => 
   const tile = page.locator(`.grid[data-row] .card[data-id="${id}"]`)
   await rest(page, tile)
   await expect.poll(async () => (await look(tile)).tilted, { message: 'The mouse leaves the tile tilted and lifted' }).toBe(true)
+  // The picture of the flight forward is seen to fly and land first, and it may start a moment after the page's address changes:
+  // what is noted below is then only the one back.
+  await recordGhost(page)
   await tile.click()
   await expect(page).toHaveURL(/\/game\//)
+  expect((await takeGhost(page)).frames.length, 'The picture flew to the game page').toBeGreaterThan(0)
   await settled(page)
+  // Where the picture's animation ends, and what the tile it lands on is while it flies: noted the moment the picture is added
+  // to the page and on every frame, so a machine that draws no frame during the flight still shows both.
+  await recordGhost(page)
   await page.evaluate(() => {
-    // What the flight lands on, each frame, until its picture is gone.
-    window.__landing = { rests: [], end: null, seen: false }
+    window.__rests = []
     const watch = () => {
-      const ghost = document.querySelector('.ghost')
       const card = document.querySelector('.grid[data-row] .card[data-rest]')
-      if (ghost) {
-        window.__landing.seen = true
-        const r = ghost.getBoundingClientRect()
-        window.__landing.end = { x: r.x, y: r.y, w: r.width }
-        if (card) {
-          const t = getComputedStyle(card.querySelector('.tilt'))
-          window.__landing.rests.push(t.transform === 'none' && t.translate === 'none')
-        }
-      }
-      requestAnimationFrame(watch)
+      if (!document.querySelector('.ghost') || !card) return
+      const t = getComputedStyle(card.querySelector('.tilt'))
+      window.__rests.push(t.transform === 'none' && t.translate === 'none')
     }
-    requestAnimationFrame(watch)
+    new MutationObserver(watch).observe(document.body, { childList: true, subtree: true })
+    const frame = () => {
+      watch()
+      requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
   })
   await page.goBack()
   await expect(page.locator('.grid[data-row] .card').first()).toBeAttached()
-  await expect.poll(() => page.evaluate(() => window.__landing.seen && !document.querySelector('.ghost')), { message: 'The picture flew back to its tile' }).toBe(true)
-  const landing = await page.evaluate(() => window.__landing)
-  expect(landing.rests.length, 'The tile it lands on is marked at rest while the picture flies').toBeGreaterThan(0)
-  expect(landing.rests.every(Boolean), 'It has no tilt and no lift while the picture flies').toBe(true)
+  const flown = await takeGhost(page)
+  expect(flown.frames.length, 'The picture flew back to its tile').toBeGreaterThan(0)
+  const rests = await page.evaluate(() => window.__rests)
+  expect(rests.length, 'The tile it lands on is marked at rest while the picture flies').toBeGreaterThan(0)
+  expect(rests.every(Boolean), 'It has no tilt and no lift while the picture flies').toBe(true)
   const place = await page.locator(`.grid[data-row] .card[data-id="${id}"]`).evaluate((el) => {
     const r = el.getBoundingClientRect()
     return { x: r.x, y: r.y, w: r.width }
   })
-  expect(Math.abs(landing.end.x - place.x), 'The picture ends at the tile, from the left').toBeLessThan(2)
-  expect(Math.abs(landing.end.y - place.y), 'From the top').toBeLessThan(2)
-  expect(Math.abs(landing.end.w - place.w), 'And as wide').toBeLessThan(2)
+  expect(Math.abs(flown.end.x - place.x), 'The picture ends at the tile, from the left').toBeLessThan(2)
+  expect(Math.abs(flown.end.y - place.y), 'From the top').toBeLessThan(2)
+  expect(Math.abs(flown.end.width - place.w), 'And as wide').toBeLessThan(2)
   await expect(page.locator('.grid[data-row] .card[data-rest]'), 'The tile is let go of when the picture lands').toHaveCount(0)
 })
 

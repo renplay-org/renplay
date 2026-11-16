@@ -1,7 +1,8 @@
-import { test, expect, freeze, openClocked } from './fixtures.mjs'
+import { test, expect, freeze, openClocked, where } from './fixtures.mjs'
 
 for (const [name, path, label] of [['Library', '/', 'Search your games'], ['Catalog', '/catalog', 'Search the catalog']]) {
-  test(`${name}: address at 200 ms once, screen reader count at 600 ms after the last key`, async ({ page }) => {
+  test(`${name}: address at 200 ms once, screen reader count at 600 ms after the last key`, async ({ page }, testInfo) => {
+    where(testInfo, ['chromium-desktop', 'webkit-portrait'], "Timers of the page's clock: landscape is the same engine and input as portrait")
     await freeze(page)
     await page.addInitScript(() => {
       window.__writes = []

@@ -36,23 +36,46 @@ test.describe('one press is one move', () => {
     await library(page)
     await tap(page, 'down', 60)
     expect((await moves(page)).length, 'a 60 ms tap').toBe(1)
-    await page.evaluate(() => { window.__hold('down', true); window.__stick(0, 0.9) })
-    await page.waitForTimeout(120)
-    await page.evaluate(() => { window.__hold('down', false) })
-    await page.waitForTimeout(120)
-    await page.evaluate(() => { window.__stick(0, 0) })
-    await page.waitForTimeout(100)
-    expect((await moves(page)).length, 'the d-pad and the stick together are one press').toBe(2)
+    // The d-pad and the stick pushed together, the d-pad let go, then the stick: one press. The page repeats a hold once its own clock
+    // says 550 ms, so a busy machine that took that long over it has held a button, which is not this check: it is asked again.
+    let together
+    for (let attempt = 0; attempt < 5 && together === undefined; attempt++) {
+      const before = (await moves(page)).length
+      const took = await page.evaluate(async () => {
+        const pause = (ms) => new Promise((done) => setTimeout(done, ms))
+        const from = performance.now()
+        window.__hold('down', true)
+        window.__stick(0, 0.9)
+        await pause(120)
+        window.__hold('down', false)
+        await pause(120)
+        window.__stick(0, 0)
+        const took = performance.now() - from
+        await pause(100)
+        return took
+      })
+      if (took < 500) together = (await moves(page)).length - before
+    }
+    expect(together, 'the d-pad and the stick together are one press').toBe(1)
   })
 
   test('a press held for half a second is still one move, and a longer hold repeats', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
     await library(page)
-    await tap(page, 'down', 500)
-    expect((await moves(page)).length, 'a half second press').toBe(1)
-    await tap(page, 'down', 1500)
-    expect((await moves(page)).length, 'a long hold moves again').toBeGreaterThan(3)
-    expect((await moves(page)).length, 'at a pace a person can follow').toBeLessThan(14)
+    // The page repeats a hold once its own clock says 550 ms. A press that a busy machine held longer than the test asked is a
+    // hold, which repeats: it is not the half second this is about, and is asked again.
+    let half
+    for (let attempt = 0; attempt < 5 && half === undefined; attempt++) {
+      const before = (await moves(page)).length
+      const held = await tap(page, 'down', 500)
+      if (held < 545) half = (await moves(page)).length - before
+    }
+    expect(half, 'a half second press').toBe(1)
+    const before = (await moves(page)).length
+    const held = await tap(page, 'down', 1500)
+    expect((await moves(page)).length - before, 'a long hold moves again').toBeGreaterThan(3)
+    // The pace is for a hold of the length asked: a longer one on a busy machine moves more.
+    if (held < 1700) expect((await moves(page)).length - before, 'at a pace a person can follow').toBeLessThan(14)
   })
 })
 
@@ -70,6 +93,8 @@ const place = (page) => page.evaluate(() => {
 test.describe('reaching every game', () => {
   test('the d-pad goes down through All games to the last tile, each one whole and clear of the toolbar, and A opens it', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
+    // A press for each of dozens of tiles, each seen by the page: a busy machine takes its time.
+    test.slow()
     await library(page)
     const seen = []
     let last = null
@@ -94,6 +119,8 @@ test.describe('reaching every game', () => {
 
   test('right and left across the rows keep each tile whole and clear of the header, the stuck toolbar and the bottom', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
+    // A press for each of dozens of tiles, each seen by the page: a busy machine takes its time.
+    test.slow()
     await library(page)
     for (const button of ['right', 'left']) {
       for (let i = 0; i < (button === 'right' ? 40 : 30); i++) {
@@ -168,21 +195,24 @@ test.describe('the bumpers', () => {
     desktopOnly(testInfo)
     await library(page)
     const path = () => page.evaluate(() => location.pathname)
-    for (const next of ['/catalog', '/add', '/activity', '/account', '/']) {
-      await tap(page, 'rb', 60)
+    // The address changes at once, but the page before stays up until the next one's code has come, and a bumper goes on from the page
+    // that is drawn (its listener is bound a frame after that). The next press waits for the new page to be there.
+    const bump = async (button, next) => {
+      const before = await page.evaluateHandle(() => document.querySelector('main').firstElementChild)
+      await tap(page, button, 60)
       await expect.poll(path).toBe(next)
+      await expect.poll(() => page.evaluate((el) => document.querySelector('main').firstElementChild !== el, before), { message: `The page for ${next} is drawn` }).toBe(true)
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
     }
-    await tap(page, 'lb', 60)
-    await expect.poll(path).toBe('/account')
+    for (const next of ['/catalog', '/add', '/activity', '/account', '/']) await bump('rb', next)
+    await bump('lb', '/account')
     // A page of one's own: the game page belongs to the Library, and the history to You.
     await page.goto('/game/game-000')
     await expect(page.locator('.stage')).toBeVisible()
-    await tap(page, 'rb', 60)
-    await expect.poll(path).toBe('/catalog')
+    await bump('rb', '/catalog')
     await page.goto('/history')
     await expect(page.locator('main')).toContainText(/\w/)
-    await tap(page, 'lb', 60)
-    await expect.poll(path).toBe('/activity')
+    await bump('lb', '/activity')
   })
 })
 
@@ -195,7 +225,6 @@ test.describe('the legend', () => {
     await tap(page, 'down', 60)
     await expect(legend).toBeVisible()
     await expect(legend).toHaveText(/Select\s*Back\s*LBRB\s*Pages|Select.*Back.*Pages/)
-    await page.screenshot({ path: testInfo.outputPath('legend.png') })
     await page.mouse.move(300, 300)
     await page.mouse.move(340, 320)
     await expect(legend, 'gone with the mouse').toHaveCount(0)

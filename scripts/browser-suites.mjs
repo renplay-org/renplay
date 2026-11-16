@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 const files = readFileSync(0, 'utf8').split('\n').filter(Boolean)
 const shared = files.some((p) =>
   /^(scripts\/|\.github\/workflows\/|mise\.toml$|tasks\.toml$|server\/package(-lock)?\.json$)/.test(p) ||
-  /^server\/scripts\/(check-app-ui\.mjs|app-ui\/(lib|playwright\.config|summary-reporter|serve)\.mjs)$/.test(p))
+  /^server\/scripts\/app-ui\/(playwright\.config|summary-reporter|serve)\.mjs$/.test(p))
 const app = shared || files.some((p) => /^(selector\/|design\/|server\/|runtime\/|tests\/|demo\/static\/)/.test(p))
 const layout = shared || files.some((p) => /^(website\/|docs\/|design\/|server\/src\/envvars\.ts$)/.test(p))
-console.log(JSON.stringify([...(app ? ['legacy', 'playwright'] : []), ...(layout ? ['layout'] : [])]))
+console.log(JSON.stringify([...(app ? ['playwright'] : []), ...(layout ? ['layout'] : [])]))

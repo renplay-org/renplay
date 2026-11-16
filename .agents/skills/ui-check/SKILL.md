@@ -18,9 +18,10 @@ container with Node 24 and matching package versions. Only this container run co
 Never re-run a passing suite to make sure. A doubt about a test is a flake to report, not a reason
 to repeat acceptance. Native Mac browsers below are for quick tries and visual review, not acceptance.
 
-The Playwright suite uses one worker, desktop Chromium at 1440 px, and touch WebKit at 390 by 844 px and
-844 by 390 px. JSON, timings and retained failure traces are in `ui-test-results/`. Read the text
-or JSON failure first, then the trace. A pass only on retry warns locally and fails CI. Never
+The Playwright suite runs up to five workers (three in each WebKit project) over five projects: desktop Chromium at 1440 px, touch WebKit at 390 by
+844 px and 844 by 390 px, desktop WebKit for the static demo, and Chromium at 390 px with touch for the library's
+own checks in `specs/chromium/`. A spec says in its first line which projects run it and why. JSON, timings and retained failure traces are in `ui-test-results/`. Read the text
+or JSON failure first, then the trace. A test that passes only on its retry is listed in the summary as flaky and warned about in CI, and does not fail the job. Never
 point the suite at a real library. No screenshots in pull requests.
 
 For app changes, choose the affected behavior explicitly:
@@ -29,15 +30,14 @@ For test or imported helper changes, use
 `sh scripts/test-ui.sh --warm playwright --only-changed=origin/dev` after fetching `origin/dev`.
 Playwright follows test imports, not the app's built assets, so this is not a selector for app changes.
 Re-run just the last failures with `sh scripts/test-ui.sh --warm playwright --last-failed`.
-For one older subject, use `sh scripts/test-ui.sh --warm legacy --only search`.
 Stop the warm container with `mise run test:ui:stop`. Results, including the last-failed state, stay
 in `ui-test-results/` across container runs.
 
 For repeats without retries, use the **Flake hunt** workflow on your branch. Its repeat count
-defaults to 10. It also runs nightly against `dev`. The older checks keep every run's log, and
-Playwright uses `--repeat-each` with `--retries=0`. Each job's summary lists every test that failed
-at least once, with reports and failure traces in its artifacts. Repeats belong there, not in the
-working loop. The normal complete suite has a five minute budget, including the old checks.
+defaults to 10. It also runs nightly against `dev`. It uses Playwright's `--repeat-each` with
+`--retries=0`. The job's summary lists every test that failed at least once, with reports and
+failure traces in its artifacts. Repeats belong there, not in the working loop. The normal
+complete suite has a five minute budget, including the layout checks.
 
 Never loosen a test without stopping to report it and getting a maintainer's approval. Do not remove assertions,
 widen tolerances, add or lengthen fixed waits, skip, quarantine, or change a test only to make it

@@ -283,14 +283,17 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
 3. UI changes are looked at on a phone size (WebKit, iPhone) and a desktop size, using
    `npm run screenshots` or Playwright directly. No page errors.
 4. Browser acceptance is `mise run test:ui`, the pinned official Playwright Linux image with Node 24.
-   Native Mac browsers are for quick tries only. The Playwright suite uses one worker, desktop Chromium, and touch
-   WebKit in portrait and landscape. While working, run only the tests a change touches, using
-   `sh scripts/test-ui.sh --warm playwright --grep <behavior>` or `--warm legacy --only <subject>`.
+   Native Mac browsers are for quick tries only. The suite is Playwright Test (`server/scripts/app-ui/specs/`) and the
+   website and docs layout check. Playwright runs up to five workers (three in each WebKit project, and four and two on CI, whose four vCPUs are slower) over five projects: desktop Chromium, touch WebKit in
+   portrait and landscape, desktop WebKit for the static demo, and a phone-sized Chromium for the library's own checks
+   in `specs/chromium/`. A spec says in its first line which projects run it and why (`only()` and `where()`), so a
+   test runs where it shows something new. While working, run only the tests a change touches, using
+   `sh scripts/test-ui.sh --warm playwright --grep <behavior>`. The whole suite has a budget of five minutes.
    Run the whole suite once at the end, in the container, and push only after it passes. Never re-run
    a passing suite to make sure. A doubt about a test is a flake to report, and the **Flake hunt**
    workflow repeats it without retries (by hand, or nightly on `dev`). Stop the warm container with
    `mise run test:ui:stop`. Results and failure traces are in `ui-test-results/`.
-   A retry-only pass warns locally and fails CI. No PR screenshots.
+   A test that passes only on its retry does not fail a pull request: the job summary lists it under "Flaky, to fix from the flake hunt" and CI warns once for each. A test that fails every attempt fails the job, and the nightly flake hunt, which runs without retries, fails on any failure. No PR screenshots.
    Never loosen a test without stopping to report it and getting a maintainer's approval: no removed assertions,
    wider tolerances, added or longer fixed waits, skips, quarantine or changes only to make it pass.
    Moving an assertion needs equivalent or stronger coverage in the new runner, not less coverage.

@@ -8,8 +8,12 @@
 //   - with reduced motion the same scrolls are one jump
 //   - at a font 50% wider than the page's own (some phones have a wide one), the count a search adds to the Library's heading
 //     changes nothing: not its height, and not the line the heading is on
-import { mock } from '../app-mock.mjs'
-import { check, isMain, main, parked, quiet, ready, SEARCH_PAGES } from './lib.mjs'
+import { test, expect, check, only, until } from '../fixtures.mjs'
+import { parked, quiet, ready, SEARCH_PAGES } from '../helpers.mjs'
+
+test.use({ mockOptions: {} })
+
+const nextFrames = (page, n = 2) => page.evaluate((n) => new Promise((done) => { const step = () => (n-- > 0 ? requestAnimationFrame(step) : done()); step() }), n)
 
 /** Samples the page on every frame: where things are, how tall it is, the shifts the browser reports (Chromium only). */
 const startSampling = (page) =>
@@ -73,25 +77,22 @@ const describe = (g) => `${Math.round(g.distance)} px in ${g.moving} frames, the
 /** Smooth: more than a jump, no frame covering more than a third of the way, and never back. */
 const smooth = (g) => g.distance > 12 && g.moving >= 3 && g.biggest <= g.distance / 3 + 1 && g.turns === 0
 
-/** Whether the toolbar ends stuck under the header, and the page was never shorter than the screen under it. */
+/** Whether the toolbar ends stuck under the header. */
 const parkedAfter = (frames, stick) => {
   const last = frames.at(-1)
   return Math.abs(last.toolbar - last.header - stick) <= 1
 }
 
-async function steady(browser, base, errors, options, label) {
-  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
-  const page = await ctx.newPage()
-  await mock(page, errors, label)
-  const tolerance = 1
-  for (const [name, path, field, noun] of SEARCH_PAGES) {
-    const word = noun.toLowerCase()
-    for (const from of ['the top', 'scrolled down']) {
-      const where = `${label}: ${name} from ${from}`
-      await ready(page, base, path)
+for (const [name, path, field, noun] of SEARCH_PAGES) {
+  for (const from of ['the top', 'scrolled down']) {
+    test(`${name} from ${from}: a search moves the page once, smoothly, and nothing else`, async ({ page }) => {
+      const word = noun.toLowerCase()
+      const where = `${name} from ${from}`
+      const tolerance = 1
+      await ready(page, path)
       if (from !== 'the top') {
         await page.evaluate(() => window.scrollTo({ top: 1500, behavior: 'instant' }))
-        await page.waitForTimeout(300)
+        await quiet(page)
       }
       const stick = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.toolbar[role="search"]')).top))
       const keysBefore = await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith('renplay:scroll:')).length)
@@ -100,7 +101,7 @@ async function steady(browser, base, errors, options, label) {
       const room = await page.evaluate(() => document.querySelector('.bd')?.outerHTML)
       await page.evaluate((f) => document.querySelector(`input[aria-label="${f}"]`).focus({ preventScroll: true }), field)
       await startSampling(page)
-      await page.waitForTimeout(100)
+      await nextFrames(page)
       await takeFrames(page)
 
       // The first key of a search: one smooth scroll that puts the toolbar under the header.
@@ -166,47 +167,39 @@ async function steady(browser, base, errors, options, label) {
       check(keysAfter <= keysBefore + 1, `${where}: a search adds no scroll memory of its own (${keysBefore} then ${keysAfter})`)
       const still = await page.evaluate((r) => ({ same: document.querySelector('main')?.firstElementChild === window.__root, animations: document.querySelector('main')?.firstElementChild?.getAnimations().length, room: document.querySelector('.bd')?.outerHTML === r }), room)
       check(still.same && still.animations === animations && still.room, `${where}: the page does not fade in again and the backdrop does not change`)
-      await page.evaluate(() => cancelAnimationFrame(window.__loop))
-    }
+    })
   }
-  await ctx.close()
 }
 
-/** With reduced motion the first letter, and a later one after scrolling away, put the toolbar under the header in one jump. */
-async function reduced(browser, base, errors, options, label) {
-  const ctx = await browser.newContext({ ...options, reducedMotion: 'reduce', serviceWorkers: 'block' })
-  const page = await ctx.newPage()
-  await mock(page, errors, label)
+test.describe('reduced motion', () => {
+  test.use({ reducedMotion: 'reduce' })
   for (const [name, path, field, noun] of SEARCH_PAGES) {
-    const word = noun.toLowerCase()
-    await ready(page, base, path)
-    const stick = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.toolbar[role="search"]')).top))
-    await page.evaluate((f) => document.querySelector(`input[aria-label="${f}"]`).focus({ preventScroll: true }), field)
-    await startSampling(page)
-    await takeFrames(page)
-    await page.keyboard.type(word[0])
-    await quiet(page)
-    const first = await takeFrames(page)
-    const jump = glide(first.frames)
-    check(jump.moving <= 1 && parkedAfter(first.frames, stick), `${label}: ${name}: with reduced motion the first letter jumps to the toolbar at once (${describe(jump)})`)
-    await page.evaluate(() => window.scrollBy({ top: 700, behavior: 'instant' }))
-    await takeFrames(page)
-    await page.keyboard.type(word[1])
-    await quiet(page)
-    const again = await takeFrames(page)
-    const back = glide(again.frames.slice(1))
-    check(back.moving <= 1 && parkedAfter(again.frames, stick), `${label}: ${name}: with reduced motion a later letter takes the page back at once (${describe(back)})`)
-    await page.evaluate(() => cancelAnimationFrame(window.__loop))
+    test(`${name}: with reduced motion the first letter and a later one put the toolbar under the header in one jump`, async ({ page }) => {
+      const word = noun.toLowerCase()
+      await ready(page, path)
+      const stick = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.toolbar[role="search"]')).top))
+      await page.evaluate((f) => document.querySelector(`input[aria-label="${f}"]`).focus({ preventScroll: true }), field)
+      await startSampling(page)
+      await takeFrames(page)
+      await page.keyboard.type(word[0])
+      await quiet(page)
+      const first = await takeFrames(page)
+      const jump = glide(first.frames)
+      check(jump.moving <= 1 && parkedAfter(first.frames, stick), `${name}: with reduced motion the first letter jumps to the toolbar at once (${describe(jump)})`)
+      await page.evaluate(() => window.scrollBy({ top: 700, behavior: 'instant' }))
+      await takeFrames(page)
+      await page.keyboard.type(word[1])
+      await quiet(page)
+      const again = await takeFrames(page)
+      const back = glide(again.frames.slice(1))
+      check(back.moving <= 1 && parkedAfter(again.frames, stick), `${name}: with reduced motion a later letter takes the page back at once (${describe(back)})`)
+    })
   }
-  await ctx.close()
-}
+})
 
-/** The Library's heading keeps its height when its count grows from "130" to "130 of 130" and back, at a wide font. */
-async function heading(browser, base, errors, options, label) {
-  const ctx = await browser.newContext({ ...options, serviceWorkers: 'block' })
-  const page = await ctx.newPage()
-  await mock(page, errors, label)
-  await ready(page, base, '/')
+test('the Library\'s heading keeps its height when its count grows from "130" to "130 of 130" and back, at a wide font', async ({ page }, testInfo) => {
+  only(testInfo, 'chromium-phone', 'A phone with a wide font')
+  await ready(page, '/')
   const measure = () =>
     page.evaluate(() => {
       const h = document.querySelector('.sec-h')
@@ -229,28 +222,15 @@ async function heading(browser, base, errors, options, label) {
   await font(150)
   await page.evaluate(() => document.fonts.ready)
   const before = await measure()
-  check(before.width > normal.width * 1.3, `${label}: the wide font is in use ("All games" is ${Math.round(normal.width)} px wide, then ${Math.round(before.width)} px)`)
-  const field = page.locator('input[aria-label="Search your games"]')
-  await field.focus()
+  check(before.width > normal.width * 1.3, `the wide font is in use ("All games" is ${Math.round(normal.width)} px wide, then ${Math.round(before.width)} px)`)
+  const input = page.locator('input[aria-label="Search your games"]')
+  await input.focus()
   await page.keyboard.type('g')
   await page.waitForFunction(() => /of/.test(document.querySelector('.sec-h .n').textContent))
   const narrowed = await measure()
-  await field.fill('')
+  await input.fill('')
   await page.waitForFunction(() => !/of/.test(document.querySelector('.sec-h .n').textContent))
   const cleared = await measure()
-  check(narrowed.sech === before.sech && cleared.sech === before.sech, `${label}: the heading keeps its height with the count "${narrowed.text}" (${before.sech} px, then ${narrowed.sech} px, then ${cleared.sech} px)`)
-  check(narrowed.h2 === before.h2 && cleared.h2 === before.h2, `${label}: the heading's title and count stay on one line (${before.h2} px, then ${narrowed.h2} px, then ${cleared.h2} px)`)
-  await ctx.close()
-}
-
-export const tasks = ({ chrome, safari, base, errors, desktop, phone, iphone }) => [
-  { name: 'steady', label: 'desktop', run: () => steady(chrome, base, errors, desktop, 'desktop') },
-  { name: 'steady', label: 'phone', run: () => steady(chrome, base, errors, phone, 'phone') },
-  { name: 'reduced', label: 'desktop', run: () => reduced(chrome, base, errors, desktop, 'desktop') },
-  { name: 'reduced', label: 'phone', run: () => reduced(chrome, base, errors, phone, 'phone') },
-  { name: 'heading', label: 'phone', run: () => heading(chrome, base, errors, phone, 'phone') },
-  safari && { name: 'steady', label: 'WebKit', run: () => steady(safari, base, errors, iphone, 'phone (WebKit)') },
-  safari && { name: 'reduced', label: 'WebKit', run: () => reduced(safari, base, errors, iphone, 'phone (WebKit)') },
-]
-
-if (isMain(import.meta.url)) await main([{ tasks }])
+  check(narrowed.sech === before.sech && cleared.sech === before.sech, `the heading keeps its height with the count "${narrowed.text}" (${before.sech} px, then ${narrowed.sech} px, then ${cleared.sech} px)`)
+  check(narrowed.h2 === before.h2 && cleared.h2 === before.h2, `the heading's title and count stay on one line (${before.h2} px, then ${narrowed.h2} px, then ${cleared.h2} px)`)
+})

@@ -90,8 +90,8 @@ dir = "selector"
 run = ["npx tsc -b --noEmit", "npm run build", "node ../scripts/check-dist.mjs"]
 
 ["check:app-ui"]
-description = "The library in a browser, files in server/scripts/app-ui (run a few at a time, each also on its own): whole rows, scroll memory, the artwork's flight, layout shift, the Up next carousel, the search and its scrolling, the flight to a game's page"
-run = "sh scripts/test-ui.sh legacy"
+description = "The library in a browser: the Playwright specs in server/scripts/app-ui/specs, in the pinned Linux container"
+run = "sh scripts/test-ui.sh playwright"
 
 ["check:docs"]
 description = "Docs build, with the configuration page, every link and llms.txt checked"

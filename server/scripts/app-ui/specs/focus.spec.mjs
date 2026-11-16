@@ -1,8 +1,10 @@
-import { test, expect, open, settled } from './fixtures.mjs'
+import { test, expect, open, settled, where } from './fixtures.mjs'
 import { ringAt } from '../focus-ring.mjs'
 
 for (const [name, path, label] of [['Library', '/', 'Search your games'], ['Catalog', '/catalog', 'Search the catalog']]) {
   test(`${name}: shortcuts focus a whole ring, Escape clears then leaves`, async ({ page }, testInfo) => {
+    // The Library's and the Catalog's search is one toolbar and one field. WebKit takes a picture of the ring at a high price: once.
+    where(testInfo, name === 'Library' ? ['chromium-desktop', 'webkit-portrait'] : ['chromium-desktop'], "The ring is the one search field of the toolbar both pages share, and landscape is as wide as a tablet")
     for (const how of ['shortcut', '/', 'pointer']) {
       await open(page, path)
       await settled(page)

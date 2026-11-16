@@ -1,4 +1,4 @@
-import { test, expect, freeze, open, openClocked, settled } from './fixtures.mjs'
+import { test, expect, freeze, open, openClocked, settled, where } from './fixtures.mjs'
 
 async function state(page) {
   return page.locator('.carousel').evaluate((box) => ({
@@ -40,6 +40,7 @@ async function direction(page, sign, count) {
 }
 
 test('Carousel: next wraps last to first, previous wraps first to last', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Landscape is the same engine and the same keys as portrait')
   await open(page)
   await settled(page)
   const count = await page.locator('.carousel .slide:not(.copy)').count()
@@ -60,7 +61,8 @@ test('Carousel: next wraps last to first, previous wraps first to last', async (
   await direction(page, -1, count)
 })
 
-test('Carousel: automatic turn is scheduled at 7000 ms, not before', async ({ page }) => {
+test('Carousel: automatic turn is scheduled at 7000 ms, not before', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop'], "A timer of the page's clock: the same in every browser and size")
   await freeze(page)
   await page.addInitScript(() => {
     window.__turns = []

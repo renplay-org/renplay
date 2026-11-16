@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.mjs'
+import { test, expect, where } from './fixtures.mjs'
 import { play, slot } from './player-fixture.mjs'
 
 const touch = (testInfo) => !!testInfo.project.use.hasTouch
@@ -40,6 +40,7 @@ const sharing = (items) =>
   })
 
 test('the game page\'s Saves tab, its action sheet and its history sheet have no cut label, one label to a line, and the history is titled with the save\'s name', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Every line is measured against its own box and the screen: landscape is wider than portrait and shows no label cut that portrait does not')
   await play(page, {
     path: '/game/game-000#saves',
     slots: [{ ...slot(1, 5), title: 'Meeting Diya', note: 'Before the first lunch scene', pinnedAt: '2026-11-10T10:00:00Z' }, slot(2, 30), slot(3, 60)],
@@ -59,7 +60,6 @@ test('the game page\'s Saves tab, its action sheet and its history sheet have no
   expect(await toolbar.evaluate((el) => el.scrollWidth - el.clientWidth), 'The toolbar does not scroll').toBeLessThanOrEqual(1)
   // Every button of both is a whole target.
   for (const button of await page.locator('.toolbar button, .toolbar a').all()) expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(40)
-  await page.screenshot({ path: testInfo.outputPath('saves-tab.png') })
   // The action sheet on a phone, the menu on a computer.
   await press(testInfo, page.getByRole('button', { name: 'Save actions' }).first())
   const actions = page.locator('.menu')
@@ -69,7 +69,6 @@ test('the game page\'s Saves tab, its action sheet and its history sheet have no
   expect(await sharing(items), 'Labels that share a line').toEqual([])
   expect(await items.allTextContents()).toEqual(['Load', 'Unpin', 'Name and note', 'Download', 'Copy to another game', 'Previous versions', 'Delete'])
   for (const item of await items.all()) expect((await item.boundingBox()).height).toBeGreaterThanOrEqual(44)
-  await page.screenshot({ path: testInfo.outputPath('actions.png') })
   // The history of this save: titled with its name, and why each version is there in plain words.
   await press(testInfo, items.filter({ hasText: 'Previous versions' }))
   const history = page.getByRole('dialog', { name: 'Previous versions of Meeting Diya' })
@@ -78,7 +77,6 @@ test('the game page\'s Saves tab, its action sheet and its history sheet have no
   await expect(history.getByText('The older of two copies')).toBeVisible()
   expect(await history.getByText(/\.save|overwrite|conflict|game-delete|user-delete/).count(), 'No file names or code words').toBe(0)
   expect(await cut(history), 'The history').toEqual([])
-  await page.screenshot({ path: testInfo.outputPath('history.png') })
   await press(testInfo, history.getByRole('button', { name: 'Close' }))
   // And the history of every save: each version by its save's name, and the reasons in words.
   await press(testInfo, page.getByRole('button', { name: 'History' }))
@@ -89,7 +87,6 @@ test('the game page\'s Saves tab, its action sheet and its history sheet have no
   await expect(all.getByText('Page 2 · Slot 3', { exact: true })).toBeVisible()
   await expect(all.getByText(/^Replaced by a Sync code · /)).toBeVisible()
   expect(await cut(all), 'The whole history').toEqual([])
-  await page.screenshot({ path: testInfo.outputPath('history-all.png') })
 })
 
 /** The opacity of the surface a sheet or menu is drawn on, as computed: what shows through when nothing is blurred. */
@@ -102,6 +99,7 @@ const opacity = (locator) =>
   })
 
 test('every sheet and menu reads with no blur: what is behind it does not show through', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], "A blur is the engine's: landscape is the same engine as portrait")
   await play(page, {
     path: '/game/game-000#saves',
     slots: [{ ...slot(1, 5), title: 'Meeting Diya', note: 'Before the first lunch scene' }, slot(2, 30), slot(3, 60)],
@@ -118,7 +116,6 @@ test('every sheet and menu reads with no blur: what is behind it does not show t
   await solid(actions, 'The actions')
   // The picture is of the sheet at rest, not while it rises in.
   await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect.getComputedTiming().endTime !== Infinity).map((a) => a.finished.catch(() => {}))))
-  await page.screenshot({ path: testInfo.outputPath('actions-no-blur.png') })
   await press(testInfo, actions.getByRole('button', { name: 'Name and note' }))
   const naming = page.getByRole('dialog', { name: 'Name and note' })
   await expect(naming).toBeVisible()
@@ -130,7 +127,6 @@ test('every sheet and menu reads with no blur: what is behind it does not show t
   await expect(history).toBeVisible()
   await solid(history, 'The history of a save')
   await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect.getComputedTiming().endTime !== Infinity).map((a) => a.finished.catch(() => {}))))
-  await page.screenshot({ path: testInfo.outputPath('history-no-blur.png') })
   await press(testInfo, history.getByRole('button', { name: 'Close' }))
   await press(testInfo, page.getByRole('button', { name: 'History' }))
   const all = page.getByRole('dialog', { name: 'Save history' })
@@ -146,24 +142,26 @@ test('every sheet and menu reads with no blur: what is behind it does not show t
 })
 
 test('Start from the main menu sits under Resume and opens the game without a save', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'What the page offers: landscape adds no other layout')
   await play(page, { path: '/game/game-000' })
   const resume = page.getByRole('link', { name: 'Resume' }).first()
   const link = page.getByRole('link', { name: 'Start from the main menu' })
   await expect(link).toBeVisible()
   // Under Resume, quiet.
   expect((await link.boundingBox()).y).toBeGreaterThan((await resume.boundingBox()).y + (await resume.boundingBox()).height - 1)
-  await page.screenshot({ path: testInfo.outputPath('start-from-the-main-menu.png') })
   await press(testInfo, link)
   await expect(page).toHaveURL(/\/play\/game-000$/)
 })
 
 test('Resume loads the newest save, which is what Start from the main menu is not', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'What the page offers: landscape adds no other layout')
   await play(page, { path: '/game/game-000' })
   await press(testInfo, page.getByRole('link', { name: 'Resume' }).first())
   await expect(page).toHaveURL(/\/play\/game-000\?resume=quick-2$/)
 })
 
-test('a game with no saves has no Start from the main menu', async ({ page }) => {
+test('a game with no saves has no Start from the main menu', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'What the page offers: landscape adds no other layout')
   await play(page, { path: '/game/game-000', slots: [] })
   await expect(page.getByRole('link', { name: 'Play' }).first()).toBeVisible()
   await expect(page.getByRole('link', { name: 'Start from the main menu' })).toHaveCount(0)
