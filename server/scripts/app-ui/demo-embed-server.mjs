@@ -13,9 +13,18 @@ export async function demoEmbedServer() {
   let demoUrl = ''
   const host = createServer((_req, res) => res.end(`<!doctype html><html><body style="margin:0">
     <script>window.messages=[]; addEventListener('message', e => { if(e.origin===${JSON.stringify('DEMO_ORIGIN')}) messages.push({ ...e.data, frame: e.source===document.querySelector('#laptop').contentWindow ? 'laptop' : 'phone' }) })</script>
-    <iframe id="laptop" title="Laptop" width="880" height="700" src="${demoUrl}/?embed=laptop"></iframe>
-    <iframe id="phone" title="Phone" width="390" height="844" src="${demoUrl}/game/the-question?embed=phone"></iframe>
-  </body></html>`.replace('DEMO_ORIGIN', demoUrl)))
+    <iframe id="laptop" title="Laptop" width="880" height="700"></iframe>
+    <iframe id="phone" title="Phone" width="390" height="844"></iframe>
+    <script>
+    // What the website does: one random key for this visitor, kept in its own storage and given to both frames.
+    const bytes = crypto.getRandomValues(new Uint8Array(32))
+    const key = localStorage.getItem('renplay-visitor') ?? btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+    localStorage.setItem('renplay-visitor', key)
+    window.visitor = key
+    document.querySelector('#laptop').src = 'DEMO_ORIGIN/?embed=laptop#visitor=' + key
+    document.querySelector('#phone').src = 'DEMO_ORIGIN/game/the-question?embed=phone#visitor=' + key
+    </script>
+  </body></html>`.replaceAll('DEMO_ORIGIN', demoUrl)))
   await new Promise((done) => host.listen(0, '127.0.0.1', done))
   const hostUrl = `http://127.0.0.1:${host.address().port}`
   const cfg = { ...loadConfig(), demo: true, demoEmbedder: hostUrl, auth: 'on', adultGames: 'off', dataDir: join(root, 'data'), gamesDir: join(root, 'games'), internalDir: join(root, 'internal'), workDir: join(root, 'work'), purgeDir: join(root, 'purge'), uploadsDir: join(root, 'uploads'), enginesDir: join(root, 'engines'), archivesDir: join(root, 'archives'), recipesDir: join(root, 'recipes'), walkthroughsDir: join(root, 'walkthroughs'), overlaysDir: join(root, 'overlays'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', backupDir: null, telemetry: 'off' }

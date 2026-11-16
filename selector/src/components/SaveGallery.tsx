@@ -17,7 +17,7 @@ import { Seg, Pill, IconBtn } from '../lantern/controls'
 import { Confirm, Empty, MenuItem, Spinner, errorText, useToast } from '../lantern/ui'
 import type { SaveVersions, SyncDownloaded } from '@shared/api'
 import Sheet from '../lantern/Sheet'
-import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
+import { demoPlayTarget, demoPlayTo, useDemoEmbed } from '../lib/demo-embed'
 
 type Kind = 'all' | 'manual' | 'auto' | 'quick'
 
@@ -38,7 +38,7 @@ export default function SaveGallery({ game }: { game: Game }) {
   const toast = useToast()
   const navigate = useNavigate()
   const embed = useDemoEmbed()
-  const openSave = (file: string) => demoPlayTarget(embed) ? window.top!.location.assign(playLink(game.id, file)) : navigate(playLink(game.id, file))
+  const openSave = (file: string) => demoPlayTarget(embed) ? window.top!.location.assign(demoPlayTo(embed, playLink(game.id, file))) : navigate(playLink(game.id, file))
   const fileRef = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState<Kind>('all')
   const [importing, setImporting] = useState(false)

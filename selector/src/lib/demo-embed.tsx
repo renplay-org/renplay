@@ -1,7 +1,9 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { embedMessage } from '@shared/demo-embed'
+import type { UseQueryResult } from '@tanstack/react-query'
+import { embedMessage, visitorKeyFrom } from '@shared/demo-embed'
+import { ApiError, post } from './api'
 import { useAuth } from './auth'
 import { useGames } from './queries'
 import { isTouchDevice } from './platform'
@@ -13,9 +15,49 @@ export function useDemoEmbed() {
   return useContext(EmbedContext)
 }
 
-export function demoEmbedMode(search: string): EmbedMode | null {
+function demoEmbedMode(search: string): EmbedMode | null {
   const mode = new URLSearchParams(search).get('embed')
   return mode === 'laptop' || mode === 'phone' ? mode : null
+}
+
+const VISITOR_STORED = 'renplay-demo-visitor'
+
+/**
+ * The visitor key the website hands to its frames in the address fragment (#visitor=KEY). It is
+ * kept for this tab and taken out of the address, so a reload or a copied link does not carry it.
+ */
+function visitorKey(): string | null {
+  const found = visitorKeyFrom(location.hash)
+  if (found) {
+    try { sessionStorage.setItem(VISITOR_STORED, found) } catch { /* A tab that cannot store keeps it until it reloads. */ }
+    history.replaceState(history.state, '', location.pathname + location.search)
+    return found
+  }
+  try { return visitorKeyFrom(`#visitor=${sessionStorage.getItem(VISITOR_STORED) ?? ''}`) } catch { return null }
+}
+
+/**
+ * Signs the visitor in as their own guest in the demo. With a visitor key (the website's frames
+ * have one) the key names the guest, so both frames are one guest, even with no cookie shared
+ * between them. A plain embedded visit makes a guest when nobody is signed in. Returns what to
+ * show while it works, or null.
+ */
+export function useDemoGuest(demo: boolean | undefined, me: UseQueryResult<unknown>): 'working' | 'failed' | null {
+  const key = useMemo(() => demo ? visitorKey() : null, [demo])
+  const embedded = useRef(demoEmbedMode(location.search) !== null).current
+  const exchanged = useRef(false)
+  const [state, setState] = useState<'idle' | 'working' | 'failed'>('idle')
+  const unauthorized = me.error instanceof ApiError && me.error.status === 401
+  const wanted = !!demo && state === 'idle' && (key !== null && !exchanged.current || (key !== null || embedded) && unauthorized)
+  useEffect(() => {
+    if (!wanted) return
+    exchanged.current = true
+    setState('working')
+    void post('/api/auth/demo', key ? { visitor: key } : {})
+      .then(() => me.refetch())
+      .then((result) => setState(result.isError ? 'failed' : 'idle'), () => setState('failed'))
+  }, [wanted, key, me.refetch])
+  return wanted || state === 'working' ? 'working' : state === 'failed' ? 'failed' : null
 }
 
 /** Only the authenticated public demo enables the website bridge. */
@@ -86,6 +128,12 @@ function Bridge({ mode, origin }: { mode: EmbedMode; origin: string }) {
     }
   }, [origin, qc])
   return null
+}
+
+/** A play link that leaves the website's frame carries the visitor key, so the guest stays the same there. */
+export function demoPlayTo(mode: EmbedMode | null, to: string): string {
+  const key = demoPlayTarget(mode) ? visitorKey() : null
+  return key ? `${to}#visitor=${key}` : to
 }
 
 /** A touch screen plays outside the website's small device frame. */

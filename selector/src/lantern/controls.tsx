@@ -1,7 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
+import { demoPlayTarget, demoPlayTo, useDemoEmbed } from '../lib/demo-embed'
 import './Seg.css'
 
 /**
@@ -40,7 +40,7 @@ export function Pill({
   )
   if (to) {
     return (
-      <Link to={to} className={cls} {...(rest as Record<string, unknown>)} target={(to.startsWith('/play/') && demoPlayTarget(embed)) || rest.target}>
+      <Link to={to.startsWith('/play/') ? demoPlayTo(embed, to) : to} className={cls} {...(rest as Record<string, unknown>)} target={(to.startsWith('/play/') && demoPlayTarget(embed)) || rest.target}>
         {body}
       </Link>
     )

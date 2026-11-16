@@ -792,7 +792,7 @@ Default: `false`
 
 </div>
 
-Run Renplay as a public demo. The sign-in page offers Try the demo, a shared guest who can play, save, rate and keep games offline, but cannot upload, install, change their account or see Settings. Saves come only from playing, at most 2 MB each and 32 MB in all. Sign-in is on. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.
+Run Renplay as a public demo. The sign-in page offers Try the demo, a guest for each visitor who can play, save, rate and keep games offline, but cannot upload, install, change their account or see Settings. A guest goes after 2 hours unseen, and at most 100 guests are kept. Saves come only from playing, at most 2 MB each and 32 MB in all. Sign-in is on. The server stops after 4 hours of running, once idle for a minute, so a host that starts it again from its image starts it fresh.
 
 </div>
 

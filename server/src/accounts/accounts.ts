@@ -102,11 +102,11 @@ export class Accounts {
   ownerClaimed(): void {
     this.setupGrant = ''; this.setupCode = ''
   }
-  private limit(key: string): void {
+  private limit(key: string, most = 10): void {
     const now = Date.now()
     for (const [k, value] of this.limits) if (value.until <= now) this.limits.delete(k)
     const bucket = this.limits.get(key) ?? { count: 0, until: now + 60_000 }
-    if (++bucket.count > 10) throw new HttpError(429, 'Too many tries. Wait a minute.')
+    if (++bucket.count > most) throw new HttpError(429, 'Too many tries. Wait a minute.')
     this.limits.set(key, bucket)
   }
   private secure(req: Request): boolean { return req.secure || this.cfg.publicUrl.startsWith('https://') }
@@ -347,7 +347,7 @@ export class Accounts {
     /** Try the demo: a session as the visitor's own guest, no password. A visitor key from the website's frames names the guest. Only in a demo. */
     r.post('/auth/demo', async (req, res) => {
       if (!this.guests) throw new HttpError(404, 'This is not a demo')
-      const arrived = await this.guests.arrive(req.body, viewer()?.user.id, req.ip ?? '', () => this.limit(`ip:${req.ip}`))
+      const arrived = await this.guests.arrive(req.body, viewer()?.user.id, req.ip ?? '', () => this.limit(`demo:${req.ip}`, 120))
       if (arrived) {
         this.newSession(req, res, arrived.guest, arrived.keyed && this.secure(req))
         this.guests.trimSessions(arrived.guest)

@@ -23,7 +23,7 @@ import ArtPicker from '../components/ArtPicker'
 import { ago, capitalize, duration, jobStage, pct, playedTime, timeZone } from '../lib/format'
 import { bytes } from '@shared/format'
 import { recipeLinks, playLink, popupClick } from '../lib/links'
-import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
+import { demoPlayTarget, demoPlayTo, useDemoEmbed } from '../lib/demo-embed'
 import { isRenpy } from '@shared/family'
 import { useCatalog, useGame, useSaves } from '../lib/queries'
 
@@ -150,7 +150,7 @@ export default function GamePage() {
 
   return (
     <div style={{ paddingBottom: 20 }}>
-      <Stage game={game} under={installed && !game.job && renpy && latest ? <Link className="link-q" to={playLink(gameId)} target={demoPlayTarget(embed)} onClick={() => travelToDoor(game, hidden)}>Start from the main menu</Link> : undefined} eyebrow={installed ? 'In your library' : game.status === 'installing' ? 'Installing' : 'Not installed'} back={{ to: '/', label: 'Library' }} meta={meta} body={body} actions={actions} actsRef={actsRef} />
+      <Stage game={game} under={installed && !game.job && renpy && latest ? <Link className="link-q" to={demoPlayTo(embed, playLink(gameId))} target={demoPlayTarget(embed)} onClick={() => travelToDoor(game, hidden)}>Start from the main menu</Link> : undefined} eyebrow={installed ? 'In your library' : game.status === 'installing' ? 'Installing' : 'Not installed'} back={{ to: '/', label: 'Library' }} meta={meta} body={body} actions={actions} actsRef={actsRef} />
 
       <div style={{ marginTop: 32, marginBottom: 24 }}>
         <Seg<Tab>

@@ -4,7 +4,7 @@
 
 ## What a visitor gets
 
-- **Try the demo** signs them in as a shared guest (`RENPLAY_DEMO=on`). There is no account to make.
+- **Try the demo** signs them in as a guest of their own (`RENPLAY_DEMO=on`). There is no account to make.
 - One game to play: **The Question**, Ren'Py's own sample game, without its music. Its art (MIT,
   like Ren'Py) is in the demo's own recipe, `recipes/the-question.yaml`. The Ren'Py Tutorial
   cannot be distributed outside Ren'Py, and other free games need their developers' permission.
@@ -13,9 +13,30 @@
   install, change the account or open Settings. Saves come only from playing: no imports, copies or
   Sync codes. A save file is at most 2 MB, all saves with their history at most 32 MB and 1,000
   files (each keeps 3 earlier versions), so nobody can fill the demo's disk or memory.
-- Everyone is the same guest: a rating, a status, a save one visitor makes, every other visitor sees
-  until the next fresh start. Tags and the level for adult games cannot be changed.
+- Every visitor has their own guest, with their own saves, progress, favourites, ratings and choices. Nobody
+  sees what another visitor did. A guest can change its own tags and its level for adult games, never above
+  Blurred.
 - A banner on every page says it is a demo and links to the install guide, except in the website's embed mode.
+
+## Guests
+
+A guest is a player with no password, made when a visitor opens the demo. It is found again by the visitor's
+session, or by a visitor key when the website's frames bring one (see Embed the demo). Nothing of a guest's
+survives its removal: its saves, progress, choices and sessions go. A guest is removed when:
+
+- Nobody has seen it for 2 hours, checked every minute.
+- The demo holds 100 guests and a new visitor arrives. The one unseen the longest goes first.
+- The demo restarts (every 4 hours, below).
+
+Making guests is limited: 20 new guests an hour from one address, and 120 sign-ins a minute. A guest keeps its 20
+newest sessions. The limits are in `demoGuests` in `server/src/config.ts`. The save limits per guest are
+unchanged: 2 MB a file, 32 MB and 1,000 files in all. At 100 guests that bounds the saves at about 3 GB in the
+worst case. A real visitor's saves are a few hundred KB. Memory is small: a few database rows, one save-store
+object and a cached session for each guest who has been active.
+
+The guest is a player. The demo still refuses what it always did for a guest: installs, uploads, art uploads, save
+imports, copies, Sync codes, a new save folder, a password, a PIN, tokens, sessions, linked sign-ins and a change
+of the guest's name or picture. Nothing of it is admin.
 
 ## How it resets
 
@@ -63,7 +84,7 @@ include a path, trailing slash, wildcard or list of origins.
   width="390" height="844" allow="fullscreen"></iframe>
 ```
 
-Both modes sign in the shared guest automatically, hide the demo banner and account menu, and keep
+Both modes sign in a guest automatically (the visitor's own, see Visitor key below), hide the demo banner and account menu, and keep
 `embed` while navigating. The embedder chooses the viewport: give the phone frame a real 390 by 844
 CSS-pixel size and scale it visually with a CSS transform if needed. `phone` does not override the
 app's responsive layout. On a touch device, Play and loading a save open the demo in the top window.
@@ -72,6 +93,35 @@ Do not sandbox the outer app frames. The game's own sandbox and message checks a
 A fresh guest has no Up next stage in the library. To show Play on the first view, open that frame
 on `/game/the-question?embed=laptop` instead. A nudge only animates a Play or Resume button already
 shown in that frame. It does not add a stage to the library.
+
+### Visitor key
+
+Give both frames one key, so they are one guest, and a visitor's save made in one shows in the other. Without
+a key, each browser is its own guest through its session cookie, which is enough when the website and the demo
+share a site (`renplay.org` and `demo.renplay.org`), because both frames then share the browser's cookies. The
+key also works where they do not: a browser that blocks third-party cookies, or a website on another site.
+
+1. The website makes the key once for its visitor, from 32 random bytes written as base64url (43 characters of
+   `A-Z a-z 0-9 - _`), and keeps it in its own `localStorage`. A key made any other way is refused. A shorter one
+   is too easy to guess.
+2. It puts the key in the address fragment of both frames, never in the query:
+   `https://demo.renplay.org/?embed=laptop#visitor=KEY`. A fragment is not sent to the server, not logged and
+   not passed in a Referer header.
+3. Each frame reads the key, keeps it for that tab (`sessionStorage`), takes it out of its address and signs in
+   with it (`POST /api/auth/demo` with `{ "visitor": "KEY" }`). The server keeps only a hash of the key. The key
+   names a demo guest and nothing else: it is not a session, a token or a password, and outside a demo it does
+   nothing.
+4. A guest made for a key is found again by the same key, from any browser or address, until the guest goes.
+
+The session cookie stays `HttpOnly` and `SameSite=Lax`. Over HTTPS, a frame that signed in with a key gets the
+cookie as `SameSite=None; Secure; Partitioned` instead, so Chrome and Firefox keep it for that frame even when
+they block third-party cookies. Safari does not store a cookie for a frame of another site: there the website and
+the demo must share a site, as renplay.org and demo.renplay.org do. With no cookie at all a frame still finds its
+guest again from the key when it reloads, but cannot stay signed in between requests, and shows "Could not open
+the demo".
+
+A play link that leaves the frame (on a touch screen, Play opens the demo in the top window) carries the key in
+its fragment, so the top window is the same guest. Links inside the demo carry no key.
 
 ### Messages
 

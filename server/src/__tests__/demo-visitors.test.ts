@@ -218,6 +218,15 @@ describe('the demo bounds its guests', () => {
     await request(app.app).get('/api/me').set('Cookie', visits[4]!.cookie).expect(200)
   })
 
+  it('lets frames with no cookie ask again and again, but not without end', async () => {
+    const app = await start(true)
+    const key = newKey()
+    for (let i = 0; i < 120; i++) await enter(app, key)
+    await request(app.app).post('/api/auth/demo').set(site).set('X-Forwarded-For', '10.0.0.1').send({ visitor: key }).expect(429)
+    await enter(app, key, '10.0.0.2')
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM demo_guests').get()).toMatchObject({ n: 1 })
+  })
+
   it('gives the session cookie a partitioned form only over https, for a frame with a key', async () => {
     const insecure = await start(true)
     const lax = (await enter(insecure, newKey())).headers.find((c) => c.startsWith('renplay_session='))!

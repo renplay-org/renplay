@@ -7,6 +7,7 @@ import type { SaveStores } from '../saves/stores.js'
 import { HttpError } from '../util/paths.js'
 import { log } from '../util/log.js'
 import type { Purger } from '../util/purge.js'
+import { isVisitorKey } from '../shared/demo-embed.js'
 import { hash } from './passwords.js'
 
 /** What a guest's removal needs to forget about them. */
@@ -17,14 +18,6 @@ export interface GuestParts {
   purger: Purger
   /** Lets the account code forget the sessions it keeps in memory. */
   forgetSessions: () => void
-}
-
-/** 32 random bytes as base64url are 43 characters: nothing shorter is unguessable. */
-const KEY = /^[A-Za-z0-9_-]{43,128}$/
-
-/** A visitor key as the website sends it, or null when it is not one. */
-function visitorKey(value: unknown): string | null {
-  return typeof value === 'string' && KEY.test(value) ? value : null
 }
 
 /** What a key is kept as: a hash that names a guest and nothing else. */
@@ -73,8 +66,8 @@ export class DemoGuests {
    */
   async arrive(body: unknown, current: number | undefined, address: string, session: () => void): Promise<{ guest: number; keyed: boolean } | null> {
     const sent = (body as { visitor?: unknown } | undefined)?.visitor
-    const key = sent === undefined ? null : visitorKey(sent)
-    if (sent !== undefined && !key) throw new HttpError(400, 'That visitor key is not valid')
+    if (sent !== undefined && !isVisitorKey(sent)) throw new HttpError(400, 'That visitor key is not valid')
+    const key = sent ?? null
     const here = current !== undefined && this.isGuest(current) ? current : null
     if (here !== null && (!key || this.find(key) === here)) return null
     session()

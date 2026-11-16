@@ -9,6 +9,9 @@ release notes say what).
 
 ### Changed
 
+- In a public demo (`RENPLAY_DEMO`) each visitor now has a guest of their own, with their own saves, progress, favourites and choices, so nobody sees what another visitor did. A guest goes after 2 hours unseen, with its saves, and when the demo holds 100 guests the one unseen the longest goes first. One address can make 20 new guests an hour. A guest can now change its own tags and its level for adult games. Nothing else a guest may do has changed: no installs, no admin, no account changes.
+- A website that embeds the demo hands both its frames the same visitor key in the address (`#visitor=` and 43 random characters), so a save made in one frame shows in the other, without cookies shared between the frames. Opened directly, the demo works as before with a session in the browser. `demo/README.md` has the details.
+
 - The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
 - Buttons have a new look. The one button to press on a screen is cream, the others have a thin outline, corners are squarer, and the glowing gradient buttons are gone. Nothing moved: every control is where it was, at the size it was.
 - Titles are set in a book face, Fraunces (67 KB), and labels, counts, codes, paths, keys and the clock in a small monospace, JetBrains Mono (21 KB), both loaded once. The words under a title that speak to you, such as on the sign-in page and where a list is empty, are in the book face too.

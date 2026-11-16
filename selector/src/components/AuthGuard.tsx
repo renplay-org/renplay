@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { ApiError, post } from '../lib/api'
-import { DemoEmbed, demoEmbedMode } from '../lib/demo-embed'
+import { ApiError } from '../lib/api'
+import { DemoEmbed, useDemoGuest } from '../lib/demo-embed'
 import { useAuth, useProviders } from '../lib/auth'
 import { setAdminLighterBackground } from '../lib/backdrop'
 import { useDefaults } from '../lib/queries'
@@ -16,16 +16,9 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
     return () => window.removeEventListener('renplay:signed-out', refresh)
   }, [me.refetch])
   const providers = useProviders()
-  const embeddedGuest = !!(providers.data?.demo && demoEmbedMode(location.search) && me.error instanceof ApiError && me.error.status === 401)
-  const openingDemo = useRef(false)
-  const [demoFailed, setDemoFailed] = useState(false)
-  useEffect(() => {
-    if (!embeddedGuest) { openingDemo.current = false; return }
-    if (openingDemo.current) return
-    openingDemo.current = true
-    void post('/api/auth/demo').then(() => me.refetch()).catch(() => setDemoFailed(true))
-  }, [embeddedGuest, me.refetch])
-  if (embeddedGuest) return demoFailed ? <p className="p-6">Could not open the demo. Reload to try again.</p> : <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
+  // The demo's visitor signs in as their own guest, in the website's frames and when a key is given.
+  const guest = useDemoGuest(providers.data?.demo, me)
+  if (guest) return guest === 'failed' ? <p className="p-6">Could not open the demo. Reload to try again, and check that your browser allows cookies for this page.</p> : <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
   if (providers.data?.setup && !providers.data.oidc && !providers.data.ldap && !me.isPending && !(me.data?.user.role === 'admin' && me.data.user.id !== 1)) return <Navigate to="/setup" replace />
   if (me.isPending || providers.isPending) return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>
   if (me.error instanceof ApiError && me.error.status === 401 && (!me.data || !location.pathname.startsWith('/play/'))) return <Navigate to={`/signin?return=${encodeURIComponent(location.pathname + location.search)}`} replace />

@@ -368,7 +368,7 @@ export interface Me {
   user: Account
   /** Sign-in is on. */
   auth: boolean
-  /** The demo's shared guest. */
+  /** A demo's guest of one visitor. */
   demo: boolean
   /** Present only in the public demo. The sole allowed website origin. */
   demoEmbedder?: string
