@@ -169,6 +169,50 @@ describe('the demo bounds its guests', () => {
     expect(await app.accounts.sweepGuests()).toBe(0)
   })
 
+  it('counts a key sign-in as activity, so a guest who comes back just before the deadline is not swept', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-16T10:00:00Z'))
+    const app = await start(true, { idleMs: 3600_000 })
+    const key = newKey()
+    const first = await enter(app, key)
+    const id = await userId(app, first.cookie)
+    await save(app, first.cookie).expect(200)
+    // Just before the deadline the visitor comes back with the key and no cookie, which makes a new session.
+    vi.setSystemTime(new Date('2026-11-16T10:59:00Z'))
+    const back = await enter(app, key)
+    // A frame that is already signed in as the key's guest is seen too.
+    vi.setSystemTime(new Date('2026-11-16T11:00:30Z'))
+    await enter(app, key, '10.0.0.1', back.cookie)
+    // Past the original deadline, and past the idle time since the first sign-in. A plain guest that came back is seen too.
+    const plain = await enter(app, undefined, '10.0.0.2')
+    vi.setSystemTime(new Date('2026-11-16T11:00:40Z'))
+    await enter(app, undefined, '10.0.0.2', plain.cookie)
+    vi.setSystemTime(new Date('2026-11-16T11:30:00Z'))
+    expect(await app.accounts.sweepGuests()).toBe(0)
+    expect(await userId(app, back.cookie)).toBe(id)
+    expect(JSON.stringify(await saved(app, back.cookie))).toContain('1-1-LT1.save')
+    // And it is swept once it has really been idle.
+    vi.setSystemTime(new Date('2026-11-16T12:45:00Z'))
+    expect(await app.accounts.sweepGuests()).toBe(2)
+  })
+
+  it('does not sweep a guest that is seen between choosing it and removing it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-16T10:00:00Z'))
+    const app = await start(true, { idleMs: 3600_000 })
+    const first = await enter(app, newKey(), '10.0.0.1'), second = await enter(app, newKey(), '10.0.0.2')
+    const ids = [await userId(app, first.cookie), await userId(app, second.cookie)]
+    vi.setSystemTime(new Date('2026-11-16T11:30:00Z'))
+    // Removing the first guest takes a moment, and the second one plays in that moment.
+    const purge = app.services.purger.purge.bind(app.services.purger)
+    vi.spyOn(app.services.purger, 'purge').mockImplementation(async (path) => {
+      await request(app.app).get('/api/games').set('Cookie', second.cookie).expect(200)
+      await purge(path)
+    })
+    expect(await app.accounts.sweepGuests()).toBe(1)
+    expect(app.db.raw.prepare('SELECT COUNT(*) n FROM users WHERE id = ?').get(ids[1]!)).toMatchObject({ n: 1 })
+  })
+
   it('evicts the guest unseen the longest when the demo is full', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-11-16T10:00:00Z'))

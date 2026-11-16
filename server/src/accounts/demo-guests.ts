@@ -69,7 +69,7 @@ export class DemoGuests {
     if (sent !== undefined && !isVisitorKey(sent)) throw new HttpError(400, 'That visitor key is not valid')
     const key = sent ?? null
     const here = current !== undefined && this.isGuest(current) ? current : null
-    if (here !== null && (!key || this.find(key) === here)) return null
+    if (here !== null && (!key || this.find(key) === here)) { this.seen(here); return null }
     session()
     return { guest: await this.enter(key, address), keyed: !!key }
   }
@@ -78,11 +78,16 @@ export class DemoGuests {
   private enter(key: string | null, address: string): Promise<number> {
     return this.serial(async () => {
       const existing = key && this.find(key)
-      if (existing) return existing
+      if (existing) { this.seen(existing); return existing }
       this.spend(address)
       while ((this.db.raw.prepare('SELECT COUNT(*) n FROM demo_guests').get() as { n: number }).n >= this.cfg.demoGuests.max) await this.removeOldest()
       return this.create(key)
     })
+  }
+
+  /** Whether the guest has gone unseen for the idle time, as of now. */
+  private idle(id: number): boolean {
+    return !!this.db.raw.prepare('SELECT 1 FROM demo_guests WHERE user_id = ? AND seen_at < ?').get(id, Date.now() - this.cfg.demoGuests.idleMs)
   }
 
   /** Removes the guests nobody has seen for the idle time. Returns how many went. */
@@ -91,6 +96,8 @@ export class DemoGuests {
       const gone = this.db.raw.prepare('SELECT user_id FROM demo_guests WHERE seen_at < ?').all(Date.now() - this.cfg.demoGuests.idleMs) as Array<{ user_id: number }>
       let removed = 0
       for (const { user_id } of gone) {
+        // Removing the guests before took time: this one may have been seen since it was chosen.
+        if (!this.idle(user_id)) continue
         try { await this.remove(user_id); removed++ } catch (e) { log('demo', `Could not remove an idle guest: ${e instanceof Error ? e.message : e}`) }
       }
       if (removed) log('demo', `Removed ${removed} idle ${removed === 1 ? 'guest' : 'guests'}`)
