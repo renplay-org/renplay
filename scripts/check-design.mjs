@@ -25,7 +25,7 @@ const SCAN = [
 
 /** Places that may keep this many literals for now, each one to move to a token. Counts only go down. */
 const ALLOWED = {
-  'selector/src/index.css': 30,
+  'selector/src/index.css': 29,
   'website/site.css': 76,
   'docs/site/src/styles/renplay.css': 37,
   'website/catalog.css': 36,

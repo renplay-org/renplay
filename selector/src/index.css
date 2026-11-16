@@ -273,7 +273,7 @@ code {
 .logo img {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--r-2);
 }
 .nav {
   display: none;
@@ -1788,7 +1788,7 @@ select.input option {
   bottom: 0;
   background: var(--glass-sheet);
   backdrop-filter: blur(30px) saturate(140%);
-  border-radius: var(--r-4) var(--r-4) 0 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;
   padding: 10px 20px calc(22px + var(--sab));
   max-height: calc(100dvh - 24px - var(--sat));
   overflow: auto;
@@ -1851,7 +1851,7 @@ select.input option {
     width: min(540px, 100vw - 32px);
     max-height: calc(100dvh - 32px);
     transform: translate(-50%, -50%);
-    border-radius: var(--r-4);
+    border-radius: var(--r-3);
     padding: 24px 26px;
     animation: pop var(--t-pane) var(--out) both;
   }

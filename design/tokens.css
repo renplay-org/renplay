@@ -68,11 +68,11 @@
   --opsz-title: 144;
   --opsz-text: 14;
 
-  /* Radii: 4 for controls, 8 for rows, 12 for plates and tiles, 16 for sheets. Round is for dots, avatars and switches. */
+  /* Radii, the website's: 4 for a control and a tile, 6 for a row, 10 for a plate, a sheet and the player's menu. Round is
+     for dots, avatars and switches. */
   --r-1: 4px;
-  --r-2: 8px;
-  --r-3: 12px;
-  --r-4: 16px;
+  --r-2: 6px;
+  --r-3: 10px;
   --r-round: 999px;
 
   /* Space and the hit area */
