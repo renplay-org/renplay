@@ -15,8 +15,9 @@ import { gridOf, growBy, onGamePage, parked, quiet, scrollToEnd, settledGrid } f
 test.use({ mockOptions: {} })
 
 // The grid's columns are the layout's (--cols, which the grid's tracks and the batch both come from): 3 below 720 px, 4 from 720,
-// 5 from 1000, 6 from 1280 and 8 from 1680. A width in each, and both sides of every change.
+// 5 from 1000, 6 from 1280 and 8 from 1680. The Library at a width in each layout and on both sides of every change.
 const WIDTHS = [360, 540, 719, 720, 860, 999, 1000, 1140, 1279, 1280, 1480, 1679, 1680, 1920]
+const CATALOG_WIDTHS = [360, 720, 1000, 1280, 1680]
 
 // Four lanes of widths, each its own test, so that they run side by side.
 for (const lane of [0, 1, 2, 3]) {
@@ -29,7 +30,9 @@ for (const lane of [0, 1, 2, 3]) {
     const bad = []
     for (const width of WIDTHS.filter((_, i) => i % 4 === lane)) {
       await page.setViewportSize({ width, height: 800 })
+      // Both lists grow with the same hook: the Catalog is loaded at the first width of each layout, the Library at every one.
       for (const [path, total] of [['/', GAMES], ['/catalog', RECIPES]]) {
+        if (path === '/catalog' && !CATALOG_WIDTHS.includes(width)) continue
         await page.goto(path)
         await page.waitForSelector('.grid[data-row] .card')
         const sizes = await growBy(page, 3)

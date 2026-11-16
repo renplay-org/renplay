@@ -2,7 +2,10 @@
 export const padScript = () => {
   const buttons = Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }))
   const pad = { id: 'Test pad', index: 0, connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons, timestamp: 0 }
-  navigator.getGamepads = () => [pad]
+  // How many times the page has read the controller: a frame reads it twice in a row, once to see whether one is there and once
+  // to see what it holds.
+  window.__polls = 0
+  navigator.getGamepads = () => { window.__polls++; return [pad] }
   const names = { a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, menu: 9, up: 12, down: 13, left: 14, right: 15 }
   /** `__hold(button, on)` presses a button, 'down' and the like for the d-pad. */
   window.__hold = (name, on) => { buttons[names[name]].pressed = on }
@@ -15,16 +18,18 @@ export const padScript = () => {
 export const withPad = (page) => page.addInitScript(padScript)
 
 /**
- * Presses a button for `ms` and for at least two frames, then lets go and waits for two frames more: the page reads the
- * controller once a frame, so a press that lets go before a frame has seen it is no press, and a slow machine that draws a
- * frame late must still be seen to have been pressed.
+ * Presses a button for `ms` and until the page has read the controller with it pressed, then lets go and waits for the page to
+ * have read it let go. The page reads it once a frame, so a press that lets go before a frame has seen it is no press, and a slow
+ * machine that draws a frame late must still be seen to have pressed. A press is no longer than a frame, though, however slow
+ * the frame: a longer one would be a hold, which repeats.
  */
 export const tap = (page, name, ms = 100) => page.evaluate(([n, t]) => new Promise((done) => {
-  const frames = (count) => new Promise((ok) => { const step = () => (count-- > 0 ? requestAnimationFrame(step) : ok()); step() })
+  // A frame reads the controller twice in a row, so two reads after a change include one that saw it.
+  const read = () => new Promise((ok) => { const from = window.__polls; const look = () => (window.__polls >= from + 2 ? ok() : requestAnimationFrame(look)); look() })
   window.__hold(n, true)
-  Promise.all([new Promise((ok) => setTimeout(ok, t)), frames(2)]).then(() => {
+  Promise.all([new Promise((ok) => setTimeout(ok, t)), read()]).then(() => {
     window.__hold(n, false)
-    frames(2).then(done)
+    read().then(done)
   })
 }), [name, ms])
 

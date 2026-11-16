@@ -3,9 +3,10 @@ import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   testDir: './specs',
-  // The container has four CPUs: three workers keep the browsers from starving one another. Every test has its own page, so the
+  // The container has four CPUs. A Chromium test waits more than it works, so five of them side by side fit. A WebKit test keeps
+  // three cores busy (it draws in software), so its projects take two workers at most. Every test has its own page, so the
   // tests of one file run side by side too.
-  workers: 3,
+  workers: 5,
   fullyParallel: true,
   retries: 1,
   forbidOnly: !!process.env.CI,
@@ -24,15 +25,16 @@ export default defineConfig({
     locale: 'en-US',
     timezoneId: 'UTC',
   },
+  // WebKit draws in software and takes twice as long to do the same, so its tests get twice the time.
   projects: [
     { name: 'chromium-desktop', use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } } },
     // The library's own checks (specs/chromium/) run on a desktop and on a phone's size in Chromium, which has what they read:
     // layout shift, a finger drawn with touch events, the clock. The phone is what an iPhone is to the page.
     { name: 'chromium-phone', testMatch: /specs\/chromium\//, use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
-    { name: 'webkit-portrait', testIgnore: /static-demo\.spec|specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
-    { name: 'webkit-landscape', testIgnore: /static-demo\.spec|specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+    { name: 'webkit-portrait', workers: 2, timeout: 40000, testIgnore: /static-demo\.spec|specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
+    { name: 'webkit-landscape', workers: 2, timeout: 40000, testIgnore: /static-demo\.spec|specs\/chromium\//, use: { browserName: 'webkit', viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } },
     // The static demo's service worker has its own WebKit fixes: it is also checked at desktop size.
-    { name: 'webkit-desktop', testMatch: /static-demo\.spec/, use: { browserName: 'webkit', viewport: { width: 1440, height: 900 } } },
+    { name: 'webkit-desktop', workers: 2, timeout: 40000, testMatch: /static-demo\.spec/, use: { browserName: 'webkit', viewport: { width: 1440, height: 900 } } },
   ],
   webServer: {
     command: 'node scripts/app-ui/serve.mjs',
