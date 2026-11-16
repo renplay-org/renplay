@@ -91,7 +91,6 @@
   min-width: 0;
   outline: none;
   -webkit-tap-highlight-color: transparent;
-  perspective: 900px;
 }
 
 /* The tile is the website's shelf card. It has a border in the game's own
@@ -100,12 +99,16 @@
    transform on .tilt and where the sheen is. */
 .card {
   --tile-rest: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  /* The lift comes toward the viewer by 14 px (6 px for a press) under the lean's 900 px of perspective, which is this much bigger. */
+  --lift: 1.0158;
+  --press-lift: 1.0067;
   --tile-lit: 0 30px 64px -16px var(--tint), 0 0 0 1px rgba(0, 0, 0, 0.4), 0 0 70px -6px color-mix(in srgb, var(--tint) 80%, transparent);
 }
 .card .tilt {
   position: relative;
-  transform-style: preserve-3d;
-  transition: translate var(--t-focus) var(--out);
+  transition:
+    translate var(--t-focus) var(--out),
+    scale var(--t-focus) var(--out);
 }
 .card .frame {
   border: 1px solid color-mix(in srgb, var(--tint) 60%, #fff 10%);
@@ -193,17 +196,24 @@
       transition: none;
     }
     html:not([data-typing]) .card:not([data-rest]):hover .tilt {
-      translate: 0 -6px 14px;
+      translate: 0 -6px;
+      scale: var(--lift);
     }
   }
   .card.on:not([data-rest]) .tilt,
   .card:focus-visible:not([data-rest]) .tilt {
-    translate: 0 -6px 14px;
-    transition: translate var(--t-focus) var(--out);
+    translate: 0 -6px;
+    scale: var(--lift);
+    transition:
+      translate var(--t-focus) var(--out),
+      scale var(--t-focus) var(--out);
   }
   .card[data-press]:not([data-rest]) .tilt {
-    translate: 0 -2px 6px;
-    transition: translate var(--t-press) var(--out);
+    translate: 0 -2px;
+    scale: var(--press-lift);
+    transition:
+      translate var(--t-press) var(--out),
+      scale var(--t-press) var(--out);
   }
 }
 /* At rest: the cover's flight is measuring or landing on this tile. */

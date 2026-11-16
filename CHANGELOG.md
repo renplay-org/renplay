@@ -17,6 +17,7 @@ release notes say what).
 
 ### Fixed
 
+- A tile you move to with the keyboard or a controller is sharp again, with a crisp white ring. Lifting it used to draw its picture and ring slightly soft. A grid of tiles is also lighter to draw on a computer without a graphics chip.
 - On a phone held upright, the "Turn your phone sideways" line goes the moment you open the game's menu, so it no longer lies over a row.
 
 ## [4.12.0] - 2026-11-15

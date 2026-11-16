@@ -79,7 +79,7 @@ function put(t: Tile): void {
     t.live = false
     return
   }
-  t.tilt.style.transform = `rotateY(${t.ry.toFixed(2)}deg) rotateX(${t.rx.toFixed(2)}deg)`
+  t.tilt.style.transform = `perspective(900px) rotateY(${t.ry.toFixed(2)}deg) rotateX(${t.rx.toFixed(2)}deg)`
   t.sheen.style.setProperty('--gx', `${t.gx.toFixed(0)}%`)
   t.sheen.style.setProperty('--gy', `${t.gy.toFixed(0)}%`)
   t.live = true
