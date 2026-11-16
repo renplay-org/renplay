@@ -32,6 +32,12 @@ async function arrived(card) {
   }, { message: 'The tile has stopped changing' }).toBe(true)
 }
 
+/** The person's own Settings page (an admin's has the server's panels, which the mock has no answers for). */
+const asPerson = (page) =>
+  page.route('**/api/me', (r) =>
+    r.fulfill({ json: { user: { id: 2, username: 'kuba', name: 'Kuba', role: 'player', disabled: 0, created_at: '2026-01-01T00:00:00.000Z', prefs: '{}', avatar: '', adult_ceiling: 'off', adult_choice: 'off', hasPin: false }, auth: true, demo: false, unclaimed: false, hasPassword: true } }),
+  )
+
 const mouseOnly = (testInfo) => test.skip(testInfo.project.use.hasTouch, 'A mouse')
 const touchOnly = (testInfo) => test.skip(!testInfo.project.use.hasTouch, 'A finger')
 
@@ -125,6 +131,79 @@ test('Tiles: the focused tile is lifted and lit with the white ring, and is not 
   expect(lit.shadow, 'It glows').not.toBe(restShadow)
   await expect.poll(async () => (await look(tile)).shadow, { message: 'The white ring is there' }).toContain('rgb(255, 255, 255)')
   expect((await look(cards.nth(2))).lifted, 'The next tile stays down').toBe(false)
+})
+
+test('Tiles: only the cover moves under the mouse, and nothing dark is drawn on or around it', async ({ page }, testInfo) => {
+  mouseOnly(testInfo)
+  const cards = await grid(page)
+  const under = cards.nth(0)
+  const text = (card) => card.evaluate((el) => {
+    const title = el.querySelector('.ct').getBoundingClientRect()
+    const meta = el.querySelector('.cm')?.getBoundingClientRect() ?? title
+    return { top: title.top, left: title.left, meta: meta.top, held: !!el.querySelector('.tilt .ct, .tilt .cm'), transform: getComputedStyle(el.querySelector('.ct')).transform }
+  })
+  const before = await text(under)
+  expect(before.held, 'The title and the line under it are not in the layer that leans').toBe(false)
+  await rest(page, under)
+  await expect.poll(async () => (await look(under)).tilted, { message: 'The cover tilts' }).toBe(true)
+  await arrived(under)
+  expect((await look(under)).lifted, 'And lifts').toBe(true)
+  const after = await text(under)
+  expect(after, 'The title and the meta have not moved by a pixel, and have no transform').toEqual(before)
+  const dark = await under.evaluate((el) => {
+    const frame = getComputedStyle(el.querySelector('.frame'))
+    return { shadow: frame.boxShadow, ground: frame.backgroundColor, tint: getComputedStyle(el).getPropertyValue('--tint').trim() }
+  })
+  expect(dark.shadow, 'The lit cover has the colour of its art in its shadow and no black ring').not.toMatch(/rgba?\(0, 0, 0/)
+  expect(await look(cards.nth(5)).then((l) => l.shadow), 'A cover at rest draws no shadow of its own: its glow is the tile\'s own light').toBe('none')
+  expect(dark.ground, 'What shows behind the picture is the game\'s colour, not black').not.toMatch(/^rgba?\(([0-3]), ?([0-3]), ?([0-3])/)
+})
+
+test('Tiles: Move cards with the pointer off keeps the border, the glow and the sheen and takes the tilt and the lift away', async ({ page }, testInfo) => {
+  mouseOnly(testInfo)
+  await asPerson(page)
+  await page.goto('/settings')
+  const move = page.getByRole('switch', { name: 'Move cards with the pointer' })
+  await expect(move, 'The switch is on until it is turned off').toHaveAttribute('aria-checked', 'true')
+  await move.click()
+  await expect(move).toHaveAttribute('aria-checked', 'false')
+  expect(await page.evaluate(() => localStorage.getItem('renplay:card-motion')), 'The choice is kept in this browser').toBe('0')
+  const cards = await grid(page)
+  const under = cards.nth(0)
+  const restShadow = (await look(under)).shadow
+  await rest(page, under)
+  await expect.poll(async () => (await look(under)).sheen, { message: 'The sheen is whole under the mouse' }).toBe('1')
+  await arrived(under)
+  const lit = await look(under)
+  expect(lit.shadow, 'The glow is there').not.toBe(restShadow)
+  expect(lit.border, 'So is the border').toMatch(/^1px /)
+  await page.waitForTimeout(300)
+  for (let i = 0; i < 6; i++) {
+    const l = await look(cards.nth(i))
+    expect(l.tilted || l.lifted, `Tile ${i} does not move`).toBe(false)
+  }
+  // The same switch, turned on again, lets the tile under the mouse tilt.
+  await page.goto('/settings')
+  await page.getByRole('switch', { name: 'Move cards with the pointer' }).click()
+  const again = await grid(page)
+  await rest(page, again.nth(0))
+  await expect.poll(async () => (await look(again.nth(0))).tilted, { message: 'On again, the tile under the mouse tilts' }).toBe(true)
+  await arrived(again.nth(0))
+  expect((await look(again.nth(0))).lifted, 'And lifts').toBe(true)
+})
+
+test('Tiles: reduced motion keeps the tiles still whatever the switch says', async ({ page }, testInfo) => {
+  mouseOnly(testInfo)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await asPerson(page)
+  await page.goto('/settings')
+  await expect(page.getByRole('switch', { name: 'Move cards with the pointer' }), 'The switch is on').toHaveAttribute('aria-checked', 'true')
+  const cards = await grid(page)
+  await rest(page, cards.nth(0))
+  await expect.poll(async () => (await look(cards.nth(0))).sheen, { message: 'The sheen is whole under the mouse' }).toBe('1')
+  await page.waitForTimeout(300)
+  const l = await look(cards.nth(0))
+  expect(l.tilted || l.lifted, 'It does not move').toBe(false)
 })
 
 test('Tiles: a press leans the tile toward the finger and back, and scrolling moves nothing', async ({ page }, testInfo) => {

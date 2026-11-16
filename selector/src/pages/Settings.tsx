@@ -6,7 +6,7 @@ import { useRoom } from '../lantern/Room'
 import { useAuth } from '../lib/auth'
 import { useSystem } from '../lib/queries'
 import { AboutPanel } from './settings/about'
-import { BrowserSettings, KeepCache, LighterBackground } from './settings/browser'
+import { BrowserSettings, CardMotion, KeepCache, LighterBackground } from './settings/browser'
 import { CatalogPanel } from './settings/catalog'
 import { DefaultsForEveryone } from './settings/defaults'
 import { AdultGamesPanel, EnginesPanel, SignInOff } from './settings/general'
@@ -59,6 +59,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
           <section className={`${section === 'browser' ? '' : 'hidden'} panel stack`} style={{ gap: 14 }}>
             <h2 className="h3">This browser</h2>
             <LighterBackground />
+            <CardMotion />
             <KeepCache />
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
               <DeviceAdultRow />

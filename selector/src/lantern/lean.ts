@@ -1,3 +1,4 @@
+import { cardsMove } from '../lib/cardmotion'
 import { reducedMotion } from './travel'
 
 /**
@@ -10,7 +11,7 @@ import { reducedMotion } from './travel'
  * One set of listeners for the page and one frame loop. The loop runs only while the pointer moves or a tile is
  * still settling, and only over the tiles in view: a tile that scrolls out of view is put back at once. Scrolling
  * itself moves nothing, since the pointer did not move. The same-place moves the browser repeats after a scroll are
- * not moves. Reduced motion has no lean.
+ * not moves. Reduced motion has no lean, and nor has a browser that turned the movement off (lib/cardmotion.ts).
  */
 
 interface Tile {
@@ -66,6 +67,9 @@ let moved = 0
 let aimed = false
 let frame = 0
 let last = 0
+
+/** No lean: the device asks for reduced motion, or this browser turned the movement off. */
+const still = () => reducedMotion() || !cardsMove()
 
 const clamp = (n: number, lo = -1, hi = 1) => Math.min(hi, Math.max(lo, n))
 
@@ -200,7 +204,7 @@ function onMove(e: PointerEvent): void {
     wanted = under
     run()
   }
-  if (reducedMotion()) return
+  if (still()) return
   if (!inRow) {
     if (pointer) {
       pointer = null
@@ -249,7 +253,7 @@ function onBlur(e: FocusEvent): void {
 }
 
 function onDown(e: PointerEvent): void {
-  if (reducedMotion() || (e.pointerType === 'mouse' && e.button !== 0)) return
+  if (still() || (e.pointerType === 'mouse' && e.button !== 0)) return
   const tile = tileAt(e.target)
   if (!tile) return
   press = { tile, x: e.clientX, y: e.clientY }
@@ -267,6 +271,16 @@ function onUp(): void {
   run()
 }
 
+/** The browser's choice changed to still: every tile that leans is put back, and nothing waits for the pointer. */
+function onStill(): void {
+  if (!still()) return
+  pointer = null
+  over = null
+  press = null
+  aimed = true
+  for (const t of tiles.values()) reset(t)
+}
+
 function listen(on: boolean): void {
   const act = on ? document.addEventListener.bind(document) : document.removeEventListener.bind(document)
   act('pointermove', onMove as EventListener, { passive: true })
@@ -276,6 +290,7 @@ function listen(on: boolean): void {
   act('pointercancel', onUp)
   act('focusin', onFocus as EventListener)
   act('focusout', onBlur as EventListener)
+  act('renplay:card-motion', onStill)
 }
 
 /**

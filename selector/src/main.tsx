@@ -10,6 +10,7 @@ import Setup from './pages/Setup'
 import { AuthGuard } from './components/AuthGuard'
 import './index.css'
 import './lantern/Type.css'
+import './lib/cardmotion'
 import { installGamepad } from './lib/gamepad'
 import { keptGames, refreshShell } from './lib/offline'
 
