@@ -359,3 +359,12 @@
 [data-row][data-glow="b"]::after {
   opacity: 1;
 }
+/* The light reaches past the page's edge. A phone makes its layout wider for anything that does, and the page would zoom out,
+   so on a phone the results clip it at the page's edge: their box is as wide as the page. */
+@media (max-width: 719px) {
+  .results {
+    overflow-x: clip;
+    margin: 0 calc(-1 * var(--gutter));
+    padding: 0 var(--gutter);
+  }
+}

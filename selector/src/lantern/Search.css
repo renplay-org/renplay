@@ -146,6 +146,7 @@
 /* While a search is typed the list moves under a pointer that rests on it: the tile under it does not lift (see useTypingCalm). */
 [data-typing] .card:hover:not(:focus-visible):not(.on) {
   z-index: auto;
+  --rest-glow: 1;
 }
 [data-typing] .card:hover:not(:focus-visible):not(.on) .tilt {
   transform: none !important;
