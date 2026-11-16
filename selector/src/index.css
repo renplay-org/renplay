@@ -1347,7 +1347,7 @@ select.input option {
 .stage .tb .logo-t.inv {
   filter: invert(1) drop-shadow(0 6px 18px rgba(0, 0, 0, 0.5));
 }
-/* Running text, so that when it wraps a line starts with a word and a line ends with its dot, never the other way. */
+/* Running text, with each dot tied to the word before it, so a line that wraps ends with its dot and never starts with one. */
 .stage .tb .meta {
   font-size: 13px;
   color: var(--fg-2);
@@ -1355,7 +1355,6 @@ select.input option {
 }
 .stage .tb .meta .sep {
   color: var(--fg-4);
-  margin: 0 2px;
 }
 .stage .acts .actions .btn.p,
 .stage .acts .actions .btn.s {

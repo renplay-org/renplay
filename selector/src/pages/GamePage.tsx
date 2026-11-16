@@ -81,7 +81,7 @@ export default function GamePage() {
     game.phone && <span key="m3">{phoneLabel[game.phone]}</span>,
     !isRenpy(game) && <BetaBadge key="m4" engine={game.family} />,
   ].filter(Boolean)
-  const meta = metaParts.flatMap((part, i) => (i ? [<span key={`sep${i}`} className="sep">·</span>, ' ', part] : [part]))
+  const meta = metaParts.flatMap((part, i) => (i ? [<span key={`sep${i}`} className="sep">{'\u00a0·'}</span>, ' ', part] : [part]))
 
   const body = (
     <>
