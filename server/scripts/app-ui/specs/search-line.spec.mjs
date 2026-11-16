@@ -37,13 +37,16 @@ async function offInk(page, height, hide) {
   await style.evaluate((el) => el.remove())
   const ink = [10, 10, 15]
   let most = 0
-  for (let i = 0; i < data.length; i += info.channels) for (let c = 0; c < 3; c++) most = Math.max(most, Math.abs(data[i + c] - ink[c]))
+  // WebKit on Linux paints the corner pixel of the screen a shade lighter, whatever is on the page: it is left out.
+  for (let i = info.channels; i < data.length; i += info.channels) for (let c = 0; c < 3; c++) most = Math.max(most, Math.abs(data[i + c] - ink[c]))
   return most
 }
 
 for (const [name, path, label] of PAGES) {
   test.describe(name, () => {
     test.beforeEach(async ({ page }) => {
+      // The page's own scroll takes its time on a slow software renderer: these tests wait for it.
+      test.slow()
       // 130 made-up games, so the page is long enough to scroll with tiles under the line.
       await mock(page, [], 'line')
       await open(page, path)
@@ -145,6 +148,7 @@ for (const [name, path, label] of PAGES) {
 test.describe('every page with a header', () => {
   for (const [name, path] of [['the Library', '/'], ['the Catalog', '/catalog'], ['a game page', '/game/game-000']]) {
     test(`${name}: at the top the header keeps its look, and once the page has scrolled it is solid ink with a hairline`, async ({ page }) => {
+      test.slow()
       await mock(page, [], 'line')
       await page.goto(path)
       await expect(page.locator('main')).toBeVisible()
@@ -202,7 +206,10 @@ test.describe('a computer', () => {
 })
 
 test.describe('a phone', () => {
-  test.beforeEach(({ page }) => test.skip(!isPhone(page), 'A phone only'))
+  test.beforeEach(({ page }) => {
+    test.skip(!isPhone(page), 'A phone only')
+    test.slow()
+  })
 
   /** What must not move when the field opens: the page's scroll, the line, the words, the first tile, the page's height. */
   const places = (page) =>

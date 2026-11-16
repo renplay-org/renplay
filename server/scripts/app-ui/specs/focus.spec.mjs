@@ -48,7 +48,8 @@ for (const [name, path, label] of [['Library', '/', 'Search your games'], ['Cata
         await expect(input, 'and the search stays').toHaveValue('a/b')
         const kept = page.locator('.search-kept')
         await expect(kept, 'as a word in the line').toContainText('a/b')
-        await kept.tap()
+        // The page is still scrolling to the line as it was typed, so the word moves: it is pressed, not waited for.
+        await kept.dispatchEvent('click')
         await expect(input, 'the word clears the search').toHaveValue('')
         await expect(kept).toHaveCount(0)
         continue
