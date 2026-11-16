@@ -6,7 +6,9 @@
  */
 /// <reference lib="webworker" />
 import { createAnswer } from './answer'
+import { fail } from './http'
 import { idbStore } from './idb'
+import { fromElsewhere } from './origin'
 import type { Snapshot } from './types'
 
 declare const self: ServiceWorkerGlobalScope
@@ -27,5 +29,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin || !url.pathname.startsWith('/api/')) return
   // Art and avatars are static files of the demo.
   if (/^\/api\/(art|avatars)\//.test(url.pathname)) return
+  // A page of another site can send a form to the demo as a navigation, which this worker answers as well.
+  if (fromElsewhere(event.request, location.origin)) return event.respondWith(fail(403, 'This request must come from this Renplay'))
   event.respondWith(answer(event.request))
 })

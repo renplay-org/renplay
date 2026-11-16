@@ -144,3 +144,46 @@ test('only the allowed website may frame the demo', async ({ page }) => {
     await new Promise((done) => other.close(done))
   }
 })
+
+test('a form on another site cannot change the visitor\'s progress', async ({ context, page }) => {
+  await page.goto(demo.embedderOrigin)
+  await expect.poll(() => ready(page), { timeout: 30000 }).toBe(2)
+  const laptop = await (await page.locator('#laptop').elementHandle()).contentFrame()
+  const progress = () => laptop.evaluate(() => fetch('/api/games/the-question').then((r) => r.json()).then(({ game }) => [game.notNowAt, game.lastPlayedAt, game.favoriteAt, game.rating, game.playStatus, game.playTime]))
+  const unchanged = [null, null, null, null, null, 0]
+  expect(await progress()).toEqual(unchanged)
+  // The other site: pages that submit a form to the demo, as a top-level navigation the way a link or a button would.
+  // The text/plain form is the one that sends a body the demo reads as JSON.
+  const forms = {
+    '/not-now': { action: '/api/games/the-question/not-now' },
+    '/played': { action: '/api/games/the-question/played' },
+    '/favorite': { action: '/api/games/the-question/favorite', json: '{"on":true,"x":"' },
+    '/rating': { action: '/api/games/the-question/rating', json: '{"rating":5,"x":"' },
+    '/status': { action: '/api/games/the-question/status', json: '{"status":"finished","x":"' },
+  }
+  const other = createServer((req, res) => {
+    const form = forms[req.url]
+    const fields = form?.json ? `<input name='${form.json}' value='"}'>` : ''
+    res.writeHead(form ? 200 : 404, { 'content-type': 'text/html' }).end(form ? `<!doctype html><form method="post" action="${demo.origin}${form.action}" ${form.json ? 'enctype="text/plain"' : ''}>${fields}</form><script>document.forms[0].submit()</script>` : '')
+  })
+  await new Promise((done) => other.listen(0, '127.0.0.1', done))
+  try {
+    for (const path of Object.keys(forms)) {
+      const attacker = await context.newPage()
+      const answered = attacker.waitForResponse((response) => response.url().startsWith(`${demo.origin}/api/`))
+      await attacker.goto(`http://127.0.0.1:${other.address().port}${path}`)
+      const response = await answered
+      // WebKit sends this navigation to the host and not to the worker (the host has no such file and nothing to change).
+      // Where the worker has it, it refuses.
+      const reachedHost = demo.requests.includes(forms[path].action)
+      if (!reachedHost) expect(response.status(), path).toBe(403)
+      await attacker.close()
+    }
+    expect(await progress()).toEqual(unchanged)
+    // The demo's own pages still change it.
+    expect(await laptop.evaluate(() => fetch('/api/games/the-question/not-now', { method: 'POST' }).then((r) => r.status))).toBe(200)
+    expect((await progress())[0]).not.toBeNull()
+  } finally {
+    await new Promise((done) => other.close(done))
+  }
+})
