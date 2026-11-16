@@ -15,6 +15,7 @@ import { useArrowFocus } from '../lantern/focus'
 import { useFlightBack, useGoBack } from '../lantern/flight'
 import type { Health } from '@shared/api'
 import { Pill } from '../lantern/controls'
+import { Logo } from '../lantern/Logo'
 import { focusSearch, wantSearch } from '../lantern/Search'
 import { isApple } from '../lib/platform'
 import './AppShell.css'
@@ -206,8 +207,7 @@ function Shell() {
       <header className="top">
         <div className="top-in">
           <NavLink to="/" className="logo" aria-label="Renplay, the library">
-            <img src="/favicon.svg" alt="" />
-            Renplay
+            <Logo />
           </NavLink>
           <nav className="nav" aria-label="Sections">
             <NavLink to="/" end className={({ isActive }) => (isActive ? 'on' : '')}>

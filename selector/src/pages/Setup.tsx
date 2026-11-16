@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { Pill } from '../lantern/controls'
+import { Logo } from '../lantern/Logo'
 import { errorText } from '../lantern/ui'
 import { post } from '../lib/api'
 import { useProviders } from '../lib/auth'
@@ -13,8 +14,7 @@ export default function Setup() {
   return (
     <AuthLayout wide>
       <div className="logo" style={{ justifyContent: 'center', marginBottom: 18 }}>
-        <img src="/favicon.svg" alt="" />
-        Renplay
+        <Logo />
       </div>
       <div className="steps" style={{ justifyContent: 'center', marginBottom: 18 }}>
         <b>1 Claim the server</b>

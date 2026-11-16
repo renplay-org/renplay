@@ -161,7 +161,7 @@ export async function refreshShell(signal?: AbortSignal): Promise<void> {
   const shell = await caches.open(SHELL)
   const index = await fetch('/', { cache: 'no-store', signal })
   if (index.ok) await shell.put('/index.html', index)
-  for (const url of ['/favicon.svg', '/manifest.webmanifest', '/apple-touch-icon.png']) await shell.add(url).catch(() => {})
+  for (const url of ['/favicon.svg', '/wordmark.svg', '/manifest.webmanifest', '/apple-touch-icon.png']) await shell.add(url).catch(() => {})
   const res = await fetch('/asset-manifest.json', { cache: 'no-store', signal })
   if (!res.ok) return
   const chunks = Object.values((await res.json()) as Record<string, { file?: string; css?: string[]; assets?: string[] }>)

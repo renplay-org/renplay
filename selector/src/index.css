@@ -265,9 +265,6 @@ code {
   align-items: center;
   min-height: 40px;
   gap: 10px;
-  font-weight: 700;
-  font-size: 17px;
-  letter-spacing: -0.01em;
   flex: none;
 }
 .logo img {

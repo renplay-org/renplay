@@ -109,7 +109,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fromKept(req, url, null))
   } else if (path.startsWith('/assets/')) {
     event.respondWith(shellFile(req))
-  } else if (/^\/(favicon\.svg|manifest\.webmanifest|apple-touch-icon\.png|icon-(192|512)\.png)$/.test(path)) {
+  } else if (/^\/(favicon\.svg|wordmark\.svg|manifest\.webmanifest|apple-touch-icon\.png|icon-(192|512)\.png)$/.test(path)) {
     event.respondWith(answer(req, SHELL))
   } else if (req.mode === 'navigate' && !path.startsWith('/api/')) {
     event.respondWith(shellPage(req))
