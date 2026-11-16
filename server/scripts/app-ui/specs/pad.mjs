@@ -29,13 +29,16 @@ export const withPad = (page) => page.addInitScript(padScript)
 /**
  * Presses a button for `ms` and until the page has read the controller with it pressed, then lets go and waits for the page to have
  * read it let go. A slow machine that draws a frame late must still be seen to have pressed, but a press is no longer than a frame,
- * however slow the frame: a longer one would be a hold, which repeats.
+ * however slow the frame: a longer one would be a hold, which repeats. It says how long it held, in ms.
  */
 export const tap = (page, name, ms = 100) => page.evaluate(async ([n, t]) => {
+  const from = performance.now()
   window.__hold(n, true)
   await Promise.all([new Promise((ok) => setTimeout(ok, t)), window.__seen()])
+  const held = performance.now() - from
   window.__hold(n, false)
   await window.__seen()
+  return held
 }, [name, ms])
 
 /**

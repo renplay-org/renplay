@@ -36,21 +36,46 @@ test.describe('one press is one move', () => {
     await library(page)
     await tap(page, 'down', 60)
     expect((await moves(page)).length, 'a 60 ms tap').toBe(1)
-    // Each change is waited for in frames, not in time: a slow machine that draws a frame late is not a longer hold, which repeats.
-    await page.evaluate(async () => { window.__hold('down', true); window.__stick(0, 0.9); await window.__seen() })
-    await page.evaluate(async () => { window.__hold('down', false); await window.__seen() })
-    await page.evaluate(async () => { window.__stick(0, 0); await window.__seen() })
-    expect((await moves(page)).length, 'the d-pad and the stick together are one press').toBe(2)
+    // The d-pad and the stick pushed together, the d-pad let go, then the stick: one press. The page repeats a hold once its own clock
+    // says 550 ms, so a busy machine that took that long over it has held a button, which is not this check: it is asked again.
+    let together
+    for (let attempt = 0; attempt < 5 && together === undefined; attempt++) {
+      const before = (await moves(page)).length
+      const took = await page.evaluate(async () => {
+        const pause = (ms) => new Promise((done) => setTimeout(done, ms))
+        const from = performance.now()
+        window.__hold('down', true)
+        window.__stick(0, 0.9)
+        await pause(120)
+        window.__hold('down', false)
+        await pause(120)
+        window.__stick(0, 0)
+        const took = performance.now() - from
+        await pause(100)
+        return took
+      })
+      if (took < 500) together = (await moves(page)).length - before
+    }
+    expect(together, 'the d-pad and the stick together are one press').toBe(1)
   })
 
   test('a press held for half a second is still one move, and a longer hold repeats', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
     await library(page)
-    await tap(page, 'down', 500)
-    expect((await moves(page)).length, 'a half second press').toBe(1)
-    await tap(page, 'down', 1500)
-    expect((await moves(page)).length, 'a long hold moves again').toBeGreaterThan(3)
-    expect((await moves(page)).length, 'at a pace a person can follow').toBeLessThan(14)
+    // The page repeats a hold once its own clock says 550 ms. A press that a busy machine held longer than the test asked is a
+    // hold, which repeats: it is not the half second this is about, and is asked again.
+    let half
+    for (let attempt = 0; attempt < 5 && half === undefined; attempt++) {
+      const before = (await moves(page)).length
+      const held = await tap(page, 'down', 500)
+      if (held < 545) half = (await moves(page)).length - before
+    }
+    expect(half, 'a half second press').toBe(1)
+    const before = (await moves(page)).length
+    const held = await tap(page, 'down', 1500)
+    expect((await moves(page)).length - before, 'a long hold moves again').toBeGreaterThan(3)
+    // The pace is for a hold of the length asked: a longer one on a busy machine moves more.
+    if (held < 1700) expect((await moves(page)).length - before, 'at a pace a person can follow').toBeLessThan(14)
   })
 })
 
