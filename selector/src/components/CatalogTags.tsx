@@ -120,9 +120,8 @@ export default function CatalogTags({ games, all = games, vocabulary, prefs, onC
         {(onClear || chosen.length > 0 || common.length > 0) && (
           <div className="chips wrap" ref={row}>
             {onClear && (
-              <Chip onClick={onClear}>
+              <Chip onClick={onClear} after={<X aria-hidden="true" />}>
                 Clear filters
-                <X aria-hidden="true" />
               </Chip>
             )}
             {chosen.map((id) => chip(id, counts.get(id)?.count ?? 0))}

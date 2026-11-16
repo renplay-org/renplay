@@ -319,9 +319,8 @@ export default function Library() {
         </Toolbar>
         {filter in FILTERS && (
           <div className="chip-bar" style={{ marginBottom: 10 }}>
-            <Chip on onClick={() => change(() => update('filter', null))} aria-label={`${FILTERS[filter]}, show all games`}>
+            <Chip on onClick={() => change(() => update('filter', null))} aria-label={`${FILTERS[filter]}, show all games`} after={<X aria-hidden="true" />}>
               {FILTERS[filter]}
-              <X aria-hidden="true" />
             </Chip>
           </div>
         )}

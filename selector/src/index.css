@@ -291,14 +291,9 @@ code {
   color: var(--fg-2);
   font-weight: 600;
   font-size: 15px;
-  transition:
-    color var(--t-focus),
-    background var(--t-focus);
+  transition: color var(--t-focus);
 }
-.nav a.on {
-  color: var(--fg);
-  background: var(--plate-2);
-}
+.nav a.on,
 .nav a:hover {
   color: var(--fg);
 }
@@ -936,8 +931,7 @@ select.input option {
 .notice.green svg {
   color: var(--green);
 }
-/* The settings' sections: words, as the tabs are. A row on a phone, the chosen one under a lamp underline, and a column on a
-   computer, the chosen one with a lamp edge, as the docs' sidebar has. */
+/* The settings' sections: words, as the tabs are, the chosen one under a lamp underline. A row on a phone, a column on a computer. */
 .side-nav {
   display: flex;
   gap: 0 22px;
@@ -955,18 +949,16 @@ select.input option {
   display: flex;
   align-items: center;
   min-height: 44px;
-  border-bottom: 2px solid transparent;
   font-size: 14px;
   color: var(--fg-3);
   font-weight: 500;
-  transition:
-    color var(--t-focus),
-    border-color var(--t-focus);
+  transition: color var(--t-focus);
 }
+.side-nav a:hover,
+.side-nav button:hover,
 .side-nav a.on,
 .side-nav button.on {
   color: var(--fg);
-  border-bottom-color: var(--lamp);
 }
 .side-nav .grp {
   display: none;
@@ -992,13 +984,7 @@ select.input option {
   .side-nav a,
   .side-nav button {
     padding: 0 14px;
-    border-bottom: 0;
     border-radius: var(--r-1);
-  }
-  .side-nav a.on,
-  .side-nav button.on {
-    box-shadow: inset 2px 0 var(--lamp);
-    border-radius: 0;
   }
 }
 .split {
@@ -2382,9 +2368,6 @@ button.frow:hover {
 .frow .link-n {
   text-align: left;
   min-height: 40px;
-}
-.frow .link-n:hover {
-  text-decoration: underline;
 }
 .frow .m {
   flex: none;

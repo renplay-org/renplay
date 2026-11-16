@@ -14,7 +14,7 @@ import { RoomProvider } from '../lantern/Room'
 import { useArrowFocus } from '../lantern/focus'
 import { useFlightBack, useGoBack } from '../lantern/flight'
 import type { Health } from '@shared/api'
-import { Pill } from '../lantern/controls'
+import { Pill, U } from '../lantern/controls'
 import { Logo } from '../lantern/Logo'
 import { focusSearch, wantSearch } from '../lantern/Search'
 import { isApple } from '../lib/platform'
@@ -211,10 +211,10 @@ function Shell() {
           </NavLink>
           <nav className="nav" aria-label="Sections">
             <NavLink to="/" end className={({ isActive }) => (isActive ? 'on' : '')}>
-              Library
+              <U>Library</U>
             </NavLink>
             <NavLink to="/catalog" className={({ isActive }) => (isActive ? 'on' : '')}>
-              Catalog
+              <U>Catalog</U>
             </NavLink>
           </nav>
           <div className="top-r">

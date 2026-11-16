@@ -1,6 +1,45 @@
 /* Words, as the website draws them. A tab, a choice and a filter are plain text in Inter, and the chosen one is lit white
-   with a lamp underline: no strip, no fill. A tag is a small fact in mono, and facts in a line are separated by a mark
-   that never starts or ends a wrapped line. */
+   with a lamp underline: no strip, no fill. The underline is the website's menu line (`.links a` in its stylesheet): exactly
+   the width of the text, never of the padding or an icon, drawn from the left on hover and on the one chosen, and drawn back
+   on the one left. It is the .u inside the word: lantern/controls.tsx puts every label in one, so its box is the text. Under
+   reduced motion the durations are zero, and it simply appears. A tag is a small fact in mono, and facts in a line are
+   separated by a mark that never starts or ends a wrapped line. */
+.u {
+  position: relative;
+}
+.u::before,
+.u::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  top: calc(100% + 2px);
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+  transition: transform var(--t-pane) var(--out);
+}
+/* The lamp is the chosen one's line, and the colour of the word is the hover's. */
+.u::before {
+  height: 2px;
+  background: var(--lamp);
+}
+.u::after {
+  height: 1px;
+  background: currentColor;
+}
+.on > .u::before,
+[aria-current] > .u::before {
+  transform: scaleX(1);
+}
+@media (hover: hover) {
+  :is(.seg > button, .chip, .nav a, .side-nav a, .side-nav button, .gw-tabs button):hover:not(:disabled, .ex) > .u::after {
+    transform: scaleX(1);
+  }
+}
+:is(.seg > button, .chip, .nav a, .side-nav a, .side-nav button, .gw-tabs button):focus-visible > .u::after {
+  transform: scaleX(1);
+}
 .seg {
   display: flex;
   gap: 0 22px;
@@ -8,9 +47,9 @@
   max-width: 100%;
 }
 .seg > button {
-  /* A word never shrinks below its label: a long group scrolls (.seg.scroll) instead. */
+  /* A word never shrinks below its label: a long group scrolls (.seg.scroll) instead. Its hit area is 44 px (index.css), the
+     word is its text, so that the line under it is. */
   flex: none;
-  min-width: 44px;
   min-height: 44px;
   padding: 0;
   display: inline-flex;
@@ -23,25 +62,11 @@
   white-space: nowrap;
   transition: color var(--t-focus);
 }
-/* The underline sits just above the box's edge, where the focus ring is drawn inside it. */
-.seg > button::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2px;
-  height: 2px;
-  background: transparent;
-  transition: background var(--t-focus);
-}
 .seg > button:hover:not(:disabled) {
   color: var(--fg);
 }
 .seg > button.on {
   color: var(--fg);
-}
-.seg > button.on::after {
-  background: var(--lamp);
 }
 .seg > button:focus-visible {
   box-shadow: inset 0 0 0 2px #fff;
@@ -65,27 +90,25 @@
   gap: 6px;
   min-height: 40px;
   padding: 0;
-  border-bottom: 2px solid transparent;
   color: var(--fg-3);
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   flex: none;
-  transition:
-    color var(--t-focus),
-    border-color var(--t-focus);
+  transition: color var(--t-focus);
 }
 .chip:hover {
   color: var(--fg);
-}
-.chip.on {
-  color: var(--fg);
-  border-bottom-color: var(--lamp);
 }
 .chip.ex {
   color: var(--red);
   text-decoration: line-through;
   text-decoration-thickness: 1.5px;
+}
+.chip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 .chip .n {
   font-family: var(--mono);
@@ -131,4 +154,23 @@
 .sepline {
   --mark: "\00b7";
   --gap-mark: 16px;
+}
+/* A quiet link keeps its faint line, which a touch screen has, and draws the website's line over it on hover and on focus: from
+   the left, the width of the text only (the content box, so not the padding that gives it its hit area). */
+.link-q,
+.src a,
+.frow .link-n,
+.picker .choice .cs a,
+.picker .credit a {
+  background: linear-gradient(currentColor, currentColor) 0 calc(100% - 2px) / 0 1px no-repeat;
+  background-origin: content-box;
+  transition: background-size var(--t-pane) var(--out);
+}
+@media (hover: hover) {
+  :is(.link-q, .src a, .frow .link-n, .picker .choice .cs a, .picker .credit a):hover {
+    background-size: 100% 1px;
+  }
+}
+:is(.link-q, .src a, .frow .link-n, .picker .choice .cs a, .picker .credit a):focus-visible {
+  background-size: 100% 1px;
 }

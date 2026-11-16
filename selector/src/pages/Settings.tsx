@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { U } from '../lantern/controls'
 import { Spinner } from '../lantern/ui'
 import { DeviceAdultRow } from '../components/AdultLadder'
 import { useRoom } from '../lantern/Room'
@@ -39,12 +40,12 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
           <span className="grp">Server</span>
           {SECTIONS.map(([value, label]) => (
             <button key={value} onClick={() => setSection(value)} aria-current={section === value ? 'page' : undefined} className={section === value ? 'on' : ''}>
-              {label}
+              <U>{label}</U>
             </button>
           ))}
           <span className="grp">People</span>
-          <Link to="/settings/users">Users</Link>
-          <Link to="/activity">Activity</Link>
+          <Link to="/settings/users"><U>Users</U></Link>
+          <Link to="/activity"><U>Activity</U></Link>
         </nav>
         <div className="body stack" style={{ gap: 18 }}>
           <div className={section === 'general' ? 'stack' : 'hidden'} style={{ gap: 18 }}>

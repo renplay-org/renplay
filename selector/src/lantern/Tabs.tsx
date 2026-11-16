@@ -1,4 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { U } from './controls'
 import { padKeys } from './focus'
 import './Words.css'
 
@@ -36,7 +37,7 @@ export function Tabs<T extends string>({ value, onChange, options, label, group,
     <div ref={row} role="tablist" aria-label={label} className={`seg tabs scroll ${small ? 'sm' : ''}`.trim()} onKeyDown={onKeyDown}>
       {options.map((o) => (
         <button key={o.value} type="button" role="tab" id={tabId(group, o.value)} aria-selected={o.value === value} aria-controls={o.value === value ? panelId(group, o.value) : undefined} className={o.value === value ? 'on' : ''} onClick={() => onChange(o.value)}>
-          {o.label}
+          <U>{o.label}</U>
         </button>
       ))}
     </div>

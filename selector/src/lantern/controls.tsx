@@ -83,13 +83,24 @@ export function IconBtn(props: IconBtnProps) {
   )
 }
 
-/** Filter chips: 40 px, selected paper, excluded red with a strike, dim when nothing would show. */
-export function Chip({ on, ex, n, dim, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number; dim?: boolean }) {
+/**
+ * The word of a tab, a choice or a filter: the label is in a `.u`, whose box is the text, so the line drawn under a chosen or
+ * hovered word (Words.css) is exactly as wide as the text, never the padding or an icon.
+ */
+export function U({ children }: { children: ReactNode }) {
+  return <span className="u">{children}</span>
+}
+
+/** Filter chips: 40 px words, the one included lit with the underline, excluded red with a strike, dim when nothing would show. `after` is an icon, outside the underline. */
+export function Chip({ on, ex, n, dim, after, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number; dim?: boolean; after?: ReactNode }) {
   return (
     <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''} ${dim ? 'dim' : ''}`} {...rest}>
-      {children}
-      {n != null && ' '}
-      {n != null && <span className="n">{n}</span>}
+      <U>
+        {children}
+        {n != null && ' '}
+        {n != null && <span className="n">{n}</span>}
+      </U>
+      {after}
     </button>
   )
 }
@@ -125,7 +136,7 @@ export function Seg<T extends string>({
           className={`${o.value === value ? 'on' : ''} ${o.na ? 'na' : ''} ${o.className ?? ''}`}
           onClick={() => onChange?.(o.value)}
         >
-          {o.label}
+          <U>{o.label}</U>
         </button>
       ))}
     </div>
