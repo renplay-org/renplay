@@ -174,7 +174,8 @@ const pages = [
   ['docs guide', (p) => p.goto(`${docs}/start-here/quick-start/`)],
 ]
 const runs = [[webkit, `${Number(process.env.LAYOUT_WIDTH) || 390} px WebKit`], [chromium, '1440 px Chromium']]
-for (const [engine, label] of runs) {
+// The two browsers run side by side: each has its own pages, and the checks inside each follow one another.
+await Promise.all(runs.map(async ([engine, label]) => {
   const browser = await engine.launch()
   for (const [name, open] of pages.filter(([name]) => !only || name.startsWith(only))) {
     for (let run = 0; run < runsOf; run++) await check(browser, label, name, open)
@@ -185,7 +186,9 @@ for (const [engine, label] of runs) {
     for (const width of [360, 430]) await check(browser, `${width} px WebKit`, 'home', pages[0][1], width)
   }
   await browser.close()
-}
+}))
+// Reported as they ran one after the other: WebKit first.
+results.sort((a, b) => Number(!a.label.endsWith('WebKit')) - Number(!b.label.endsWith('WebKit')))
 for (const s of [ws, as, ds]) s.close()
 
 let failed = false
