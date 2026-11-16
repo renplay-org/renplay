@@ -28,7 +28,7 @@ async function embedder(port, demoOrigin) {
     <iframe id="phone" title="Phone" width="390" height="844" allow="fullscreen" src="${demoOrigin}/game/the-question?embed=phone"></iframe>
   </body></html>`
   const server = createServer((_req, res) => res.writeHead(200, { 'content-type': 'text/html' }).end(page))
-  await new Promise((done) => server.listen(port, 'localhost', done))
+  await new Promise((done) => server.listen(port, '127.0.0.1', done))
   return { close: () => new Promise((done) => server.close(done)) }
 }
 
@@ -41,7 +41,7 @@ export async function staticDemo({ dir } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'renplay-static-demo-'))
   // Both addresses are decided first: the build names the embedder, and the page names the demo.
   const host = createServer()
-  await new Promise((done) => host.listen(0, 'localhost', done))
+  await new Promise((done) => host.listen(0, '127.0.0.1', done))
   const embedderPort = host.address().port
   await new Promise((done) => host.close(done))
   const embedderOrigin = `http://localhost:${embedderPort}`
@@ -77,7 +77,7 @@ export async function staticDemo({ dir } = {}) {
   const origin = `http://localhost:${server.port}`
   const page = await embedder(embedderPort, origin)
   return {
-    origin, embedderOrigin, requests: server.requests, dir: out,
+    origin, port: server.port, embedderOrigin, requests: server.requests, dir: out,
     close: async () => { await Promise.all([server.close(), page.close()]); rmSync(root, { recursive: true, force: true }) },
   }
 }

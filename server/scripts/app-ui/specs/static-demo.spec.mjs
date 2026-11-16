@@ -130,9 +130,9 @@ test('only the allowed website may frame the demo', async ({ page }) => {
   const violations = []
   page.on('console', (message) => { if (/frame-ancestors|Refused to frame|ancestor violates/i.test(message.text())) violations.push(message.text()) })
   const other = createServer((_req, res) => res.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html><html><body></body></html>'))
-  await new Promise((done) => other.listen(0, 'localhost', done))
+  await new Promise((done) => other.listen(0, '127.0.0.1', done))
   try {
-    expect((await fetch(`${demo.origin}/`)).headers.get('content-security-policy')).toBe(`frame-ancestors 'self' ${demo.embedderOrigin}`)
+    expect((await fetch(`http://127.0.0.1:${demo.port}/`)).headers.get('content-security-policy')).toBe(`frame-ancestors 'self' ${demo.embedderOrigin}`)
     await page.goto(`http://localhost:${other.address().port}`)
     await page.evaluate((url) => {
       document.body.innerHTML = '<iframe title="Refused demo"></iframe>'

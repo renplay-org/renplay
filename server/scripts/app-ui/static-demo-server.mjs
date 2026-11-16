@@ -51,7 +51,7 @@ export async function serveStatic(dir, port = 0) {
     if (req.method === 'HEAD') return void res.end()
     createReadStream(file).pipe(res)
   })
-  await new Promise((done) => server.listen(port, 'localhost', done))
+  await new Promise((done) => server.listen(port, '127.0.0.1', done))
   return { port: server.address().port, requests, close: () => new Promise((done) => server.close(done)) }
 }
 
