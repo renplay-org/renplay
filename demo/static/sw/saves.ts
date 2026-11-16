@@ -109,8 +109,25 @@ async function setNote(env: Env, dir: string, file: string, b: { title?: unknown
   return json({ ok: true, title: next.title || null, note: next.note || null, pinnedAt: next.pinnedAt || null })
 }
 
+/**
+ * Changes to the saves, one at a time. Each one reads what is there (the file's current copy, what the quota holds)
+ * and writes from it, in separate transactions of the store, so two at once would both read the same file and the
+ * copy the first replaced would never be kept. One line for all of them, not one per file, since the quota is shared.
+ */
+const queues = new WeakMap<Env, Promise<unknown>>()
+function inTurn<T>(env: Env, change: () => Promise<T>): Promise<T> {
+  const done = (queues.get(env) ?? Promise.resolve()).then(change, change)
+  queues.set(env, done.catch(() => {}))
+  return done
+}
+
 /** The save routes the demo answers. The rest of a save folder's routes (imports, copies, Sync codes, exports) are not here. */
-export async function savesRoute(env: Env, req: Request, url: URL, game: Game, rest: string): Promise<Response | null> {
+export function savesRoute(env: Env, req: Request, url: URL, game: Game, rest: string): Promise<Response | null> {
+  const read = req.method === 'GET' || req.method === 'HEAD'
+  return read ? answerSaves(env, req, url, game, rest) : inTurn(env, () => answerSaves(env, req, url, game, rest))
+}
+
+async function answerSaves(env: Env, req: Request, url: URL, game: Game, rest: string): Promise<Response | null> {
   const dir = game.saveDir
   const method = req.method
   const resolve = (): { dir: string; name: string } => {

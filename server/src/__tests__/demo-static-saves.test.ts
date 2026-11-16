@@ -85,4 +85,33 @@ describe('the static demo\'s saves', () => {
     const after = await held()
     expect([after.bytes, after.entries]).toEqual([before.bytes, before.entries])
   })
+
+  /** Every payload a save ever held, current or kept: none may be lost by what was written at once. */
+  const recoverable = async () => {
+    const rows = [...(await store.all('files')), ...(await store.all('versions'))]
+    return new Set(rows.map((r) => new DataView(r.data).getUint32(0)))
+  }
+
+  it('loses no version when two writes to one save come at once', async () => {
+    for (let round = 0; round < 20; round++) {
+      store = memoryStore()
+      answer = createAnswer({ store, snapshot: async () => ({ routes: {}, me: {}, games: [{ id: 'the-question', title: 'The Question', saveDir: DIR, art: {} }] }) as never, notify: () => {} })
+      await put('1-1.save', payload(64, 1))
+      await Promise.all([put('1-1.save', payload(64, 2)), put('1-1.save', payload(64, 3))])
+      expect([...(await recoverable())].sort(), `round ${round}`).toEqual([1, 2, 3])
+    }
+  })
+
+  it('loses nothing when a write, a delete and a restore of one save come at once', async () => {
+    await put('1-1.save', payload(64, 1))
+    await put('1-1.save', payload(64, 2))
+    const [first] = (await store.all('versions')).sort((a, b) => a.savedAt - b.savedAt)
+    await Promise.all([put('1-1.save', payload(64, 3)), call('DELETE', '/slot?file=1-1.save'), call('POST', '/history/restore', { id: first!.id })])
+    expect([...(await recoverable())].sort()).toEqual([1, 2, 3])
+  })
+
+  it('keeps the quota when many writes to different saves come at once', async () => {
+    await Promise.all(Array.from({ length: 40 }, (_, i) => put(`${i}-1.save`, payload(1.5 * MB, i))))
+    expect((await held()).bytes).toBeLessThanOrEqual(32 * MB)
+  })
 })
