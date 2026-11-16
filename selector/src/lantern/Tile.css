@@ -326,7 +326,7 @@
 }
 
 /* The light behind a grid or a shelf: the colour of the game under the hand or the focus, as behind the website's shelf
-   (a radial glow, 34 percent of the tint). It has two lamps, ::before and ::after, which take turns: lean.ts sets the colour
+   (a radial glow, 34 percent of the tint, cut to the size where the shelf's fades out). It has two lamps, ::before and ::after, which take turns: lean.ts sets the colour
    and place of the one that is out and turns it on with data-glow, and the other fades. That crossfades from tile to tile
    with nothing animated but opacity, and the colour is never an animated property, which every tile would inherit. */
 [data-row] {
@@ -340,19 +340,19 @@
   left: 0;
   top: 0;
   z-index: -1;
-  width: 1380px;
-  height: 720px;
-  margin: -360px 0 0 -690px;
+  width: 994px;
+  height: 518px;
+  margin: -259px 0 0 -497px;
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--t-room) var(--out);
 }
 [data-row]::before {
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow-a) 34%, transparent), transparent 72%);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow-a) 34%, transparent), transparent);
   transform: translate(var(--glow-a-x, 0px), var(--glow-a-y, 0px));
 }
 [data-row]::after {
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow-b) 34%, transparent), transparent 72%);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow-b) 34%, transparent), transparent);
   transform: translate(var(--glow-b-x, 0px), var(--glow-b-y, 0px));
 }
 [data-row][data-glow="a"]::before,
