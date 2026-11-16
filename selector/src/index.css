@@ -2163,7 +2163,7 @@ input[type="range"] {
   flex: none;
 }
 .ib.plate {
-  background: var(--plate-2);
+  box-shadow: inset 0 0 0 1px var(--hair);
   color: var(--fg);
 }
 .frows {
