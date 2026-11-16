@@ -29,8 +29,9 @@ changes, not the website.
 - **One lit control per screen.** The thing to do next is paper (`--paper`, `--on-paper`), flat, no shadow. Everything
   else is a hairline (`--hair`) or quiet text.
 - **Words, not strips.** A tab, a choice and a filter are plain text, and the one chosen is lit white with a `--lamp`
-  underline. A tag is a small mono fact, separated from the next by a slash. A section is a hairline across its top
-  with its title in Fraunces, never a filled rounded card. A plate (`.plate`) is for a card you press or drop on.
+  underline: the website's menu line, exactly as wide as the text (a `.u` inside the word, `lantern/controls.tsx`), drawn from the
+  left on the chosen one and on hover and drawn back on the one left. A tag is a small mono fact, separated from the next by a slash. A section is a hairline across its top
+  with its title in Fraunces, never a filled rounded card. A save is a card like a tile (4 px, a border in the game's colour). A plate (`.plate`) is for a card you press or drop on.
 - **The brand gradient has three homes.** The logo, the avatar without a picture, and the room's glow. Never on a
   control, never behind text.
 - **Three corners, the website's.** `--r-1` (4 px) for a control and a tile, `--r-2` (6) for a row, `--r-3` (10) for a
@@ -48,7 +49,9 @@ changes, not the website.
   the game's colour, a sheen toward the pointer, and under the hand a lean (every tile in view leans toward the pointer,
   the one under it more), a lift and the colour's long shadow. The game under the hand or the focus also lights the grid
   behind it. A press leans a tile on a touch screen. Reduced motion keeps the colour and drops the lean and the lift.
-  Nothing else moves under the hand.
+  Only the cover moves, with its border, glow and sheen: the title and the line under it stay still, and nothing dark shows
+  behind a leaning cover. Settings, This browser has a switch, Move cards with the pointer, which drops the lean and the lift
+  as reduced motion does. Nothing else moves under the hand.
 - **Density, touch and speed are not the language's to change.** Sizes and spaces (`--s1` to `--s6`, `--hit`), the
   44 px hit area, the adult blur and the game page's weight stay as they are.
 
