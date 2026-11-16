@@ -14,7 +14,7 @@ export const DEMO_ROUTES = {
     'GET /me', 'GET /me/adult', 'GET /me/tags', 'GET /auth/providers', 'GET /health', 'GET /defaults', 'GET /content', 'GET /widget', 'GET /catalog',
     'GET /history', 'GET /games', 'GET /games/:id', 'POST /auth/demo', 'POST /telemetry/client', 'GET /:id', 'GET /:id/boot', 'GET /:id/history',
     'PUT /games/:id/favorite', 'PUT /games/:id/status', 'PUT /games/:id/rating', 'POST /games/:id/not-now', 'DELETE /games/:id/not-now',
-    'POST /games/:id/played', 'POST /games/:id/play-time', 'PUT /:id/file', 'GET /:id/raw', 'GET /:id/screenshot', 'GET /:id/download',
+    'POST /games/:id/played', 'POST /games/:id/play-time', 'PUT /games/:id/cache', 'PUT /:id/file', 'GET /:id/raw', 'GET /:id/screenshot', 'GET /:id/download',
     'PUT /:id/meta', 'POST /:id/save-dir', 'POST /:id/history/restore', 'DELETE /:id/slot', 'DELETE /:id/file',
   ],
   file: [
@@ -38,7 +38,7 @@ export const DEMO_ROUTES = {
     'POST /jobs/:id/pause', 'POST /jobs/:id/resume', 'POST /jobs/:id/retry', 'POST /me/avatar', 'POST /me/claim-owner', 'POST /me/identities/ldap',
     'POST /me/identities/oidc', 'POST /me/password', 'POST /me/tokens', 'POST /system/backups', 'POST /system/engines/refresh', 'POST /system/prune',
     'POST /system/storage/refresh', 'POST /uploads', 'POST /uploads/:id/complete', 'POST /users', 'POST /users/:id/merge', 'POST /users/:id/password',
-    'POST /users/:id/saves/copy', 'POST /users/:id/saves/import', 'PUT /content', 'PUT /defaults', 'PUT /games/:id/cache', 'PUT /games/:id/files/raw',
+    'POST /users/:id/saves/copy', 'POST /users/:id/saves/import', 'PUT /content', 'PUT /defaults', 'PUT /games/:id/files/raw',
     'PUT /games/:id/walkthroughs/:file', 'PUT /me', 'PUT /me/adult', 'PUT /me/pin', 'PUT /me/tags', 'PUT /system/downloads', 'PUT /system/sync',
     'PUT /system/telemetry', 'PUT /uploads/:id', 'PUT /users/:id',
   ],

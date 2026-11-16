@@ -2,6 +2,8 @@ name: Demo
 
 # The public demo at demo.renplay.org (demo/): built with each release (release.yml) or by hand,
 # tried, pushed as ghcr.io/renplay-org/renplay:demo, and started from it (DEMO_DEPLOY_HOOK).
+# The same demo as plain files (demo/static/) is built from that image, tried in browsers, and published to Cloudflare
+# once the repository variable STATIC_DEMO_DEPLOY is true.
 
 on:
   workflow_call:
@@ -11,6 +13,10 @@ on:
         required: true
     secrets:
       DEMO_DEPLOY_HOOK:
+        required: false
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_ACCOUNT_ID:
         required: false
   workflow_dispatch:
     inputs:
@@ -34,6 +40,7 @@ jobs:
       # The Ren'Py SDK the demo's games are built with: the engine Renplay plays them on.
       RENPY: 8.5.3
       IMAGE: ghcr.io/renplay-org/renplay:demo
+      WRANGLER: wrangler@4.158.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,3 +98,39 @@ jobs:
           if [ -z "$HOOK" ]; then echo "No DEMO_DEPLOY_HOOK secret, so the demo is not restarted"; exit 0; fi
           curl -fsS -X POST "$HOOK" > /dev/null
           echo "The demo starts from the new image"
+
+      # The static demo: the demo's own answers captured from the new image, and the files of its games from the
+      # image's build (not from a running container). It follows the image, so a failure here leaves the demo above as it is.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: The static demo
+        run: |
+          npm ci --prefix selector
+          npm ci --prefix server
+          docker buildx build --target games --output type=local,dest=/tmp/demo-seed demo
+          docker run -d --name demo-capture -e PORT=10000 -p 8080:8080 --memory 512m "$IMAGE"
+          for _ in $(seq 1 60); do curl -fs -o /dev/null http://127.0.0.1:8080/api/health && break; sleep 2; done
+          node demo/static/build.mjs demo/static/dist --seed /tmp/demo-seed --base http://127.0.0.1:8080
+          docker rm -f demo-capture
+
+      # Chromium, and WebKit at desktop size and at 390 px wide, on the real game: two frames, the requests, the frame policy.
+      - name: Try the static demo in browsers
+        env:
+          STATIC_DEMO_DIR: ${{ github.workspace }}/demo/static/dist
+        run: |
+          npm run build --prefix selector
+          cd server
+          npx playwright install --with-deps chromium webkit
+          npx playwright test --config scripts/app-ui/playwright.config.mjs --project=chromium-desktop --project=webkit-desktop --project=webkit-portrait static-demo
+
+      # Jan's switch: until STATIC_DEMO_DEPLOY is true, nothing is published (and the domain stays where it is).
+      - name: Publish the static demo
+        if: ${{ vars.STATIC_DEMO_DEPLOY == 'true' }}
+        working-directory: demo/static
+        run: npx --yes "$WRANGLER" deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

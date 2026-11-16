@@ -38,6 +38,9 @@ export function createAnswer(env: Env): (req: Request) => Promise<Response> {
     if (game) {
       const g = s.games.find((x) => x.id === game[1])
       if (!g) return fail(404, 'Game not found')
+      // The runtime sends the compiled caches of a build after a first start. The server keeps them for an admin and
+      // refuses the guest with a 403. Here the upload is taken and dropped, so no request of the demo fails.
+      if (game[2] === '/cache' && m === 'PUT') return json({ ok: true })
       return (await gameRoute(env, req, g, game[2] ?? '', body)) ?? unanswered(m, path)
     }
     const saves = new RegExp(`^/api/saves/(${GAME_ID})(/.*)?$`).exec(path)

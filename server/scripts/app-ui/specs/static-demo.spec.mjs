@@ -57,7 +57,10 @@ async function playAndSave(page) {
 async function runtimeSaves(page) {
   const save = [...(await renpySave('A shared scene', Math.floor(Date.now() / 1000)))]
   const frame = await (await page.locator('#phone').elementHandle()).contentFrame()
-  const status = await frame.evaluate(async (bytes) => (await fetch('/api/saves/the-question/file?path=the-question/1-1-LT1.save', { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: new Uint8Array(bytes) })).status, save)
+  const status = await frame.evaluate(async (bytes) => {
+    const { game } = await (await fetch('/api/games/the-question')).json()
+    return (await fetch(`/api/saves/the-question/file?path=${game.saveDir}/1-1-LT1.save`, { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: new Uint8Array(bytes) })).status
+  }, save)
   expect(status).toBe(200)
 }
 

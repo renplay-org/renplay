@@ -181,12 +181,17 @@ describe('the static demo answers what the demo server answers', () => {
       { route: 'POST /:id/import', method: 'POST', path: `${TQ}/import`, body: {} },
       { route: 'POST /:id/sync', method: 'POST', path: `${TQ}/sync`, body: {} },
       { route: 'POST /:id/copy', method: 'POST', path: `${TQ}/copy`, body: {} },
-      { route: 'PUT /games/:id/cache', method: 'PUT', path: '/api/games/the-question/cache', body: {} },
     ]
     for (const c of refused) {
       const [a, b] = await Promise.all([real(c), standIn(c)])
       expect([b.status, await b.json()], `${c.method} ${c.path}`).toEqual([a.status, await a.json()])
     }
+  })
+  it('takes the compiled caches the runtime uploads, which the demo server refuses, so that no request fails', async () => {
+    const c = { route: 'PUT /games/:id/cache', method: 'PUT', path: '/api/games/the-question/cache?build=b1&name=screens.rpyb', body: {} }
+    expect((await real(c)).status).toBe(403)
+    const answer = await standIn(c)
+    expect([answer.status, await answer.json()]).toEqual([200, { ok: true }])
   })
   it('names the build\'s embedder as the one origin the bridge talks to, and says it has no server', async () => {
     const me = (await (await standIn({ route: '', method: 'GET', path: '/api/me' })).json()) as { demoEmbedder: string; demoStatic: boolean; demo: boolean }
@@ -200,7 +205,7 @@ describe('the static demo answers what the demo server answers', () => {
   })
   it('the cases cover every route the stand-in answers', () => {
     const covered = new Set([...reads, ...progress].map((c) => c.route))
-    for (const route of ['PUT /:id/file', 'GET /:id/raw', 'GET /:id/screenshot', 'GET /:id/download', 'PUT /:id/meta', 'POST /:id/save-dir', 'POST /:id/history/restore', 'DELETE /:id/slot', 'DELETE /:id/file']) covered.add(route)
+    for (const route of ['PUT /games/:id/cache', 'PUT /:id/file', 'GET /:id/raw', 'GET /:id/screenshot', 'GET /:id/download', 'PUT /:id/meta', 'POST /:id/save-dir', 'POST /:id/history/restore', 'DELETE /:id/slot', 'DELETE /:id/file']) covered.add(route)
     expect([...covered].sort()).toEqual([...ANSWERED].sort())
   })
 })

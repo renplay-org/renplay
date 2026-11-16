@@ -1,0 +1,12 @@
+// The static demo at https://demo.renplay.org, served by Cloudflare as static files.
+// `node build.mjs dist --seed <dir>` writes the public files into dist/ (see ../README.md). .github/workflows/demo.yml
+// deploys it, once the repository variable STATIC_DEMO_DEPLOY is true. An address that is not a file is the page
+// itself (the library chooses what to show), so the single page app fallback answers it.
+{
+  "name": "renplay-demo",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./dist", "html_handling": "auto-trailing-slash", "not_found_handling": "single-page-application" },
+  "routes": [{ "pattern": "demo.renplay.org", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}

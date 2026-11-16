@@ -6,7 +6,7 @@ const command = new URL('./browser-suites.mjs', import.meta.url)
 const suites = (...paths) => JSON.parse(execFileSync(process.execPath, [command.pathname], { input: paths.join('\n'), encoding: 'utf8' }))
 
 test('app and runtime inputs select both library runners', () => {
-  for (const path of ['selector/src/App.tsx', 'server/src/shared/api.ts', 'runtime/renplay-runtime.js', 'tests/contract.py', 'server/scripts/app-ui/specs/search.spec.mjs']) {
+  for (const path of ['selector/src/App.tsx', 'server/src/shared/api.ts', 'runtime/renplay-runtime.js', 'tests/contract.py', 'server/scripts/app-ui/specs/search.spec.mjs', 'demo/static/sw/answer.ts']) {
     assert.deepEqual(suites(path), ['legacy', 'playwright'], path)
   }
 })

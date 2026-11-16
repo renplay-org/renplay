@@ -17,6 +17,11 @@ ENV RENPLAY_ADULT_GAMES=off \
     RENPLAY_BACKUP_DIR=off
 RUN cd /games/_archives && node /tmp/seed.mjs *.zip
 
+# The built games of the seed stage alone: the static demo (static/) takes the files of their builds from here, as
+#   docker build --target games --output type=local,dest=<dir> demo
+FROM scratch AS games
+COPY --from=seed /games /games
+
 FROM ${IMAGE}
 # One nginx worker, whatever cores the host shows. Each visitor's own address comes from the
 # CF-Connecting-IP header: nginx takes it and logs it, and Renplay trusts nginx alone

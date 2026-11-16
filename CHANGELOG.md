@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- The public demo can also be built as plain files for a static host, with no server behind it (`demo/static/`). A service worker in the browser answers what the demo asks of the server, and the visitor's saves, history, names and play progress stay in that browser. It needs https or localhost. A server demo (`RENPLAY_DEMO`) works as before. The demo's notice in the static demo says "This is a demo. Your saves stay in this browser." and the library leaves out what it cannot do without a server: Keep offline, exporting and importing saves, copying a save to another game and choosing other art.
+
 ### Changed
 
 - The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.

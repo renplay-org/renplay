@@ -1,6 +1,7 @@
 import { createServer } from 'node:http'
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
-import { extname, join, normalize } from 'node:path'
+import { extname, join, normalize, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.zip': 'application/zip', '.pack': 'application/octet-stream', '.wasm': 'application/wasm' }
 
@@ -52,4 +53,10 @@ export async function serveStatic(dir, port = 0) {
   })
   await new Promise((done) => server.listen(port, 'localhost', done))
   return { port: server.address().port, requests, close: () => new Promise((done) => server.close(done)) }
+}
+
+// node static-demo-server.mjs <dir> [port]: the same server by hand, at http://localhost:<port> (a secure context).
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const { port } = await serveStatic(resolve(process.argv[2] ?? 'dist'), Number(process.argv[3] ?? 5191))
+  console.log(`http://localhost:${port}`)
 }
