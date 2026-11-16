@@ -1,4 +1,5 @@
 import type { Request } from 'express'
+import { DEMO_REFUSAL, demoRefuses } from '../shared/demo-refusals.js'
 import { HttpError } from '../util/paths.js'
 
 /** A closed player allowlist makes new management endpoints admin-only by default. */
@@ -11,29 +12,7 @@ export function playerRoute(method: string, path: string): boolean {
   return /^(PUT \/api\/games\/[^/]+\/(favorite|art|status|rating)|POST \/api\/games\/[^/]+\/(played|play-time|art\/upload|not-now)|POST \/api\/telemetry\/client|DELETE \/api\/games\/[^/]+\/(art|not-now|art\/uploads\/[0-9a-f]{64}))$/.test(`${method} ${path}`)
 }
 
-/**
- * What the demo's guest may not do, on top of a player's limits: anything that changes the shared
- * account or adds files to the server. Everything a visitor tries goes at the next restart anyway.
- */
-const DEMO_REFUSED: Array<[method: string, path: RegExp]> = [
-  ['PUT', /^\/api\/me$/],
-  ['POST', /^\/api\/me\/(password|avatar|tokens|claim-owner)$/],
-  ['PUT', /^\/api\/me\/pin$/],
-  ['DELETE', /^\/api\/me\/(tokens|sessions)(\/.*)?$/],
-  // The shared account's sessions are other visitors' browsers.
-  ['GET', /^\/api\/me\/sessions$/],
-  ['*', /^\/api\/me\/identities(\/.*)?$/],
-  ['POST', /^\/api\/games\/[^/]+\/art\/upload$/],
-  ['DELETE', /^\/api\/games\/[^/]+\/art\/uploads\/.+$/],
-  ['POST', /^\/api\/saves-import$/],
-  // Choices everyone shares, since everyone is the same guest.
-  ['PUT', /^\/api\/me\/(tags|adult)$/],
-]
-/** The guest's save writes: a game's own saving, a save's name and note, deleting one, restoring one. */
-const DEMO_SAVE_WRITES = /^\/api\/saves\/[^/]+\/(file|meta|slot|history\/restore)$/
+/** The demo's guest may not do what the shared list refuses. */
 export function demoCheck(req: Request): void {
-  const refused = DEMO_REFUSED.some(([m, p]) => (m === '*' || m === req.method) && p.test(req.path))
-  // Imports, copies, Sync codes and the save folder are not among them: they bring in files or change the game for everyone.
-  const saveWrite = req.method !== 'GET' && req.method !== 'HEAD' && /^\/api\/saves\//.test(req.path) && !DEMO_SAVE_WRITES.test(req.path)
-  if (refused || saveWrite) throw new HttpError(403, 'The demo cannot do this. Install your own Renplay to try it.')
+  if (demoRefuses(req.method, req.path)) throw new HttpError(403, DEMO_REFUSAL)
 }
