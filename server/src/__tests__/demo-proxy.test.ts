@@ -56,7 +56,7 @@ async function behindProxy(env: Record<string, string>, limits: Partial<DemoGues
 /** What a request got: Node's own client, since fetch will not send a Host of the visitor's choosing. */
 interface Answer { status: number; cookies: string[] }
 const key = () => randomBytes(32).toString('base64url')
-const sessionCookie = (res: Answer) => res.cookies.find((c) => c.startsWith('renplay_session='))
+const sessionCookie = (res: Answer) => res.cookies.find((c) => /^renplay_session(_framed)?=/.test(c))
 const HTTPS = { RENPLAY_PUBLIC_URL: 'https://demo.example' }
 
 describe('the demo behind its proxy, on the host\'s HTTPS edge', () => {

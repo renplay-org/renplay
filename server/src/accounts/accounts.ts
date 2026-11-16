@@ -23,6 +23,9 @@ import { publicUser, validName, validUsername } from './users.js'
 import type { AdultState, Identities, Me, Providers, Session, Sessions, SwitchPeople, TagPrefs, Token, TokenCreated, Tokens } from '../shared/api.js'
 
 const DAYS30 = 30 * 86400_000
+/** The session cookie, and its partitioned form for the demo's frames. The proxy's cache key names both (image/nginx.conf.template). */
+const SESSION_COOKIE = 'renplay_session'
+const FRAMED_COOKIE = 'renplay_session_framed'
 
 export class Accounts {
   readonly enabled: boolean
@@ -112,8 +115,9 @@ export class Accounts {
   private secure(req: Request): boolean { return req.secure || this.cfg.publicUrl.startsWith('https://') }
   private cookie(req: Request, res: Response, value: string, partitioned = false): void {
     const maxAge = value ? DAYS30 : 0
-    // A frame of another site keeps its own copy of this cookie (CHIPS), where it is allowed only so.
-    res.cookie('renplay_session', value, partitioned ? { httpOnly: true, sameSite: 'none', secure: true, partitioned: true, path: '/', maxAge } : { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/', maxAge })
+    // A frame of another site keeps its own copy of this cookie (CHIPS), where it is allowed only so. It has a name of
+    // its own: with one name a browser sends both forms, and the older one, a direct visit's, would be read first.
+    res.cookie(partitioned ? FRAMED_COOKIE : SESSION_COOKIE, value, partitioned ? { httpOnly: true, sameSite: 'none', secure: true, partitioned: true, path: '/', maxAge } : { httpOnly: true, sameSite: 'lax', secure: this.secure(req), path: '/', maxAge })
   }
   private newSession(req: Request, res: Response, id: number, partitioned = false): void {
     log('sign-in', `Signed in: ${this.user(id).username}`)
@@ -172,12 +176,17 @@ export class Accounts {
       const u = this.user(row.user_id)
       return u.disabled ? null : { user: u, session: hash(bearer), bearer: true }
     }
-    const token = req.get('cookie')?.match(/(?:^|;\s*)renplay_session=([^;]+)/)?.[1]
-    if (!token) return null
-    const found = this.session(hash(token))
-    // A guest's cookie is not renewed: it outlasts the demo, and a renewed one would lose its form.
-    if (found && !this.guests) this.cookie(req, res, token)
-    return found
+    // The framed session is the one a key signed in last, so it comes first, and a plain one is the way back when it is gone.
+    const header = req.get('cookie') ?? ''
+    for (const name of [FRAMED_COOKIE, SESSION_COOKIE]) {
+      const token = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))?.[1]
+      const found = token ? this.session(hash(token)) : null
+      if (!found) continue
+      // A guest's cookie is not renewed: it outlasts the demo, and a renewed one would lose its form.
+      if (!this.guests) this.cookie(req, res, token!)
+      return found
+    }
+    return null
   }
   /** Cookie authentication does not constrain body type: raw, multipart and empty deletes work. */
   csrf(req: Request): void {

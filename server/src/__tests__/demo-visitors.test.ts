@@ -40,7 +40,7 @@ async function enter(app: App, key?: string, address = '10.0.0.1', cookie = ''):
   if (cookie) req.set('Cookie', cookie)
   const res = await req.send(key ? { visitor: key } : {}).expect(200)
   const headers = ([] as string[]).concat(res.headers['set-cookie'] ?? [])
-  return { cookie: headers.map((c) => c.split(';')[0]!).find((c) => c.startsWith('renplay_session=')) ?? cookie, headers }
+  return { cookie: headers.map((c) => c.split(';')[0]!).find((c) => /^renplay_session(_framed)?=/.test(c)) ?? cookie, headers }
 }
 const me = async (app: App, cookie: string) => (await request(app.app).get('/api/me').set('Cookie', cookie).expect(200)).body
 const userId = async (app: App, cookie: string) => (await me(app, cookie)).user.id as number
@@ -321,10 +321,48 @@ describe('the demo bounds its guests', () => {
     const lax = (await enter(insecure, newKey())).headers.find((c) => c.startsWith('renplay_session='))!
     expect(lax).toMatch(/HttpOnly/i); expect(lax).toMatch(/SameSite=Lax/i); expect(lax).not.toMatch(/Partitioned/i)
     const secure = await start(true, {}, { publicUrl: 'https://demo.example' })
-    const framed = (await enter(secure, newKey())).headers.find((c) => c.startsWith('renplay_session='))!
+    const framed = (await enter(secure, newKey())).headers.find((c) => c.startsWith('renplay_session_framed='))!
     expect(framed).toMatch(/Secure/i); expect(framed).toMatch(/Partitioned/i); expect(framed).toMatch(/SameSite=None/i); expect(framed).toMatch(/HttpOnly/i)
     const direct = (await enter(secure)).headers.find((c) => c.startsWith('renplay_session='))!
     expect(direct).toMatch(/SameSite=Lax/i); expect(direct).not.toMatch(/Partitioned/i)
+  })
+
+  it('lets a framed session and a plain one live side by side, and the key\'s guest wins whichever comes first', async () => {
+    const app = await start(true, {}, { publicUrl: 'https://demo.example' })
+    const key = newKey()
+    // A visitor opened the demo directly: a plain cookie for a guest of their own.
+    const direct = await enter(app, undefined, '10.0.0.1')
+    const plainGuest = await userId(app, direct.cookie)
+    // The website's frame on the same site sends that cookie too, and brings the key of another guest.
+    const frame = await enter(app, key, '10.0.0.1', direct.cookie)
+    expect(frame.cookie).toMatch(/^renplay_session_framed=/)
+    expect(frame.headers.filter((c) => c.startsWith('renplay_session='))).toEqual([])
+    const keyGuest = await userId(app, frame.cookie)
+    expect(keyGuest).not.toBe(plainGuest)
+    // The browser sends both, in either order: the frame is the key's guest, not the one from the direct visit.
+    for (const header of [`${direct.cookie}; ${frame.cookie}`, `${frame.cookie}; ${direct.cookie}`]) expect(await userId(app, header)).toBe(keyGuest)
+    // The direct visit is untouched where the framed cookie does not go.
+    expect(await userId(app, direct.cookie)).toBe(plainGuest)
+    // A frame that comes back with both cookies is already the key's guest and needs no new session.
+    const sessions = () => app.db.raw.prepare('SELECT COUNT(*) n FROM sessions').get()
+    const before = sessions()
+    const again = await enter(app, key, '10.0.0.1', `${direct.cookie}; ${frame.cookie}`)
+    expect(again.headers).toEqual([])
+    expect(sessions()).toEqual(before)
+    // A framed session that is gone leaves the plain one.
+    app.db.raw.prepare('DELETE FROM sessions WHERE user_id = ?').run(keyGuest)
+    app.accounts.invalidate()
+    await request(app.app).get('/api/me').set('Cookie', frame.cookie).expect(401)
+    expect(await userId(app, `${frame.cookie}; ${direct.cookie}`)).toBe(plainGuest)
+  })
+
+  it('signs a guest out of both forms of the cookie', async () => {
+    const app = await start(true, {}, { publicUrl: 'https://demo.example' })
+    const frame = await enter(app, newKey())
+    const res = await request(app.app).post('/api/auth/logout').set(site).set('Cookie', frame.cookie).expect(200)
+    const cleared = ([] as string[]).concat(res.headers['set-cookie'] ?? [])
+    for (const name of ['renplay_session', 'renplay_session_framed']) expect(cleared.find((c) => c.startsWith(`${name}=;`)), name).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i)
+    await request(app.app).get('/api/me').set('Cookie', frame.cookie).expect(401)
   })
 })
 

@@ -119,8 +119,9 @@ http {
       proxy_set_header Host $http_host;
       proxy_set_header X-Forwarded-Proto $scheme;
       proxy_cache auth;
-      # The device level narrows what a request may read, so it is part of the answer too.
-      proxy_cache_key "$cookie_renplay_session|$http_authorization|$http_x_renplay_adult|$resource_uri";
+      # The device level narrows what a request may read, so it is part of the answer too. A demo's frame
+      # has a session cookie of its own: without it in the key, its answer would serve everyone.
+      proxy_cache_key "$cookie_renplay_session|$cookie_renplay_session_framed|$http_authorization|$http_x_renplay_adult|$resource_uri";
       proxy_cache_valid 204 60s;
       proxy_ignore_headers Set-Cookie Cache-Control;
       proxy_hide_header Set-Cookie;
