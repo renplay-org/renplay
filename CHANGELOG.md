@@ -14,6 +14,8 @@ release notes say what).
 
 ### Changed
 
+- The Library's and the Catalog's search, tags and sort are one line, 52 px high at every size, in the website's look. On a computer the search is a field with one line under it, always there, then the tags as words, then the sort. On a phone the search is an icon that opens the field over the line, and while it holds text a word with your search stays in the line and clears it when pressed. The Catalog's line starts with All, Free and Completed, a divider, and then the tags. A line with more words than fit scrolls sideways. While it is stuck under the header the whole line stays, so the tags you chose are always in view.
+- The header is solid once the page has scrolled, on every page, and a search line stuck under it is one solid area with the header and a single thin line under both. Nothing of the page shows through it or in the gap between them. At the top of a page the header looks as it did.
 - The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
 - Buttons have a new look. The one button to press on a screen is cream, the others have a thin outline, corners are squarer, and the glowing gradient buttons are gone. Nothing moved: every control is where it was, at the size it was.
 - Titles are set in a book face, Fraunces (67 KB), and labels, counts, codes, paths, keys and the clock in a small monospace, JetBrains Mono (21 KB), both loaded once. The words under a title that speak to you, such as on the sign-in page and where a list is empty, are in the book face too.
@@ -29,6 +31,7 @@ release notes say what).
 
 ### Fixed
 
+- A controller moves along a row first: pressing right or left on the search line goes to the next word beside it and not down to a tile that happens to be nearer.
 - A tile you move to with the keyboard or a controller is sharp again, with a crisp white ring. Lifting it used to draw its picture and ring slightly soft. A grid of tiles is also lighter to draw on a computer without a graphics chip.
 - On a phone held upright, the "Turn your phone sideways" line goes the moment you open the game's menu, so it no longer lies over a row.
 

@@ -1,5 +1,6 @@
 // The one search of the Library and the Catalog, in a browser, against the built library and a made-up API:
-//   - one search per list, in the page's toolbar, as high as the control beside it, its shortcut shown on a desktop only
+//   - one search per list, in the page's toolbar line: an underlined field at least as high as the control beside it on a computer,
+//     an icon that opens the field on a phone, its shortcut shown on a desktop only
 //   - it filters as you type, the clear button and Enter work as they should (the address's timing is in specs/search.spec.mjs)
 //   - what a search finds and in what order: typos, accents, words in any order, developer and tag, the best match first
 import { test, expect, check, only } from '../fixtures.mjs'
@@ -12,9 +13,11 @@ for (const [name, path, field, noun, , one] of SEARCH_PAGES) {
     const phone = !!testInfo.project.use.hasTouch
     await ready(page, path)
     const found = await page.evaluate((field) => {
+      // The placeholder is read with the field open: on a phone it is an icon until it has focus.
+      document.querySelector(`input[aria-label="${field}"]`).focus()
       const inputs = [...document.querySelectorAll('input[type=text], input[type=search], input:not([type])')].filter((i) => i.getBoundingClientRect().width > 0)
       const input = document.querySelector(`input[aria-label="${field}"]`)
-      const box = document.querySelector('.search-field')?.getBoundingClientRect()
+      const box = document.querySelector('.search-box')?.getBoundingClientRect()
       const pill = document.querySelector('.toolbar .sort, .toolbar .seg')?.getBoundingClientRect()
       const hint = document.querySelector('.search-field .shortcut')
       // The placeholder, as wide as it is drawn, against the room the field leaves it.
@@ -32,17 +35,19 @@ for (const [name, path, field, noun, , one] of SEARCH_PAGES) {
         header: document.querySelectorAll('header .search, header button[aria-keyshortcuts]').length,
         height: box && Math.round(box.height),
         beside: pill && Math.round(pill.height),
-        radius: getComputedStyle(document.querySelector('.search-field')).borderRadius,
+        // A computer's field is the website's: one hairline under the text, no fill and no corners.
+        underline: getComputedStyle(document.querySelector('.search-box'), '::after').height,
+        fill: getComputedStyle(document.querySelector('.search-box')).backgroundColor,
         hint: !!hint && getComputedStyle(hint).display !== 'none',
         inLandmark: landmarks.some((l) => l.contains(input)),
-        chipsInLandmark: landmarks.some((l) => l.querySelector('.chip-bar')),
+        chipsInLandmark: landmarks.some((l) => l.querySelector('.line-words')),
         gridInLandmark: landmarks.some((l) => l.contains(document.querySelector('.grid[data-row]'))),
         shortcuts: input.getAttribute('aria-keyshortcuts'),
       }
     }, field)
     check(found.inputs === 1 && found.labelled === 1 && found.header === 0, `${name} has one search and the header has none (${found.inputs} fields)`)
     check(found.placeholder === field && found.fits, `${name}'s search says what it searches and the words fit (${found.room} px for "${found.placeholder}")`)
-    check(found.height === found.beside && found.radius === '4px', `${name}'s search is as high as the control beside it and has a control's corners (${found.height} and ${found.beside} px, radius ${found.radius})`)
+    check(found.height >= found.beside && found.height <= 52 && found.fill === 'rgba(0, 0, 0, 0)' && (phone || found.underline === '1px' || found.underline === '2px'), `${name}'s search is as high as the control beside it and fits the 52 px line, with no box${phone ? '' : ', one line under it'} (${found.height} and ${found.beside} px, ${found.underline} line)`)
     check(found.hint === !phone, `${name}'s shortcut hint is ${phone ? 'not shown on a phone' : 'shown on a desktop'}`)
     check(found.inLandmark && found.chipsInLandmark && !found.gridInLandmark, `${name}'s field and tag chips are in a search landmark and the results are not`)
     check(/\//.test(found.shortcuts), `${name}'s field names / as a shortcut (${found.shortcuts})`)

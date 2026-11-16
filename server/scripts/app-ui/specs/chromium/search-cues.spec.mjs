@@ -27,13 +27,14 @@ for (const [name, path, field] of SEARCH_PAGES) {
           slot: count && getComputedStyle(count).display !== 'none' ? Math.round(count.getBoundingClientRect().width * 10) / 10 : null,
           status: status?.textContent,
           hidden: !!status && status.getBoundingClientRect().width <= 1 && status.getBoundingClientRect().height <= 1,
-          clear: [...document.querySelectorAll('.chip-bar .chip')].some((c) => c.textContent.includes('Clear filters')),
+          clear: [...document.querySelectorAll('.line-words .chip')].some((c) => c.textContent.includes('Clear filters')),
           rows: document.querySelectorAll('.count-line').length,
-          row: document.querySelector('.chip-bar')?.getBoundingClientRect().height,
+          // The toolbar is one line of the same height whatever it holds.
+          row: document.querySelector('.toolbar.line')?.getBoundingClientRect().height,
           field: { left: Math.round(box.left * 10) / 10, width: Math.round(box.width * 10) / 10 },
           seg: [...document.querySelectorAll('.toolbar .seg button')].map((b) => Math.round(b.getBoundingClientRect().left * 10) / 10),
-          // From the place the toolbar rests to the chips, on the page: a row for the count would make it longer.
-          chips: Math.round((document.querySelector('.chip-bar')?.getBoundingClientRect().top - document.querySelector('.toolbar-top').getBoundingClientRect().top) * 10) / 10,
+          // From the place the toolbar rests to the results, on the page: a row for the count would make it longer.
+          chips: Math.round((document.querySelector('.results')?.getBoundingClientRect().top - document.querySelector('.toolbar-top').getBoundingClientRect().top) * 10) / 10,
         }
       })
     /** Reads until the page shows what it should, then once more: a state that is there and stays. */
@@ -70,10 +71,12 @@ for (const [name, path, field] of SEARCH_PAGES) {
     const paused = await read()
     // Clear filters is the first chip of the row once a tag is chosen, and the row keeps its height. It takes the tags away
     // and leaves the search as it is.
+    // On a phone the open field covers the line: the tag is chosen once it has closed, leaving the search as a word.
+    if (phone) await page.evaluate(() => document.activeElement?.blur())
     await page.getByRole('button', { name: /^(Romance|Fantasy)/ }).first().click()
     await expect(page.getByRole('button', { name: 'Clear filters' }), 'Clear filters appears once a tag is chosen').toBeVisible()
     const tagged = await read()
-    check(tagged.clear && tagged.row === paused.row && (await page.locator('.chip-bar .chip').first().textContent()).includes('Clear filters'), `${name} offers Clear filters first in the chip row once a tag is chosen, and the row keeps its height (${paused.row} then ${tagged.row} px)`)
+    check(tagged.clear && tagged.row === paused.row && (await page.locator('.line-words .chip').first().textContent()).includes('Clear filters'), `${name} offers Clear filters first among the line's words once a tag is chosen, and the line keeps its height (${paused.row} then ${tagged.row} px)`)
     await page.getByRole('button', { name: 'Clear filters' }).click()
     await expect(page.getByRole('button', { name: 'Clear filters' }), 'and takes it away').toHaveCount(0)
     await expect.poll(() => new URL(page.url()).searchParams.has('tag') || new URL(page.url()).searchParams.has('with'), { message: 'and the tags go from the address' }).toBe(false)
@@ -85,6 +88,7 @@ for (const [name, path, field] of SEARCH_PAGES) {
     const buttons = () => page.evaluate(() => [...document.querySelectorAll('.empty-filter .btn')].map((b) => b.textContent.trim()))
     const alone = library ? 'Clear the search,Search the catalog' : 'Clear the search'
     await until(async () => (await buttons()).join() === alone, `${name}'s empty result from the search alone offers Clear the search`)
+    if (phone) await page.evaluate(() => document.activeElement?.blur())
     await page.getByRole('button', { name: /^(Romance|Fantasy)/ }).first().click()
     await page.locator('.empty-filter').getByRole('button', { name: 'Clear filters' }).click()
     await expect(fieldOf(page, field), "Clear filters in the empty result leaves the search").toHaveValue('zzzzzz')
@@ -100,6 +104,8 @@ for (const [name, path, field] of SEARCH_PAGES) {
 
 /** Chooses a tag by its chip, or in All tags when the row is shorter (Clear filters takes the place of two chips). */
 async function choose(page, tag) {
+  // A phone's open field covers the line: the field closes first.
+  await page.evaluate(() => document.activeElement?.blur?.())
   // Choosing moves the page and the row: look once they have settled.
   await quiet(page)
   const chip = page.getByRole('button', { name: new RegExp(`^${tag}`) }).first()
@@ -117,7 +123,7 @@ async function choose(page, tag) {
 for (const [name, path, field] of SEARCH_PAGES) {
   test(`${name}: the tag chips, their counts and order, and All tags`, async ({ page }, testInfo) => {
     const touch = !!testInfo.project.use.hasTouch
-    const chips = () => page.evaluate(() => [...document.querySelectorAll('.chip-bar .chips.wrap .chip')].filter((c) => !c.textContent.includes('Clear filters')).map((c) => ({ label: c.querySelector('.u').childNodes[0].textContent.trim(), n: Number(c.querySelector('.n')?.textContent), dim: c.classList.contains('dim'), on: c.getAttribute('aria-pressed') === 'true', width: c.getBoundingClientRect().width })))
+    const chips = () => page.evaluate(() => [...document.querySelectorAll('.line-words .chip')].filter((c) => !c.textContent.includes('Clear filters') && !c.classList.contains('all')).map((c) => ({ label: c.querySelector('.u').childNodes[0].textContent.trim(), n: Number(c.querySelector('.n')?.textContent), dim: c.classList.contains('dim'), on: c.getAttribute('aria-pressed') === 'true', width: c.getBoundingClientRect().width })))
     const order = (list) => list.map((c) => c.label).join(', ')
     await ready(page, path)
     const before = await chips()
@@ -140,7 +146,7 @@ for (const [name, path, field] of SEARCH_PAGES) {
     const selected = picked.filter((c) => c.on)
     check(selected.length >= 1 && picked.slice(0, selected.length).every((c) => c.on), `${name}'s selected chips come first (${order(picked.slice(0, 3))})`)
     // A row that scrolls sideways on a phone goes back to its start, where the chosen chips now are.
-    check(await page.evaluate(() => document.querySelector('.chip-bar .chips.wrap').scrollLeft === 0), `${name}'s chip row shows its start, with the chosen chips, after a tag is chosen`)
+    check(await page.evaluate(() => document.querySelector('.line-words').scrollLeft === 0), `${name}'s line of words shows its start, with the chosen chips, after a tag is chosen`)
     if (name === 'the Library') {
       const tagsInAddress = new URL(page.url()).searchParams.get('tag')?.split(',') ?? []
       const titles = await titlesOf(page)
@@ -149,11 +155,12 @@ for (const [name, path, field] of SEARCH_PAGES) {
     await page.getByRole('button', { name: 'Clear filters' }).click()
     await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0)
     await quiet(page)
-    // All tags, at the right end of the row on both pages, opens every tag with its count. The Library only includes.
+    // All tags, at the right end of the line's words on both pages, opens every tag with its count. The Library only includes.
     const allTags = page.getByRole('button', { name: 'All tags' })
-    const rowBox = await page.locator('.chip-bar').boundingBox()
+    const rowBox = await page.locator('.line-words').boundingBox()
+    const inset = await page.locator('.line-words').evaluate((el) => Number.parseFloat(getComputedStyle(el).paddingRight))
     const buttonBox = await allTags.boundingBox()
-    check(buttonBox.x + buttonBox.width >= rowBox.x + rowBox.width - 2, `${name}'s All tags is at the right end of the chip row`)
+    check(buttonBox.x + buttonBox.width >= rowBox.x + rowBox.width - inset - 2 && (await page.locator('.line-words > :last-child').textContent()) === 'All tags', `${name}'s All tags is the last of the line's words, at its right end`)
     await (touch ? allTags.tap() : allTags.click())
     const sheet = page.getByRole('dialog', { name: 'Tags' })
     await sheet.waitFor()

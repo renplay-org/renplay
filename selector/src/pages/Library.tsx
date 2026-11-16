@@ -175,6 +175,8 @@ export default function Library() {
     .filter((job) => job.type === 'import' && ['failed', 'interrupted'].includes(job.status) && jobs?.jobs.find((other) => other.type === 'import' && other.game === job.game)?.id === job.id && !all.find((game) => game.id === job.game)?.job)
     .filter((job, index, rows) => rows.findIndex((other) => other.game === job.game) === index)
   const search = useMemo(() => createSearch(all, (g) => gameTags(g, vocabulary).map((t) => t.label)), [all, vocabulary])
+  // A library with no tags has no words for the line: its search stays open.
+  const tagged = useMemo(() => all.some((g) => gameTags(g, vocabulary).length > 0), [all, vocabulary])
   const hits = useMemo(() => search.find(query), [search, query])
   const shown = all
     .filter(
@@ -307,7 +309,24 @@ export default function Library() {
           <Link to="/catalog">Find more in the catalog</Link>
         </div>
         <Toolbar label="Search your games">
-          <SearchField label="Search your games" value={typed} onChange={typeSearch} count={{ shown: shown.length, total: all.length, narrowed: active }} />
+          <SearchField label="Search your games" value={typed} onChange={typeSearch} count={{ shown: shown.length, total: all.length, narrowed: active }} always={!tagged} />
+          <CatalogTags
+            line
+            games={shown}
+            all={all}
+            vocabulary={vocabulary}
+            prefs={{ include: tags, exclude: [] }}
+            mode="include"
+            onClear={filtered ? clearFilters : undefined}
+            onChange={(next) => change(() => update('tag', next.include.join(',') || null))}
+            lead={
+              filter in FILTERS && (
+                <Chip on onClick={() => change(() => update('filter', null))} aria-label={`${FILTERS[filter]}, show all games`} after={<X aria-hidden="true" />}>
+                  {FILTERS[filter]}
+                </Chip>
+              )
+            }
+          />
           <SortMenu
             value={by}
             searching={searching}
@@ -317,16 +336,6 @@ export default function Library() {
             }}
           />
         </Toolbar>
-        {filter in FILTERS && (
-          <div className="chip-bar" style={{ marginBottom: 10 }}>
-            <Chip on onClick={() => change(() => update('filter', null))} aria-label={`${FILTERS[filter]}, show all games`} after={<X aria-hidden="true" />}>
-              {FILTERS[filter]}
-            </Chip>
-          </div>
-        )}
-        <div role="search" aria-label="Filter your games by tag">
-          <CatalogTags games={shown} all={all} vocabulary={vocabulary} prefs={{ include: tags, exclude: [] }} mode="include" onClear={filtered ? clearFilters : undefined} onChange={(next) => change(() => update('tag', next.include.join(',') || null))} />
-        </div>
         <div className={`results ${active ? 'held' : ''}`.trim()}>
           <div className="grid" data-row ref={rows.grid}>
             {shown.slice(0, rows.shown).map((g) => (

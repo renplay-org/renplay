@@ -169,22 +169,30 @@ export default function Catalog() {
           </>
         )
       })()}
-      <Toolbar label="Search the catalog" wrap style={{ marginTop: 14 }}>
+      <Toolbar label="Search the catalog" style={{ marginTop: 14 }}>
         <SearchField label="Search the catalog" value={typed} onChange={setTyped} count={{ shown: filtered.length, total: all.length, narrowed: active }} />
-        <Seg
-          small
-          value={filter}
-          onChange={(value) => { parkResults(); setAddress({ filter: value === 'all' ? null : value }) }}
-          options={[
-            { value: 'all', label: <span className="tnum">All {tagged.length}</span>, className: 'all' },
-            { value: 'free', label: 'Free' },
-            { value: 'completed', label: 'Completed' },
-          ]}
+        <CatalogTags
+          line
+          games={filtered}
+          all={all}
+          vocabulary={vocabulary}
+          prefs={tagPrefs}
+          onChange={setTagPrefs}
+          onClear={filters ? clearFilters : undefined}
+          divide
+          lead={
+            <Seg
+              value={filter}
+              onChange={(value) => { parkResults(); setAddress({ filter: value === 'all' ? null : value }) }}
+              options={[
+                { value: 'all', label: <span className="tnum">All {tagged.length}</span>, className: 'all' },
+                { value: 'free', label: 'Free' },
+                { value: 'completed', label: 'Completed' },
+              ]}
+            />
+          }
         />
       </Toolbar>
-      <div role="search" aria-label="Filter the catalog by tag">
-        <CatalogTags games={filtered} all={all} vocabulary={vocabulary} prefs={tagPrefs} onChange={setTagPrefs} onClear={filters ? clearFilters : undefined} />
-      </div>
       <div className={`results ${active ? 'held' : ''}`.trim()}>
         <div className="grid" data-row ref={rows.grid}>
           {filtered.slice(0, rows.shown).map((r) => (

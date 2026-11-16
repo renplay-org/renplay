@@ -132,19 +132,40 @@ test.describe('reaching every game', () => {
     }
   })
 
-  test('up from the first row reaches the search, the tags and the Up next buttons, and right moves along them', async ({ page }, testInfo) => {
+  test('up from the first row reaches the line (the search, the tags, the sort) and the Up next buttons, and right moves along them', async ({ page }, testInfo) => {
     desktopOnly(testInfo)
     await library(page)
     const stops = []
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       await tap(page, 'up', 60)
       stops.push((await place(page)).id)
     }
-    expect(stops, 'the tags, the search field and the first Up next button, in that order').toEqual(['Romance 130, any', 'Search your games', 'Play'])
+    expect(stops, 'the search field, then the first Up next button').toEqual(['Search your games', 'Play'])
     await tap(page, 'right', 60)
     expect((await place(page)).id, 'right goes along the buttons, not on to the next slide').toBe('Game page')
     await tap(page, 'a', 60)
     await expect(page, 'A opens the game page').toHaveURL(/\/game\/game-000$/)
+  })
+
+  test('the line is one row: right walks the search, each tag and the sort, and down goes back into the games', async ({ page }, testInfo) => {
+    desktopOnly(testInfo)
+    await library(page)
+    await tap(page, 'up', 60)
+    const walked = [(await place(page)).id]
+    for (let i = 0; i < 3; i++) {
+      await tap(page, 'right', 60)
+      walked.push((await place(page)).id)
+    }
+    expect(walked, 'the search field, the tag, All tags and the sort, in the order drawn').toEqual(['Search your games', 'Romance 130, any', 'All tags', 'Recent, change the order'])
+    await tap(page, 'a', 60)
+    await expect(page.locator('.menu-pop'), 'A presses the sort and opens its menu').toBeVisible()
+    await tap(page, 'b', 60)
+    await tap(page, 'left', 60)
+    await tap(page, 'a', 60)
+    await expect(page.getByRole('dialog', { name: 'Tags' }), 'A presses a word: All tags opens its list').toBeVisible()
+    await tap(page, 'b', 60)
+    await tap(page, 'down', 60)
+    expect(await page.evaluate(() => !!document.activeElement.closest('.grid[data-row]')), 'down enters the games').toBe(true)
   })
 })
 
