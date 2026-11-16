@@ -5,7 +5,7 @@
 //   - a tile in view before and after a key was replaced by another element, was dimmer, ran an animation or a transition, or
 //     showed its placeholder again in between, or
 //   - a tile that comes in with a picture the page has shown before was not showing it at once (no placeholder, no fade).
-import { test, expect, check } from '../fixtures.mjs'
+import { test, expect, check, only } from '../fixtures.mjs'
 import { fieldOf, parked, ready, SEARCH_PAGES } from '../helpers.mjs'
 
 test.use({ mockOptions: { delay: 60, thumbhash: true } })
@@ -118,7 +118,8 @@ async function finish(page) {
 }
 
 for (const [name, path, field, word] of SEARCH_PAGES) {
-  test(`${name}: no tile that stays in view blinks while typing and deleting, and a tile that comes back shows its picture at once`, async ({ page }) => {
+  test(`${name}: no tile that stays in view blinks while typing and deleting, and a tile that comes back shows its picture at once`, async ({ page }, testInfo) => {
+    only(testInfo, 'chromium-desktop', "Tiles are the page's elements and pictures: a phone's three columns replace the same ones")
     await ready(page, path)
     await fieldOf(page, field).click()
     // The pointer rests on the list, as a person's does while they type: a tile that lands under it must not lift.

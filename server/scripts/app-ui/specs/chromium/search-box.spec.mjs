@@ -51,8 +51,10 @@ for (const [name, path, field, noun, , one] of SEARCH_PAGES) {
     const before = (await gridOf(page)).tiles
     await fieldOf(page, field).click()
     await page.keyboard.type(one)
-    await expect.poll(async () => (await gridOf(page)).tiles, { message: `${name} filters as you type (${before} tiles)` }).toBeLessThan(before)
-    check((await gridOf(page)).tiles > 0, `${name} filters as you type, and finds the game`)
+    // The page has drawn two frames since the last key: the grid is already filtered, with no wait for the address.
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+    const after = (await gridOf(page)).tiles
+    check(after > 0 && after < before, `${name} filters as you type, before the address has caught up (${before} tiles, then ${after})`)
     await page.click('.search-field .clear')
     // The grid may have grown a batch: the toolbar is at the top then, and the end of the grid is near.
     await expect.poll(async () => (await gridOf(page)).tiles, { message: `the clear button brings every game back (${before} tiles)` }).toBeGreaterThanOrEqual(before)

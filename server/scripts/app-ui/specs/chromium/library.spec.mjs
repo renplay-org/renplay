@@ -112,6 +112,8 @@ test('layout shift stays under 0.02 on the Library, the Catalog and a game page'
   for (const [name, path, ready] of [['the Library', '/', '.grid[data-row] .card'], ['the Catalog', '/catalog', '.grid[data-row] .card'], ['a game page', '/game/game-000', '.stage']]) {
     await page.goto(path)
     await page.waitForSelector(ready)
+    // Whatever the page is still to ask for (its pictures, a late answer) has come, and it has faded in.
+    await page.waitForLoadState('networkidle')
     await expect.poll(() => page.evaluate(() => document.getAnimations().every((a) => a.playState === 'finished')), { message: `${name} has faded in` }).toBe(true)
     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
     const loaded = await page.evaluate(() => window.__cls)
@@ -122,7 +124,7 @@ test('layout shift stays under 0.02 on the Library, the Catalog and a game page'
         return scrollY + innerHeight < document.documentElement.scrollHeight - 2
       })
       // The grid grows ahead of a person who scrolls: wait for it to have grown, as a quick machine does within the 80 ms.
-      await settledGrid(page).catch(() => {})
+      await settledGrid(page)
       if (!more) break
     }
     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))

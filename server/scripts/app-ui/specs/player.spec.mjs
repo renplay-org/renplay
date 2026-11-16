@@ -83,6 +83,7 @@ const topCentreWords = (page) =>
   })
 
 test('in full screen nothing is at the top centre, and the menu says Hold Esc to leave', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'What the menu says and where: landscape is the same engine and input as portrait')
   await play(page)
   await page.locator('.rp-pill').first().click()
   const menu = page.getByRole('dialog', { name: /the player menu/ })
@@ -352,6 +353,7 @@ test('on a phone held upright the guide is a sheet that takes the menu\'s place,
 })
 
 test('the home screen tip goes the moment the menu opens, so it never lies over a row', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Whether the tip is there: landscape is the same engine and input as portrait')
   await play(page, { iphone: true })
   const tip = page.locator('.toast', { hasText: 'add Renplay to your home screen' })
   // Upright, the turn line goes first, and the tip waits for it to go.

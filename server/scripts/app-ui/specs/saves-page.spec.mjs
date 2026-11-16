@@ -40,6 +40,7 @@ const sharing = (items) =>
   })
 
 test('the game page\'s Saves tab, its action sheet and its history sheet have no cut label, one label to a line, and the history is titled with the save\'s name', async ({ page }, testInfo) => {
+  where(testInfo, ['chromium-desktop', 'webkit-portrait'], 'Every line is measured against its own box and the screen: landscape is wider than portrait and shows no label cut that portrait does not')
   await play(page, {
     path: '/game/game-000#saves',
     slots: [{ ...slot(1, 5), title: 'Meeting Diya', note: 'Before the first lunch scene', pinnedAt: '2026-11-10T10:00:00Z' }, slot(2, 30), slot(3, 60)],
