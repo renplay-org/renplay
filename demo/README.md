@@ -95,7 +95,7 @@ frame are both controlled by it, so the game's save requests reach it too, and t
 1. Builds the library and the worker. Drops the PDF reader's files, which the demo's games do not use.
 2. `capture.mjs` signs in as the guest on a running demo server (`--base`) and reads its answers, the page of each game
    and the runtime. It reads only. Each catalog entry keeps only its grid picture, the one the Catalog page shows.
-   The pictures the answers name are the only art copied (`api/art/`).
+   The pictures the answers and the game pages name, in any format, are the only art copied (`api/art/`).
 3. `snapshot.mjs` writes the files, and takes each game's build files from `--seed`, the demo image's seed stage:
    `docker buildx build --build-arg IMAGE=<the image the demo was built from> --target games --output type=local,dest=<dir> demo`
    (see `Dockerfile`). Every seed run installs with a new build name, so the export must be the build the demo image holds: the
@@ -106,7 +106,9 @@ frame are both controlled by it, so the game's save requests reach it too, and t
    robots meta with noindex, and writes a `robots.txt` that lets crawlers in. They are let in on purpose: a page that
    robots.txt blocks is never fetched, so its noindex is never read, and the address can still be listed. The server
    demo's image (`Dockerfile`) does the same.
-5. Checks the output against Cloudflare's static asset limits (20,000 files, 25 MiB a file) and fails if it does not fit.
+5. `art.mjs` reads the finished output and fails when its snapshot or a game's page names an `/api/art` file the output
+   lacks. The stand-in leaves pictures to the host, so such a file would be a 404 for the visitor.
+6. Checks the output against Cloudflare's static asset limits (20,000 files, 25 MiB a file) and fails if it does not fit.
 
 `--embedder` is the one origin the embed bridge talks to and ignores messages from anything else. It is set at build
 time, `https://renplay.org` by default.
@@ -130,6 +132,8 @@ node server/scripts/app-ui/static-demo-server.mjs /tmp/static-demo 5191    # htt
   (`demo-static-routes.ts`). A new server route fails it until it is classified, and a route that is answered needs a case
   in the contract test.
 - `demo-static-headers.test.ts` checks the headers.
+- `demo-static-art.test.ts` writes a snapshot from a demo server and checks that every picture its answers and pages name is
+  in the output, that the catalog's other formats are dropped, and that the build's check fails on a missing one.
 - `server/scripts/app-ui/specs/static-demo.spec.mjs` serves the output on `localhost` and, in a test embedder page with
   the laptop and phone frames, checks that a save made in one frame appears in the other, survives a reload and is not
   in a second browser; that every request goes to the static server or the engines host and none fail; and that only

@@ -77,7 +77,7 @@ export async function staticDemo({ dir } = {}) {
   const origin = `http://localhost:${server.port}`
   const page = await embedder(embedderPort, origin)
   return {
-    origin, port: server.port, embedderOrigin, requests: server.requests, delays: server.delays, dir: out,
+    origin, port: server.port, embedderOrigin, requests: server.requests, answers: server.answers, delays: server.delays, dir: out,
     close: async () => { await Promise.all([server.close(), page.close()]); rmSync(root, { recursive: true, force: true }) },
   }
 }

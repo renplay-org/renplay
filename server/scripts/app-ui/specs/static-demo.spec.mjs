@@ -219,10 +219,15 @@ test('a returning visitor whose browser still has the server demo\'s worker is a
     writeFileSync(file, standIn)
     demo.delays.set('/sw.js', 2500)
     demo.requests.length = 0
+    demo.answers.length = 0
     await page.goto(demo.origin)
     await expect(page.locator('.card[data-id="the-question"]')).toBeVisible({ timeout: 30000 })
-    // Every answer came from the stand-in: the old worker would have asked the host, which has no such file.
-    expect(demo.requests.filter((path) => path.startsWith('/api/'))).toEqual([])
+    // Every answer came from the stand-in: the old worker would have asked the host, which has no such file. The pictures
+    // are the exception: the stand-in leaves them to the host, which has each as a file.
+    const picture = (path) => /^\/api\/(art|avatars)\//.test(path)
+    expect(demo.requests.filter((path) => path.startsWith('/api/') && !picture(path))).toEqual([])
+    await expect.poll(() => demo.answers.filter((a) => picture(a.path)).length).toBe(demo.requests.filter(picture).length)
+    expect(demo.answers.filter((a) => picture(a.path) && a.status !== 200)).toEqual([])
     expect(errors).toEqual([])
   } finally {
     demo.delays.clear()
