@@ -58,7 +58,8 @@ test('the scene says its three lines, asks, and the screen that is picked wakes 
   for (const line of SCENE.slice(1)) {
     await page.keyboard.press('Space')
     // A press while a line is still being typed finishes it, so a line is said once it shows whole.
-    await expect(page.locator('#typed .t')).toContainText(line)
+    await page.keyboard.press('Space')
+    await expect(page.locator('#typed .t')).toHaveText(line)
   }
   await expect(scene).toHaveAttribute('data-scene', 'choice')
   await expect(page.locator('#choices a')).toHaveCount(3)
@@ -68,7 +69,9 @@ test('the scene says its three lines, asks, and the screen that is picked wakes 
   await expect.poll(() => wakeOf(page, 'tablet'), { message: 'The screen picked is lit' }).toBeGreaterThan(0.95)
   for (const name of ['laptop', 'phone']) expect(await wakeOf(page, name), `The ${name} stays dark`).toBeLessThan(0.05)
   await expect(page.locator('#typed .t')).toContainText(AFTER)
+  await page.keyboard.press('Space')
   await expect(scene).not.toHaveAttribute('data-typing', '1')
+  await expect(page.locator('#typed .t')).toContainText('every save kept on your own server')
   expect(await page.evaluate(() => sessionStorage.getItem('renplay-device'))).toBe('tablet')
   // The hand no longer wakes the others: the choice is made.
   const at = await glass(page)

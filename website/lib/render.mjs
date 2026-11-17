@@ -6,6 +6,8 @@ import { esc } from '../js/catalog-view.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 export const read = (path) => readFileSync(join(root, path), 'utf8')
+// The colour of the browser's own bar is the room's: the ink of design/tokens.css.
+const INK = /--ink:\s*(#[0-9a-f]{6})/i.exec(readFileSync(join(root, '../design/tokens.css'), 'utf8'))[1]
 
 const PARTIAL = '\\{\\{(nav|footer|backdrop|footlinks|guides)\\}\\}'
 
@@ -52,7 +54,7 @@ export function head({ title, description, canonical, image, imageAlt, imageSize
     `<meta name="twitter:description" content="${esc(description)}">`,
     image && `<meta name="twitter:image" content="${esc(image)}">`,
     image && `<meta name="twitter:image:alt" content="${esc(imageAlt)}">`,
-    '<meta name="theme-color" content="#0a0a0f">',
+    `<meta name="theme-color" content="${INK}">`,
     '<link rel="icon" href="/logo.svg" type="image/svg+xml">',
     '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">',
     '<link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48">',
