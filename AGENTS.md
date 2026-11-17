@@ -130,7 +130,7 @@ docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renpl
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
 website/           renplay.org and adult.renplay.org: plain HTML, CSS and a little script, built by `build.mjs` (`sh build.sh`) into
                      dist/ and dist-adult/. The home page (index.html) is the painted room: the room's paintings and lit
-                     screens in img/, the light and the screens in js/home.js and js/shared.js, the scene, the demo in two
+                     screens in img/, the light and the screens in js/home.js, demo.js, shelf.js, credits.js and shared.js, the scene, the demo in two
                      frames (https://demo.renplay.org, the static demo, no key), the shelf, install, answers and credits.
                      The safe-for-work catalog index gives each game a page (pages/game.html), the shelf and /catalog its
                      first screen. The adult catalog is pages/catalog.html built in adult mode (a build-time setting, never

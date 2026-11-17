@@ -75,7 +75,7 @@ const SHARED_JS = ['shared.js', 'room-data.js', 'room.js']
 rmSync(OUT, { recursive: true, force: true })
 rmSync(ADULT_OUT, { recursive: true, force: true })
 for (const f of [...COMMON, 'home.css', 'logo.png', 'img', '_redirects', '_headers']) cpSync(join(root, f), join(OUT, f), { recursive: true })
-for (const f of [...SHARED_JS, 'home.js', 'catalog.js', 'catalog-view.js', 'thumbhash.js']) cpSync(join(root, 'js', f), join(OUT, 'js', f))
+for (const f of [...SHARED_JS, 'home.js', 'demo.js', 'shelf.js', 'credits.js', 'catalog.js', 'catalog-view.js', 'thumbhash.js']) cpSync(join(root, 'js', f), join(OUT, 'js', f))
 cpSync(join(root, '../LICENSE'), join(OUT, 'LICENSE'))
 copyDesign(OUT)
 

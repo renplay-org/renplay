@@ -176,6 +176,44 @@ test('with the keyboard, a link in the credits opens the roll', async ({ page },
   await expect.poll(() => page.evaluate(() => { const r = document.getElementById('roll').getBoundingClientRect(), w = document.getElementById('roll-window').getBoundingClientRect(); return Math.abs(r.top - w.top) < 8 })).toBe(true)
 })
 
+test('the shelf moves with its arrows and is lit by the game in its middle', async ({ page }, testInfo) => {
+  only(testInfo, 'chromium-desktop', 'The arrows are for a mouse and a keyboard, and a finger moves the shelf itself')
+  await home(page)
+  const shelf = page.locator('#shelf')
+  await shelf.scrollIntoViewIfNeeded()
+  const before = await shelf.evaluate((el) => el.scrollLeft)
+  await page.locator('#shelf-next').click()
+  await expect.poll(() => shelf.evaluate((el) => el.scrollLeft), { message: 'The shelf has moved on' }).toBeGreaterThan(before + 100)
+  const lit = () => page.evaluate(() => {
+    const wrap = document.querySelector('.shelf-wrap'), list = document.getElementById('shelf'), box = list.getBoundingClientRect()
+    const middle = [...list.children].sort((a, b) => Math.abs(a.getBoundingClientRect().left + a.offsetWidth / 2 - (box.left + box.width / 2)) - Math.abs(b.getBoundingClientRect().left + b.offsetWidth / 2 - (box.left + box.width / 2)))[0]
+    return wrap.style.getPropertyValue('--tint') === middle.dataset.tint
+  })
+  await expect.poll(lit, { message: 'The light behind the shelf is the colour of the game in its middle' }).toBe(true)
+  await page.locator('#shelf-prev').click()
+  await expect.poll(() => shelf.evaluate((el) => el.scrollLeft)).toBeLessThan(before + 100)
+  await expect(page.locator('#shelf .card a').first()).toHaveAttribute('href', /^\/catalog\/game-\d+\/$/)
+})
+
+test('every control the keyboard reaches shows where it is', async ({ page }, testInfo) => {
+  only(testInfo, 'chromium-desktop', 'Keyboard focus is the same on every screen')
+  await home(page)
+  const seen = []
+  for (let i = 0; i < 60; i++) {
+    await page.keyboard.press('Tab')
+    const at = await page.evaluate(() => {
+      const el = document.activeElement
+      if (!el || el === document.body || el.closest('iframe')) return null
+      const style = getComputedStyle(el)
+      const shown = (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0) || style.boxShadow !== 'none'
+      return { what: `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${el.className ? `.${String(el.className).split(' ')[0]}` : ''} "${el.textContent.trim().slice(0, 24)}"`, shown, scene: el.id === 'scene' }
+    })
+    if (at && !seen.some((s) => s.what === at.what)) seen.push(at)
+  }
+  expect(seen.length, 'The keyboard reaches the header, the scene, the demo, the shelf, the install section and the answers').toBeGreaterThan(25)
+  expect(seen.filter((s) => !s.shown && !s.scene).map((s) => s.what), 'Each has a ring (the scene takes keys, and is not outlined)').toEqual([])
+})
+
 test('the catalog finds a game by its name, and its card leads to the game\'s page', async ({ page }, testInfo) => {
   only(testInfo, 'chromium-desktop', 'The same on every screen: the page is drawn by the build and read by the browser')
   await home(page, '/catalog/')
