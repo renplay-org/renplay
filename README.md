@@ -4,69 +4,93 @@
 
 <p align="center"><b>Renplay is a self-hosted player for Ren’Py games in the browser, with saves on your own server.</b></p>
 
+<p align="center"><i>Your Ren’Py games, on every screen.</i></p>
+
 <p align="center">
   <a href="https://github.com/renplay-org/renplay/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/renplay-org/renplay?color=e0306f"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-7c5cff"></a>
   <a href="https://renplay.org/support"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/support-Ko--fi-fb7aa8?logo=kofi&logoColor=white"></a>
 </p>
 
-<p align="center"><a href="https://renplay.org/docs">Docs</a> · <a href="https://renplay.org">Website</a> · <a href="https://renplay.org/catalog">Catalog</a> · <a href="https://renplay.org/demo">Try the demo</a> · <a href="https://renplay.org/releases">Release notes</a> · <a href="https://renplay.org/support">Support</a></p>
+<p align="center"><a href="https://demo.renplay.org">Try the demo</a> · <a href="https://renplay.org">Website</a> · <a href="https://docs.renplay.org">Docs</a> · <a href="https://renplay.org/catalog">Catalog</a> · <a href="https://renplay.org/releases">Releases</a> · <a href="https://renplay.org/support">Support</a></p>
 
-<p align="center"><img src="docs/screenshots/desktop-library.webp" alt="The Renplay library: the game in play on the stage, Up next below, adult games blurred" width="880"></p>
+<p align="center"><img src="docs/screenshots/desktop-game.webp" alt="A game page in Renplay on a desktop, with its art, details and a Play button" width="880"></p>
 
-Renplay is a self-hosted library for the visual novels you download: [Ren’Py](https://www.renpy.org/)
-games first, and HTML games such as Twine stories too. Add a game’s normal PC download, press
-Install, and play it in any browser: on your computer, your tablet or your phone. Every save lands
-on your server the moment you make it, so you can stop on the laptop and continue on the phone.
-Other engines are added only when their normal download plays as easily. The
-[docs](https://docs.renplay.org/engines/) say what works.
+Many visual novels come as a PC download. Renplay turns that download into a game you can open in any
+browser: on your computer, your tablet or your phone. Add a game’s normal PC download, press
+Install and play. Every save goes to your own server the moment the game makes it, so you can stop on
+the laptop and carry on from the phone.
+
+Renplay needs a server of your own, such as a home server or a NAS, and runs as one container. It plays
+[Ren’Py](https://www.renpy.org/) games first. HTML games, such as Twine stories, play too, with fewer
+features. The [docs](https://docs.renplay.org/engines/) say what works.
 
 <p align="center">
-  <img src="docs/screenshots/phone-library.webp" alt="The library on a phone" width="260">
-  &nbsp;
   <img src="docs/screenshots/phone-game.webp" alt="A game page on a phone" width="260">
+  &nbsp;
+  <img src="docs/screenshots/phone-catalog.webp" alt="The catalog on a phone" width="260">
 </p>
 
-## What you get
+## What it does
 
-- **Play anywhere.** Smooth, full-speed playback in the browser. On phones the game fills the
-  screen around the camera cutout, and on iPhone it runs full screen from the home screen.
-- **Offline, and with a controller.** Keep a game in a browser and play it with no network: saves
-  made offline are sent when you are back. A controller moves around the library and plays the
-  game through Ren’Py’s own buttons.
-- **Separate accounts.** Local sign-in, OpenID Connect and LDAP keep each person's saves and progress
-  separate. Admins manage the shared library, and players play. On a shared tablet **Who is
-  playing?** switches person with a PIN. Sign-in can be switched off for a trusted home network.
-- **Saves on your server.** Saves, autosaves and progress sync as you play, with earlier versions
-  kept. Sequels find the previous season’s saves, just like on desktop. Import saves from the
-  desktop version, export them back, or copy them between games.
-- **One-click installs.** Drop in the PC zip (or 7z, rar). Renplay unpacks it, shrinks the images
-  and prepares it for the web. No Ren’Py SDK, and the game’s code never runs on your server.
-- **A curated catalog.** Known games get their proper title, art, links and tested settings from
-  the [catalog](https://renplay.org/catalog), and Renplay tells you when a newer tested
-  version exists.
-- **Resume in one tap.** Up next opens your latest save straight away, with play time and your
-  last save on the library home. Mark a story Finished on its game page to leave it out of Up next.
-  Its saves stay safe.
-- **Adult games, your way.** Three levels, Off, Blurred and Shown. Off leaves adult games out
-  completely, Blurred shows them without their pictures, and the server never sends a picture a
-  person is not meant to see. Each person chooses on their account page, within the admin's limit,
-  and **Hide adult games here** covers a shared screen.
-- **Find your next game.** Keep favourites at the top of your library, sort by last played,
-  title or recently added, and search titles, developers and tags. Recent combines last played and
-  recently added. Library filters stay in the
-  address so Back brings them back. The catalog has search and tag filters too. Game pages show
-  summaries, development state and optional content tags.
-- **Mods.** Install a mod zip, browse a game’s files, or edit scripts in the browser. Your changes
-  stay separate from the game and survive updates.
-- **Your own recipes and dashboards.** A folder of recipe files fixes or adds games without waiting
-  for the catalog. Prometheus metrics and a Homepage widget show what your server is doing.
-- **Fast to start.** Games and the engine are cached in your browser, assets stream as the game
-  needs them, and compiled scripts are kept, so a big game starts in seconds.
+- **Plays what you already own.** Games made with Ren’Py 8, and most made with Ren’Py 7, which run on
+  the same engine. HTML games play too. Known games come from [a tested catalog](#the-catalog) with
+  their art and settings. There is no Ren’Py SDK, and a game’s code never runs on your server.
+- **Saves with a history.** Saves, autosaves and unlocked galleries sync the moment the game writes
+  them. Every overwrite keeps the version before it, and a sequel finds the first season’s saves, as
+  on desktop. Import saves from the desktop version and export them back.
+- **Phones, offline, a controller.** Full screen on iPhone and Android, clear of the notch, with the
+  screen kept awake while you read. Keep a game in your browser and it plays offline, and its saves go
+  up when you are back. A controller moves around the library and plays the game.
+- **Everyone in the house.** The games are shared. Saves, favourites and play time belong to each
+  person. Sign in with a local account, OpenID Connect or LDAP, or switch person on a shared tablet
+  with a PIN.
+- **Adult games, on your terms.** Many visual novels are for adults, and Renplay plays them like any
+  other game. Each person chooses a level within the limit you set: Off leaves adult games out, Blurred
+  shows them without their pictures, and Shown shows everything. At Blurred the server never sends a
+  picture of them.
+- **Mods, dashboards, your own hardware.** Upload a mod or edit scripts in the browser, and the change
+  sits beside the game, so updates never touch it. Prometheus metrics and a Homepage widget show what the
+  server is doing. Renplay sends one small anonymous report a day, which you can turn off
+  ([what is in it](https://docs.renplay.org/telemetry/)).
+
+## Quick to start, light to carry
+
+Three numbers, measured on 17 November 2026 on one MacBook, with Playwright’s Chromium and WebKit.
+The times are the median of five runs, and a phone here means a phone-sized browser window, not a real phone.
+
+| | | How it was measured |
+|---|---|---|
+| **3 s** from Play to the first frame | 3.2 s in a desktop browser and 2.9 s in an iPhone-sized WebKit window | The Question on [demo.renplay.org](https://demo.renplay.org), the first visit, on a fast connection. From pressing Play to the player’s own ready message, the first frame Ren’Py draws |
+| **61 MB** before the first frame | The median for 16 games with a PC download of 1 GB or more (2.0 GB in the middle). The range is 23 to 186 MB, and the rest streams while you play | Computed from the file lists of a test library of tested games: the size of the files the browser needs before the first frame, not a timed run |
+| **2 s** back to a game you played before | About 3 KB moves, because the engine and the game are already in your browser | The Question in a desktop browser, a second visit, from pressing Play to the first frame |
+
+On a slow link (Chromium’s Fast 4G preset, 9 Mbps and 170 ms latency) the first visit takes about 20
+seconds, because about 20 MB comes over the network once, mostly the Ren’Py engine that every game
+of that version shares. The second visit takes 2 to 3.5 seconds.
+
+## The catalog
+
+<p align="center"><a href="https://renplay.org/catalog"><img src="docs/screenshots/desktop-catalog.webp" alt="The Renplay catalog: tested games with their art, tags and search" width="880"></a></p>
+
+Every game in the [catalog](https://renplay.org/catalog) was installed and played in Renplay. It
+says which download to get from the developer, brings the official art, and sets what the game
+needs. The catalog never hosts game files. Renplay checks it every six hours, links your games to
+it and tells you when a newer tested version exists. A game that is not in it still installs and
+plays, and a recipe of your own can give it a title and art.
+
+Missing a game? [Request it](https://renplay.org/catalog/request), or add it yourself in the
+[catalog repository](https://github.com/renplay-org/catalog).
+
+## Try the demo
+
+[demo.renplay.org](https://demo.renplay.org) is a real copy of Renplay that runs in your browser,
+with The Question, Ren’Py’s own sample game, and the whole catalog. Its saves stay in your browser and
+nothing can be installed in it.
 
 ## Install
 
-Renplay is one container. Give it a folder for games and one for data:
+Renplay is one container. Give it a folder for games and one for your saves:
 
 ```sh
 docker run -d --name renplay -p 8080:8080 \
@@ -75,109 +99,66 @@ docker run -d --name renplay -p 8080:8080 \
   ghcr.io/renplay-org/renplay:latest
 ```
 
-Open http://localhost:8080. On a new install, enter the setup code from `docker logs renplay`
-and create the owner account. Copy a game’s PC download into `/path/to/games/_archives/`, or upload
-it under **Add games**, and press **Install**. The first install also downloads the Ren’Py web
-engine (about 16 MB).
+Open http://localhost:8080. On a new install, enter the setup code from `docker logs renplay` and
+create the owner account. Copy a game’s PC download into `/path/to/games/_archives/`, or upload it
+under **Add games**, and press **Install**. The first install also downloads the Ren’Py web engine
+(about 16 MB). Then press **Play**.
 
-The same image is on Docker Hub as `renplay/renplay`. Pin a release's version
-(`ghcr.io/renplay-org/renplay:X.Y.Z`, the newest is on the releases page) for production. The [releases](https://renplay.org/releases)
-list what changed. Use HTTPS outside a trusted local network. See [Accounts](#accounts) before
-sharing an upgraded install.
+- **Pin a version for production.** Use `ghcr.io/renplay-org/renplay:X.Y.Z` with the newest version
+  from the [releases](https://renplay.org/releases) instead of `latest`, so an upgrade happens when
+  you decide. The same image is on Docker Hub as `renplay/renplay`.
+- **Back up `/data`.** It holds your saves and their history, accounts, the library and mods. Keep it
+  on local disk, never on a network share. `/games` can be a share. Allow about twice a game’s
+  download size free while it installs.
+- **The image runs as user 1000.** Both folders must be writable by that user, or use `--user` to run
+  as another one. The docs show how, and how to run with a read-only root filesystem.
+- **Use HTTPS outside your home network.** New installs ask for sign-in. See
+  [Accounts](https://docs.renplay.org/accounts/) before sharing an upgraded install.
 
 More in the docs: [Docker Compose](https://docs.renplay.org/install/docker/),
-[Kubernetes](https://docs.renplay.org/install/kubernetes/),
+[Kubernetes](https://docs.renplay.org/install/kubernetes/) (there is also a
+[Helm chart](charts/renplay/README.md)), guides for
+[TrueNAS](https://docs.renplay.org/install/truenas/), [Unraid](https://docs.renplay.org/install/unraid/),
+[Synology](https://docs.renplay.org/install/synology/), [UGREEN](https://docs.renplay.org/install/ugreen/)
+and [QNAP](https://docs.renplay.org/install/qnap/),
 [adding games](https://docs.renplay.org/guides/adding-games/),
 [playing on your phone](https://docs.renplay.org/guides/playing/),
 [configuration](https://docs.renplay.org/configuration/) (every environment variable),
-[upgrading and backups](https://docs.renplay.org/upgrading/),
-[the 4.x stability contract](https://docs.renplay.org/stability/) and
+[upgrading and backups](https://docs.renplay.org/upgrading/) and
 [troubleshooting](https://docs.renplay.org/troubleshooting/).
-
-**Back up `/data` and keep it on local disk:** it holds your saves and their history, accounts,
-the SQLite library, mods and the art cache. SQLite must not be on a network share. `/games` and the
-archives folder can be shares. Allow about twice the game's download size free during install.
-Downloads are kept by default. Turn off **Keep downloads** in Settings to delete only uploads
-through Renplay after a successful install. Files copied in are never deleted automatically.
-`RENPLAY_KEEP_DOWNLOADS=true` or `false` sets and locks the choice. The deprecated
-`RENPLAY_DELETE_ARCHIVES` alias still works with the opposite value.
-
-Optionally mount a downloads folder at `/downloads`. Renplay uses it when it exists and is
-writable, or uses `ARCHIVES_DIR` when set. Without that mount it keeps using `/games/_archives`.
-Existing files are never moved. Settings shows which folder is in use. Deleting `/games` also
-loses downloads stored inside it. Games can be rebuilt only while their downloads are available.
-Admins can use **Delete download** on a game's Details tab to free space without touching saves.
-Reinstalling then needs the download again.
-
-The image defaults to user `1000:1000`. You can use any non-root IDs with `--user 568:568`, or
-start as root with `--user 0:0 -e PUID=99 -e PGID=100`. The entrypoint drops root before starting
-the app. Root without these variables drops to `1000:1000`. Make both mounted folders writable
-by the chosen user first. Renplay does not change their ownership. A read-only root filesystem
-works with writable `/data`, `/games` and a `/tmp` tmpfs. The image includes a health check through
-nginx on port 8080. See the [Docker guide](https://docs.renplay.org/install/docker/).
-
-## Accounts
-
-New data folders require sign-in. Upgrades keep sign-in off and show an admin reminder. Set
-`RENPLAY_AUTH=on` to turn it on. The first admin claims the owner and all existing saves. You can
-seed the owner with `RENPLAY_ADMIN_USERNAME` and `RENPLAY_ADMIN_PASSWORD_FILE` instead of a setup
-code. Passwords must have at least 10 characters. The account menu shows your name and Sign out.
-
-`RENPLAY_AUTH=off` lets everyone play as the owner, or the account id in `RENPLAY_AUTH_USER`.
-Changing modes never moves or deletes other people's saves. All saves and history live under
-`/data/users/<id>/`. Back up `/data` yourself too.
-
-Cookies work on plain HTTP for a local NAS and are marked `Secure` over HTTPS. Behind HTTPS
-termination, set `RENPLAY_PUBLIC_URL` to the public HTTPS address. Keep proxy hop counts correct
-with `RENPLAY_TRUSTED_HOPS` (the included nginx is one hop).
-
-Single sign-on supports OIDC providers such as Pocket ID, Authentik, Authelia and Keycloak, plus
-LDAP directories such as LLDAP. Groups can control roles and adult games levels. Register OIDC's exact
-callback `/api/auth/oidc/callback`. See the [provider examples](https://docs.renplay.org/accounts/).
-Local usernames take precedence over LDAP and accounts are only linked explicitly while signed in.
-
-Open **Account** from the account menu (the **You** tab on phones) to upload a profile picture, link sign-ins, change your name, password
-and adult games level, manage sessions and script tokens, or export your saves. Admins use
-**Settings → Users** to add users, change roles and adult games levels, disable accounts, reset passwords,
-and copy, merge, export or import save folders. Overwrites keep history. Removing a user archives
-their folder. These tools work with sign-in off too. More in [Accounts](https://docs.renplay.org/accounts/)
-and the [Accounts API](https://docs.renplay.org/developers/accounts-api/).
 
 ## Questions
 
-**Which games work?** Ren’Py 8 games, and most Ren’Py 7 games. HTML games such as Twine stories
-play too, marked Beta. See [Engines](https://docs.renplay.org/engines/) and the
+**Which games work?** Ren’Py 8 games, and most Ren’Py 7 games. HTML games such as Twine stories play
+too, marked Beta. See [Engines](https://docs.renplay.org/engines/) and the
 [catalog](https://renplay.org/catalog), which lists games that were tested.
 
-**Where do I get games?** From their developers: itch.io, Patreon, Steam and so on. Renplay and
-its catalog never host game files.
+**Where do I get games?** From their developers: itch.io, Patreon, Steam and so on. Renplay and its
+catalog never host game files.
 
 **Can I keep playing on desktop Ren’Py?** Yes. Export a game’s saves and they work in the desktop
 version, and the other way round.
 
+**Do I need a big server?** No. Installing a game takes some CPU for a few minutes, and playing is just
+serving files, because the game runs in your browser.
+
 More in the [FAQ](https://docs.renplay.org/faq/).
 
-## For developers
+## Get involved
 
-- [Docs](https://docs.renplay.org): [how Renplay works](https://docs.renplay.org/developers/architecture/)
-  and [contributing](https://docs.renplay.org/developers/contributing/)
-- [CONTRIBUTING.md](CONTRIBUTING.md): the short version
-- [AGENTS.md](AGENTS.md): product rules and lessons learned, for people and AI agents alike
-- [CHANGELOG.md](CHANGELOG.md): what changed in each version
-- Related: [catalog](https://renplay.org/github/catalog) (recipes and art),
-  [engines](https://renplay.org/github/engines) (Ren’Py web engines),
-  [website](https://renplay.org)
+- **Questions**, such as whether a game works, go to [Discussions](https://renplay.org/discussions).
+- **Bugs** go to [issues](https://renplay.org/issues).
+- **A game to add or fix** belongs in the [catalog](https://github.com/renplay-org/catalog).
+- **Code:** read [CONTRIBUTING.md](CONTRIBUTING.md) first. [AGENTS.md](AGENTS.md) holds the product
+  rules and lessons learned, for people and AI agents alike. [How Renplay works](https://docs.renplay.org/developers/architecture/)
+  explains the pieces. [CHANGELOG.md](CHANGELOG.md) lists what changed in each version.
+- **Related repositories:** [catalog](https://github.com/renplay-org/catalog) (recipes and art) and
+  [engines](https://github.com/renplay-org/engines) (the Ren’Py web engines).
 
-## Support
-
-Questions, such as whether a game works, go to
-[Discussions](https://renplay.org/discussions). Report bugs in
-[issues](https://renplay.org/issues).
-
-Renplay is made by the Renplay Team. It is free and open source. If it is useful to you, you can
-[support it](https://renplay.org/support).
+Renplay is made by the Renplay Team. It is free and open source. If it makes your evenings better, you
+can [support it](https://renplay.org/support).
 
 ## License
 
-[MIT](LICENSE). Ren’Py is © Tom Rothamel and contributors, under its own license. Games belong to
-their developers.
+[MIT](LICENSE). Ren’Py is © Tom Rothamel and contributors, under its own license, and Renplay is not
+affiliated with it. Games belong to their developers.
