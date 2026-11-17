@@ -1,7 +1,7 @@
 ---
 apiVersion: v2
 name: renplay
-description: Play downloaded Ren'Py visual novels in your browser with server saves
+description: Renplay is a self-hosted player for Ren’Py games in the browser, with saves on your own server.
 type: application
 kubeVersion: ">=1.25.0-0"
 version: 4.13.0
@@ -15,7 +15,9 @@ maintainers:
     url: https://github.com/renplay-org
 keywords:
   - renpy
+  - visual-novel
   - games
+  - game-library
   - self-hosted
 annotations:
   category: Entertainment
