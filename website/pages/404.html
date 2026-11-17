@@ -2,22 +2,26 @@
 <html lang="en">
 <head>
 {{head}}
+<script>document.documentElement.classList.add('js')</script>
 </head>
-<body>
-<div class="grain"></div>
+<body class="page">
+{{backdrop}}
 {{nav}}
-<main class="wrap">
-  <section class="final lost">
-    <h1>This page <span class="grad-text">is not here.</span></h1>
-    <p class="lead" style="margin-left:auto;margin-right:auto">The address may have changed, or the game may have left the catalog.</p>
+<main class="page-main lost-main wrap">
+  <div class="lost-top" aria-hidden="true"><div class="code">404</div></div>
+  <section class="lost" aria-labelledby="h-lost">
+    <p class="name">Renplay</p>
+    <h1 id="h-lost">This page <span>is not here.</span></h1>
+    <p>The address may have changed, or the game may have left the catalog.</p>
     <div class="cta">
       <a class="btn primary" href="{{site}}/">Go to the home page</a>
       <a class="btn" href="{{site}}/catalog/">Browse the catalog</a>
-      <a class="btn" href="https://docs.renplay.org">Read the docs</a>
+      <a class="btn" href="https://docs.renplay.org/">Read the docs</a>
     </div>
   </section>
 </main>
-{{footer}}
-<script src="/js/menu.js" defer></script>
+<script src="/js/room-data.js"></script>
+<script src="/js/shared.js" defer></script>
+<script src="/js/room.js" defer></script>
 </body>
 </html>

@@ -3,3 +3,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
 /img/*
   Cache-Control: public, max-age=86400
+/og/*
+  Cache-Control: public, max-age=86400
+/design/fonts/*
+  Cache-Control: public, max-age=604800

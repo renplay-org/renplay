@@ -25,11 +25,7 @@ const SCAN = [
 
 /** Places that may keep this many literals for now, each one to move to a token. Counts only go down. */
 const ALLOWED = {
-  'website/site.css': 76,
   'docs/site/src/styles/renplay.css': 37,
-  'website/catalog.css': 36,
-  'website/partials/footer.html': 1,
-  'website/partials/nav.html': 1,
 }
 
 const files = []
