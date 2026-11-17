@@ -173,6 +173,9 @@ The code was untangled so that a change lands in one place. `scripts/check-struc
   `scripts/check-structure.mjs` at their size: they may only shrink.
 - **Tests test behaviour.** Tests are type-checked (`server/tsconfig.test.json`). Drive the code the
   way it is used (requests, messages, the built runtime), never by cutting its source text apart.
+- **A new test earns its place.** It names the behaviour it protects and fails when that behaviour breaks. Duplicate coverage
+  is removed rather than added, and the total test lines (`TEST_LINES` in `scripts/check-structure.mjs`) only go down: raising
+  the number takes a one-line reason beside it.
 - **Write things once.** A device check goes in `selector/src/lib/platform.ts`, a size for people is
   `bytes` in `shared/format.ts`, a control comes from `lantern/`. Look for the existing one first.
 
