@@ -1,8 +1,13 @@
 # renplay
 
-Play downloaded Ren'Py visual novels in your browser with server saves
+Renplay is a self-hosted player for Ren’Py games in the browser, with saves on your own server.
 
-**Homepage:** <https://renplay.org>
+Add a game's normal PC download, press Install and play it in any browser, on your computer, your
+tablet or your phone. Every save goes to your own server the moment the game makes it, so you can stop
+on the laptop and carry on from the phone. The chart runs Renplay as one pod, with a volume for your
+saves and one for your games.
+
+**Homepage:** <https://renplay.org> · [Docs](https://docs.renplay.org) · [Try the demo](https://demo.renplay.org) · [Catalog](https://renplay.org/catalog) · [Source](https://github.com/renplay-org/renplay)
 
 ## Usage
 
@@ -10,6 +15,9 @@ Play downloaded Ren'Py visual novels in your browser with server saves
 helm install renplay oci://ghcr.io/renplay-org/charts/renplay
 kubectl port-forward service/renplay 8080:8080
 ```
+
+The chart's version is the Renplay version it installs. Add `--version X.Y.Z` to pin one. The newest is
+on the [releases page](https://renplay.org/releases).
 
 Open http://localhost:8080 and create the owner account. A default StorageClass
 is required unless you supply existing claims or NFS storage for games.
