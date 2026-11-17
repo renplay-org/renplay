@@ -1,8 +1,14 @@
 # The public demo
 
-[demo.renplay.org](https://demo.renplay.org) lets anyone try Renplay without installing it.
+[demo.renplay.org](https://demo.renplay.org) lets anyone try Renplay without installing it. It is the static demo
+below: the real library and game player as plain files, with each visitor's saves in their own browser.
 
-## What a visitor gets
+The demo image described first (`RENPLAY_DEMO`) is still built and published with each release, as
+`ghcr.io/renplay-org/renplay:demo`, for anyone who wants a demo with a server. The static demo is made from it.
+
+## The demo image
+
+### What a visitor gets
 
 - **Try the demo** signs them in as a shared guest (`RENPLAY_DEMO=on`). There is no account to make.
 - One game to play: **The Question**, Ren'Py's own sample game, without its music. Its art (MIT,
@@ -17,14 +23,14 @@
   until the next fresh start. Tags and the level for adult games cannot be changed.
 - A banner on every page says it is a demo and links to the install guide, except in the website's embed mode.
 
-## How it resets
+### How it resets
 
 Everything is in the image: the installed game, its art, the catalog, the guest. Every start from the
 image is a fresh demo with an empty disk. When visitors keep coming, the demo stops itself after 4
 hours of running, once nobody has asked anything for a minute (health checks do not count), and at
 4 hours and 15 minutes in any case, so it starts fresh again.
 
-## How it is built
+### How it is built
 
 `.github/workflows/demo.yml` runs after each release, or by hand:
 
@@ -35,8 +41,8 @@ hours of running, once nobody has asked anything for a minute (health checks do 
    throwaway admin installs the games with their recipes and makes their art. The admin's password
    is random and never kept, and a demo refuses every sign-in but the guest. The second stage copies
    `/data` and `/games` in and turns the demo on.
-3. The image is pushed as `ghcr.io/renplay-org/renplay:demo`, and the `DEMO_DEPLOY_HOOK` secret
-   starts the demo from it. The image listens on port 8080, with the health check `/api/health`.
+3. The image is pushed as `ghcr.io/renplay-org/renplay:demo`. It listens on port 8080, with the health check
+   `/api/health`.
 
 `make-art.mjs` made The Question's art from the game's own pictures. Run it again to change them.
 
@@ -145,8 +151,8 @@ node server/scripts/app-ui/static-demo-server.mjs /tmp/static-demo 5191    # htt
 ### Publishing
 
 `static/wrangler.jsonc` is a Worker with static assets for `demo.renplay.org`, with the single page app fallback
-(an address that is not a file is the library's page). `demo.yml` builds the output after the server demo is
-published, tries it in browsers, and deploys it only when the repository variable `STATIC_DEMO_DEPLOY` is `true`. It
+(an address that is not a file is the library's page). `demo.yml` builds the output from the demo image, tries it
+in browsers, and deploys it when the repository variable `STATIC_DEMO_DEPLOY` is `true`. It
 uses the same `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets as `sites.yml`.
 
 ## Embed the demo
