@@ -251,6 +251,8 @@ async function saveHere(page) {
 async function visit(page, path = '/') {
   await page.goto(demo.origin + path)
   await expect(page.getByRole('link', { name: 'Catalog', exact: true }).first()).toBeVisible({ timeout: 30000 })
+  // Leaving a page with a request in flight is an error of the page, not of the demo.
+  await page.waitForLoadState('networkidle')
 }
 
 const REFUSAL = 'The demo cannot do this. Install your own Renplay to try it.'
