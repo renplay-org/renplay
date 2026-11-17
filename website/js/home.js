@@ -133,34 +133,36 @@ let sceneState = 'line'
 const SCRIPT = scene && $$('#story p').map((p) => p.textContent.trim())
 function sceneInit() {
   if (!scene) return
-  const typed = $('#typed'), choices = $('#choices'), after = $('#after'), story = $('#story'), replay = $('#replay')
+  // The typed line has its own span, beside the hidden copies of every line that keep the box as tall as its longest (index.html).
+  const t = $('#typed .t'), choices = $('#choices'), after = $('#after'), story = $('#story'), replay = $('#replay')
   const afterText = after.textContent.trim()
   let i = 0, timer = 0, full = '', shown = 0, typing = false, picked = '', picking = false
   // the mark at the end of a finished line, as in a visual novel: a small blinking triangle. It is not a scroll hint.
   const mark = Object.assign(document.createElement('i'), { className: 'mark' })
   mark.setAttribute('aria-hidden', 'true')
-  const markOn = () => { if (sceneState === 'line' || sceneState === 'after') typed.append(mark) }
+  const markOn = () => { if (sceneState === 'line' || sceneState === 'after') t.append(mark) }
   const markOff = () => mark.remove()
   const setState = (s) => { sceneState = s; scene.dataset.scene = s }
   const say = (text, then) => {
     clearInterval(timer)
     full = text; shown = 0; typing = true; scene.dataset.typing = '1'
-    typed.textContent = ''
+    t.textContent = ''
     markOff()
     story.replaceChildren(Object.assign(document.createElement('p'), { textContent: text })) // for screen readers
-    const done = () => { typing = false; delete scene.dataset.typing; typed.textContent = full; markOn(); then?.() }
+    const done = () => { typing = false; delete scene.dataset.typing; t.textContent = full; markOn(); then?.() }
     if (still) return done()
     timer = setInterval(() => {
       shown += 1
-      typed.textContent = full.slice(0, shown)
+      t.textContent = full.slice(0, shown)
       if (shown >= full.length) { clearInterval(timer); done() }
     }, 28)
   }
-  const skipTyping = () => { clearInterval(timer); typing = false; delete scene.dataset.typing; typed.textContent = full; markOn() }
+  const skipTyping = () => { clearInterval(timer); typing = false; delete scene.dataset.typing; t.textContent = full; markOn() }
   const start = () => {
     i = 0; picked = ''
     for (const el of Object.values(devs)) el.classList.remove('on')
     if (still) for (const n of Object.keys(devs)) setWake(n, false)
+    delete scene.dataset.last
     setState('line')
     say(SCRIPT[0])
   }
@@ -173,7 +175,8 @@ function sceneInit() {
       if (i < SCRIPT.length) {
         say(SCRIPT[i])
         if (i === SCRIPT.length - 1) {
-          // the last line asks the question; the choice appears with it
+          // the last line asks the question; the choice appears with it, and its place is kept from now on so the box does not grow when it comes
+          scene.dataset.last = ''
           const showNow = () => offerChoice()
           const tm = setInterval(() => { if (!typing) { clearInterval(tm); showNow() } }, 60)
         }
@@ -300,7 +303,8 @@ function demoInit() {
   view.observe(duo)
 
   const echo = { from: '', at: 0 }
-  const post = (name, type) => frames[name]?.contentWindow?.postMessage({ type }, DEMO)
+  // A frame that has not said ready has no page of the demo to hear it (the laptop is never loaded on a phone), and the browser reports a message sent to one.
+  const post = (name, type) => { if (state[name].ready) frames[name].contentWindow?.postMessage({ type }, DEMO) }
   const ago = (ms) => {
     const s = Math.max(0, Math.round((Date.now() - ms) / 1000))
     return s < 5 ? 'just now' : s < 60 ? `${s} seconds ago` : `${Math.round(s / 60)} minutes ago`

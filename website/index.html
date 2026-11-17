@@ -75,6 +75,15 @@
       <p class="after" id="after">The screen wakes on the very line you stopped at. Renplay plays your Ren’Py games in any browser, with every save kept on your own server.</p>
       <span class="adv" aria-hidden="true">Click, tap or press space</span>
     </div>
+    <script>
+    // The box is as tall as its longest line from the first paint, so it never grows as the lines are said: every line is in it, unseen.
+    {
+      const typed = document.getElementById('typed'), live = document.createElement('span')
+      live.className = 't'
+      const ghosts = [...document.querySelectorAll('#story p'), document.getElementById('after')].map((p) => Object.assign(document.createElement('span'), { className: 'ghost', textContent: p.textContent.trim() }))
+      typed.replaceChildren(...ghosts, live)
+    }
+    </script>
 
     <nav class="menu" id="menu" aria-label="Start">
       <a href="#install"><b>New game</b><span>Install</span></a>

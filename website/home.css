@@ -18,8 +18,11 @@ h1 span { display: block; -webkit-text-fill-color: var(--fg); text-shadow: 0 2px
 .dlg { position: relative; z-index: 4; align-self: end; margin-top: auto; width: min(820px, 100%); justify-self: end; padding: 26px 30px 22px; border-radius: var(--r-3); background: var(--on-ink-hi); border: 1px solid var(--line); box-shadow: 0 20px 60px -16px color-mix(in srgb, #000 70%, transparent); backdrop-filter: blur(12px) saturate(1.1); -webkit-backdrop-filter: blur(12px) saturate(1.1); min-height: 136px; }
 .story p, .typed, .after { font: 400 clamp(19px, 1.5vw, 21px) / 1.55 var(--serif); font-variation-settings: 'opsz' var(--opsz-text); color: var(--fg); }
 .story p + p, .after { margin-top: 0.5em; }
-.typed { min-height: 3.1em; }
-.scene-pad[data-typing] .typed::after { content: ""; display: inline-block; width: 2px; height: 1.05em; margin-left: 3px; vertical-align: -0.15em; background: var(--lamp); animation: blink 1.05s steps(1) infinite; }
+.typed { min-height: 3.1em; display: grid; }
+/* Every line is also in the box, unseen, so that the box is as tall as its longest line while the line is typed. */
+.typed .ghost, .typed .t { grid-area: 1 / 1; }
+.typed .ghost { visibility: hidden; }
+.scene-pad[data-typing] .typed .t::after { content: ""; display: inline-block; width: 2px; height: 1.05em; margin-left: 3px; vertical-align: -0.15em; background: var(--lamp); animation: blink 1.05s steps(1) infinite; }
 .typed .mark { display: inline-block; width: 0.5em; height: 0.62em; margin-left: 0.4em; vertical-align: -0.02em; background: var(--lamp); clip-path: polygon(0 0, 100% 50%, 0 100%); animation: blink 1.05s steps(1) infinite; }
 .adv { display: none; position: absolute; left: 30px; bottom: 12px; font: 400 12px var(--mono); color: var(--fg-4); opacity: 0; transition: opacity var(--t-room); }
 .js .adv { display: block; }
@@ -47,15 +50,17 @@ html:not(.js) .story p { margin-bottom: 0.5em; }
 .js .typed, .js .choices, .js .after, .js .menu { display: none; }
 .js .story { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .js [data-scene=choice] .choices { display: grid; }
-.js [data-scene=choice] .typed { display: block; }
+.js [data-scene=choice] .typed { display: grid; }
 .js [data-scene=after] .after { display: none; }
 .js [data-scene=menu] .menu { display: flex; }
 .js [data-scene=menu] .replay { display: inline-flex; }
 .js [data-scene=menu] .dlg { display: none; }
-.js [data-scene=line] .typed, .js [data-scene=after] .typed { display: block; }
-.js [data-scene=menu] .typed { display: block; }
-.js [data-scene=menu] .typed::after { display: none; }
-.js:not([data-scene]) .typed { display: block; }
+.js [data-scene=line] .typed, .js [data-scene=after] .typed { display: grid; }
+.js [data-scene=menu] .typed { display: grid; }
+.js [data-scene=menu] .typed .t::after { display: none; }
+.js:not([data-scene]) .typed { display: grid; }
+/* The choices keep their place from the last line on, unseen until it has been said. */
+.js [data-scene=line][data-last] .choices { display: grid; visibility: hidden; }
 .replay[hidden] { display: none; }
 @keyframes blink { 50% { opacity: 0; } }
 
@@ -112,7 +117,7 @@ html:not(.js) .story p { margin-bottom: 0.5em; }
 .duo.flash .beam { opacity: 1; }
 .duo.flash .beam .dash { stroke: #fff; stroke-width: 2.5; }
 @keyframes dash { to { stroke-dashoffset: -20; } }
-.livecard { display: none; }
+.livecard, html:not(.js) .livecard { display: none; }
 .after-demo { display: none; flex-wrap: wrap; gap: 12px; margin-top: 36px; justify-content: center; animation: rise var(--t-room) var(--out) both; }
 .after-demo.show, html:not(.js) .after-demo { display: flex; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
@@ -348,7 +353,7 @@ html:not(.js) .code + .code { margin-top: 12px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
   .js .roll { transform: none !important; }
-  .typed .mark, .typed::after, .beam .dash { animation: none; }
+  .typed .mark, .typed .t::after, .beam .dash { animation: none; }
 }
 @media (scripting: none) {
   .js .roll { transform: none; }

@@ -7,7 +7,7 @@
 // index in the browser, after the visitor says they are 18 or older. NEVER_SHOW_ADULT_COVERS=1 builds it with its covers
 // always blurred. Each page's social card is made here too (lib/og.mjs), with the game's cover fetched once.
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LINKS, card, chips, countText, coverUrl, esc, facts, gamePath, headline, howTo, isWhole, offered, poster, releasesList, REPO, shownTags, store, tagLabel, tintOf, working } from './js/catalog-view.js'
 import { CARD, fetchCover, gameCard, homeCard } from './lib/og.mjs'
@@ -25,9 +25,12 @@ const SHELF = ['butterfly-soup', 'charm-studies', 'cryptid-crush', 'dawn-chorus'
 // Pages the website has besides the home page, the catalog and the games. The answer pages are added here, so the sitemap and the nav have room for them.
 const PAGES = []
 
+// Where the sites are written: dist and dist-adult here, or the folders in WEBSITE_OUT and WEBSITE_OUT_ADULT (the browser tests build their own).
+const OUT = resolve(root, process.env.WEBSITE_OUT ?? 'dist')
+const ADULT_OUT = resolve(root, process.env.WEBSITE_OUT_ADULT ?? 'dist-adult')
 const write = (dir, path, text) => {
-  mkdirSync(dirname(join(root, dir, path)), { recursive: true })
-  writeFileSync(join(root, dir, path), text)
+  mkdirSync(dirname(join(dir, path)), { recursive: true })
+  writeFileSync(join(dir, path), text)
 }
 
 async function loadIndex() {
@@ -62,19 +65,18 @@ const inCatalog = (site) => ({ site, catalogCurrent: ' aria-current="page"' })
 
 /** What the pages take from design/ (Lamplight's tokens, fonts, grain and the wordmark), at /design/, and the mark as /logo.svg. */
 function copyDesign(out) {
-  for (const f of ['tokens.css', 'fonts.css', 'fonts', 'grain.webp', 'logo/wordmark.svg']) cpSync(join(root, '../design', f), join(root, out, 'design', f), { recursive: true })
-  cpSync(join(root, '../design/logo/mark.svg'), join(root, out, 'logo.svg'))
+  for (const f of ['tokens.css', 'fonts.css', 'fonts', 'grain.webp', 'logo/wordmark.svg']) cpSync(join(root, '../design', f), join(out, 'design', f), { recursive: true })
+  cpSync(join(root, '../design/logo/mark.svg'), join(out, 'logo.svg'))
 }
 const COMMON = ['site.css', 'catalog.css', 'favicon.ico', 'favicon-48.png', 'apple-touch-icon.png', 'NOTICE']
 const SHARED_JS = ['shared.js', 'room-data.js', 'room.js']
 
 // ---- renplay.org ----------------------------------------------------------------------------------------------------
-const OUT = 'dist'
-rmSync(join(root, OUT), { recursive: true, force: true })
-rmSync(join(root, 'dist-adult'), { recursive: true, force: true })
-for (const f of [...COMMON, 'home.css', 'logo.png', 'img', '_redirects', '_headers']) cpSync(join(root, f), join(root, OUT, f), { recursive: true })
-for (const f of [...SHARED_JS, 'home.js', 'catalog.js', 'catalog-view.js', 'thumbhash.js']) cpSync(join(root, 'js', f), join(root, OUT, 'js', f))
-cpSync(join(root, '../LICENSE'), join(root, OUT, 'LICENSE'))
+rmSync(OUT, { recursive: true, force: true })
+rmSync(ADULT_OUT, { recursive: true, force: true })
+for (const f of [...COMMON, 'home.css', 'logo.png', 'img', '_redirects', '_headers']) cpSync(join(root, f), join(OUT, f), { recursive: true })
+for (const f of [...SHARED_JS, 'home.js', 'catalog.js', 'catalog-view.js', 'thumbhash.js']) cpSync(join(root, 'js', f), join(OUT, 'js', f))
+cpSync(join(root, '../LICENSE'), join(OUT, 'LICENSE'))
 copyDesign(OUT)
 
 // The social cards: one for the home page, one for each game.
@@ -284,11 +286,10 @@ ${[['/', undefined], ['/catalog/', updated], ...PAGES.map((path) => [path, updat
 write(OUT, 'robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`)
 
 // ---- adult.renplay.org ----------------------------------------------------------------------------------------------------
-const ADULT_OUT = 'dist-adult'
-for (const f of COMMON) cpSync(join(root, f), join(root, ADULT_OUT, f), { recursive: true })
-cpSync(join(root, 'img/room'), join(root, ADULT_OUT, 'img/room'), { recursive: true })
-for (const f of [...SHARED_JS, 'catalog.js', 'catalog-view.js', 'thumbhash.js']) cpSync(join(root, 'js', f), join(root, ADULT_OUT, 'js', f))
-cpSync(join(root, '../LICENSE'), join(root, ADULT_OUT, 'LICENSE'))
+for (const f of COMMON) cpSync(join(root, f), join(ADULT_OUT, f), { recursive: true })
+cpSync(join(root, 'img/room'), join(ADULT_OUT, 'img/room'), { recursive: true })
+for (const f of [...SHARED_JS, 'catalog.js', 'catalog-view.js', 'thumbhash.js']) cpSync(join(root, 'js', f), join(ADULT_OUT, 'js', f))
+cpSync(join(root, '../LICENSE'), join(ADULT_OUT, 'LICENSE'))
 copyDesign(ADULT_OUT)
 write(ADULT_OUT, 'index.html', render(read('pages/catalog.html'), {
   modes: ['adult'],

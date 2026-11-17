@@ -36,6 +36,7 @@ code, pre, kbd { font-family: var(--mono); }
 .btn.primary { background: var(--paper); border-color: var(--paper); color: var(--on-paper); }
 .btn.primary:hover { background: var(--paper-2); border-color: var(--paper-2); color: #000; }
 .btn.sm { min-height: 38px; padding: 0 16px; font-size: 14px; }
+@media (pointer: coarse) { .btn.sm { min-height: var(--hit); } }
 .btn:active { transform: translateY(1px); }
 
 /* Labels: small, sentence case, mono, with a lantern for the dot */
