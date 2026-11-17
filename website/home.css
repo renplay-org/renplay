@@ -84,6 +84,8 @@ html:not(.js) .cta { order: 3; }
 .find:focus-within { border-color: var(--lamp); }
 .find svg { width: 20px; height: 20px; color: var(--fg-3); flex: none; }
 .find input { flex: 1; min-width: 0; height: 100%; background: none; border: 0; outline: 0; color: var(--fg); font: 400 16px var(--sans); }
+/* the keyboard sees where it is: the underline itself turns to the lamp */
+.find input:focus-visible { box-shadow: 0 1px 0 var(--lamp); }
 .find input::placeholder { color: var(--fg-4); }
 .find .btn { flex: none; }
 .shelf-wrap { --tint: var(--t2); position: relative; margin-top: 8px; overflow-x: clip; }
@@ -244,7 +246,8 @@ html:not(.js) .code + .code { margin-top: 12px; }
   .cta .btn { flex: 1 1 0; min-width: 0; }
   .s-gallery { padding-top: clamp(100px, 20vh, 200px); }
   .find { height: 52px; }
-  .find .btn { display: none; }
+  /* the keyboard's Search key sends it; without a script the button stays, since there is no other hint */
+  .js .find .btn { display: none; }
   /* the demo on a phone: the drawn phone, a picture, and a tap opens the real thing full screen */
   .wide-only { display: none; }
   .narrow-only { display: block; }
