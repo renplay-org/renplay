@@ -81,6 +81,8 @@ html:not(.js) .story p { margin-bottom: 0.5em; }
 
 /* 2. The demo: two real Renplays */
 .live-label { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; font: 400 14px/1.4 var(--mono); color: var(--fg-2); min-height: 22px; }
+/* Without scripts the demo cannot run, so the page does not call it live: the posters and their link stand alone. */
+html:not(.js) .live-label { display: none; }
 .pulse { width: 9px; height: 9px; border-radius: var(--r-round); background: var(--pink); box-shadow: 0 0 0 0 color-mix(in srgb, var(--pink) 60%, transparent); animation: pulse 2s infinite; flex: none; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--pink) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pink) 0%, transparent); } }
 .duo { --s: 0.88; --ps: 0.72; display: grid; grid-template-columns: auto 96px auto; justify-content: center; align-items: end; gap: 0 clamp(12px, 3vw, 36px); position: relative; }
