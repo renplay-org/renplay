@@ -110,6 +110,13 @@ html.taken .nav { transform: translateY(-110%); }
   .nav.open .links a:first-child { border-top: 0; }
   .nav.open .links a.install-link { display: flex; }
 }
+/* Without JavaScript the Menu button does nothing, so on a narrow screen the links are the header: in a row under the name, in the page's flow. */
+@media (max-width: 860px) {
+  html:not(.js) .nav { position: relative; height: auto; flex-wrap: wrap; padding-block: calc(env(safe-area-inset-top, 0px) + 4px) 4px; z-index: 5; background: var(--ink); }
+  html:not(.js) .menu-btn { display: none; }
+  html:not(.js) .links { display: flex; flex-wrap: wrap; width: 100%; margin-left: 0; }
+  html:not(.js) .links a.install-link { display: flex; }
+}
 @media (max-height: 520px) and (orientation: landscape) {
   :root { --nav-h: calc(48px + env(safe-area-inset-top, 0px)); }
   .brand { font-size: 16px; }

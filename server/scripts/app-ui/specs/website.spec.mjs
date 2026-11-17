@@ -307,6 +307,9 @@ test.describe('without scripts', () => {
     await expect(page.locator('#livecard')).toBeHidden()
     await expect(page.locator('#pickup')).toHaveAttribute('href', 'https://demo.renplay.org/game/the-question')
     await expect(page.locator('#after-demo a').nth(1)).toHaveAttribute('href', 'https://demo.renplay.org/')
+    // The header's links are on the page, since the Menu button needs a script.
+    for (const a of await page.locator('#nav-links a').all()) await expect(a).toBeVisible()
+    await expect(page.locator('#menu-btn')).toBeHidden()
     await expect(page.locator('#roll dd').first()).toBeVisible()
     for (const a of await page.locator('#roll a').all()) await expect(a).toBeVisible()
     await expect(page.locator('#shelf .card a').first()).toHaveAttribute('href', /^\/catalog\/game-\d+\/$/)
