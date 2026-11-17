@@ -38,7 +38,7 @@ const CHOICES = ['The phone', 'The tablet', 'The laptop']
 const WAYS = [['Install', '#install'], ['Try the demo', 'https://demo.renplay.org/']]
 const FEATURES = ['Plays what you already own', 'Saves with a history', 'Phones, offline, a controller', 'Everyone in the house', 'Adult games, on your terms', 'Mods, dashboards, your own hardware']
 const STEPS = ['Add the game', 'Renplay prepares it', 'Play anywhere']
-const NUMBERS = ['From Play to the first frame, on a phone', 'Smaller than the download', 'Back on another screen']
+const NUMBERS = ['From Play to the first frame', 'Smaller than the download', 'Back to a game you played before']
 const FAQ = ['Will my games work?', 'Where do the games come from?', 'Do I need a big server?', 'Can I go back to desktop Ren’Py?', 'Does it play offline?', 'What about adult games?', 'Is it really free?', 'What does it send home?']
 const COMMANDS = ['docker run -d --name renplay -p 8080:8080', 'image: ghcr.io/renplay-org/renplay:latest']
 const GUIDES = ['docker', 'kubernetes', 'truenas', 'unraid', 'synology', 'ugreen', 'qnap'].map((g) => `https://docs.renplay.org/install/${g}/`)

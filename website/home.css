@@ -159,7 +159,6 @@ html:not(.js) .live-label { display: none; }
 .numbers dd span { display: block; margin-top: 10px; color: var(--fg-3); font-size: 14px; line-height: 1.5; max-width: 34ch; }
 /* until the measurements come, the figures are quiet */
 .numbers[data-pending] dd b { font-size: 24px; color: var(--fg-4); font-weight: 600; }
-.numbers:not([data-pending]) > .fine { display: none; }
 
 /* 5. What you get */
 .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(28px, 4vw, 56px) clamp(24px, 3vw, 44px); }
