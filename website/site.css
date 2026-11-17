@@ -89,7 +89,8 @@ h2 { font-size: clamp(36px, 5.2vw, 68px); margin-top: 12px; }
    and anchors land below it (scroll-padding-top on html). The Menu button and the links are at least 44 px. */
 .nav { position: fixed; inset: 0 0 auto 0; z-index: 50; height: var(--nav-h); display: flex; align-items: center; gap: 18px; padding: env(safe-area-inset-top, 0px) max(var(--nav-pad), calc((100vw - 1200px) / 2)) 0; border-bottom: 1px solid transparent;
   background: linear-gradient(to bottom, var(--on-ink-hi), transparent) border-box; transition: background var(--t-pane), border-color var(--t-pane), transform var(--t-travel) var(--out); }
-.nav.solid { background: color-mix(in srgb, var(--ink) 98.5%, transparent); backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); border-color: var(--line); }
+/* Opaque, not nearly so: WebKit showed a bright button passing under a header that was 1.5% open. */
+.nav.solid { background: var(--ink); border-color: var(--line); }
 .brand { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--fg); font: 700 18px/1 var(--sans); text-decoration: none; text-shadow: 0 1px 12px color-mix(in srgb, #000 60%, transparent); letter-spacing: -0.01em; }
 .brand img { border-radius: var(--r-2); }
 .brand .wordmark { border-radius: 0; height: 23.6px; width: auto; filter: drop-shadow(0 1px 12px color-mix(in srgb, #000 60%, transparent)); }

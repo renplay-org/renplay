@@ -149,6 +149,13 @@ html:not(.js) .gate .btn.primary { display: none; }
   .band .actions .btn { flex: 1 1 100%; }
   .facts div { grid-template-columns: 1fr; gap: 2px; }
   .games { --cw: 150px; gap: 30px 14px; }
+  /* the games come sooner: a shorter lead, and each row of chips is one line that moves under the finger, to the screen's edges (More opens it out) */
+  .page-head { padding-bottom: 12px; }
+  .page-head .lead { font-size: 15px; }
+  .chip-row:not(.open) { flex-wrap: nowrap; overflow-x: auto; margin-inline: -18px; padding-inline: 18px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .chip-row:not(.open)::-webkit-scrollbar { display: none; }
+  .chip-row:not(.open) .chip-btn { flex: none; white-space: nowrap; }
+  .count-row { margin-top: 14px; }
 }
 @media (max-height: 520px) and (orientation: landscape) {
   .lost-top { display: none; }

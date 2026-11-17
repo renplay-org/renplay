@@ -149,7 +149,7 @@ write(OUT, 'catalog/index.html', render(read('pages/catalog.html'), {
   footnote: FOOTNOTE_CATALOG,
   eyebrow: 'The catalog',
   heading: 'Games that work in Renplay.',
-  lead: 'Every game here was installed and played in Renplay. Get it from its developer on itch.io, Patreon or F95zone, add the download, and Renplay picks up the art and the right settings by itself. Most other Ren’Py games work too.',
+  lead: 'Every game here was installed and played in Renplay. Get it from its developer, add the download, and Renplay brings the art and the right settings. Most other Ren’Py games work too.',
   states: filters.states,
   tags: filters.tags,
   count: countText(games.length),
