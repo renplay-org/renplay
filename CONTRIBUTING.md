@@ -1,7 +1,7 @@
 # Contributing
 
-Thanks for helping with Renplay. The long version is in the
-[docs](https://docs.renplay.org/developers/contributing/); this is the short one.
+Thanks for helping with Renplay. This is the short version. The long one is in the
+[docs](https://docs.renplay.org/developers/contributing/).
 
 - **A game does not work, or you got one working:** that belongs in the
   [catalog](https://renplay.org/github/catalog) (requests, broken games, new recipes).
@@ -35,6 +35,20 @@ Put a game's PC zip into `/tmp/rp/games/_archives/` and install it from the libr
 
 [How Renplay works](https://docs.renplay.org/developers/architecture/) explains how the pieces fit together, and
 [AGENTS.md](AGENTS.md) lists the product rules and lessons learned (useful for humans too).
+
+## The look and the words
+
+- **One look, called Lamplight.** Colours, faces, corners and durations come only from
+  `design/tokens.css`, fonts from `design/fonts.css` and the mark from `design/logo/`. The website is the
+  reference: where the app differs from it, the app changes. [design/README.md](design/README.md) has the
+  rules, and `mise run check:design` fails on a colour, face or corner written anywhere else.
+- **Works on phones.** Every screen must work at 390 px wide, in portrait and in landscape, with touch
+  only and no hover-only controls.
+- **Plain, short copy.** Sentence case, full sentences, no exclamation marks. No semicolons, em dashes,
+  en dashes or ellipses in text people read: the interface, server messages, docs, the changelog, and
+  commit and pull request text. `mise run check:copy` checks the interface, the docs and the changelog.
+- **Safe for work.** Nothing published may show adult art, in the docs, screenshots or the catalog. Take
+  screenshots with `mise run screenshots <url> <dir> --sfw`, or use safe-for-work art.
 
 ## Browser tests
 
@@ -102,8 +116,8 @@ or changing a test only to make it pass. A migration must keep equivalent or str
 2. Use Conventional Commit titles (`feat:`, `fix:`, `perf:`, `docs:`, `chore:`) for commits and the
    pull request. Explain what changes and why.
 3. Run `mise run check` and add a test for new behavior that fails without the change. For interface
-   changes, check a 390 px phone and a desktop. Say which devices and browsers you tried by hand,
-   and what was only checked in a test browser.
+   changes, check a 390 px phone and a desktop, and the look against the website. Say which devices and
+   browsers you tried by hand, and what was only checked in a test browser.
 4. Add a line to `CHANGELOG.md` under `Unreleased` for anything users notice. Update the docs when
    setup, configuration or described behavior changes. Docs live in `docs/site`. For a new or changed
    environment variable, edit `server/src/envvars.ts` and run `npm run gen` in `docs/site`.
@@ -130,13 +144,12 @@ Contributions are under the project's [MIT licence](LICENSE). There is no contri
 ## Releases and deployment
 
 Pull requests run CI, and a pull request merges when it is green. An `edge` image of any branch can be
-built by hand (the **Edge image** workflow). Releases are cut from `dev` when a set of
-changes is done and tested on a running instance, at least every few weeks while there is
-something to release; fixes can ship as patch releases any time. Versions follow SemVer: minor for
-features, patch for fixes, major when upgrading needs action from you (the changelog says what).
+built by hand (the **Edge image** workflow). Versions follow SemVer: minor for features, patch for
+fixes, major when upgrading needs action from you (the changelog says what).
 
 A release is a `release-X.Y.Z` branch (versions bumped, `Unreleased` moved into a dated section of
-`CHANGELOG.md`) squash-merged into `main`. CI checks the versions and the changelog; the release
-workflow tags `vX.Y.Z`, publishes the GitHub release with that changelog section, and pushes the
-image as `ghcr.io/renplay-org/renplay:X.Y.Z` and `:latest`. The full procedure is in
+`CHANGELOG.md`) squash-merged into `main`. CI checks the versions and the changelog. The release
+workflow pushes the image as `X.Y.Z` and `latest` to `ghcr.io/renplay-org/renplay` and Docker Hub
+(`renplay/renplay`), publishes and signs the Helm chart, tags `vX.Y.Z`, publishes the GitHub release
+with that changelog section, and rebuilds the docs and the demo. The full procedure is in
 [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md).

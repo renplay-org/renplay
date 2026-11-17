@@ -119,7 +119,8 @@ design/            Lamplight, the one source of the look: tokens.css, fonts.css 
 runtime/           Plain ES5-style scripts for the game pages: renplay-runtime.js (Ren'Py) and
                      renplay-html.js (HTML games), each with renplay-player.js, what they share, in
                      front. The server builds them (server/src/play/runtime.ts)
-image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it)
+image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it), and README.md,
+                     the overview Docker Hub shows (the release sets it, and it stays short and in the website's voice)
 charts/renplay/    The Helm chart
 deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
                      these files (a code block marked file=deploy/<path>), CI checks them (tests/examples.sh)
@@ -335,7 +336,8 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated
   `## [X.Y.Z] - YYYY-MM-DD` section, and is squash-merged into `main`. CI checks versions and the
   changelog. `release.yml` then builds the image (`X.Y.Z` and `latest`, GHCR and Docker Hub),
-  publishes and signs the chart, tags `vX.Y.Z` with the changelog section as the GitHub release,
+  sets the Docker Hub overview from `image/README.md` (a refusal does not fail the release), publishes and signs the chart,
+  tags `vX.Y.Z` with the changelog section as the GitHub release,
   deploys the docs and rebuilds the demo. Afterwards `dev` fast-forwards to the release branch. (`main` only gets squashed releases, so it never shares history with `dev`; the
   release branch records it with `git merge -s ours`.)
 - **Cadence:** release when a coherent set of changes is done and verified on a running instance,
