@@ -128,13 +128,20 @@ demo/              The public demo: its image (demo.renplay.org), and static/, t
                      server/src/__tests__/demo-static-routes.ts
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
-website/           renplay.org and adult.renplay.org: plain HTML and CSS, built by `build.mjs` (`sh build.sh`) into
-                     dist/ and dist-adult/. The safe-for-work catalog index gives each game a page (pages/game.html)
-                     and /catalog its first screen. The adult catalog is pages/catalog.html built in adult mode (a
-                     build-time setting, never the hostname), behind an age question, noindex. js/catalog-view.js is
-                     what the browser and the build both draw with. NEVER_SHOW_ADULT_COVERS=1 keeps adult covers
-                     blurred. _redirects holds the stable addresses (/docs, /github, /demo, /adult...), www/ the
-                     www.renplay.org redirect
+website/           renplay.org and adult.renplay.org: plain HTML, CSS and a little script, built by `build.mjs` (`sh build.sh`) into
+                     dist/ and dist-adult/. The home page (index.html) is the painted room: the room's paintings and lit
+                     screens in img/, the light and the screens in js/home.js, demo.js, shelf.js, credits.js and shared.js, the scene, the demo in two
+                     frames (https://demo.renplay.org, the static demo, no key), the shelf, install, answers and credits.
+                     The safe-for-work catalog index gives each game a page (pages/game.html), the shelf and /catalog its
+                     first screen. The adult catalog is pages/catalog.html built in adult mode (a build-time setting, never
+                     the hostname), behind an age question, noindex. js/catalog-view.js is what the browser and the build
+                     both draw with. lib/ holds the templates and head tags (render.mjs) and the social cards (og.mjs, with
+                     its own letters in glyphs.mjs and fraunces-card.ttf), made at build time from each game's cover and
+                     name. site.css is shared, home.css is the home page, catalog.css the other pages. Colours, faces,
+                     corners and durations come from design/. NEVER_SHOW_ADULT_COVERS=1 keeps adult covers blurred.
+                     _redirects holds the stable addresses (/github, /demo, /adult...), www/ the www.renplay.org redirect.
+                     `mise run check:website` reads the built files against the findability checklist
+                     (scripts/check-website.mjs), and specs/website.spec.mjs drives it in a browser
 telemetry/         The collector for the daily usage report: a Cloudflare Worker with D1 (telemetry.renplay.org),
                      its tests (`mise run check:telemetry`), deploy.sh. Not part of the image
 tests/             The image's install contract, the chart's tests, the deploy/ examples

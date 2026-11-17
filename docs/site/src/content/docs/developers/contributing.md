@@ -60,10 +60,11 @@ inside code blocks, so copyable commands always match the release.
 
 ## The website
 
-renplay.org is in `website/` of the repository: plain HTML and CSS, with no build step beyond
-copying the files. `mise run website` shows it on `http://localhost:5190`, and `mise run
-check:website` checks every link and picture in it. The docs and the website go live with each
-release.
+renplay.org is in `website/` of the repository: plain HTML, CSS and a little script, built by
+`website/build.mjs` from the catalog's index. `mise run website` shows it on `http://localhost:5190`.
+`mise run check:website` checks every link and picture in it, and that each page has what a search
+engine and a person without scripts need. Its colours, faces and corners come from `design/`. The
+docs and the website go live with each release.
 
 ## Product rules
 

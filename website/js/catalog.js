@@ -26,7 +26,7 @@ const blurOf = (g) => {
 const draw = (g, i) => card(g, { link: !ADULT, hidden: hides(g), blur: hides(g) ? blurOf(g) : '', eager: i < 4 })
 const view = () => filter(ADULT ? games : games.filter((g) => !g.nsfw), vocab, { q: $q.value, state: ui.state, tags: ui.tags })
 const base = () => (ADULT ? games : games.filter((g) => !g.nsfw))
-const shownCount = () => $games.querySelectorAll('.game:not(.skel)').length
+const shownCount = () => $games.querySelectorAll('.card:not(.skel)').length
 
 /** Draw the filters and the first `limit` cards of the view, rounded up to whole rows. */
 function render(limit) {
@@ -97,6 +97,13 @@ addEventListener('scroll', () => { clearTimeout(saving); saving = setTimeout(sav
 document.addEventListener('click', (e) => { if (e.target.closest('a.game')) save() })
 
 const open = (g) => { $('detail-body').innerHTML = detail(g, vocab, { hidden: hides(g), blur: hides(g) ? blurOf(g) : '' }); $('detail').showModal() }
+
+// The room at night behind the page, and the cards that lean toward the light. The glow behind the grid takes the colour of the card nearest it.
+const R = window.Renplay
+R.mountRoom($('room'), { dim: 0.3, sat: 0.9 })
+let glow = ''
+const lean = R.lean(() => $games.querySelectorAll('.card:not(.skel)'), { ry: 8, rx: 6, lit: (c) => { const tint = c.dataset.tint ?? ''; if (tint !== glow) { glow = tint; if (tint) $games.style.setProperty('--glow', tint); else $games.style.removeProperty('--glow') } } })
+if (lean) R.onFrame(lean)
 let opened = null
 const REQUESTS = ['request']
 
@@ -133,11 +140,11 @@ async function start() {
     try { sessionStorage.setItem(`${KEY}:index`, JSON.stringify({ vocabulary: idx.vocabulary, games: (idx.games ?? []).filter(offered) })) } catch {}
     load(idx)
   } catch {
-    if (!$games.dataset.prerendered) $games.innerHTML = `<div class="empty">The catalog could not be loaded. It is also on <a href="${REPO}">GitHub</a>.</div>`
+    if (!('prerendered' in $games.dataset)) $games.innerHTML = `<div class="empty">The catalog could not be loaded. It is also on <a href="${REPO}">GitHub</a>.</div>`
     return
   }
   // The first screen of the safe-for-work page came with the page: keep it, and only wire it up.
-  if (ADULT || !$games.dataset.prerendered) reset()
+  if (ADULT || !('prerendered' in $games.dataset)) reset()
   else watch()
   wire()
   hashed()

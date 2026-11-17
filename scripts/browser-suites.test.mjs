@@ -11,8 +11,11 @@ test('app and runtime inputs select the library specs', () => {
   }
 })
 test('site inputs select layout, including generated configuration inputs', () => {
-  for (const path of ['website/style.css', 'docs/site/astro.config.mjs']) assert.deepEqual(suites(path), ['layout'], path)
+  assert.deepEqual(suites('docs/site/astro.config.mjs'), ['layout'])
   assert.deepEqual(suites('server/src/envvars.ts'), ['playwright', 'layout'])
+})
+test('the website has a browser spec of its own, so its inputs select it as well as layout', () => {
+  for (const path of ['website/site.css', 'website/js/home.js', 'website/index.html']) assert.deepEqual(suites(path), ['playwright', 'layout'], path)
 })
 test('shared scripts, workflows and tool pins always select everything', () => {
   for (const path of [

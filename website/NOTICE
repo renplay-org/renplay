@@ -3,3 +3,6 @@ covers belongs to the games' developers and is not covered by it.
 
 js/thumbhash.js is the decoding half of ThumbHash by Evan Wallace
 (https://github.com/evanw/thumbhash), under the MIT license, Copyright (c) 2023 Evan Wallace.
+
+lib/fraunces-card.ttf is Fraunces (https://github.com/undercasetype/Fraunces), under the SIL Open Font License 1.1, cut to Latin
+at one optical size and weight from design/fonts/fraunces.woff2. The social cards set their letters from it (lib/glyphs.mjs).

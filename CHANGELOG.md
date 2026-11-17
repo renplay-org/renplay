@@ -7,6 +7,11 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- renplay.org and adult.renplay.org have the new look. The home page is a painted room whose three screens wake under your hand, with an opening scene you click through, the real demo on a laptop and a phone, a shelf of tested games, the install commands and plain answers. On a phone you pick the demo's phone up, and put it down again to be back where you were. The catalog, each game's page, the age question and the page that is not found follow the same look.
+- A link to a game's page on renplay.org shows a card with the game's name and cover, made by the website, instead of a picture from the developer's host.
+
 ## [4.13.0] - 2026-11-17
 
 ### Added
