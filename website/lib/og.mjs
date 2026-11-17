@@ -41,9 +41,16 @@ export async function gameCard({ title, developer, tint, cover }) {
   const lit = /^#[0-9a-f]{6}$/i.test(tint ?? '') ? tint : token('--fg-4')
   const box = { x: 84, y: 60, w: 360, h: 540 }
   const text = { x: 520, max: W - 520 - 72 }
-  const name = fit(title, [92, 80, 68, 58, 50, 44], text.max, 4)
   const by = developer ? fit(`By ${developer}`, [34, 28, 24], text.max, 1) : null
-  const nameTop = 250 - (name.lines.length - 1) * name.size * 0.5
+  // The name and the line under it are set in the space between the label at the top and the wordmark at the bottom, as large as they go.
+  const area = { top: 170, height: 300 }
+  let name
+  for (const size of [92, 80, 68, 58, 50, 44, 38]) {
+    name = fit(title, [size], text.max, 5)
+    if (name.lines.length * size * 1.08 + (by ? size * 0.35 + by.size * 1.2 : 0) <= area.height) break
+  }
+  const total = name.lines.length * name.size * 1.08 + (by ? name.size * 0.35 + by.size * 1.2 : 0)
+  const nameTop = area.top + (area.height - total) / 2 + name.size * 0.85
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
     <defs>
       <radialGradient id="g1" cx="22%" cy="40%" r="70%"><stop offset="0" stop-color="${mix(lit, 0.55)}"/><stop offset="1" stop-color="${token('--ink')}"/></radialGradient>
@@ -53,7 +60,7 @@ export async function gameCard({ title, developer, tint, cover }) {
     <rect x="${box.x - 1}" y="${box.y - 1}" width="${box.w + 2}" height="${box.h + 2}" rx="5" fill="${mix(lit, 0.6)}"/>
     <path d="${textPath(['Renplay catalog'], { size: 30, x: text.x, y: 120 })}" fill="${token('--fg-3')}"/>
     <path d="${textPath(name.lines, { size: name.size, x: text.x, y: nameTop, lead: 1.08 })}" fill="${token('--fg')}"/>
-    ${by ? `<path d="${textPath(by.lines, { size: by.size, x: text.x, y: nameTop + (name.lines.length - 1) * name.size * 1.08 + name.size * 0.55 + by.size })}" fill="${token('--fg-3')}"/>` : ''}
+    ${by ? `<path d="${textPath(by.lines, { size: by.size, x: text.x, y: nameTop + (name.lines.length - 1) * name.size * 1.08 + name.size * 0.35 + by.size * 1.1 })}" fill="${token('--fg-3')}"/>` : ''}
   </svg>`
   const layers = []
   if (cover) {

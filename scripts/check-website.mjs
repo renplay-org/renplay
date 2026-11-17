@@ -9,8 +9,9 @@
  *    structured data, the text a reader gets with scripts and frames removed, the sitemap and robots.txt, and the weight of the
  *    painted pictures. Each check names its checklist item (A-04, B-02 and so on).
  *
- * The checks that need the whole catalog (no adult game anywhere) run when CATALOG_FULL_FILE names a copy of
- * https://catalog.renplay.org/index.v4.json. Every failure is printed, and any failure exits 1.
+ * The checks that need the whole catalog (no adult game anywhere) read https://catalog.renplay.org/index.v4.json, or the copy
+ * in CATALOG_FULL_FILE, and are left out when the build was made from a file (CATALOG_INDEX_FILE) with none to compare. Every
+ * failure is printed, and any failure exits 1.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -370,8 +371,20 @@ for (const [at, set] of headerSets.slice(1)) {
 }
 
 // ---- no adult game in the build, when the whole catalog is at hand ------------------------------------------------------
-if (process.env.CATALOG_FULL_FILE) {
-  const full = JSON.parse(readFileSync(process.env.CATALOG_FULL_FILE, 'utf8'))
+// The file in CATALOG_FULL_FILE, else the catalog's own copy (unless the build was made from a file, which is a run with no network).
+async function wholeCatalog() {
+  if (process.env.CATALOG_FULL_FILE) return JSON.parse(readFileSync(process.env.CATALOG_FULL_FILE, 'utf8'))
+  if (process.env.CATALOG_INDEX_FILE) return null
+  try {
+    const res = await fetch('https://catalog.renplay.org/index.v4.json', { signal: AbortSignal.timeout(30000) })
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  }
+}
+const full = await wholeCatalog()
+if (!full) console.log('The whole catalog was not at hand, so the build was not searched for adult games.')
+else {
   const adults = (full.games ?? []).filter((g) => g.nsfw)
   const text = files(main.dist, /\.(html|xml|txt|js)$/).map((f) => readFileSync(f, 'utf8'))
   for (const g of adults) {
