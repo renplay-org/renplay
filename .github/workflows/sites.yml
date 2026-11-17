@@ -65,6 +65,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+      # The build makes each page's social card with the image library from the server's packages (as design/build.mjs does).
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: server
       - run: sh website/build.sh
         env:
           NEVER_SHOW_ADULT_COVERS: ${{ vars.NEVER_SHOW_ADULT_COVERS }}
