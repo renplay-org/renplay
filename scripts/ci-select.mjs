@@ -55,9 +55,16 @@ const RULES = [
   ['app', /^(selector|runtime|server)\//, { app: 'all', image: true, server: true }],
 ]
 
-/** The shape of the browser jobs. One entry per job: its name, the suite for scripts/test-ui.sh and the Playwright arguments. */
+/**
+ * The shape of the browser jobs. One entry per job: its name, the suite for scripts/test-ui.sh and the Playwright arguments.
+ * The specs run in two jobs, one per engine, because a run in one job took 344 s of test time and the engines split it
+ * nearly evenly: WebKit's projects 589 s of test time and Chromium's 610 s (the reporter's figures), each over the same four workers.
+ */
 export const BROWSER_JOBS = {
-  playwright: [{ name: 'playwright', suite: 'playwright', args: '' }],
+  playwright: [
+    { name: 'playwright-webkit', suite: 'playwright', args: '--project=webkit-portrait --project=webkit-landscape --project=webkit-desktop' },
+    { name: 'playwright-chromium', suite: 'playwright', args: '--project=chromium-desktop --project=chromium-phone' },
+  ],
   website: { name: 'website', suite: 'playwright', args: 'website.spec' },
   layout: { name: 'layout', suite: 'layout', args: '' },
 }

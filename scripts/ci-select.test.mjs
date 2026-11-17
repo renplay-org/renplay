@@ -12,7 +12,8 @@ const pick = (paths, options = {}) => {
   const r = select({ files, ...options })
   return { browser: r.browser.map((b) => b.name), image: r.image, server: r.server, telemetry: r.telemetry, forced: r.forced }
 }
-const EVERYTHING = { browser: ['playwright', 'layout'], image: true, server: true, telemetry: true }
+const PLAYWRIGHT = ['playwright-webkit', 'playwright-chromium']
+const EVERYTHING = { browser: [...PLAYWRIGHT, 'layout'], image: true, server: true, telemetry: true }
 const everything = (r, why) => assert.deepEqual({ ...r, forced: undefined }, { ...EVERYTHING, forced: undefined }, why)
 
 test('texts that nothing loads run no browser, no contract and no server tests', () => {
@@ -66,14 +67,14 @@ test('the website spec and its fixture run that spec alone, and other specs run 
 test('the library, the runtime, the server and the design run every browser spec', () => {
   for (const path of ['selector/src/App.tsx', 'runtime/renplay-runtime.js', 'server/src/play/runtime.ts', 'server/src/shared/api.ts', 'demo/static/sw/answer.ts', 'design/tokens.css']) {
     const r = pick([path])
-    assert.ok(r.browser.includes('playwright'), path)
+    assert.deepEqual(r.browser.filter((n) => n !== 'layout'), PLAYWRIGHT, path)
     assert.equal(r.server, true, path)
   }
   // A browser spec is read by Playwright alone: the server's own tests do not run it.
-  assert.deepEqual(pick(['server/scripts/app-ui/specs/search.spec.mjs']), { browser: ['playwright'], image: false, server: false, telemetry: false, forced: '' })
-  assert.deepEqual(pick(['selector/src/App.tsx']).browser, ['playwright'])
-  assert.deepEqual(pick(['design/tokens.css']).browser, ['playwright', 'layout'])
-  assert.deepEqual(pick(['server/src/envvars.ts']).browser, ['playwright', 'layout'])
+  assert.deepEqual(pick(['server/scripts/app-ui/specs/search.spec.mjs']), { browser: PLAYWRIGHT, image: false, server: false, telemetry: false, forced: '' })
+  assert.deepEqual(pick(['selector/src/App.tsx']).browser, PLAYWRIGHT)
+  assert.deepEqual(pick(['design/tokens.css']).browser, [...PLAYWRIGHT, 'layout'])
+  assert.deepEqual(pick(['server/src/envvars.ts']).browser, [...PLAYWRIGHT, 'layout'])
 })
 
 test('the pipeline and the browser tooling run everything', () => {
@@ -121,7 +122,7 @@ test('deleted and renamed files run everything, except texts and unit tests that
 test('a mixed change runs the union', () => {
   assert.deepEqual(pick(['README.md', 'telemetry/src/index.ts', 'charts/renplay/values.yaml']), { browser: [], image: true, server: false, telemetry: true, forced: '' })
   const r = pick(['selector/src/App.tsx', 'docs/site/astro.config.mjs', 'website/index.html'])
-  assert.deepEqual(r.browser, ['playwright', 'layout'])
+  assert.deepEqual(r.browser, [...PLAYWRIGHT, 'layout'])
   assert.deepEqual(pick(['website/index.html', 'docs/site/astro.config.mjs']).browser, ['website', 'layout'])
 })
 
@@ -149,7 +150,7 @@ test('the command writes job outputs and a summary that names the reason for eac
   const env = { PATH: process.env.PATH, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary, BASE_REF: 'dev', EVENT: 'pull_request' }
   execFileSync(process.execPath, [command, '--github'], { input, env, encoding: 'utf8' })
   const lines = Object.fromEntries(readFileSync(output, 'utf8').split('\n').filter(Boolean).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
-  assert.deepEqual(JSON.parse(lines['browser-suites']), [{ name: 'playwright', suite: 'playwright', args: '' }])
+  assert.deepEqual(JSON.parse(lines['browser-suites']).map((j) => j.name), PLAYWRIGHT)
   assert.equal(lines.image, 'true')
   assert.equal(lines.server, 'true')
   assert.equal(lines.telemetry, 'false')
@@ -158,4 +159,14 @@ test('the command writes job outputs and a summary that names the reason for eac
   assert.match(text, /\| Layout check \| skipped \|/)
   execFileSync(process.execPath, [command, '--github'], { input, env: { ...env, RENPLAY_CI_FULL: 'true' }, encoding: 'utf8' })
   assert.match(readFileSync(summary, 'utf8'), /Everything runs: RENPLAY_CI_FULL is true/)
+})
+
+test('the two Playwright jobs together run every project once', () => {
+  const { browser } = select({ files: [file('selector/src/App.tsx')] })
+  const projects = browser.flatMap((j) => (j.args.match(/--project=[\w-]+/g) ?? []).map((a) => a.slice(10))).sort()
+  const config = readFileSync(new URL('../server/scripts/app-ui/playwright.config.mjs', import.meta.url), 'utf8')
+  const configured = [...config.matchAll(/\{ name: '([\w-]+)'/g)].map((m) => m[1]).sort()
+  assert.ok(configured.length >= 5)
+  assert.deepEqual(projects, configured, 'a project in the config that no job names would never run in CI')
+  assert.ok(browser.every((j) => j.suite === 'playwright' || j.suite === 'layout'))
 })
