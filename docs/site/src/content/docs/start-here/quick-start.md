@@ -4,7 +4,7 @@ description: Run Renplay, add a game and play it.
 ---
 
 To see Renplay before you install it, [try the demo](https://renplay.org/demo): one game to play,
-the whole catalog, and saves that last until the demo starts fresh.
+the whole catalog, and saves that stay in your own browser.
 
 ## Run it
 

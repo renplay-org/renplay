@@ -1,9 +1,9 @@
 name: Demo
 
-# The public demo at demo.renplay.org (demo/): built with each release (release.yml) or by hand,
-# tried, pushed as ghcr.io/renplay-org/renplay:demo, and started from it (DEMO_DEPLOY_HOOK).
-# The same demo as plain files (demo/static/) is built from that image, tried in browsers, and published to Cloudflare
-# once the repository variable STATIC_DEMO_DEPLOY is true.
+# The demo, built with each release (release.yml) or by hand. The demo image (demo/, RENPLAY_DEMO) is tried and pushed
+# as ghcr.io/renplay-org/renplay:demo, for anyone who runs a demo with a server. The public demo at demo.renplay.org is
+# the same demo as plain files (demo/static/): built from that image, tried in browsers, and published to Cloudflare
+# when the repository variable STATIC_DEMO_DEPLOY is true.
 
 on:
   workflow_call:
@@ -12,8 +12,6 @@ on:
         type: string
         required: true
     secrets:
-      DEMO_DEPLOY_HOOK:
-        required: false
       CLOUDFLARE_API_TOKEN:
         required: false
       CLOUDFLARE_ACCOUNT_ID:
@@ -91,16 +89,8 @@ jobs:
       - name: Push the image
         run: docker push "$IMAGE"
 
-      - name: Start the demo from the new image
-        env:
-          HOOK: ${{ secrets.DEMO_DEPLOY_HOOK }}
-        run: |
-          if [ -z "$HOOK" ]; then echo "No DEMO_DEPLOY_HOOK secret, so the demo is not restarted"; exit 0; fi
-          curl -fsS -X POST "$HOOK" > /dev/null
-          echo "The demo starts from the new image"
-
       # The static demo: the demo's own answers captured from the new image, and the files of its games from the
-      # image's build (not from a running container). It follows the image, so a failure here leaves the demo above as it is.
+      # image's build (not from a running container).
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -130,7 +120,7 @@ jobs:
           npx playwright install --with-deps chromium webkit
           npx playwright test --config scripts/app-ui/playwright.config.mjs --project=chromium-desktop --project=webkit-desktop --project=webkit-portrait static-demo
 
-      # Jan's switch: until STATIC_DEMO_DEPLOY is true, nothing is published (and the domain stays where it is).
+      # Published only when the repository variable STATIC_DEMO_DEPLOY is true.
       - name: Publish the static demo
         if: ${{ vars.STATIC_DEMO_DEPLOY == 'true' }}
         working-directory: demo/static
