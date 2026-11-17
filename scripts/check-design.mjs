@@ -25,7 +25,6 @@ const SCAN = [
 
 /** Places that may keep this many literals for now, each one to move to a token. Counts only go down. */
 const ALLOWED = {
-  'docs/site/src/styles/renplay.css': 37,
 }
 
 const files = []
@@ -106,9 +105,9 @@ for (const file of files) {
   }
   for (const m of text.matchAll(FACE)) if (!faceOk(m[1] ?? m[2])) report(m.index, 'face', m[0])
   for (const m of text.matchAll(CORNER)) if (!cornerOk(m[1])) report(m.index, 'corner', m[1])
-  // A duration is a token (--t-press, --t-focus, --t-pane, --t-travel, --t-room). Nothing is a literal in the library, which has
-  // none now: the website's and the docs' stylesheets are held to the rest until they move.
-  if (rel.startsWith('selector/src/')) {
+  // A duration is a token (--t-press, --t-focus, --t-pane, --t-travel, --t-room). Nothing is a literal in the library or the docs,
+  // which have none now: the website's stylesheets are held to the rest until they move.
+  if (rel.startsWith('selector/src/') || rel.startsWith('docs/site/src/')) {
     for (const m of text.matchAll(DURATION)) {
       for (const t of m[1].matchAll(TIME)) if (Number(t[1]) !== 0) report(m.index, 'duration', `${t[1]}${t[2]}`)
     }

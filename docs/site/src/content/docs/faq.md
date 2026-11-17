@@ -1,6 +1,6 @@
 ---
 title: FAQ
-description: Short answers to common questions.
+description: Short answers about what Renplay plays, where saves live, phones, adult games and running it on your own server.
 ---
 
 ## Which games work?

@@ -1,6 +1,6 @@
 ---
 title: Quick start
-description: Run Renplay, add a game and play it.
+description: Run Renplay with one Docker command, add your first game and play it in the browser.
 ---
 
 To see Renplay before you install it, [try the demo](https://renplay.org/demo): one game to play,

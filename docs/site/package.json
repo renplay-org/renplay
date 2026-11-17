@@ -11,6 +11,7 @@
     "gen": "node scripts/gen-config.mjs",
     "check:config": "node scripts/gen-config.mjs --check",
     "check:llms": "node scripts/check-llms.mjs",
+    "check:seo": "node scripts/check-seo.mjs",
     "dev": "npm run gen && astro dev",
     "build": "npm run gen && astro build",
     "preview": "astro preview"
