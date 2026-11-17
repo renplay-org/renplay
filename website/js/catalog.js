@@ -123,15 +123,26 @@ function hashed() {
   else $('hash-note').hidden = false
 }
 
+/** Words searched for from the home page (/catalog/?q=words): the search starts with them, and the address is tidied. */
+function asked() {
+  const q = new URLSearchParams(location.search).get('q')
+  if (q === null) return false
+  $q.value = q
+  try { history.replaceState(history.state, '', location.pathname + location.hash) } catch {}
+  return true
+}
+
 async function start() {
   if (ADULT) {
     thumb = (await import('./thumbhash.js')).thumbHashToDataURL
     $games.innerHTML = skeleton(columns() * ROWS)
   }
+  const searched = asked()
   let cached = null
   try { cached = JSON.parse(sessionStorage.getItem(`${KEY}:index`) ?? 'null') } catch {}
   if (cached) {
     load(cached)
+    if (searched) { html.classList.remove('restoring'); reset(); wire(); hashed(); return }
     if (restore(cached)) { html.classList.remove('restoring'); wire(); hashed(); return }
   }
   html.classList.remove('restoring')
@@ -143,8 +154,8 @@ async function start() {
     if (!('prerendered' in $games.dataset)) $games.innerHTML = `<div class="empty">The catalog could not be loaded. It is also on <a href="${REPO}">GitHub</a>.</div>`
     return
   }
-  // The first screen of the safe-for-work page came with the page: keep it, and only wire it up.
-  if (ADULT || !('prerendered' in $games.dataset)) reset()
+  // The first screen of the safe-for-work page came with the page: keep it, and only wire it up. A search from the home page draws its own.
+  if (ADULT || searched || !('prerendered' in $games.dataset)) reset()
   else watch()
   wire()
   hashed()

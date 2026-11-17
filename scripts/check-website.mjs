@@ -29,15 +29,17 @@ const fail = (where, what) => { const line = `${where}: ${what}`; if (!problems.
 const DEFINITION = 'Renplay is a self-hosted player for Ren’Py games in the browser, with saves on your own server.'
 const TAGLINE = 'Your Ren’Py games, on every screen.'
 const SCENE = [
-  'The window turns violet and the house goes quiet.',
-  'Somewhere in this room your story is still open, exactly where you left it. Every save is already on your own server.',
-  'You have a few screens and one evening. Which do you reach for?',
+  'Evening. The house is quiet, and the story you started at your desk is still open.',
+  'Every save went to your own server the moment you made it.',
+  'So, where do you pick it up?',
 ]
-const CHOICES = ['The phone on the sofa', 'The tablet on the side table', 'The laptop on the desk']
-const MENU = ['New game', 'Continue', 'Gallery', 'Extras']
-const FEATURES = ['What it plays', 'Saves and history', 'Phones and offline', 'Accounts and sign-in', 'Adult games, on your terms', 'Install', 'Mods in the browser', 'Dashboards', 'Private by design']
+const CHOICES = ['The phone', 'The tablet', 'The laptop']
+// The two ways on from the first screen: install, and the demo in its own tab.
+const WAYS = [['Install', '#install'], ['Try the demo', 'https://demo.renplay.org/']]
+const FEATURES = ['Plays what you already own', 'Saves with a history', 'Phones, offline, a controller', 'Everyone in the house', 'Adult games, on your terms', 'Mods, dashboards, your own hardware']
 const STEPS = ['Add the game', 'Renplay prepares it', 'Play anywhere']
-const FAQ = ['Which games work?', 'Where do I get the games?', 'Does it need a powerful server?', 'Can I still play on desktop Ren’Py?', 'Does it work without the internet?', 'What about adult games?', 'Is it really free?', 'What does it send?', 'What does the demo keep?']
+const NUMBERS = ['From Play to the first frame, on a phone', 'Smaller than the download', 'Back on another screen']
+const FAQ = ['Will my games work?', 'Where do the games come from?', 'Do I need a big server?', 'Can I go back to desktop Ren’Py?', 'Does it play offline?', 'What about adult games?', 'Is it really free?', 'What does it send home?']
 const COMMANDS = ['docker run -d --name renplay -p 8080:8080', 'image: ghcr.io/renplay-org/renplay:latest']
 const GUIDES = ['docker', 'kubernetes', 'truenas', 'unraid', 'synology', 'ugreen', 'qnap'].map((g) => `https://docs.renplay.org/install/${g}/`)
 // Wording that must not come back: the site sends a daily report, so it says so (A-12).
@@ -180,8 +182,11 @@ for (const page of main.pages) {
   if (!header) fail(at, 'A-13: no header with the navigation')
   else {
     const hrefs = links(page, header)
-    const catalogLink = all(header, (e) => e.name === 'a' && squash(textOf(e)) === 'Catalog')[0]
-    if (!catalogLink || !/^(https:\/\/renplay\.org)?\/catalog\/$/.test(catalogLink.attrs.href)) fail(at, 'A-08: the nav\'s Catalog does not go to /catalog/')
+    const catalogLinks = all(header, (e) => e.name === 'a' && squash(textOf(e)) === 'Catalog')
+    if (!catalogLinks.length || catalogLinks.some((a) => !/^(https:\/\/renplay\.org)?\/catalog\/$/.test(a.attrs.href))) fail(at, 'A-08: the nav\'s Catalog does not go to /catalog/')
+    // The nav's Demo is the demo itself, in its own tab, never a section of the home page.
+    const demoLink = all(header, (e) => e.name === 'a' && squash(textOf(e)) === 'Demo')[0]
+    if (demoLink?.attrs.href !== 'https://demo.renplay.org/' || demoLink.attrs.target !== '_blank') fail(at, 'A-08: the nav\'s Demo does not open https://demo.renplay.org/ in a new tab')
     headerSets.push([at, new Set(hrefs)])
     // The 404 is the room and a line of dialogue, with no footer of its own.
     const footer = kind === '404' ? [] : all(page.tree, (e) => e.name === 'footer')
@@ -211,7 +216,7 @@ for (const [at, set] of headerSets.slice(1)) {
   const h1 = first(page.tree, (e) => e.name === 'h1')
   if (!squash(textOf(h1)).startsWith('Renplay') || !squash(textOf(h1)).includes(TAGLINE)) fail(at, `B-01: the h1 is not "Renplay" with the tagline "${TAGLINE}"`)
   // B-02, A-15: the definition is a visible lede in the first section, outside the scene's `after` and anything hidden.
-  const define = first(section, (e) => e.name === 'p' && squash(textOf(e)) === DEFINITION)
+  const define = first(section, (e) => e.name === 'p' && squash(textOf(e)).startsWith(DEFINITION))
   if (!define) fail(at, 'B-02: the definition sentence is not a paragraph of the first section')
   else for (let n = define; n && n !== section; n = n.parent) if (n.attrs.hidden !== undefined || /\bafter\b/.test(n.attrs.class ?? '') || n.attrs['aria-hidden'] === 'true') fail(at, 'B-02: the definition sentence sits in something hidden')
   if (meta(page, 'description')[0] !== DEFINITION) fail(at, 'A-15: the description is not the definition sentence')
@@ -221,12 +226,18 @@ for (const [at, set] of headerSets.slice(1)) {
   for (const line of SCENE) if (!lines.includes(line)) fail(at, `B-03: the scene's line is not a paragraph: ${line}`)
   const choices = all(page.tree, (e) => e.name === 'a' && e.attrs['data-dev'] !== undefined)
   for (const c of CHOICES) if (!choices.some((a) => squash(textOf(a)).endsWith(c) && a.attrs.href)) fail(at, `B-03: the choice "${c}" is not a link`)
-  const menu = first(page.tree, (e) => e.attrs.id === 'menu')
-  const menuLinks = menu ? all(menu, (e) => e.name === 'a') : []
-  for (const m of MENU) if (!menuLinks.some((a) => squash(textOf(a)).startsWith(m) && a.attrs.href && a.attrs.href !== '#')) fail(at, `B-03: the menu item "${m}" is not a link with an address`)
-  // B-04, B-05, B-06: what it does, the steps, the answers and both install commands are text.
+  // The two ways on are links in the first section, with their addresses, and the demo opens in its own tab.
+  const ways = all(section, (e) => e.name === 'a' && /\bbtn\b/.test(e.attrs.class ?? ''))
+  for (const [label, href] of WAYS) {
+    const a = ways.find((x) => squash(textOf(x)) === label)
+    if (!a || a.attrs.href !== href) fail(at, `B-03: the first section has no "${label}" button to ${href}`)
+    else if (href.startsWith('https://') && (a.attrs.target !== '_blank' || !/\bnoopener\b/.test(a.attrs.rel ?? ''))) fail(at, `B-03: "${label}" should open in a new tab with rel="noopener"`)
+  }
+  // B-04, B-05, B-06: what it does, the steps, the numbers, the answers and both install commands are text.
   const headingTexts = all(page.tree, (e) => /^h[2-4]$/.test(e.name)).map((h) => squash(textOf(h)))
   for (const f of [...FEATURES, ...STEPS]) if (!headingTexts.includes(f)) fail(at, `B-04: no heading "${f}"`)
+  const numberTerms = all(first(page.tree, (e) => e.attrs.id === 'numbers'), (e) => e.name === 'dt').map((d) => squash(textOf(d)))
+  for (const n of NUMBERS) if (!numberTerms.includes(n)) fail(at, `B-04: no measured number "${n}"`)
   const details = all(page.tree, (e) => e.name === 'details')
   for (const q of FAQ) {
     const d = details.find((x) => squash(textOf(first(x, (e) => e.name === 'summary'))) === q)

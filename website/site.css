@@ -16,8 +16,9 @@
   --on-ink-hi: color-mix(in srgb, var(--ink) 78%, transparent);
 }
 * { box-sizing: border-box; margin: 0; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: var(--ink); scroll-padding-top: calc(var(--nav-h) + 12px); scrollbar-gutter: stable; }
-body { font: 400 16px/1.6 var(--sans); color: var(--fg); background: var(--ink); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+/* The page scrolls one way. Nothing may reach past the screen's edge, and what does is clipped, not scrolled to. */
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: var(--ink); scroll-padding-top: calc(var(--nav-h) + 12px); scrollbar-gutter: stable; overflow-x: clip; }
+body { font: 400 16px/1.6 var(--sans); color: var(--fg); background: var(--ink); overflow-x: clip; -webkit-font-smoothing: antialiased; }
 img { display: block; max-width: 100%; }
 a { color: var(--pink-2); text-underline-offset: 3px; }
 a:hover { color: var(--pink-3); }
@@ -79,8 +80,9 @@ h2 { font-size: clamp(36px, 5.2vw, 68px); margin-top: 12px; }
 .dev picture, .dev img { display: block; width: 100%; height: 100%; max-width: none; }
 .dev.on { --w: 1; }
 
-/* The lantern */
-.light { position: fixed; left: 0; top: 0; width: 880px; height: 880px; margin: -440px 0 0 -440px; z-index: 40; pointer-events: none; mix-blend-mode: screen; opacity: var(--la, 0.85);
+/* The lantern, in a layer the size of the window that clips it: the light never widens the page */
+.light-layer { position: fixed; inset: 0; z-index: 40; overflow: hidden; pointer-events: none; }
+.light { position: absolute; left: 0; top: 0; width: 880px; height: 880px; margin: -440px 0 0 -440px; pointer-events: none; mix-blend-mode: screen; opacity: var(--la, 0.85);
   background: radial-gradient(closest-side, color-mix(in srgb, color-mix(in srgb, var(--lamp) 55%, var(--pink-2)) 62%, transparent), color-mix(in srgb, var(--pink) 32%, transparent) 34%, color-mix(in srgb, var(--violet) 12%, transparent) 66%, transparent); will-change: transform; }
 
 /* Header. Fixed, never over text: it is opaque once the page has moved, the first screen of every page starts below it,
@@ -98,11 +100,15 @@ h2 { font-size: clamp(36px, 5.2vw, 68px); margin-top: 12px; }
 /* Install is the lit button on a wide screen, so the plain link only shows inside the phone menu */
 .links a.install-link { display: none; }
 .links a:hover, .links a[aria-current] { color: #fff; background-size: calc(100% - 24px) 1px; }
+/* Catalog is in the bar on a phone too, before the menu */
+.nav-catalog { display: none; align-items: center; min-height: 44px; margin-left: auto; padding: 0 12px; color: var(--fg); text-decoration: none; font: 600 15px var(--sans); text-shadow: 0 1px 10px color-mix(in srgb, #000 70%, transparent); }
+.nav-catalog[aria-current] { color: #fff; background: linear-gradient(currentColor, currentColor) 12px calc(50% + 12px) / calc(100% - 24px) 1px no-repeat; }
 .menu-btn { display: none; min-height: 44px; min-width: 44px; padding: 0 16px; border-radius: var(--r-1); border: 1px solid var(--hair); background: color-mix(in srgb, var(--ink) 40%, transparent); color: var(--fg); font: 600 15px var(--sans); cursor: pointer; }
 html.taken .nav { transform: translateY(-110%); }
 @media (max-width: 860px) {
   .links { display: none; }
-  .menu-btn { display: inline-flex; align-items: center; justify-content: center; margin-left: auto; }
+  .menu-btn { display: inline-flex; align-items: center; justify-content: center; }
+  .nav-catalog { display: inline-flex; }
   .nav > .btn { display: none; }
   .nav.open { background: color-mix(in srgb, var(--ink) 96%, transparent); }
   .nav.open .links { display: flex; flex-direction: column; position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); top: calc(var(--nav-h) + 4px); padding: 8px; margin: 0; background: var(--glass-sheet); border: 1px solid var(--line); border-radius: var(--r-2); box-shadow: 0 24px 60px -12px color-mix(in srgb, #000 80%, transparent); max-height: calc(100svh - var(--nav-h) - 16px); overflow: auto; }
@@ -113,7 +119,7 @@ html.taken .nav { transform: translateY(-110%); }
 /* Without JavaScript the Menu button does nothing, so on a narrow screen the links are the header: in a row under the name, in the page's flow. */
 @media (max-width: 860px) {
   html:not(.js) .nav { position: relative; height: auto; flex-wrap: wrap; padding-block: calc(env(safe-area-inset-top, 0px) + 4px) 4px; z-index: 5; background: var(--ink); }
-  html:not(.js) .menu-btn { display: none; }
+  html:not(.js) .menu-btn, html:not(.js) .nav-catalog { display: none; }
   html:not(.js) .links { display: flex; flex-wrap: wrap; width: 100%; margin-left: 0; }
   html:not(.js) .links a.install-link { display: flex; }
 }

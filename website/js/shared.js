@@ -70,7 +70,9 @@ document.addEventListener('visibilitychange', () => { running = !document.hidden
 
 /* ------------------------------------------------------------------ header */
 const nav = $('#nav')
-const R = { $, $$, clamp, lerp, still, touchy, hand, light, nav, hooks, onFrame: (fn) => hooks.push(fn), solidAt: () => 8, place }
+/** The light goes to a place and swells there: the page's answer to a choice. */
+const swell = (x, y) => { hand.bx = hand.tx = x; hand.by = hand.ty = y; hand.seen = true; hand.pulse = 1.6; if (still) { hand.x = x; hand.y = y; place() } }
+const R = { $, $$, clamp, lerp, still, touchy, hand, light, nav, hooks, onFrame: (fn) => hooks.push(fn), solidAt: () => 8, place, swell }
 window.Renplay = R
 function navInit() {
   if (!nav) return
