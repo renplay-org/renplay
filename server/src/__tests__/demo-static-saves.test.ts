@@ -6,7 +6,8 @@ import type { Store } from '../../../demo/static/sw/types'
 /*
  * What a visitor's saves may take in their browser: the server demo's limits (a file of 2 MB, 32 MB and 1,000 files
  * in all) count the earlier versions too, since they are in the browser's storage as well. Everything here runs on
- * the stand-in alone, in memory.
+ * the stand-in alone, in memory. A visitor can no longer pin a save, restore a version or delete a slot (the static demo
+ * leaves them out), but a browser that pinned one before still holds it: its pin is put in the store here.
  */
 
 const DIR = 'the_question-7'
@@ -33,7 +34,10 @@ describe('the static demo\'s saves', () => {
   /** A payload of the given size that no other call's is the same as. */
   const payload = (size: number, n: number) => { const data = new Uint8Array(size); data.fill(n % 251); new DataView(data.buffer).setUint32(0, n); return data }
   const put = (file: string, data: Uint8Array) => call('PUT', `/file?path=${DIR}/${file}`, data)
-  const pin = (file: string) => call('PUT', `/meta?file=${file}`, { pinned: true })
+  /** A save pinned in an earlier visit: the guest cannot pin one now. */
+  const pin = (file: string) => store.put('notes', { key: `${DIR}/${file}`, title: '', note: '', pinnedAt: new Date().toISOString() })
+  /** The game deleting a file, as the runtime sends it. */
+  const unlink = (file: string) => call('DELETE', `/file?path=${DIR}/${file}`)
   /** What the browser keeps: the files and every version. */
   const held = async () => {
     const files = await store.all('files'), versions = await store.all('versions')
@@ -65,23 +69,12 @@ describe('the static demo\'s saves', () => {
     expect(now.bytes).toBeLessThanOrEqual(32 * MB)
   })
 
-  it('refuses a restore that would take the saves past the quota', async () => {
-    await put('1-1.save', payload(1.5 * MB, 0))
-    await pin('1-1.save')
-    for (let i = 1; (await held()).bytes + 1.5 * MB <= 32 * MB; i++) expect((await put('1-1.save', payload(1.5 * MB, i))).status).toBe(200)
-    const before = await held()
-    const [oldest] = (await store.all('versions')).sort((a, b) => a.savedAt - b.savedAt)
-    const restored = await call('POST', '/history/restore', { id: oldest!.id })
-    expect(restored.status).toBe(507)
-    expect(await held()).toEqual(before)
-  })
-
-  it('lets a delete go on when the saves are full, since the file only moves to its history', async () => {
+  it('lets the game delete a file when the saves are full, since the file only moves to its history', async () => {
     await put('1-1.save', payload(1.5 * MB, 0))
     await pin('1-1.save')
     for (let i = 1; (await held()).bytes + 1.5 * MB <= 32 * MB; i++) await put('1-1.save', payload(1.5 * MB, i))
     const before = await held()
-    expect((await call('DELETE', '/slot?file=1-1.save')).status).toBe(200)
+    expect((await unlink('1-1.save')).status).toBe(200)
     const after = await held()
     expect([after.bytes, after.entries]).toEqual([before.bytes, before.entries])
   })
@@ -102,11 +95,10 @@ describe('the static demo\'s saves', () => {
     }
   })
 
-  it('loses nothing when a write, a delete and a restore of one save come at once', async () => {
+  it('loses nothing when a write and a delete of one save come at once', async () => {
     await put('1-1.save', payload(64, 1))
     await put('1-1.save', payload(64, 2))
-    const [first] = (await store.all('versions')).sort((a, b) => a.savedAt - b.savedAt)
-    await Promise.all([put('1-1.save', payload(64, 3)), call('DELETE', '/slot?file=1-1.save'), call('POST', '/history/restore', { id: first!.id })])
+    await Promise.all([put('1-1.save', payload(64, 3)), unlink('1-1.save')])
     expect([...(await recoverable())].sort()).toEqual([1, 2, 3])
   })
 

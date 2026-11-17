@@ -6,11 +6,13 @@ import { BetaBadge } from '../lantern/ui'
 import type { CatalogGame } from '@shared/api'
 import { stateLabel, gameTags } from '../lib/tags'
 import { popupClick, recipeLinks } from '../lib/links'
+import { useStaticDemo } from '../lib/auth'
 import { useCatalog } from '../lib/queries'
 
 /** A catalog recipe, as the sheet a catalog tile opens: what it is, where to get it, how it installs. */
 export default function RecipeCard({ recipe: r }: { recipe: CatalogGame }) {
   const { data: catalog } = useCatalog()
+  const staticDemo = useStaticDemo()
   const latest = r.releases[0]
   const broken = latest?.status === 'broken'
   const links = recipeLinks(r.links)
@@ -61,7 +63,7 @@ export default function RecipeCard({ recipe: r }: { recipe: CatalogGame }) {
           This release does not work in Renplay. Check the developer’s downloads for a newer one.
         </p>
       )}
-      {!r.local && (
+      {!r.local && !staticDemo && (
         <div className="list" style={{ marginTop: 14 }}>
           <div>
             <div className="h3">Play it in Renplay</div>
@@ -78,6 +80,10 @@ export default function RecipeCard({ recipe: r }: { recipe: CatalogGame }) {
           <Pill variant="p" size="sm" to={`/game/${r.local.id}`}>
             Open in your library
           </Pill>
+        ) : staticDemo ? (
+          <p className="small muted-2">
+            <a className="link" href="https://renplay.org/#install">Install your own Renplay</a> to add games.
+          </p>
         ) : (
           <Pill variant="p" size="sm" to="/add" icon={<Plus />}>
             Add the download

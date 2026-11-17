@@ -1,6 +1,7 @@
 import { Accessibility, Camera, Download, FastForward, Terminal, Undo2 } from 'lucide-react'
 import { TEXT_SIZES } from '@shared/defaults'
 import { Seg, SourceLabel } from '../../lantern/controls'
+import { useStaticDemo } from '../../lib/auth'
 import type { DisplayPrefs } from '../../lib/display'
 import { SwitchRow } from './PlayerMenu'
 
@@ -37,6 +38,7 @@ export default function OptionsView({
   onDownloadLog: () => void
 }) {
   const fromAdmin = options?.patchesFrom === 'admin'
+  const staticDemo = useStaticDemo()
   return (
     <>
       {renpy && options && (
@@ -64,12 +66,16 @@ export default function OptionsView({
             <Accessibility />
             The game’s accessibility screen
           </button>
-          <hr className="pm-rule" />
-          {options && <SwitchRow icon={<Terminal />} label="Developer console" checked={!!options.patches.console} onChange={(console) => onChange({ patches: { console } })} />}
-          <button type="button" className="pm-row quiet" onClick={onDownloadLog}>
-            <Download />
-            Download the game’s log
-          </button>
+          {!staticDemo && (
+            <>
+              <hr className="pm-rule" />
+              {options && <SwitchRow icon={<Terminal />} label="Developer console" checked={!!options.patches.console} onChange={(console) => onChange({ patches: { console } })} />}
+              <button type="button" className="pm-row quiet" onClick={onDownloadLog}>
+                <Download />
+                Download the game’s log
+              </button>
+            </>
+          )}
         </>
       )}
     </>
