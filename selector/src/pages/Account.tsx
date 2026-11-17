@@ -60,7 +60,8 @@ export default function Account() {
         </div>
       </header>
       <nav className="acct-nav" aria-label="Account pages">
-        <Link to="/history" className={admin ? '' : 'full'}><History /> Play history</Link>
+        <Link to="/history" className={admin || me.demoStatic ? '' : 'full'}><History /> Play history</Link>
+        {me.demoStatic && <Link to="/settings"><Settings /> This browser</Link>}
         {admin && (
           <>
             <Link to="/settings"><Settings /> Settings</Link>

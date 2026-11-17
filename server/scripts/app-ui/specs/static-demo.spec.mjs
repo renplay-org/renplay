@@ -291,6 +291,7 @@ test('a visitor can play and name a save, and the library leaves out the rest', 
   // Account and settings keep what is this browser's own.
   await visit(page, '/account')
   await expect(page.getByRole('link', { name: 'Play history' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'This browser' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Adult games' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Your saves' })).toHaveCount(0)
   await visit(page, '/settings')
