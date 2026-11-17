@@ -95,7 +95,14 @@ R.motes = (cv, stage) => {
   const ctx = cv.getContext('2d')
   const N = touchy ? 34 : 64
   const sprite = document.createElement('canvas'); sprite.width = sprite.height = 32
-  { const g = sprite.getContext('2d'); const r = g.createRadialGradient(16, 16, 0, 16, 16, 16); r.addColorStop(0, 'rgba(255,226,190,1)'); r.addColorStop(.35, 'rgba(255,190,150,.5)'); r.addColorStop(1, 'rgba(255,170,140,0)'); g.fillStyle = r; g.fillRect(0, 0, 32, 32) }
+  {
+    // a speck is the lamp's colour (design/tokens.css), whiter at its heart
+    const g = sprite.getContext('2d'), r = g.createRadialGradient(16, 16, 0, 16, 16, 16)
+    const lamp = getComputedStyle(document.documentElement).getPropertyValue('--lamp').trim().match(/[0-9a-f]{2}/gi)?.map((h) => parseInt(h, 16)) ?? [255, 197, 138]
+    const [cr, cg, cb] = lamp.map((v) => Math.round(v + (255 - v) * .4))
+    r.addColorStop(0, `rgba(${cr},${cg},${cb},1)`); r.addColorStop(.35, `rgba(${lamp},.5)`); r.addColorStop(1, `rgba(${lamp},0)`)
+    g.fillStyle = r; g.fillRect(0, 0, 32, 32)
+  }
   let W = 0, H = 0
   const P = Array.from({ length: N }, () => ({ x: Math.random(), y: Math.random(), vx: 0, vy: 0, r: .7 + Math.random() * 1.8, z: .4 + Math.random() * .6, ph: Math.random() * 6.28, sp: .5 + Math.random() }))
   const size = () => { W = cv.width = Math.round(innerWidth * .75); H = cv.height = Math.round(innerHeight * .75) }
