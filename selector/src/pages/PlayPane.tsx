@@ -57,7 +57,7 @@ export function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }
               </p>
             </div>
           </div>
-          <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }} className="stack">
+          {!staticDemo && <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }} className="stack">
             <div>
               <h3 className="label" style={{ marginBottom: 8 }}>Status</h3>
               <Seg
@@ -74,7 +74,7 @@ export function PlayPane({ game, onSaves }: { game: Game; onSaves?: () => void }
               <h3 className="label" style={{ marginBottom: 4 }}>Your rating</h3>
               <Stars value={game.rating ?? 0} onChange={(rating) => void save('rating', { rating })} />
             </div>
-          </div>
+          </div>}
         </section>
       </div>
       <div className="stack">

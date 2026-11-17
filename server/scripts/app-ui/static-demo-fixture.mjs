@@ -55,6 +55,10 @@ export async function staticDemo({ dir } = {}) {
     const { loadConfig } = await import('../../dist/config.js')
     const cfg = { ...loadConfig(), demo: true, demoEmbedder: embedderOrigin, auth: 'on', adultGames: 'off', dataDir: join(root, 'data'), gamesDir: join(root, 'games'), internalDir: join(root, 'internal'), workDir: join(root, 'work'), purgeDir: join(root, 'purge'), uploadsDir: join(root, 'uploads'), enginesDir: join(root, 'engines'), archivesDir: join(root, 'archives'), recipesDir: join(root, 'recipes'), walkthroughsDir: join(root, 'walkthroughs'), overlaysDir: join(root, 'overlays'), catalogUrls: ['http://127.0.0.1:9/none'], enginesUrl: 'http://127.0.0.1:9/none', backupDir: null, telemetry: 'off' }
     const app = await createApp(cfg, { startJobs: false })
+    // A game of the catalog that is not installed, for the Catalog's sheet.
+    app.db.setSetting('catalog_cache', { at: Date.now(), games: [{ id: 'not-installed', title: 'Not Installed', nsfw: false, engine: 'renpy', art: [], releases: [{ version: '1', status: 'verified', archives: [{ name: 'not-installed.zip', size: 4 }] }] }], vocabulary: {}, adultGames: 'off' })
+    await app.catalog.init()
+    app.catalog.stop()
     app.db.insertGame({ id: 'the-question', title: 'The Question', recipe_id: 'the-question', adult: 0, status: 'installed', build: 'b1', engine: '8.5.3', save_dir: 'the-question' })
     app.engines.template = async () => '<!doctype html><html><head></head><body><script src="renpy-pre.js"></script></body></html>'
     const source = app.app.listen(0, '127.0.0.1')

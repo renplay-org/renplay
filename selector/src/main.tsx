@@ -7,7 +7,7 @@ import { Spinner, ToastProvider } from './lantern/ui'
 import Library from './pages/Library'
 import SignIn from './pages/SignIn'
 import Setup from './pages/Setup'
-import { AuthGuard } from './components/AuthGuard'
+import { AuthGuard, NotInStaticDemo } from './components/AuthGuard'
 import './index.css'
 import './lantern/Type.css'
 import './lib/cardmotion'
@@ -77,7 +77,9 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/history" element={<History />} />
-                <Route path="/import-saves" element={<ImportSaves />} />
+                <Route element={<NotInStaticDemo />}>
+                  <Route path="/import-saves" element={<ImportSaves />} />
+                </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
               </Route>

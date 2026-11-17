@@ -1,6 +1,6 @@
 /** The guest's saves with their history, notes and pins, in the visitor's store. The routes of /api/saves/:id. */
 import type { Game, SaveSlot, SaveVersions, SavesResponse } from '../../../server/src/shared/api'
-import { DEMO_REFUSAL, demoStaticRefusesMeta } from '../../../server/src/shared/demo-refusals'
+import { DEMO_REFUSAL, demoStaticRefuses } from '../../../server/src/shared/demo-refusals'
 import { slotInfo } from '../../../server/src/shared/saveslot'
 import { Refusal, fail, json, sha1 } from './http'
 import type { Env, FileRow, NoteRow, VersionRow } from './types'
@@ -171,7 +171,7 @@ async function answerSaves(env: Env, req: Request, url: URL, game: Game, rest: s
     if (!dir || !isSlotFile(file)) return fail(400, 'Choose a save file')
     const body = ((await req.json().catch(() => ({}))) ?? {}) as { title?: unknown }
     // The demo keeps a save's name. Its note and pin are for a Renplay of your own.
-    if (demoStaticRefusesMeta(body)) return fail(403, DEMO_REFUSAL)
+    if (demoStaticRefuses(method, url.pathname, body)) return fail(403, DEMO_REFUSAL)
     return setName(env, dir, file, body)
   }
   if (rest === '/screenshot' && method === 'GET') {

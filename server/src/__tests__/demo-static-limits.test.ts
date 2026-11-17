@@ -112,8 +112,7 @@ describe('the static demo refuses what playing does not need', () => {
     it.each(hands)(`${kind}: $method $path`, async (h) => {
       const answer = await send(h)
       expect([answer.status, (await answer.json()) as unknown]).toEqual([403, { error: DEMO_REFUSAL }])
-      // A save's note and pin are refused by what the request says, not by where it goes.
-      expect(demoStaticRefuses(h.method, h.path.split('?')[0]!)).toBe(!h.path.includes('/meta'))
+      expect(demoStaticRefuses(h.method, h.path.split('?')[0]!, h.body as object | undefined)).toBe(true)
     })
   }
 
@@ -155,6 +154,13 @@ describe('the static demo refuses what playing does not need', () => {
     expect(save.status).toBe(200)
     const named = await send({ method: 'PUT', path: `${TQ}/meta?file=1-1-LT1.save`, body: { title: 'Before the question' } })
     expect([named.status, ((await named.json()) as { title: string }).title]).toEqual([200, 'Before the question'])
+  })
+
+  it('keeps a save\'s name, and refuses its note and pin by what the request says', () => {
+    const meta = `${TQ}/meta`
+    expect(demoStaticRefuses('PUT', meta, { title: 'A name' })).toBe(false)
+    expect(demoStaticRefuses('PUT', meta, { title: 'A name', note: 'x' })).toBe(true)
+    expect(demoStaticRefuses('PUT', meta, { pinned: false })).toBe(true)
   })
 
   it('has no way to pin or note a save, though a save made before this limit stays as it was', async () => {

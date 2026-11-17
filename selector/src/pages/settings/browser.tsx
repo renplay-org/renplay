@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { DeviceAdultRow } from '../../components/AdultLadder'
+import { useStaticDemo } from '../../lib/auth'
 import { SourceLabel, LanternSwitch, Pill } from '../../lantern/controls'
 import { setLighterBackground, useLighterBackground } from '../../lib/backdrop'
 import { setCardsMove, useCardsMove } from '../../lib/cardmotion'
@@ -8,12 +9,13 @@ import { Setting } from './common'
 import BackLink from '../../components/BackLink'
 
 export function BrowserSettings() {
+  const staticDemo = useStaticDemo()
   return (
     <div className="stack page-col" style={{ gap: 18 }}>
       <BackLink to="/account" label="You" />
       <h1 className="h1">This browser</h1>
       <section className="panel stack">
-        <DeviceAdultRow />
+        {!staticDemo && <DeviceAdultRow />}
         <LighterBackground />
         <CardMotion />
         <KeepCache />

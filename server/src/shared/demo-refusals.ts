@@ -52,17 +52,17 @@ const STATIC_WRITES: Array<[method: string, path: RegExp]> = [
 /** A save's download: the demo lets nobody take a file out. */
 const STATIC_DOWNLOADS = /^\/api\/saves\/[^/]+\/download$/
 
-/** The static demo refuses a save's note and pin: naming is all it keeps. */
+/** A save's name is all the static demo keeps of what a visitor writes on it: its note and pin are for a Renplay of your own. */
 const STATIC_META = ['title']
+const SAVE_META = /^\/api\/saves\/[^/]+\/meta$/
 
-/** Whether the static demo refuses this request: everything the demo server refuses, every write playing does not need, and downloads. */
-export function demoStaticRefuses(method: string, path: string): boolean {
+/**
+ * Whether the static demo refuses this request: everything the demo server refuses, every write playing does not need, and
+ * downloads. `body` is the JSON a write carries, which decides a save's name (the title is kept, a note or a pin is not).
+ */
+export function demoStaticRefuses(method: string, path: string, body: object = {}): boolean {
   if (demoRefuses(method, path)) return true
   if (method === 'GET' || method === 'HEAD') return STATIC_DOWNLOADS.test(path)
-  return path.startsWith('/api/') && !STATIC_WRITES.some(([m, p]) => m === method && p.test(path))
-}
-
-/** Whether the static demo refuses the body of a save's name: it keeps the title only. */
-export function demoStaticRefusesMeta(body: object): boolean {
-  return Object.keys(body).some((key) => !STATIC_META.includes(key))
+  if (!path.startsWith('/api/') || !STATIC_WRITES.some(([m, p]) => m === method && p.test(path))) return true
+  return SAVE_META.test(path) && Object.keys(body).some((key) => !STATIC_META.includes(key))
 }

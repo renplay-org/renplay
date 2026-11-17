@@ -88,10 +88,10 @@ export default function Account() {
         </section>
       )}
       <div className="grid2" style={{ marginTop: 22, alignItems: 'start' }}>
-        <AccountSection title="Adult games">
+        {!me.demoStatic && <AccountSection title="Adult games">
           <p className="small muted">What you see of adult games, on every device. Games that are not adult are never affected.</p>
           <AdultChoice />
-        </AccountSection>
+        </AccountSection>}
         {!me.demo && (
           <AccountSection title="Profile">
             <form onSubmit={(e) => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(() => put('/api/me', { name: form.get('name') }), 'Display name saved') }} className="stack">
