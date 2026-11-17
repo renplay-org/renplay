@@ -173,6 +173,9 @@ The code was untangled so that a change lands in one place. `scripts/check-struc
   `scripts/check-structure.mjs` at their size: they may only shrink.
 - **Tests test behaviour.** Tests are type-checked (`server/tsconfig.test.json`). Drive the code the
   way it is used (requests, messages, the built runtime), never by cutting its source text apart.
+- **A new test earns its place.** It names the behaviour it protects and fails when that behaviour breaks. Duplicate coverage
+  is removed rather than added, and the total test lines (`TEST_LINES` in `scripts/check-structure.mjs`) only go down: raising
+  the number takes a one-line reason beside it.
 - **Write things once.** A device check goes in `selector/src/lib/platform.ts`, a size for people is
   `bytes` in `shared/format.ts`, a control comes from `lantern/`. Look for the existing one first.
 
@@ -324,8 +327,12 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
   and a read-only root, an install, the upgrade from the newest release and back, the chart on
   kind, deploy/compose.yaml; skipped when nothing in the image or the chart changed), and
   `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
-  The browser checks run in parallel when their inputs changed. Shared script or workflow changes
-  run all three, and the `Browser suite` summary reports even when all three are skipped.
+  The `changes` job picks what a pull request runs from the files it changes, by the rules in
+  `scripts/ci-select.mjs` (its test holds the edge cases) and says why in the job summary. Texts and
+  the docs run no Playwright, the website runs its own spec, and the app, shared tooling, unknown,
+  deleted and renamed files, releases into `main` and manual runs run everything. The label `ci:full`
+  (then re-run the workflow) or the repository variable `RENPLAY_CI_FULL=true` forces everything. The
+  `Browser suite` summary reports even when every browser job is skipped.
   Superseded runs of the same pull request are cancelled. Upgrades are tested from the newest release.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),

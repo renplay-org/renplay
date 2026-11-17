@@ -20,6 +20,14 @@ const LARGER = {
   'server/src/art/store.ts': 839,
 }
 
+/**
+ * Lines of test code (the server's tests, the browser specs and the layout check), counted the way the size budget counts.
+ * The ceiling is today's count with a little room, and it only goes down: a new test is paid for by removing duplicate
+ * ones. When the count falls ROOM below it, lower it to match. Raising it takes a one-line reason here, next to the number.
+ */
+const TEST_LINES = 14650
+const TEST_ROOM = 100
+
 const problems = []
 const rel = (p) => relative(root, p)
 
@@ -151,6 +159,16 @@ for (const [p, max] of Object.entries(LARGER)) {
   } catch {
     problems.push(`${p} is gone: remove it from LARGER in scripts/check-structure.mjs`)
   }
+}
+
+// ---- the test-line ceiling -----------------------------------------------------------------------
+
+{
+  const testCode = [...walk(join(SERVER, '__tests__')), ...walk(join(root, 'server/scripts/app-ui/specs')), join(root, 'scripts/check-layout-shift.mjs')]
+    .filter((p) => /\.(ts|tsx|js|mjs)$/.test(p))
+  const lines = testCode.reduce((sum, p) => sum + readFileSync(p, 'utf8').split('\n').length - 1, 0)
+  if (lines > TEST_LINES) problems.push(`The tests have ${lines} lines, more than ${TEST_LINES}. A new test names the behaviour it protects, and pays for its lines by removing duplicate coverage. Raising TEST_LINES needs a one-line reason beside it.`)
+  else if (lines < TEST_LINES - TEST_ROOM) problems.push(`The tests shrank to ${lines} lines: lower TEST_LINES in scripts/check-structure.mjs to match (${lines + TEST_ROOM / 2} leaves a little room).`)
 }
 
 if (problems.length) {

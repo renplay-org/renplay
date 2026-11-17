@@ -119,7 +119,7 @@ run = [
 
 ["check:workflows"]
 description = "GitHub workflows: actionlint and zizmor"
-run = ["node --test scripts/browser-suites.test.mjs scripts/ui-workspace.test.mjs scripts/check-design.test.mjs scripts/noindex-host.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
+run = ["node --test scripts/ci-select.test.mjs scripts/ui-workspace.test.mjs scripts/check-design.test.mjs scripts/noindex-host.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
 
 ["check:telemetry"]
 description = "The telemetry collector: type check, tests on a local D1, and a dry run of the deploy"

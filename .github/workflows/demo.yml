@@ -24,9 +24,11 @@ on:
 
 permissions: {}
 
+# A run waits for the one before it: it pushes the demo image and publishes the static demo, so cancelling one halfway
+# through could leave a release's demo half replaced.
 concurrency:
   group: demo
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   demo:

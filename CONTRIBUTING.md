@@ -101,9 +101,11 @@ It caches Linux dependencies in Docker volumes `rp-server-nm`, `rp-selector-nm`,
 and `rp-ui-tools`. Stop warm containers before deleting those volumes to reclaim space. The Mac's
 `node_modules` are not used or modified. To change `UI_CPUS`, stop the warm container first.
 
-CI runs the layout checks and Playwright in parallel, only when their inputs changed.
-Workflow or shared runner changes select both. The **Browser suite** summary reports on every
-pull request, including when no browser inputs changed. Superseded runs of a pull request are cancelled.
+CI runs the layout checks and Playwright in parallel, only when their inputs changed. The rules are in
+`scripts/ci-select.mjs`, and the job summary of the `changes` job says why each part ran or not. Texts and the docs
+run no Playwright, and anything unknown, shared or deleted runs everything. The label `ci:full` (then re-run the
+workflow) forces a full run. The **Browser suite** summary reports on every pull request, including when no browser
+inputs changed. Superseded runs of a pull request are cancelled.
 
 Do not loosen a test without stopping to report it and getting a maintainer's approval. This includes removing
 an assertion, widening a tolerance, adding or lengthening a fixed wait, skipping, quarantining,

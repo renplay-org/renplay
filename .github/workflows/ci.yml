@@ -39,8 +39,11 @@ jobs:
           node scripts/release.mjs check "$V"
 
   # The code, the docs, the chart, the workflows and the deploy/ examples: the mise tasks
-  # (tasks.toml) people run locally.
+  # (tasks.toml) people run locally. Always reports: the server's type checks and tests are the one step
+  # that waits for what changed (changes), and they run whenever that could not be told.
   check:
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -63,7 +66,8 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
 
       - run: mise run install
-      - run: mise run check:server
+      - if: needs.changes.outputs.server != 'false'
+        run: mise run check:server
       - run: mise run check:structure
       - run: mise run check:design
       - run: mise run check:runtime
@@ -75,14 +79,15 @@ jobs:
       - run: mise run check:workflows
       - run: mise run check:examples
 
+  # One job for each entry changes chose: its name, the suite for scripts/test-ui.sh and the Playwright arguments.
   browser-checks:
-    name: Browser (${{ matrix.suite }})
+    name: Browser (${{ matrix.name }})
     needs: changes
     if: needs.changes.outputs.browser-suites != '[]'
     strategy:
       fail-fast: false
       matrix:
-        suite: ${{ fromJSON(needs.changes.outputs.browser-suites) }}
+        include: ${{ fromJSON(needs.changes.outputs.browser-suites) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -94,7 +99,10 @@ jobs:
       - name: Browser checks
         env:
           SUITE: ${{ matrix.suite }}
-        run: sh scripts/test-ui.sh "$SUITE"
+          ARGS: ${{ matrix.args }}
+        run: |
+          read -ra extra <<< "$ARGS"
+          sh scripts/test-ui.sh "$SUITE" "${extra[@]}"
       - name: Browser summary
         if: always()
         run: |
@@ -106,7 +114,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: browser-${{ matrix.suite }}-evidence
+          name: browser-${{ matrix.name }}-evidence
           path: ui-test-results/
           retention-days: 7
 
@@ -135,6 +143,8 @@ jobs:
 
   # The telemetry collector (telemetry/): its types, its tests on a local D1 and a dry run of its deploy.
   telemetry:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.telemetry != 'false' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -157,7 +167,11 @@ jobs:
 
       - run: mise run check:telemetry
 
-  # Select only jobs whose inputs changed. Shared browser tooling always selects all suites.
+  # Chooses what this pull request runs from the files it changes (scripts/ci-select.mjs holds the rules, and its
+  # test the edge cases) and writes the reason for each choice to the job summary. Everything runs for a release
+  # into main, a manual run, the ci:full label (set it, then re-run the workflow), the repository variable
+  # RENPLAY_CI_FULL=true, and whenever a file is unknown. An unreadable file list fails this job, and so the
+  # aggregators.
   changes:
     runs-on: ubuntu-24.04
     permissions:
@@ -166,6 +180,8 @@ jobs:
     outputs:
       image: ${{ steps.files.outputs.image }}
       browser-suites: ${{ steps.files.outputs.browser-suites }}
+      server: ${{ steps.files.outputs.server }}
+      telemetry: ${{ steps.files.outputs.telemetry }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -174,20 +190,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.base_ref }}
+          EVENT: ${{ github.event_name }}
+          RENPLAY_CI_FULL: ${{ vars.RENPLAY_CI_FULL }}
         run: |
           if [ -z "$PR" ]; then
-            echo "image=true" >> "$GITHUB_OUTPUT"
-            echo 'browser-suites=["playwright","layout"]' >> "$GITHUB_OUTPUT"
+            node scripts/ci-select.mjs --github < /dev/null
             exit 0
           fi
-          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' > files.txt
-          echo "browser-suites=$(node scripts/browser-suites.mjs < files.txt)" >> "$GITHUB_OUTPUT"
-          if grep -qE '^(server/|selector/|design/|runtime/|image/|charts/|tests/|deploy/compose\.yaml$|Dockerfile$|\.dockerignore$|mise\.toml$|tasks\.toml$|\.github/workflows/ci\.yml$)' files.txt; then
-            echo "image=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "image=false" >> "$GITHUB_OUTPUT"
-            echo "Nothing in the image or the chart changed, so the install contract is skipped."
-          fi
+          CI_LABELS=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq '[.labels[].name] | join(",")')
+          export CI_LABELS
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | [.status, .filename, (.previous_filename // "")] | @tsv' > files.tsv
+          node scripts/ci-select.mjs --github < files.tsv
 
   # The image, built from the cache earlier runs filled, against the install contract on both
   # architectures, and the chart installed on kind with it.
