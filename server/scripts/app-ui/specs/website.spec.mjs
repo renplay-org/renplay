@@ -243,6 +243,20 @@ test('the age question comes first, and no adult cover is asked for until it is 
     await expect(page.locator(`button[data-id="${id}"] .cover.blurred`)).toHaveCount(1)
     await expect(page.locator(`button[data-id="${id}"] img[src^="http"]`)).toHaveCount(0)
   }
+  // The sheet of an adult game keeps its cover blurred too, and asks for no picture of it.
+  await page.locator(`button[data-id="${adults[0]}"]`).click()
+  await expect(page.locator('#detail')).toHaveAttribute('open', '')
+  await expect(page.locator('#detail .sheet .cover.blurred')).toHaveCount(1)
+  await expect(page.locator('#detail h2').first()).toBeVisible()
+  expect(page.asked.some((u) => u.includes(`/${adults[0]}.jpg`)), 'The sheet does not ask for the cover either').toBe(false)
+  await page.locator('#detail [data-close]').click()
+  await expect(page.locator('#detail')).not.toHaveAttribute('open', '')
+  // Only the person's own choice shows them, and the choice is to hide them again.
+  await page.locator('#covers').click()
+  await expect(page.locator('#games .cover.blurred')).toHaveCount(0)
+  await expect.poll(() => page.asked.some((u) => u.includes(`/${adults[0]}.jpg`))).toBe(true)
+  await page.locator('#covers').click()
+  await expect(page.locator('#games .cover.blurred')).toHaveCount(adults.length)
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
 })
 
