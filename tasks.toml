@@ -94,9 +94,9 @@ description = "The library in a browser: the Playwright specs in server/scripts/
 run = "sh scripts/test-ui.sh playwright"
 
 ["check:docs"]
-description = "Docs build, with the configuration page, every link and llms.txt checked"
+description = "Docs build, with the configuration page, every link, llms.txt and the search engine basics checked"
 dir = "docs/site"
-run = ["npm run check:config", "npm run build", "npm run check:llms"]
+run = ["npm run check:config", "npm run build", "npm run check:llms", "npm run check:seo"]
 
 ["check:website"]
 description = "Website build, with every local link and picture checked"

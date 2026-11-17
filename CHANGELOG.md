@@ -11,6 +11,8 @@ release notes say what).
 
 - renplay.org and adult.renplay.org have the new look. The home page is a painted room whose three screens wake under your hand, with an opening scene you click through, the real demo on a laptop and a phone, a shelf of tested games, the install commands and plain answers. On a phone you pick the demo's phone up, and put it down again to be back where you were. The catalog, each game's page, the age question and the page that is not found follow the same look.
 - A link to a game's page on renplay.org shows a card with the game's name and cover, made by the website, instead of a picture from the developer's host.
+- The docs have the website's look. Page titles are in the book face and code, paths and labels in the small monospace. The header is the mark and the drawn name with quiet links. Notes are a line in the lamp's colour instead of a filled box, configuration entries and the page links at the end are thin lines instead of filled cards, and code blocks have the website's smaller corners. The home page has a band of the painted room under its title, and the footer is the website's, with the same links and the install guides. The light theme is paper, with the same type and lines.
+- Sharing a docs page shows a card made for the docs, served from `docs.renplay.org`, and every docs page has a description of at least 50 characters. The docs build now checks the titles, descriptions, canonical addresses, the card, the sitemap and the image tag the guides pin.
 
 ## [4.13.0] - 2026-11-17
 

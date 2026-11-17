@@ -1,6 +1,6 @@
 ---
 title: Docker and Docker Compose
-description: Run Renplay with Docker or Docker Compose.
+description: Run Renplay with Docker or Docker Compose, with one folder for your games and one for your saves.
 ---
 
 ## Docker Compose
