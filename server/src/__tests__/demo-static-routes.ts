@@ -5,6 +5,8 @@
  *
  * answered: the stand-in answers it, and the contract test compares its answer with the real server's.
  * file: a plain file of the static output (the game page, the runtime, the pictures).
+ * limited: the demo server's guest may call it, and the static demo refuses it on purpose, since playing does not need it
+ *   (demo-refusals.ts). The library hides what needs it (Me.demoStatic) and the static demo's limits test calls each.
  * hidden: the demo's guest may call it on the server, but the stand-in has no answer (404 for a read, 403 for the rest),
  *   and the library hides what needs it when it runs without a server (Me.demoStatic).
  * refused: the demo or the player rules refuse it for the guest, and the stand-in refuses it the same way.
@@ -13,9 +15,12 @@ export const DEMO_ROUTES = {
   answered: [
     'GET /me', 'GET /me/adult', 'GET /me/tags', 'GET /auth/providers', 'GET /health', 'GET /defaults', 'GET /content', 'GET /widget', 'GET /catalog',
     'GET /history', 'GET /games', 'GET /games/:id', 'POST /auth/demo', 'POST /telemetry/client', 'GET /:id', 'GET /:id/boot', 'GET /:id/history',
+    'POST /games/:id/played', 'POST /games/:id/play-time', 'PUT /games/:id/cache', 'PUT /:id/file', 'GET /:id/raw', 'GET /:id/screenshot',
+    'PUT /:id/meta', 'DELETE /:id/file',
+  ],
+  limited: [
     'PUT /games/:id/favorite', 'PUT /games/:id/status', 'PUT /games/:id/rating', 'POST /games/:id/not-now', 'DELETE /games/:id/not-now',
-    'POST /games/:id/played', 'POST /games/:id/play-time', 'PUT /games/:id/cache', 'PUT /:id/file', 'GET /:id/raw', 'GET /:id/screenshot', 'GET /:id/download',
-    'PUT /:id/meta', 'POST /:id/save-dir', 'POST /:id/history/restore', 'DELETE /:id/slot', 'DELETE /:id/file',
+    'GET /:id/download', 'DELETE /:id/slot', 'POST /:id/history/restore',
   ],
   file: [
     'GET /^\\/g\\//', 'GET /g/:id/:build/,/g/:id/:build/index.html', 'GET /renplay/runtime.js', 'GET /art/:file',
@@ -31,7 +36,7 @@ export const DEMO_ROUTES = {
     'DELETE /me/sessions/:id', 'DELETE /me/tokens/:id', 'DELETE /uploads/:id', 'DELETE /users/:id', 'GET /archives', 'GET /games/:id/files',
     'GET /games/:id/files/raw', 'GET /games/:id/recipe', 'GET /jobs', 'GET /jobs/:id/log', 'GET /me/identities', 'GET /me/sessions', 'GET /me/tokens',
     'GET /metrics', 'GET /system', 'GET /system/backups', 'GET /system/backups/:name', 'GET /system/storage', 'GET /uploads/:id', 'GET /users',
-    'GET /users/:id/saves/export', 'POST /', 'POST /:id/copy', 'POST /:id/import', 'POST /:id/sync', 'POST /:id/sync/download', 'POST /archives/hash',
+    'GET /users/:id/saves/export', 'POST /', 'POST /:id/copy', 'POST /:id/import', 'POST /:id/save-dir', 'POST /:id/sync', 'POST /:id/sync/download', 'POST /archives/hash',
     'POST /archives/inspect', 'POST /catalog/refresh', 'POST /games/:id/art/upload', 'POST /games/:id/files/apply', 'POST /games/:id/files/reset',
     'POST /games/:id/files/revert', 'POST /games/:id/files/upload', 'POST /games/:id/reinstall', 'POST /games/:id/safe',
     'POST /games/:id/update-not-now', 'POST /games/:id/walkthroughs', 'POST /imports', 'POST /jobs/:id/cancel', 'POST /jobs/:id/move',

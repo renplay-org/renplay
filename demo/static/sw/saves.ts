@@ -1,5 +1,6 @@
 /** The guest's saves with their history, notes and pins, in the visitor's store. The routes of /api/saves/:id. */
 import type { Game, SaveSlot, SaveVersions, SavesResponse } from '../../../server/src/shared/api'
+import { DEMO_REFUSAL, demoStaticRefusesMeta } from '../../../server/src/shared/demo-refusals'
 import { slotInfo } from '../../../server/src/shared/saveslot'
 import { Refusal, fail, json, sha1 } from './http'
 import type { Env, FileRow, NoteRow, VersionRow } from './types'
@@ -92,18 +93,11 @@ async function slotsOf(env: Env, game: Game): Promise<SavesResponse> {
 }
 
 /** A save's name and note: text of the server's own lengths, and a pin. */
-async function setNote(env: Env, dir: string, file: string, b: { title?: unknown; note?: unknown; pinned?: unknown }): Promise<Response> {
-  for (const [key, max] of [['title', 80], ['note', 500]] as const)
-    if (b[key] !== undefined && (typeof b[key] !== 'string' || (b[key] as string).length > max)) return fail(400, `The ${key === 'title' ? 'name' : 'note'} is text of up to ${max} characters`)
-  if (b.pinned !== undefined && typeof b.pinned !== 'boolean') return fail(400, 'Pinned must be true or false')
+async function setName(env: Env, dir: string, file: string, b: { title?: unknown }): Promise<Response> {
+  if (b.title !== undefined && (typeof b.title !== 'string' || b.title.length > 80)) return fail(400, 'The name is text of up to 80 characters')
   const key = `${dir}/${file}`
   const row = (await env.store.get('notes', key)) ?? { key, title: '', note: '', pinnedAt: '' }
-  const next: NoteRow = {
-    key,
-    title: b.title !== undefined ? (b.title as string).trim() : row.title,
-    note: b.note !== undefined ? (b.note as string).trim() : row.note,
-    pinnedAt: b.pinned === undefined ? row.pinnedAt : b.pinned ? row.pinnedAt || new Date().toISOString() : '',
-  }
+  const next: NoteRow = { ...row, title: b.title !== undefined ? (b.title as string).trim() : row.title }
   await env.store.put('notes', next)
   env.notify()
   return json({ ok: true, title: next.title || null, note: next.note || null, pinnedAt: next.pinnedAt || null })
@@ -121,7 +115,7 @@ function inTurn<T>(env: Env, change: () => Promise<T>): Promise<T> {
   return done
 }
 
-/** The save routes the demo answers. The rest of a save folder's routes (imports, copies, Sync codes, exports) are not here. */
+/** The save routes the demo answers: what the game's saving needs, and naming a save. Deleting, restoring, downloading, imports, copies, Sync codes and exports are not here. */
 export function savesRoute(env: Env, req: Request, url: URL, game: Game, rest: string): Promise<Response | null> {
   const read = req.method === 'GET' || req.method === 'HEAD'
   return read ? answerSaves(env, req, url, game, rest) : inTurn(env, () => answerSaves(env, req, url, game, rest))
@@ -172,49 +166,23 @@ async function answerSaves(env: Env, req: Request, url: URL, game: Game, rest: s
     }
     return json({ ok: true })
   }
-  if (rest === '/save-dir' && method === 'POST') return json({ ok: true, changed: false, saveDir: dir })
-  if (rest === '/slot' && method === 'DELETE') {
-    const row = await rowAt(cleanRel(url.searchParams.get('file')))
-    if (!row) return fail(404, 'Save not found')
-    await keepVersion(env, row, 'user-delete')
-    await env.store.del('files', row.key)
-    await env.store.del('notes', row.key)
-    env.notify()
-    return json({ ok: true })
-  }
   if (rest === '/meta' && method === 'PUT') {
     const file = cleanRel(url.searchParams.get('file'))
     if (!dir || !isSlotFile(file)) return fail(400, 'Choose a save file')
-    return setNote(env, dir, file, (await req.json().catch(() => ({}))) as { title?: unknown; note?: unknown; pinned?: unknown })
+    const body = ((await req.json().catch(() => ({}))) ?? {}) as { title?: unknown }
+    // The demo keeps a save's name. Its note and pin are for a Renplay of your own.
+    if (demoStaticRefusesMeta(body)) return fail(403, DEMO_REFUSAL)
+    return setName(env, dir, file, body)
   }
   if (rest === '/screenshot' && method === 'GET') {
     const row = await rowAt(cleanRel(url.searchParams.get('file')))
     const png = row ? (await readSave(row.data, true))?.screenshot : null
     return png ? new Response(png, { headers: { 'content-type': 'image/png', 'cache-control': 'private, no-store' } }) : fail(404, 'No screenshot')
   }
-  if (rest === '/download' && method === 'GET') {
-    const file = cleanRel(url.searchParams.get('file'))
-    const row = await rowAt(file)
-    return row ? new Response(row.data, { headers: { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename="${file.split('/').pop()}"` } }) : fail(404, 'Not found')
-  }
   if (rest === '/history' && method === 'GET') {
     const name = url.searchParams.get('file')
     const versions = (await env.store.all('versions')).filter((v) => v.dir === dir && (!name || v.name === name)).sort((a, b) => b.savedAt - a.savedAt)
     return json({ versions: versions.map((v) => ({ id: v.id, name: v.name, size: v.data.byteLength, savedAt: v.savedAt, reason: v.reason })) } satisfies SaveVersions)
-  }
-  if (rest === '/history/restore' && method === 'POST') {
-    const body = (await req.json().catch(() => ({}))) as { id?: unknown }
-    if (typeof body.id !== 'string') return fail(400, 'Missing version id')
-    const version = await env.store.get('versions', body.id)
-    if (!version) return fail(404, 'Version not found')
-    // The version stays in the history, so the restored copy is one more of what the browser keeps.
-    if (!(await fits(env, version.data.byteLength))) return fail(507, FULL)
-    const now = await env.store.get('files', version.key)
-    if (now) await keepVersion(env, now, 'restore')
-    const mtime = Date.now()
-    await env.store.put('files', { key: version.key, dir: version.dir, name: version.name, data: version.data, mtime } satisfies FileRow)
-    env.notify()
-    return json({ ok: true, file: { name: version.name, size: version.data.byteLength, mtimeMs: mtime, outcome: now ? 'replaced' : 'added' } })
   }
   return null
 }

@@ -1,4 +1,4 @@
-/** The guest's progress: a game as the library shows it, its status, rating and play time, and the play history. */
+/** The guest's progress: a game as the library shows it, its play time, and the play history. */
 import type { Game, HistoryPage } from '../../../server/src/shared/api'
 import { slotInfo } from '../../../server/src/shared/saveslot'
 import { fail, json } from './http'
@@ -32,41 +32,16 @@ export async function project(env: Env, g: Game): Promise<Game> {
   }
 }
 
-const PLAY_STATUSES = ['playing', 'stalled', 'dropped', 'finished', '']
-
 async function setProgress(env: Env, id: string, patch: Partial<Progress>): Promise<void> {
   const row = (await env.store.get('progress', id)) ?? { id }
   await env.store.put('progress', { ...row, ...patch, id })
   env.notify()
 }
 
-/** The routes of /api/games/:id that change the guest's progress, and the game itself. */
+/** The routes of /api/games/:id: the game itself, and the time the guest plays it. Favourites, status and rating are not kept: the demo is for playing. */
 export async function gameRoute(env: Env, req: Request, game: Game, rest: string, body: () => Promise<Record<string, unknown>>): Promise<Response | null> {
   const m = req.method
-  const answer = async () => json({ ok: true, game: await project(env, game) })
   if (rest === '' && m === 'GET') return json({ game: await project(env, game) })
-  if (rest === '/favorite' && m === 'PUT') {
-    const b = await body()
-    if (typeof b.on !== 'boolean') return fail(400, 'On must be a boolean')
-    await setProgress(env, game.id, { favoriteAt: b.on ? new Date().toISOString() : null })
-    return answer()
-  }
-  if (rest === '/status' && m === 'PUT') {
-    const status = String((await body()).status ?? '')
-    if (!PLAY_STATUSES.includes(status)) return fail(400, 'Status must be playing, stalled, dropped, finished or empty')
-    await setProgress(env, game.id, { playStatus: status || null, finishedAt: status === 'finished' ? new Date().toISOString() : null })
-    return answer()
-  }
-  if (rest === '/rating' && m === 'PUT') {
-    const rating = (await body()).rating ?? 0
-    if (!Number.isInteger(rating) || (rating as number) < 0 || (rating as number) > 5) return fail(400, 'Rating must be a whole number from 0 to 5')
-    await setProgress(env, game.id, { rating: rating as number })
-    return answer()
-  }
-  if (rest === '/not-now' && (m === 'POST' || m === 'DELETE')) {
-    await setProgress(env, game.id, { notNowAt: m === 'POST' ? new Date().toISOString() : null })
-    return answer()
-  }
   if (rest === '/play-time' && m === 'POST') {
     const seconds = (await body()).seconds
     if (!Number.isInteger(seconds) || (seconds as number) < 1 || (seconds as number) > 60) return fail(400, 'Seconds must be an integer from 1 to 60')
