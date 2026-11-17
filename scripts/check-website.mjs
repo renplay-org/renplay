@@ -256,7 +256,7 @@ for (const [at, set] of headerSets.slice(1)) {
     if (!/^https:\/\/demo\.renplay\.org\//.test(f.attrs['data-src'] ?? f.attrs.src ?? '')) fail(at, 'B-10: a demo frame does not point at https://demo.renplay.org')
     if (/visitor/.test(f.attrs['data-src'] ?? '')) fail(at, 'B-10: a demo frame carries a visitor key, and the static demo needs none')
   }
-  if (!hrefs.includes('https://demo.renplay.org/') || !/Open (it|the demo)/.test(text)) fail(at, 'B-10: no plain link to open the demo')
+  if (!hrefs.some((h) => h === 'https://demo.renplay.org/') || !/Open (it|the demo)/.test(text)) fail(at, 'B-10: no plain link to open the demo')
   // B-11, B-12, B-19: the picture of the first screen, and its preload.
   const hero = first(page.tree, (e) => e.name === 'img' && Number(e.attrs.width) >= 1000)
   if (!hero) fail(at, 'B-11: no large picture in the first screen')
@@ -306,7 +306,7 @@ for (const [at, set] of headerSets.slice(1)) {
   const shown = /(\d+) games?/.exec(squash(textOf(first(catalog.tree, (e) => e.attrs.id === 'count'))))?.[1]
   if (Number(shown) !== items || items !== gamePages.length) fail('catalog/index.html', `C-07: the page says ${shown} games, its list has ${items} and ${gamePages.length} pages were built`)
   if (links(catalog).some((h) => h.includes('?'))) fail('catalog/index.html', 'C-03: a link carries a query string, so a filter could become a page')
-  if (!links(catalog).includes('https://docs.renplay.org/guides/adding-games/')) fail('catalog/index.html', 'C-06: no link to the docs on adding games')
+  if (!links(catalog).some((h) => h === 'https://docs.renplay.org/guides/adding-games/')) fail('catalog/index.html', 'C-06: no link to the docs on adding games')
   const withCards = all(first(catalog.tree, (e) => e.attrs.id === 'games'), (e) => e.name === 'img' && e.attrs.alt && e.attrs.width && e.attrs.height).length
   if (withCards < 12) fail('catalog/index.html', `C-05: only ${withCards} cards are drawn with a picture, with its alt and size`)
 

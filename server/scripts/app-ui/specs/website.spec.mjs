@@ -235,7 +235,7 @@ test('the age question comes first, and no adult cover is asked for until it is 
   await page.goto(`${site.adultOrigin}/`)
   await expect(page.locator('h1')).toHaveText('Are you 18 or older?')
   await expect(page.locator('.after-gate')).toBeHidden()
-  expect(page.asked.filter((u) => u.includes('catalog.renplay.org')), 'Nothing is fetched before the answer').toEqual([])
+  expect(page.asked.filter((u) => new URL(u).host === 'catalog.renplay.org'), 'Nothing is fetched before the answer').toEqual([])
   await page.locator('#yes').click()
   await expect(page.locator('#games .card')).toHaveCount(14)
   const adults = site.full.games.filter((g) => g.nsfw).map((g) => g.id)
@@ -387,7 +387,7 @@ test('the first screen is light enough to open on a phone: at most 700 KB on a d
   const budget = phone ? 450e3 : 700e3
   expect(bytes, `The first screen weighs ${Math.round(bytes / 1000)} KB: ${seen.sort((a, b) => b[1] - a[1]).slice(0, 8).map(([u, n]) => `${u} ${n}`).join(', ')}`).toBeLessThan(budget)
   // Nothing of the demo is asked for until its section is near.
-  expect(page.asked.filter((u) => u.includes('demo.renplay.org'))).toEqual([])
+  expect(page.asked.filter((u) => new URL(u).host === 'demo.renplay.org')).toEqual([])
 })
 
 test('on a phone every control is at least 44 px, in the page and in the menu', async ({ page }, testInfo) => {
