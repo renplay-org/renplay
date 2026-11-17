@@ -1,17 +1,16 @@
-/* The app's tokens (renplay selector/src/index.css): the website, the docs and Renplay are one family. */
+/* Lamplight's tokens (design/tokens.css) are loaded before this file. These are the website's older names for them,
+   until the website is rebuilt in Lamplight. Its --pink is the token --pink-2. */
 :root {
-  color-scheme: dark;
-  --ink: #0a0a0f; --ink2: #12121a; --card: rgb(255 255 255 / .04); --line: rgb(255 255 255 / .08);
-  --fg: #f4f4f8; --dim: #b8b8c6; --faint: #8a8a9a;
-  --pink: #ff9ec0; --rose: #d62a68; --violet: #8b6bff;
-  --grad: linear-gradient(90deg, #ff9ec0, #c4b5fd);
-  --brand: linear-gradient(135deg, #d62a68, #7556f0);
+  --ink2: var(--ink-2); --card: rgb(255 255 255 / .04);
+  --dim: var(--fg-3); --faint: var(--fg-4);
+  --pink: var(--pink-2); --rose: #d62a68;
+  --grad: linear-gradient(90deg, var(--pink-2), var(--violet-2));
   --glow: 0 12px 30px -12px rgb(244 80 138 / .7);
   --radius: 18px;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; overflow-x: clip; }
-body { margin: 0; font: 17px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif; color: var(--fg); background: var(--ink); -webkit-font-smoothing: antialiased; overflow-x: clip; }
+body { margin: 0; font: 17px/1.6 var(--sans); color: var(--fg); background: var(--ink); -webkit-font-smoothing: antialiased; overflow-x: clip; }
 a { color: inherit; }
 img { max-width: 100%; height: auto; }
 .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }

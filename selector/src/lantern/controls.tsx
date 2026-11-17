@@ -2,11 +2,13 @@ import { Loader2 } from 'lucide-react'
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { demoPlayTarget, useDemoEmbed } from '../lib/demo-embed'
-import './Seg.css'
+import './Rows.css'
+import './Section.css'
+import './Words.css'
 
 /**
- * The pill: the one button shape. Primary is the brand gradient (one lit pill per visible task),
- * plate secondary, quiet text, danger red text. While `loading` it spins and takes no taps.
+ * The button: Primary is paper (one lit button per visible task), secondary a hairline, quiet text,
+ * danger red text. While `loading` it spins and takes no taps.
  */
 export function Pill({
   variant = 's',
@@ -81,18 +83,29 @@ export function IconBtn(props: IconBtnProps) {
   )
 }
 
-/** Filter chips: 40 px, selected white on ink, excluded red with a strike, dim when nothing would show. */
-export function Chip({ on, ex, n, dim, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number; dim?: boolean }) {
+/**
+ * The word of a tab, a choice or a filter: the label is in a `.u`, whose box is the text, so the line drawn under a chosen or
+ * hovered word (Words.css) is exactly as wide as the text, never the padding or an icon.
+ */
+export function U({ children }: { children: ReactNode }) {
+  return <span className="u">{children}</span>
+}
+
+/** Filter chips: 40 px words, the one included lit with the underline, excluded red with a strike, dim when nothing would show. `after` is an icon, outside the underline. */
+export function Chip({ on, ex, n, dim, after, className, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; ex?: boolean; n?: number; dim?: boolean; after?: ReactNode }) {
   return (
-    <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''} ${dim ? 'dim' : ''}`} {...rest}>
-      {children}
-      {n != null && ' '}
-      {n != null && <span className="n">{n}</span>}
+    <button type="button" aria-pressed={!!on} className={`chip ${on ? 'on' : ''} ${ex ? 'ex' : ''} ${dim ? 'dim' : ''} ${className ?? ''}`.trim()} {...rest}>
+      <U>
+        {children}
+        {n != null && ' '}
+        {n != null && <span className="n">{n}</span>}
+      </U>
+      {after}
     </button>
   )
 }
 
-/** Segmented control: pill buttons on a plate, 44 px (40 small), every button at least 44 wide. */
+/** A choice among a few, as words: the chosen one lit with an underline, every word at least 44 wide and tall. Tabs are `Tabs`. */
 export function Seg<T extends string>({
   value,
   onChange,
@@ -100,7 +113,6 @@ export function Seg<T extends string>({
   label,
   small,
   scroll,
-  wrap,
   className,
   disabled,
 }: {
@@ -110,13 +122,11 @@ export function Seg<T extends string>({
   label?: string
   small?: boolean
   scroll?: boolean
-  /** A group with more than fits goes on a second line, so that no label is cut. */
-  wrap?: boolean
   className?: string
   disabled?: boolean
 }) {
   return (
-    <div role="group" aria-label={label} className={`seg ${small ? 'sm' : ''} ${scroll ? 'scroll' : ''} ${wrap ? 'wrap' : ''} ${className ?? ''}`.trim()}>
+    <div role="group" aria-label={label} className={`seg ${small ? 'sm' : ''} ${scroll ? 'scroll' : ''} ${className ?? ''}`.trim()}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -126,7 +136,7 @@ export function Seg<T extends string>({
           className={`${o.value === value ? 'on' : ''} ${o.na ? 'na' : ''} ${o.className ?? ''}`}
           onClick={() => onChange?.(o.value)}
         >
-          {o.label}
+          <U>{o.label}</U>
         </button>
       ))}
     </div>
@@ -179,8 +189,7 @@ export function Tag({ dim, children }: { dim?: boolean; children: ReactNode }) {
   return <span className={`tag ${dim ? 'dim' : ''}`}>{children}</span>
 }
 
-/** A progress bar in the brand gradient. */
-/** A progress bar, `value` from 0 to 1. Indeterminate: a shimmer while the size is not known yet. */
+/** A progress bar filled in lamp, `value` from 0 to 1. Indeterminate: a shimmer while the size is not known yet. */
 export function Bar({ value, thin, indeterminate, style }: { value: number; thin?: boolean; indeterminate?: boolean; style?: CSSProperties }) {
   return (
     <div className={`bar ${thin ? 'thin' : ''}`} style={style}>

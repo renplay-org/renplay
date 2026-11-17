@@ -16,7 +16,7 @@
   gap: 8px;
   height: 44px;
   padding: 0 14px 0 10px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   background: var(--glass);
   backdrop-filter: blur(16px);
   color: var(--fg);
@@ -47,8 +47,7 @@
 .rp-pill .mark {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, #d62a68, #7556f0);
+  border-radius: var(--r-2);
 }
 /* The controller's Menu button, after the word, while one is connected. */
 .rp-pill .pad-menu {
@@ -84,7 +83,7 @@
   gap: 8px;
   height: 44px;
   padding: 0 16px 0 12px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   background: var(--glass);
   backdrop-filter: blur(16px);
   color: var(--fg);
@@ -130,7 +129,7 @@
   padding: calc(8px + var(--pi-top, 0px)) 12px calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
   background: var(--ink);
   box-shadow: 1px 0 0 var(--line), 24px 0 60px -12px rgba(0, 0, 0, 0.6);
-  border-radius: 0 var(--r-sheet) var(--r-sheet) 0;
+  border-radius: 0 var(--r-3) var(--r-3) 0;
   animation: pm-in var(--t-pane) var(--out) both;
 }
 .pm.bottom {
@@ -140,7 +139,7 @@
   max-height: 82dvh;
   padding: 8px calc(12px + var(--pi-right, 0px)) calc(12px + var(--pi-bottom, 0px)) calc(12px + var(--pi-left, 0px));
   box-shadow: 0 -1px 0 var(--line), 0 -24px 60px -12px rgba(0, 0, 0, 0.6);
-  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;
   animation-name: pm-up;
 }
 /* The guide inside the sheet on an upright phone: tall, with the reader filling what is under the Back row. */
@@ -177,14 +176,19 @@
 }
 .pm-title {
   min-width: 0;
+  font-family: var(--serif);
+  font-optical-sizing: auto;
   font-size: 17px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 .pm-clock {
   flex: none;
   margin-left: auto;
   color: var(--fg-3);
+  font-family: var(--mono);
   font-size: 13px;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -205,7 +209,7 @@
   width: 100%;
   min-height: var(--pm-row);
   padding: 0 12px;
-  border-radius: 12px;
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--fg);
   font-size: 15px;
@@ -303,15 +307,12 @@
   color: var(--fg-3);
   font-size: 13px;
 }
-.pm-group,
-.pm-group-title {
+.pm-group {
   padding: 12px 12px 4px;
   color: var(--fg-3);
-  font-size: 13px;
-  font-weight: 650;
-}
-.pm-group-title {
-  padding: 4px 0 10px;
+  /* 13 px, not 12: nothing in the menu is smaller, so a hand and a controller can read it. */
+  font: 400 13px/1.45 var(--mono);
+  letter-spacing: 0.02em;
 }
 .pm .seg {
   height: 48px;
@@ -382,7 +383,7 @@
   width: 100%;
   height: 64px;
   padding: 0 12px 0 8px;
-  border-radius: 12px;
+  border-radius: var(--r-2);
   background: transparent;
   color: var(--fg);
   text-align: left;
@@ -395,7 +396,7 @@
 .pm-thumb {
   width: 96px;
   flex: none;
-  border-radius: 8px;
+  border-radius: var(--r-2);
 }
 .pm-thumb .lbl,
 .pm-thumb .hid {

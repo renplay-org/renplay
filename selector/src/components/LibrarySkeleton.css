@@ -1,7 +1,7 @@
 /* The Library's loading page: its lines and the stage's text block and actions in the loaded page's sizes. */
 .skel-line {
   height: 14px;
-  border-radius: 6px;
+  border-radius: var(--r-1);
 }
 .card .ct.skel-line {
   height: 17px;
@@ -29,5 +29,17 @@
   }
   .stage .acts.skel-acts {
     min-height: 54px;
+  }
+}
+/* The toolbar's line: the search is a field on a computer and an icon on a phone. */
+.skel-search {
+  width: 300px;
+  height: 24px;
+  flex: none;
+  border-radius: var(--r-1);
+}
+@media (max-width: 719px) {
+  .skel-search {
+    width: 44px;
   }
 }

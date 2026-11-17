@@ -372,6 +372,8 @@ export interface Me {
   demo: boolean
   /** Present only in the public demo. The sole allowed website origin. */
   demoEmbedder?: string
+  /** Present only in the static demo, which has no server behind it: what needs one is left out. */
+  demoStatic?: boolean
   unclaimed: boolean
   hasPassword: boolean
 }

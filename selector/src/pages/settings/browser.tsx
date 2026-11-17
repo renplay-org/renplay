@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { DeviceAdultRow } from '../../components/AdultLadder'
 import { SourceLabel, LanternSwitch, Pill } from '../../lantern/controls'
 import { setLighterBackground, useLighterBackground } from '../../lib/backdrop'
+import { setCardsMove, useCardsMove } from '../../lib/cardmotion'
+import { reducedMotion } from '../../lantern/travel'
 import { Setting } from './common'
 import BackLink from '../../components/BackLink'
 
@@ -13,6 +15,7 @@ export function BrowserSettings() {
       <section className="panel stack">
         <DeviceAdultRow />
         <LighterBackground />
+        <CardMotion />
         <KeepCache />
       </section>
     </div>
@@ -29,6 +32,20 @@ export function LighterBackground() {
       source={<SourceLabel kind={from === 'chosen' ? 'here' : from === 'admin' ? 'admin' : 'def'} />}
     >
       <LanternSwitch checked={on} label="Lighter background" onChange={setLighterBackground} />
+    </Setting>
+  )
+}
+
+export function CardMotion() {
+  const on = useCardsMove()
+  return (
+    <Setting
+      title="Move cards with the pointer"
+      hint={reducedMotion() ? 'Game tiles lean toward the pointer and lift under it. This device asks for reduced motion, so they stay still.' : 'Game tiles lean toward the pointer and lift under it.'}
+      inline
+      source={<SourceLabel kind={on ? 'def' : 'here'} />}
+    >
+      <LanternSwitch checked={on} label="Move cards with the pointer" onChange={setCardsMove} />
     </Setting>
   )
 }

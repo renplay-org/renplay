@@ -1,4 +1,5 @@
-/* A keycap: a small raised key with the layout's characters, the shifted one above. */
+/* A keycap: a small raised key with the layout's characters, the shifted one above. Mono, at 13 px: the player's menu
+   keeps no text under 13 px, which the label size of 11 px would break. */
 .keycap {
   display: inline-flex;
   flex-direction: column;
@@ -8,11 +9,11 @@
   height: 40px;
   padding: 0 8px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
+  border-radius: var(--r-1);
   background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
   box-shadow: 0 2px 0 rgba(255, 255, 255, 0.14);
   color: var(--fg);
-  font: 600 15px/18px var(--sans);
+  font: 400 13px/18px var(--mono);
   vertical-align: middle;
 }
 .keycap .hi {
@@ -20,7 +21,6 @@
 }
 .keycap .up {
   color: var(--fg-3);
-  font-weight: 500;
 }
 .pad-menu {
   width: 22px;
@@ -41,7 +41,7 @@
   height: 20px;
   padding: 0 6px;
   border: 1.5px solid currentColor;
-  border-radius: 8px 8px 5px 5px;
+  border-radius: var(--r-1);
   font: 700 11px/1 var(--sans);
   flex: none;
 }

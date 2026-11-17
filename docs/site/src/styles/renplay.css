@@ -1,6 +1,7 @@
-/* The app's tokens (selector/src/index.css): the docs, the website and Renplay are one family. */
+/* Lamplight's tokens (design/tokens.css) are loaded before this file: Starlight's variables take their values from
+   them, so the docs, the website and Renplay are one family. A few colours have no token yet. */
 :root {
-  --sl-font: Inter, ui-sans-serif, system-ui, -apple-system, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --sl-font: var(--sans);
   --sl-content-width: 46rem;
   --sl-sidebar-width: 17rem;
   --sl-text-h1: clamp(2rem, 4vw, 2.8rem);
@@ -8,33 +9,33 @@
   --sl-color-accent: #c2255f;
   --sl-color-accent-high: #8d1545;
   --sl-color-text-accent: #a8164f;
-  --rp-gradient: linear-gradient(100deg, #ff9ec0, #c4b5fd);
-  --rp-brand: linear-gradient(135deg, #d62a68, #7556f0);
+  --rp-gradient: linear-gradient(100deg, var(--pink-2), var(--violet-2));
   --rp-card: rgb(125 105 145 / .045);
 }
 :root[data-theme='dark'] {
-  --sl-color-black: #0a0a0f;
-  --sl-color-gray-6: #12121a;
-  --sl-color-gray-5: #1c1c27;
+  --sl-color-black: var(--ink);
+  --sl-color-gray-6: var(--ink-2);
+  --sl-color-gray-5: #1c1c27; /* --ink-3 is #1c1c26: the docs take it in the pull request that restyles them */
   --sl-color-gray-4: #2e2e3a;
-  --sl-color-gray-3: #8a8a9a;
-  --sl-color-gray-2: #b8b8c6;
-  --sl-color-gray-1: #cfcfda;
-  --sl-color-white: #f4f4f8;
-  --sl-color-bg: #0a0a0f;
-  --sl-color-bg-nav: rgb(10 10 16 / .74);
-  --sl-color-bg-sidebar: #0a0a0f;
+  --sl-color-gray-3: var(--fg-4);
+  --sl-color-gray-2: var(--fg-3);
+  --sl-color-gray-1: var(--fg-2);
+  --sl-color-white: var(--fg);
+  --sl-color-bg: var(--ink);
+  --sl-color-bg-nav: var(--glass);
+  --sl-color-bg-sidebar: var(--ink);
   --sl-color-bg-inline-code: #1c1c27;
   --sl-color-hairline: #24242f;
   --sl-color-hairline-light: #1c1c27;
   --sl-color-hairline-shade: #121219;
   --sl-color-accent-low: #331a2b;
-  --sl-color-accent: #f4508a;
-  --sl-color-accent-high: #ff9ec0;
-  --sl-color-text-accent: #ff9ec0;
+  --sl-color-accent: var(--pink);
+  --sl-color-accent-high: var(--pink-2);
+  --sl-color-text-accent: var(--pink-2);
   --rp-card: rgb(255 255 255 / .025);
 }
 :root[data-theme='light'] {
+  color-scheme: light; /* design/tokens.css sets dark, and Starlight's own rule sits in a layer below it */
   --sl-color-bg: #fcfbfe;
   --sl-color-bg-nav: rgb(252 251 254 / .94);
   --sl-color-bg-sidebar: #f7f5fa;
@@ -45,8 +46,11 @@ body { -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 4px; }
 .header { backdrop-filter: blur(24px) saturate(140%); }
 .docs-header { display: flex; align-items: center; gap: 2rem; height: 100%; }
-.docs-brand { display: flex; align-items: center; gap: .65rem; text-decoration: none; color: var(--sl-color-white); font-size: 1.1rem; font-weight: 700; letter-spacing: -.035em; white-space: nowrap; }
+.docs-brand { display: flex; align-items: center; gap: .65rem; text-decoration: none; color: var(--sl-color-white); font-size: 1.1rem; white-space: nowrap; }
 .docs-brand img { border-radius: 10px; box-shadow: 0 8px 26px -8px rgb(244 80 138 / .5); }
+/* The drawn wordmark, in the shade the theme asks for. 22 px is the height at which its capitals match a 17 px Inter's. */
+.docs-brand .wordmark { width: auto; height: 22px; border-radius: 0; box-shadow: none; }
+:root[data-theme='dark'] .wordmark-light, :root[data-theme='light'] .wordmark-dark { display: none; }
 .docs-label { border-left: 1px solid var(--sl-color-hairline); padding-left: .7rem; margin-left: .15rem; color: var(--sl-color-gray-2); font-size: .95rem; font-weight: 450; letter-spacing: 0; }
 .docs-search { flex: 1; max-width: 26rem; }
 .docs-links { display: flex; align-items: center; gap: 1.5rem; margin-left: auto; font-size: .85rem; }

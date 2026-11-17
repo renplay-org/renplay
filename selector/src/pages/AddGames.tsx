@@ -118,7 +118,7 @@ function Downloads() {
 function RowGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginTop: 14 }}>
-      <h3 className="small muted" style={{ fontWeight: 650, marginBottom: 4 }}>
+      <h3 className="label" style={{ marginBottom: 4 }}>
         {title}
       </h3>
       <div className="rows">{children}</div>
@@ -340,7 +340,7 @@ function UploadZone() {
         const f = e.dataTransfer.files[0]
         if (f && !up) start(f)
       }}
-      className="panel"
+      className="plate"
       style={{ border: drag ? '1.5px dashed var(--pink)' : '1.5px dashed var(--plate-3-flat)', textAlign: 'center', padding: '28px 18px' }}
     >
       {up ? (

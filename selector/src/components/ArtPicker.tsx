@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Sheet from '../lantern/Sheet'
 import { ArtPicture, Frame, creditText } from '../lantern/art'
 import { Pill, Seg } from '../lantern/controls'
+import { Tabs, panelId, tabId } from '../lantern/Tabs'
 import { api, del } from '../lib/api'
 import type { Game } from '@shared/api'
 import type { ArtFormat } from '@shared/art'
@@ -173,9 +174,9 @@ export default function ArtPicker({ game, open, onClose, initialKind = 'grid', s
       }
     >
       <div className="pk-head">
-        <Seg small scroll label="Format" value={kind} onChange={(k) => { setKind(k); setPreviewing(null); setFile(null) }} options={KINDS} />
+        <Tabs small label="Format" group="art" value={kind} onChange={(k) => { setKind(k); setPreviewing(null); setFile(null) }} options={KINDS} />
       </div>
-      <div className={`picker ${kind === 'grid' || kind === 'icon' ? 'side' : 'top'}`}>
+      <div className={`picker ${kind === 'grid' || kind === 'icon' ? 'side' : 'top'}`} role="tabpanel" id={panelId('art', kind)} aria-labelledby={tabId('art', kind)}>
         <div className="prev" aria-live="polite">
           <div className="plabel">
             <span className="grow">{WHERE[kind]}</span>

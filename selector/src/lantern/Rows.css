@@ -1,0 +1,106 @@
+/* Rows for downloads, activity, users. */
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+.rows > .r {
+  display: flex;
+  gap: var(--s4);
+  align-items: center;
+  padding: var(--s4) 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.rows > .r:first-child {
+  border-top: 0;
+}
+.rows > .r.pick {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--s3) 0;
+  text-align: left;
+}
+@media (hover: hover) {
+  .rows > .r.pick:hover {
+    background: var(--plate);
+  }
+}
+.r .ic {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-2);
+  flex: none;
+}
+.r .ic svg {
+  width: 20px;
+  height: 20px;
+}
+.r .pill {
+  padding: 0;
+  background: none;
+}
+.r .ic.ok {
+  color: var(--green);
+}
+.r .ic.bad {
+  color: var(--red);
+}
+.r .ic.run {
+  color: var(--pink-2);
+}
+.r .t {
+  font-size: 15px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.r .m {
+  font-size: 13px;
+  color: var(--fg-3);
+  margin-top: 2px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.r .mini {
+  width: 46px;
+  flex: none;
+}
+.r .mini .frame {
+  border-radius: var(--r-2);
+  aspect-ratio: 1;
+}
+.r .mini .tag18 {
+  display: none;
+}
+.r .end {
+  margin-left: auto;
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  flex: none;
+}
+@media (max-width: 719px) {
+  .r.stack-ph {
+    flex-wrap: wrap;
+  }
+  .r.stack-ph .end {
+    margin-left: 44px;
+    flex: 1 1 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .r.stack-ph .grow {
+    flex: 1 1 160px;
+  }
+}
+.day {
+  font: 400 12px var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--fg-3);
+  margin: 28px 0 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hair);
+}

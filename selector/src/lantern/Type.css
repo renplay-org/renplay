@@ -1,0 +1,97 @@
+/* Type scale: 13, 15, 17, 20, 26, 34, 44, 60. No uppercase. A large title (h1 and the stage's) is Fraunces at its largest
+   optical size, tracked in. At that size Fraunces closes the space between words, so it takes a little of it back. A small
+   title (h2 and the others) lets the optical size follow its size, as the website's card titles do: the largest cut is too
+   tight at 20 px. h3 is a heading to use, so it stays Inter. */
+.h1 {
+  font-family: var(--serif);
+  font-variation-settings: "opsz" var(--opsz-title);
+  font-size: 34px;
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  word-spacing: 0.06em;
+}
+@media (min-width: 720px) {
+  .h1 {
+    font-size: 44px;
+  }
+}
+.h1.xl {
+  font-size: 34px;
+}
+@media (min-width: 720px) {
+  .h1.xl {
+    font-size: 60px;
+  }
+}
+.h2 {
+  font-family: var(--serif);
+  font-optical-sizing: auto;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.h3 {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+/* A label that introduces a section: mono, with the lamp before it, the website's lantern (a small flame-coloured body with
+   its cap and a glow). The demo's note is one too. */
+.eyebrow,
+.demo-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 400 12px/1.3 var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--fg-3);
+}
+.eyebrow::before,
+.demo-note::before {
+  content: "";
+  width: 9px;
+  height: 11px;
+  flex: none;
+  border-radius: var(--r-1) var(--r-1) var(--r-2) var(--r-2);
+  background: var(--lamp);
+  /* The cap, a strip above the body, and the glow. */
+  box-shadow:
+    0 -6px 0 -3px var(--fg-4),
+    0 0 7px 0 color-mix(in srgb, var(--lamp) 50%, transparent);
+}
+/* The note at the top of the demo: a line of the website's voice, not a plate, with room above the stage under it. */
+.demo-note {
+  align-items: flex-start;
+  margin: 12px 0 14px;
+  line-height: 1.5;
+}
+.demo-note::before {
+  margin-top: 5px;
+}
+.demo-note a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.demo-note a:hover {
+  color: var(--pink-3);
+}
+/* A label or a small fact in mono, as the website's .label: a noun over a field, a time, a size, a count. */
+.label,
+.fact {
+  font: 400 12px/1.45 var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--fg-3);
+}
+.label {
+  display: block;
+}
+/* The story voice: where there is nothing to use yet, the page speaks to the reader. */
+.story {
+  font-family: var(--serif);
+  font-variation-settings: "opsz" var(--opsz-text);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.35;
+}

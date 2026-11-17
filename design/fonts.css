@@ -1,0 +1,77 @@
+/* Lamplight's three faces, self-hosted, all under the SIL Open Font License, with the files in fonts/. Fallbacks are
+   sized to the web fonts so the swap never moves the layout. */
+@font-face {
+  font-family: Fraunces;
+  src: url(./fonts/fraunces.woff2) format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Inter;
+  src: url(./fonts/inter.woff2) format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url(./fonts/jetbrains-mono.woff2) format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+/* Fraunces' metrics on Georgia, by weight, measured on the titles and the story voice. Its optical size changes its
+   width a good deal, so each weight has its own size for the optical size it is set at: 400 at 14 (the story voice),
+   700 following the size (15 to 20 px, small titles), 850 at 144 (large titles). The ascent and descent are Fraunces'
+   (1956 and 510 of 2000), divided by the size adjustment, and the line gap is Fraunces', none. Linux has no Georgia:
+   its twin there is Gelasio. */
+@font-face {
+  font-family: 'Fraunces fallback';
+  src: local(Georgia), local(Gelasio);
+  font-weight: 100 599;
+  size-adjust: 105%;
+  ascent-override: 93.1%;
+  descent-override: 24.3%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Fraunces fallback';
+  src: local('Georgia Bold'), local(Georgia-Bold), local('Gelasio Bold'), local(Georgia), local(Gelasio);
+  font-weight: 600 799;
+  size-adjust: 97%;
+  ascent-override: 100.8%;
+  descent-override: 26.3%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Fraunces fallback';
+  src: local('Georgia Bold'), local(Georgia-Bold), local('Gelasio Bold'), local(Georgia), local(Gelasio);
+  font-weight: 800 900;
+  size-adjust: 82%;
+  ascent-override: 119.3%;
+  descent-override: 31.1%;
+  line-gap-override: 0%;
+}
+/* Inter's metrics on Arial (or its twins Liberation Sans and Arimo), by weight: Arial Bold is wider against Inter's
+   than Arial is, so each has its own size. The ascent and descent are Inter's (1984 and 494 of 2048), divided by the
+   size adjustment, and the line gap is Inter's, none. WebKit on Linux does not find a face by its bold name, so the
+   bold face ends with the plain names, which it gives in bold. */
+@font-face {
+  font-family: 'Inter fallback';
+  src: local(Arial), local('Liberation Sans'), local(Arimo), local(Helvetica);
+  font-weight: 100 599;
+  size-adjust: 106%;
+  ascent-override: 91.4%;
+  descent-override: 22.75%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Inter fallback';
+  src: local('Arial Bold'), local(Arial-BoldMT), local('Liberation Sans Bold'), local(LiberationSans-Bold), local('Arimo Bold'), local('Helvetica Bold'), local('Liberation Sans'), local(Arial), local(Arimo), local(Helvetica);
+  font-weight: 600 900;
+  size-adjust: 102%;
+  ascent-override: 95%;
+  descent-override: 23.6%;
+  line-gap-override: 0%;
+}

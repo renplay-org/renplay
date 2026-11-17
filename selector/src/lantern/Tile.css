@@ -1,0 +1,386 @@
+/* A tile's corner is the website card's, --r-1. What stands for a tile has it too: its skeleton, the cover in flight and the art picker's choices. */
+.frame,
+.card,
+.ghost,
+.skel,
+.skeleton,
+.picker .choice {
+  border-radius: var(--r-1);
+}
+/* The tile: the grid, 2:3, and the wide grid, 920x430. Art fills the frame, the title sits below. */
+.frame {
+  position: relative;
+  aspect-ratio: 2/3;
+  overflow: hidden;
+  background: var(--tint-ink);
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.8);
+  isolation: isolate;
+}
+.frame.wide {
+  aspect-ratio: 920/430;
+}
+.frame.hero {
+  aspect-ratio: 1920/620;
+}
+.frame.sq {
+  aspect-ratio: 1;
+}
+.frame .ph,
+.frame img.art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.frame img.art {
+  opacity: 1;
+  transition: opacity var(--t-pane) var(--out);
+}
+.frame img.art.loading {
+  opacity: 0;
+}
+.frame .tag18 {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.frame .corner {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  gap: 5px;
+}
+.frame .prog {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0));
+  font-size: 10.5px;
+  color: #fff;
+}
+.frame .prog .bar {
+  margin-top: 5px;
+}
+.frame.dim img.art,
+.frame.dim .ph {
+  opacity: 0.45;
+}
+.frame .mono {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 9%;
+  font: 700 clamp(13px, 13cqw, 36px) / 1.05 var(--serif);
+  font-variation-settings: "opsz" 24;
+  color: var(--fg);
+}
+.frame.wide .mono {
+  font-size: clamp(13px, 7cqw, 36px);
+}
+.card {
+  display: block;
+  position: relative;
+  min-width: 0;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The tile is the website's shelf card. It has a border in the game's own
+   colour mixed with white, a glow in the same colour at rest and a long one under the hand, and a sheen that follows the
+   pointer. Under the hand or the focus it lifts. The lean, a tilt toward the pointer, is lantern/lean.ts: it sets a
+   transform on .tilt and where the sheen is. Only the cover moves: .tilt holds the frame and nothing else, so the title and
+   the line under it stay where they are. Nothing dark is drawn on or around the cover: no black ring, and what shows behind
+   the picture is the game's own colour. */
+.card {
+  --tile-rest: none;
+  /* The lift comes toward the viewer by 14 px (6 px for a press) under the lean's 900 px of perspective, which is this much bigger. */
+  --lift: 1.0158;
+  --press-lift: 1.0067;
+  --tile-lit: 0 30px 64px -16px var(--tint), 0 0 70px -6px color-mix(in srgb, var(--tint) 80%, transparent);
+}
+.card .tilt {
+  position: relative;
+  transition:
+    translate var(--t-focus) var(--out),
+    scale var(--t-focus) var(--out);
+}
+.card .frame {
+  background: var(--tint);
+  border: 1px solid color-mix(in srgb, var(--tint) 86%, #fff);
+  box-shadow: var(--tile-rest);
+  transition: box-shadow var(--t-travel) var(--out);
+}
+.card .frame .sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 30%), rgba(255, 255, 255, 0.34), transparent 55%);
+  mix-blend-mode: soft-light;
+  opacity: 0.55;
+  transition: opacity var(--t-pane);
+}
+/* The glow of a tile at rest is not the frame's shadow but a box that does not lean. A wide shadow in the leaning layer makes
+   every tile that leans a layer a few times its size to draw, and the whole grid leans. A shadow is never drawn inside its own
+   box, so that box is smaller than the cover by more than the lean can show (10 px at the sides, 15 at the top and bottom,
+   which the spread takes back): where a cover has leaned away from its place nothing dark is left in the glow. */
+.card:has(> .tilt > .frame:not(.wide, .hero, .sq))::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 15px;
+  aspect-ratio: 2/3;
+  border-radius: var(--r-1);
+  box-shadow: 0 22px 50px -6px color-mix(in srgb, var(--tint) 85%, transparent), 0 0 44px 2px color-mix(in srgb, var(--tint) 60%, transparent);
+  pointer-events: none;
+  opacity: var(--rest-glow, 1);
+  transition: opacity var(--t-travel) var(--out);
+}
+/* Lit: under a mouse, with the keyboard or a controller (the white ring stays), and the tile the stage shows. */
+@media (hover: hover) {
+  .card:hover {
+    z-index: 2;
+    --rest-glow: 0;
+  }
+  .card:hover .frame {
+    box-shadow: var(--tile-lit);
+  }
+  .card:hover .frame .sheen {
+    opacity: 1;
+  }
+}
+.card.on,
+.card:focus-visible {
+  z-index: 2;
+  --rest-glow: 0;
+}
+/* The ring is the frame's, so it follows the tile when it lifts. */
+.card:focus-visible {
+  box-shadow: none;
+}
+.card.on .tilt,
+.card:focus-visible .tilt {
+  --gx: 50%;
+  --gy: 50%;
+}
+.card.on .frame {
+  box-shadow: var(--tile-lit);
+}
+.card:focus-visible .frame {
+  box-shadow: var(--ring), var(--tile-lit);
+}
+.card.on .frame .sheen,
+.card:focus-visible .frame .sheen {
+  opacity: 1;
+}
+/* A press leans toward the finger (lean.ts) and lights the tile. */
+.card[data-press] {
+  --rest-glow: 0;
+}
+.card[data-press] .frame {
+  box-shadow: var(--tile-lit);
+  transition-duration: var(--t-press);
+}
+.card[data-press] .frame .sheen {
+  opacity: 1;
+}
+/* The lift. Not under reduced motion, nor when this browser turned the movement off (Settings, This browser), not while the flight measures or lands on the tile (nor under a pointer it left there, until it moves), and under a mouse not while
+   a search is typed (Search.css), when the list moves under a pointer that is still. Under a mouse it is the shelf's:
+   the lift comes and goes at once, and the lean (lean.ts) eases. Focus eases it in, and a press pushes in a little. */
+@media (prefers-reduced-motion: no-preference) {
+  @media (hover: hover) {
+    .card .tilt {
+      transition: none;
+    }
+    html:not([data-typing], [data-cards="still"]) .card:not([data-rest], [data-still]):hover .tilt {
+      translate: 0 -6px;
+      scale: var(--lift);
+    }
+  }
+  html:not([data-cards="still"]) .card.on:not([data-rest]) .tilt,
+  html:not([data-cards="still"]) .card:focus-visible:not([data-rest]) .tilt {
+    translate: 0 -6px;
+    scale: var(--lift);
+    transition:
+      translate var(--t-focus) var(--out),
+      scale var(--t-focus) var(--out);
+  }
+  html:not([data-cards="still"]) .card[data-press]:not([data-rest]) .tilt {
+    translate: 0 -2px;
+    scale: var(--press-lift);
+    transition:
+      translate var(--t-press) var(--out),
+      scale var(--t-press) var(--out);
+  }
+}
+/* At rest: the cover's flight is measuring or landing on this tile. */
+.card[data-rest] {
+  --rest-glow: 1 !important;
+}
+.card[data-rest] .tilt {
+  transform: none !important;
+  transition: none !important;
+}
+.card[data-rest] .frame {
+  box-shadow: var(--tile-rest) !important;
+  transition: none !important;
+}
+.card[data-rest] .frame .sheen {
+  opacity: 0.55 !important;
+}
+/* Reduced motion keeps the border, the glow and the sheen, and takes the tilt away (lean.ts does not make one). So does a
+   browser that turned the movement off. */
+@media (prefers-reduced-motion: reduce) {
+  .card .tilt {
+    transform: none !important;
+  }
+}
+html[data-cards="still"] .card .tilt {
+  transform: none !important;
+}
+/* Above the frame's shadow, which spills over what is under it. */
+.card .ct,
+.card .cm {
+  position: relative;
+}
+.card .ct {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card .cm {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--fg-4);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.card .cm svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+.card .cm .vio {
+  color: var(--violet-2);
+}
+@media (min-width: 720px) {
+  .card .ct {
+    font-size: 14px;
+    margin-top: 9px;
+  }
+  .card .cm {
+    font-size: 12.5px;
+  }
+  .frame .tag18,
+  .frame .corner {
+    top: 8px;
+  }
+  .frame .tag18 {
+    right: 8px;
+  }
+  .frame .corner {
+    left: 8px;
+  }
+}
+/* Where a tile is as wide as the website's card (168 px and up, five columns and more) its title and meta are the card's:
+   Fraunces 700 at 16 px with the optical size at 24, and the meta in 13 px at --fg-4. Narrower tiles keep the density. */
+@media (min-width: 1000px) {
+  .card .ct {
+    font: 700 16px/1.25 var(--serif);
+    font-variation-settings: "opsz" 24;
+    letter-spacing: 0;
+    margin-top: 14px;
+  }
+  .card .cm {
+    font-size: 13px;
+  }
+}
+@media (max-width: 719px) {
+  .frame .corner .pill .lbl {
+    display: none;
+  }
+  .frame .corner .pill {
+    padding: 0 6px;
+  }
+}
+/* A shelf of tiles scrolls sideways, and its box would cut a lifted tile's shadow. It has room for the shadow in its padding
+   and takes the room back in its margin, so nothing of the page moves. The heading above stays over it, to be clicked. */
+.shelf {
+  display: flex;
+  gap: var(--gap);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  margin: -48px calc(-1 * var(--gutter)) -68px;
+  padding: 56px var(--gutter) 80px;
+}
+.sec:has(> .shelf) > .sec-h {
+  position: relative;
+  z-index: 1;
+}
+.shelf::-webkit-scrollbar {
+  display: none;
+}
+.shelf .card {
+  flex: none;
+  width: var(--tile-w);
+  scroll-snap-align: start;
+  scroll-margin-left: var(--gutter);
+}
+
+/* The light behind a grid or a shelf: the colour of the game under the hand or the focus, as behind the website's shelf
+   (a radial glow, 34 percent of the tint, cut to the size where the shelf's fades out). It has two lamps, ::before and ::after, which take turns: lean.ts sets the colour
+   and place of the one that is out and turns it on with data-glow, and the other fades. That crossfades from tile to tile
+   with nothing animated but opacity, and the colour is never an animated property, which every tile would inherit. */
+[data-row] {
+  position: relative;
+  isolation: isolate;
+}
+[data-row]::before,
+[data-row]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  width: 994px;
+  height: 518px;
+  margin: -259px 0 0 -497px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-room) var(--out);
+}
+[data-row]::before {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow-a) 34%, transparent), transparent);
+  transform: translate(var(--glow-a-x, 0px), var(--glow-a-y, 0px));
+}
+[data-row]::after {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow-b) 34%, transparent), transparent);
+  transform: translate(var(--glow-b-x, 0px), var(--glow-b-y, 0px));
+}
+[data-row][data-glow="a"]::before,
+[data-row][data-glow="b"]::after {
+  opacity: 1;
+}
+/* The light reaches past the page's edge. A phone makes its layout wider for anything that does, and the page would zoom out,
+   so on a phone the results clip it at the page's edge: their box is as wide as the page. */
+@media (max-width: 719px) {
+  .results {
+    overflow-x: clip;
+    margin: 0 calc(-1 * var(--gutter));
+    padding: 0 var(--gutter);
+  }
+}

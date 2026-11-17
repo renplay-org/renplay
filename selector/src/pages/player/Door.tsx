@@ -63,7 +63,7 @@ export default function Door({
   }, [game.id])
   const status = failed ? 'Something went wrong' : sandboxed ? 'Loading game' : resume ? 'Loading your save' : !progress ? 'Starting engine' : loadPct >= 1 ? 'Starting game' : 'Loading game'
   return (
-    <div inert={ready} className={cx('door', ready ? 'pointer-events-none opacity-0' : 'opacity-100')} style={{ transition: 'opacity .7s', zIndex: 10, position: 'absolute' }}>
+    <div inert={ready} className={cx('door', ready ? 'pointer-events-none opacity-0' : 'opacity-100')} style={{ transition: 'opacity var(--t-room)', zIndex: 10, position: 'absolute' }}>
       <div className={cx('art', hero?.made === 'glow' && 'blur')} style={settling ? { opacity: 0 } : undefined}>
         {art && <img src={art} alt="" />}
       </div>
@@ -85,7 +85,7 @@ export default function Door({
       </div>
       <div className="tb">
         <TitleArt game={game} hidden={hidden} />
-        <div className="muted-2" style={{ marginTop: 8, fontSize: 14 }}>
+        <div className="muted-2 line">
           {resume ? `Resuming ${resume}` : 'Starting from the main menu'} · {status}
           {!failed && progress && progress.total > 0 ? <> <span className="tnum">{Math.round(loadPct * 100)}%</span></> : null}
         </div>

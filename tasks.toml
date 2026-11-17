@@ -52,25 +52,29 @@ run = "npm run screenshots --"
 
 [check]
 description = "Everything CI checks, except the image"
-depends = ["check:server", "check:structure", "check:runtime", "check:copy", "check:ui", "test:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
+depends = ["check:server", "check:structure", "check:design", "check:runtime", "check:copy", "check:ui", "test:ui", "check:docs", "check:website", "check:chart", "check:workflows", "check:examples", "check:telemetry"]
 
 ["check:server"]
-description = "Server type check, the tests' type check, and the tests"
+description = "Server type check, the tests' and the static demo's type check, and the tests"
 dir = "server"
 # Vitest runs the tests without checking their types: tsconfig.test.json does.
-run = ["npx tsc --noEmit", "npx tsc -p tsconfig.test.json", "npx vitest run"]
+run = ["npx tsc --noEmit", "npx tsc -p tsconfig.test.json", "npx tsc -p ../demo/static/tsconfig.json", "npx vitest run"]
 
 ["check:structure"]
 description = "No import cycles, layers in order, no unused exports, files within the size budget"
 run = "node scripts/check-structure.mjs"
 
+["check:design"]
+description = "The look comes from design/tokens.css: no colour, gradient, face or corner written as a literal beyond what is allowed for now"
+run = "node scripts/check-design.mjs"
+
 ["check:types"]
 description = "Type checks of the server, its tests and the library"
-run = ["cd server && npx tsc --noEmit && npx tsc -p tsconfig.test.json", "cd selector && npx tsc -b --noEmit"]
+run = ["cd server && npx tsc --noEmit && npx tsc -p tsconfig.test.json && npx tsc -p ../demo/static/tsconfig.json", "cd selector && npx tsc -b --noEmit"]
 
 ["check:fast"]
-description = "What the pre-push hook runs: types, structure, the runtimes and the writing rule"
-depends = ["check:types", "check:structure", "check:runtime", "check:copy"]
+description = "What the pre-push hook runs: types, structure, the look, the runtimes and the writing rule"
+depends = ["check:types", "check:structure", "check:design", "check:runtime", "check:copy"]
 
 ["check:runtime"]
 description = "The game runtimes parse"
@@ -86,13 +90,13 @@ dir = "selector"
 run = ["npx tsc -b --noEmit", "npm run build", "node ../scripts/check-dist.mjs"]
 
 ["check:app-ui"]
-description = "The library in a browser, files in server/scripts/app-ui (run a few at a time, each also on its own): whole rows, scroll memory, the artwork's flight, layout shift, the Up next carousel, the search and its scrolling, the flight to a game's page"
-run = "sh scripts/test-ui.sh legacy"
+description = "The library in a browser: the Playwright specs in server/scripts/app-ui/specs, in the pinned Linux container"
+run = "sh scripts/test-ui.sh playwright"
 
 ["check:docs"]
-description = "Docs build, with the configuration page and every link checked"
+description = "Docs build, with the configuration page, every link and llms.txt checked"
 dir = "docs/site"
-run = ["npm run check:config", "npm run build"]
+run = ["npm run check:config", "npm run build", "npm run check:llms"]
 
 ["check:website"]
 description = "Website build, with every local link and picture checked"
@@ -115,7 +119,7 @@ run = [
 
 ["check:workflows"]
 description = "GitHub workflows: actionlint and zizmor"
-run = ["node --test scripts/browser-suites.test.mjs scripts/ui-workspace.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
+run = ["node --test scripts/browser-suites.test.mjs scripts/ui-workspace.test.mjs scripts/check-design.test.mjs scripts/noindex-host.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
 
 ["check:telemetry"]
 description = "The telemetry collector: type check, tests on a local D1, and a dry run of the deploy"

@@ -38,6 +38,6 @@ if [ "$(docker inspect -f '{{.State.Running}} {{.Config.Image}}' "$name" 2>/dev/
 fi
 # Serialize runs within this workspace. Each invocation reads fresh source and environment inputs.
 docker exec \
-  -e CI="${CI:-}" -e UI_REPEAT="${UI_REPEAT:-0}" \
+  -e CI="${CI:-}" -e GITHUB_ACTIONS="${GITHUB_ACTIONS:-}" -e UI_REPEAT="${UI_REPEAT:-0}" \
   -e LAYOUT_ONLY="${LAYOUT_ONLY:-}" -e LAYOUT_RUNS="${LAYOUT_RUNS:-1}" -e LAYOUT_DEBUG="${LAYOUT_DEBUG:-}" \
   "$name" timeout "${UI_TIMEOUT:-820}" flock /tmp/ui-run.lock bash /src/scripts/test-ui-container.sh "$@"

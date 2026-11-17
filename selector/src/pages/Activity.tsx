@@ -209,7 +209,7 @@ function LogDialog({ job, onClose }: { job: Job; onClose: () => void }) {
   })
   return (
     <Sheet open onClose={onClose} title="Job log" wide>
-      <pre style={{ maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', borderRadius: 12, background: 'rgba(0,0,0,.4)', padding: 16, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, lineHeight: 1.6, color: 'var(--fg-2)' }}>{data || 'No output yet.'}</pre>
+      <pre style={{ maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', borderRadius: 'var(--r-1)', background: 'var(--plate)', padding: 16, fontFamily: 'var(--mono)', fontSize: 12, lineHeight: 1.6, color: 'var(--fg-2)' }}>{data || 'No output yet.'}</pre>
     </Sheet>
   )
 }

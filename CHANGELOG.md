@@ -7,6 +7,36 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-11-17
+
+### Added
+
+- The public demo can also be built as plain files for a static host, with no server behind it (`demo/static/`). A service worker in the browser answers what the demo asks of the server, and the visitor's saves, history, names and play progress stay in that browser. It needs https or localhost. A server demo (`RENPLAY_DEMO`) works as before. The demo's notice in the static demo says "This is a demo. Your saves stay in this browser." and the library leaves out what it cannot do without a server: Keep offline, exporting and importing saves, copying a save to another game and choosing other art.
+- The docs have an `llms.txt` at `docs.renplay.org/llms.txt`, with one line for each page and a link to that page as plain Markdown, and `llms-small.txt` and `llms-full.txt` with the whole docs in one file, for assistants and coding agents that help someone install Renplay.
+
+### Changed
+
+- The Library's and the Catalog's search, tags and sort are one line, 52 px high at every size, in the website's look. On a computer the search is a field with one line under it, always there, then the tags as words, then the sort. On a phone the search is an icon that opens the field over the line, and while it holds text a word with your search stays in the line and clears it when pressed. The Catalog's line starts with All, Free and Completed, a divider, and then the tags. A line with more words than fit scrolls sideways. While it is stuck under the header the whole line stays, so the tags you chose are always in view.
+- The header is solid once the page has scrolled, on every page, and a search line stuck under it is one solid area with the header and a single thin line under both. Nothing of the page shows through it or in the gap between them. At the top of a page the header looks as it did.
+- The library, the docs and the website carry their own typeface, Inter (48 KB, loaded once), so text looks the same on every device, including those that did not have it installed. The game page loads no font.
+- Buttons have a new look. The one button to press on a screen is cream, the others have a thin outline, corners are squarer, and the glowing gradient buttons are gone. Nothing moved: every control is where it was, at the size it was.
+- Titles are set in a book face, Fraunces (67 KB), and labels, counts, codes, paths, keys and the clock in a small monospace, JetBrains Mono (21 KB), both loaded once. The words under a title that speak to you, such as on the sign-in page and where a list is empty, are in the book face too.
+- Corners follow the website's scale, three steps: 4 px on controls, tiles and tags, 6 px on rows, menus and notices, and 10 px on panels, saves, sheets and the game's menu. Labels such as Free, Does not work or Chosen are plain words on a card instead of coloured badges, and the notice that appears at the bottom is dark glass with its icon in the colour of what happened. The page that asks you to turn your phone has a cream button.
+- A game's tile in the Library, the Catalog and the shelves is the website's card, with the same corners, border, glow and lean. It has a border and a soft glow in the colour of its art. Under the mouse every tile in view leans toward the pointer, the one under it most, and that one lifts, brightens and glows in a long shadow of its colour. Behind the grid a light in that colour follows the game under the pointer and fades when the pointer leaves. On a touch screen a press leans the tile toward your finger and back, and a scroll moves nothing. A tile you move to with the keyboard or a controller lifts and glows too, with the white ring. With reduced motion set, tiles keep their colour and do not lean or lift. On wide screens a tile's title is in the book face.
+- Renplay's name next to its mark is drawn in a soft version of the book face, in the app's header, on the sign-in and setup pages and in the docs, instead of being set in the interface typeface.
+- Tabs, choices and filters are plain words, as on the website. The one you are on is lit with a thin lamp-coloured underline, and there is no filled strip behind them. The game page's tabs are real tabs for screen readers and the keyboard (the arrow keys move between them, Enter opens one) and on a phone they stay in one row that scrolls sideways. The Settings sections, the art picker's formats and the guide's tabs follow the same look.
+- Tags are small text in the label face, separated by slashes, instead of filled badges. The tags you filter by in the Catalog and the Library are words too: a tag you include is underlined and a tag you leave out is struck through.
+- The game page's and the settings' sections are divided by thin lines, with their titles in the book face, instead of filled rounded cards. Cards you press or drop a file on keep their fill. The sort button, the account page's links and the notices lose their fill too.
+- On a phone's game page the heart is a small quiet button beside Play, Change art is a quiet link with the art credits, and the line with the developer, the state and the version breaks between its parts and never leaves a dot at the end of a line.
+- The demo, built as plain files or as its image, now says in every answer that search engines should leave it out, and its robots.txt lets them in to read that. Its page has the title "Renplay demo" and a description, instead of only "Renplay".
+- Every screen follows the website's look. A save is a card like a game's tile, with its picture in the same corner and border and its name in the book face. Labels such as Admin, Installed or Changed are plain coloured words instead of filled chips, and the walkthroughs, the saves you can copy to and the files of a mod are thin-lined rows instead of filled cards. The line under a tab, a choice, a filter or a link in the header is exactly as wide as its word and draws in from the left. Under the pointer only a tile's picture leans and lifts, its title stays still, and nothing dark shows behind it. **Settings → This browser** has a new switch, **Move cards with the pointer**, which is on until you turn it off.
+
+### Fixed
+
+- A controller moves along a row first: pressing right or left on the search line goes to the next word beside it and not down to a tile that happens to be nearer.
+- A tile you move to with the keyboard or a controller is sharp again, with a crisp white ring. Lifting it used to draw its picture and ring slightly soft. A grid of tiles is also lighter to draw on a computer without a graphics chip.
+- On a phone held upright, the "Turn your phone sideways" line goes the moment you open the game's menu, so it no longer lies over a row.
+
 ## [4.12.0] - 2026-11-15
 
 ### Added
@@ -810,7 +840,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.12.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.13.0...dev
+[4.13.0]: https://github.com/renplay-org/renplay/compare/v4.12.0...v4.13.0
 [4.12.0]: https://github.com/renplay-org/renplay/compare/v4.11.0...v4.12.0
 [4.11.0]: https://github.com/renplay-org/renplay/compare/v4.10.0...v4.11.0
 [4.10.0]: https://github.com/renplay-org/renplay/compare/v4.9.0...v4.10.0

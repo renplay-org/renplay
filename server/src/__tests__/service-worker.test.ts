@@ -95,6 +95,14 @@ describe('service worker', () => {
     expect(await (await sw.get('/g/g1/b1/cache/a.rpyc?v=2')).text()).toBe('compiled')
   })
 
+  it('answers the wordmark from this browser when offline, so the header keeps its name', async () => {
+    const sw = worker()
+    sw.serve((path) => (path === '/wordmark.svg' ? new Response('<svg>Renplay</svg>') : undefined))
+    expect(await (await sw.get('/wordmark.svg')).text()).toBe('<svg>Renplay</svg>')
+    sw.serve(null)
+    expect(await (await sw.get('/wordmark.svg')).text()).toBe('<svg>Renplay</svg>')
+  })
+
   it('answers the person’s adult level offline, so a kept game’s art shows as it did online', async () => {
     const sw = worker()
     sw.serve((path) => (path === '/api/me/adult' ? Response.json({ effective: 'shown' }) : undefined))

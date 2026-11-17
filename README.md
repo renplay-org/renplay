@@ -80,8 +80,8 @@ and create the owner account. Copy a game’s PC download into `/path/to/games/_
 it under **Add games**, and press **Install**. The first install also downloads the Ren’Py web
 engine (about 16 MB).
 
-The same image is on Docker Hub as `renplay/renplay`. Pin a version
-(`ghcr.io/renplay-org/renplay:4.3.0`) for production. The [releases](https://renplay.org/releases)
+The same image is on Docker Hub as `renplay/renplay`. Pin a release's version
+(`ghcr.io/renplay-org/renplay:X.Y.Z`, the newest is on the releases page) for production. The [releases](https://renplay.org/releases)
 list what changed. Use HTTPS outside a trusted local network. See [Accounts](#accounts) before
 sharing an upgraded install.
 

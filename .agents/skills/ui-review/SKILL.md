@@ -11,8 +11,9 @@ measure, then write. Never change code during a review.
 ## 1. Know the rules
 
 Read `AGENTS.md` (the product rules: phones at 390 px, touch only, sentence case, plain copy, the adult
-levels, safe for work on GitHub) and the design system in `selector/src/lantern/`. A finding that breaks a
-product rule ranks above one that is a matter of taste.
+levels, safe for work on GitHub), `design/README.md` (Lamplight) and the design system in
+`selector/src/lantern/`. A finding that breaks a product rule ranks above one that is a matter of taste. "Looks like
+one product" in step 4 means one language across the app, the demo, the docs and the website.
 
 ## 2. Look at every surface
 

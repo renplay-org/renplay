@@ -22,7 +22,7 @@ export default function UpdateCard({ game }: { game: Game }) {
   return (
     <section id="update" className="panel">
       <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}>
-        <span className="ic-sq amber" style={{ borderRadius: 12, background: 'var(--plate-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, flex: 'none' }}>
+        <span className="amber" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, flex: 'none' }}>
           <Sparkles style={{ width: 20, height: 20 }} />
         </span>
         <div className="grow">

@@ -1,22 +1,49 @@
-/* The search: a pill, the height of the controls beside it. */
+/* The search, in the toolbar's one line (see Toolbar). On a computer it is the website's field: the text on one hairline, the
+   line turning to the lamp while it has focus, no box. The underline is drawn by ::after so the field does not change height
+   when it is lit. */
 .search-field {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 4px 0 14px;
-  border-radius: 999px;
-  background: var(--plate);
+  flex: none;
+  width: 300px;
+  min-width: 0;
+}
+.search-slot,
+.search-kept {
+  display: none;
+}
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 48px;
+  padding: 0 2px;
   color: var(--fg-3);
   min-width: 0;
-  flex: 1 1 200px;
 }
-.search-field > svg {
+.search-box::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--hair);
+  pointer-events: none;
+  transition: background var(--t-focus) var(--out);
+}
+.search-box:focus-within::after {
+  height: 2px;
+  background: var(--lamp);
+}
+.search-box > svg {
   width: 18px;
   height: 18px;
   flex: none;
 }
-.search-field input {
+.search-box input {
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -29,79 +56,206 @@
   outline: none;
   box-shadow: none;
 }
-.search-field input::placeholder {
-  color: var(--fg-3);
+.search-box input::placeholder {
+  color: var(--fg-4);
   text-overflow: ellipsis;
 }
-.search-field:focus-within {
-  box-shadow:
-    0 0 0 2px var(--ink),
-    0 0 0 4px #fff;
-}
-.search-field .clear {
+.search-box .clear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: 999px;
+  border-radius: var(--r-round);
   color: var(--fg-3);
 }
-.search-field .clear:hover {
-  background: var(--plate-2);
+.search-box .clear:hover {
   color: var(--fg);
 }
-.search-field .clear svg {
+.search-box .clear svg {
   width: 18px;
   height: 18px;
 }
 /* The shortcut is for a keyboard: a desktop shows it, a phone does not. */
-.search-field .shortcut {
+.search-box .shortcut {
   display: none;
-  margin-right: 10px;
 }
 @media (min-width: 720px) and (hover: hover) and (pointer: fine) {
-  .search-field .shortcut {
+  .search-box .shortcut {
     display: block;
   }
 }
-/* In a toolbar the search shares the row with the controls beside it. */
-.toolbar .search-field {
-  flex: 1 1 200px;
-}
-@media (min-width: 720px) {
-  .toolbar .search-field {
+/* On a phone the field is an icon in the line until it is pressed, and a library with no tags (data-always) keeps it open.
+   It is the one input throughout, so pressing it is the browser's own focus and raises the keyboard. Open, it covers the
+   whole line, whose other parts keep their places and are only not drawn: nothing moves. It is closed again by losing focus,
+   and a word stays behind while it holds text. */
+@media (max-width: 719px) {
+  .search-field:not([data-always]) {
+    width: auto;
+  }
+  .search-field:not([data-always]) .search-slot {
+    display: block;
+    width: 44px;
+    height: 44px;
+    flex: none;
+  }
+  .search-field:not([data-always]) .search-box {
+    position: absolute;
+    z-index: 1;
+    top: 4px;
+    left: var(--line-pad);
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+    color: var(--fg-2);
+  }
+  .search-field:not([data-always]) .search-box::after,
+  .search-field:not([data-always]) .search-box > :not(svg, input) {
+    display: none;
+  }
+  .search-field:not([data-always]) .search-box > svg {
+    position: relative;
+    pointer-events: none;
+  }
+  .search-field:not([data-always]) .search-box input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 0;
+    color: transparent;
+    caret-color: transparent;
+    cursor: pointer;
+  }
+  .search-field:not([data-always]) .search-box input::placeholder {
+    color: transparent;
+  }
+  .search-field:not([data-always]) .search-box:focus-within {
+    top: 0;
+    bottom: 0;
+    left: var(--line-pad);
+    right: var(--line-pad);
+    width: auto;
+    height: auto;
+    padding: 0 0 0 2px;
+    justify-content: flex-start;
+    color: var(--fg-3);
+  }
+  .search-field:not([data-always]) .search-box:focus-within::after {
+    display: block;
+  }
+  .search-field:not([data-always]) .search-box:focus-within > :not(svg, input, .shortcut, .field-count) {
+    display: inline-flex;
+  }
+  .search-field:not([data-always]) .search-box:focus-within > .field-count {
+    display: block;
+  }
+  .search-field:not([data-always]) .search-box:focus-within > svg {
+    position: static;
+  }
+  .search-field:not([data-always]) .search-box:focus-within input {
+    position: static;
+    padding: 0;
+    color: var(--fg);
+    caret-color: auto;
+    cursor: text;
+  }
+  .search-field:not([data-always]) .search-box:focus-within input::placeholder {
+    color: var(--fg-4);
+  }
+  .search-field:not([data-always]) .search-kept {
+    display: inline-flex;
+  }
+  /* Open all the time, it starts on the page's gutter like the icon's glyph does. */
+  .search-field[data-always] {
     flex: 1;
-    max-width: 360px;
+    width: auto;
+    margin-left: 10px;
+  }
+  .toolbar.line:has(.search-box:focus-within) > :not(.search-field),
+  .search-field:not([data-always]):has(.search-box:focus-within) > .search-slot {
+    visibility: hidden;
+  }
+  /* The word is not there while the field is open, so the line's words stay where they were. */
+  .search-field:not([data-always]):has(.search-box:focus-within) > .search-kept {
+    display: none;
   }
 }
-/* The toolbar sticks under the header while the tiles scroll beneath it: its controls are nearly solid, so a
-   picture passing under a label does not make it hard to read. */
-.toolbar .search-field,
-.toolbar .sort,
-.toolbar .seg {
-  background: linear-gradient(rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.07)), rgba(10, 10, 15, 0.92);
-  backdrop-filter: blur(18px);
+/* The search kept in the line while the field is closed: a lit word, which clears it. */
+.search-kept .kept-text {
+  display: inline-block;
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
-/* The focus ring is 4 px outside the field. On a computer the field starts at the toolbar's own edge, so the toolbar
-   does not clip it. A toolbar that wraps on a phone does not fade its end, which would fade the ring there. */
+/* The list's toolbar is one line, 52 px at every size: the search, the words, the sort. On a phone the icons' glyphs sit on the
+   page's gutter, and the line runs to the screen's edges. The line is the same stuck and not stuck. */
+.toolbar.line {
+  --line-pad: calc(var(--gutter) - 10px);
+  height: 52px;
+  gap: 6px;
+  padding: 0 var(--line-pad);
+  margin-bottom: 12px;
+  overflow: visible;
+}
 @media (min-width: 720px) {
-  .toolbar[role="search"] {
-    overflow: visible;
+  .toolbar.line {
+    --line-pad: 0px;
+    gap: 28px;
+    padding: 0;
   }
 }
-.toolbar.wrap[role="search"] {
-  mask-image: none;
+/* The order of a list: a quiet word with a caret, an icon on a phone. */
+.sort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 44px;
+  padding: 0 2px;
+  border-radius: var(--r-1);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg-2);
+  flex: none;
+  white-space: nowrap;
+  transition: color var(--t-focus);
+}
+.sort:hover {
+  color: var(--fg);
+}
+.sort svg {
+  width: 15px;
+  height: 15px;
+}
+.sort .swap {
+  display: none;
+}
+@media (max-width: 719px) {
+  .sort {
+    width: 44px;
+    padding: 0;
+  }
+  .sort .lbl,
+  .sort .caret {
+    display: none;
+  }
+  .sort .swap {
+    display: block;
+    width: 20px;
+    height: 20px;
+  }
 }
 /* Where the toolbar rests before it sticks: the page measures from here. */
 .toolbar-top {
   height: 0;
 }
-/* While the toolbar is stuck under the header, a bar of the header's own material runs from the top of the screen down
-   to the toolbar's bottom: the page's colour shows through it, what passes under it goes soft, and its lower edge fades
-   out. It is fixed to the screen, which is where a stuck toolbar is, so it is no part of the layout. --stuck-h (the
-   toolbar's bottom on the screen) and the stuck state are set by the Toolbar. */
+/* While the toolbar is stuck under the header, one solid area of the page's ink runs from the top of the screen down to the
+   line's bottom, with a hairline under it: no fade, no alpha, so nothing of the page reads through the header or between the
+   words. It is fixed to the screen, which is where a stuck toolbar is, so it is no part of the layout. --stuck-h (the line's
+   bottom on the screen) and the stuck state are set by the Toolbar. */
 .toolbar-glass {
   position: fixed;
   top: 0;
@@ -110,46 +264,38 @@
   height: var(--stuck-h, 0px);
   z-index: 19;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(10, 10, 15, 0.95) var(--top-h), rgba(10, 10, 15, 0.9));
-  backdrop-filter: blur(24px) saturate(140%);
-  mask-image: linear-gradient(180deg, #000 calc(100% - 16px), transparent);
+  background: var(--ink);
+  box-shadow: 0 1px 0 var(--line);
   opacity: 0;
-  transition: opacity var(--t-focus) var(--out);
 }
 .toolbar-glass[data-stuck] {
   opacity: 1;
 }
-/* The rows above the toolbar (the page's heading, the catalog's buttons) are out of sight while it is stuck: they
-   would read through the header. They keep their space, so nothing moves. */
-:has(~ .toolbar-top) {
-  transition:
-    opacity var(--t-focus) var(--out),
-    visibility 0s;
-}
-[data-stuck] > :has(~ .toolbar-top) {
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity var(--t-focus) var(--out),
-    visibility 0s var(--t-focus);
-}
 
 /* The count in the field, for while the toolbar is stuck and the heading that says it is out of sight: at the right end,
    in the field's grey, in a slot of one width (right aligned, tabular digits) so nothing moves when its words change. */
-.search-field .field-count {
+.search-box .field-count {
   display: none;
   flex: none;
   text-align: right;
   font-size: 13.5px;
 }
-[data-stuck] .search-field .field-count {
+[data-stuck] .search-box .field-count {
   display: block;
 }
 /* While a search is typed the list moves under a pointer that rests on it: the tile under it does not lift (see useTypingCalm). */
-[data-typing] .card:hover:not(:focus-visible):not(.on) .frame {
-  transform: none;
-  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.8);
+[data-typing] .card:hover:not(:focus-visible):not(.on) {
   z-index: auto;
+  --rest-glow: 1;
+}
+[data-typing] .card:hover:not(:focus-visible):not(.on) .tilt {
+  transform: none !important;
+}
+[data-typing] .card:hover:not(:focus-visible):not(.on) .frame {
+  box-shadow: var(--tile-rest);
+}
+[data-typing] .card:hover:not(:focus-visible):not(.on) .frame .sheen {
+  opacity: 0.55;
 }
 /* Matched letters in a title: brighter and underlined in the tile's own colour, not a block of yellow. */
 .card .ct mark {
@@ -168,14 +314,37 @@
 .results .empty-filter {
   margin-top: 0;
 }
-/* Tag chips: the counts are tabular, so a chip's width hardly changes with them. */
-.chip .n {
-  font-variant-numeric: tabular-nums;
-}
-.chip.dim:not(.on):not(.ex) {
-  opacity: 0.45;
-}
-/* The catalog's All N: wide enough for four digits, so Free and Completed stay put. */
+/* The catalog's All N: wide enough for three digits, so Free and Completed stay put. */
 .toolbar .seg > button.all {
-  min-width: 80px;
+  min-width: 64px;
+}
+/* The words of the line, between the search and the sort: they scroll sideways when there are more than fit, and the end
+   fades then. The line is as high as a word's ring needs, so the ring is whole. All tags stands at the right end. */
+.line-words {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 0 22px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.line-words::-webkit-scrollbar {
+  display: none;
+}
+.line-words[data-more] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.line-words > .chip.all {
+  margin-left: auto;
+}
+/* The catalog's states and its tags are one line: a hairline between them. */
+.line-words > .vr {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: var(--hair);
+  margin: 0 -4px;
 }

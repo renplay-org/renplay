@@ -1,0 +1,6 @@
+/* The drawn wordmark. 22.3 px is the height at which its capitals match those of a 17 px Inter. */
+.logo .wordmark {
+  width: auto;
+  height: 22.3px;
+  border-radius: 0;
+}

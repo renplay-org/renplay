@@ -1,0 +1,135 @@
+/* A save is a card, like a tile: the website's shelf card. Its picture is the save's own scene, 16:9, never catalog art, in
+   the 4 px corner with a border in the game's colour mixed with white, and the name and when under it on the room, with no
+   plate behind them. Under the hand or the focus the border's colour lights the scene's shadow. It does not move: only a
+   game's tile does. `--tint` is the game's, set on .saves. */
+.saves {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px 14px;
+}
+@media (min-width: 720px) {
+  .saves {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (min-width: 1100px) {
+  .saves {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+.save {
+  display: block;
+  min-width: 0;
+}
+/* The button over the scene: its ring is the scene's own corner. */
+.save-open {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-radius: var(--r-1);
+}
+.save .scene {
+  background: var(--tint);
+  border: 1px solid color-mix(in srgb, var(--tint) 86%, #fff);
+  transition: box-shadow var(--t-travel) var(--out);
+}
+@media (hover: hover) {
+  .save-open:hover .scene {
+    box-shadow: 0 18px 40px -14px var(--tint), 0 0 40px -10px color-mix(in srgb, var(--tint) 70%, transparent);
+  }
+}
+.save-open:focus-visible .scene {
+  box-shadow: 0 18px 40px -14px var(--tint), 0 0 40px -10px color-mix(in srgb, var(--tint) 70%, transparent);
+}
+.save .b {
+  padding: 10px 0 0;
+}
+.save .n {
+  font-size: 14px;
+  font-weight: 650;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+@media (min-width: 1000px) {
+  .save .n {
+    font: 700 16px/1.25 var(--serif);
+    font-variation-settings: "opsz" 24;
+  }
+}
+.save .n .pin {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--amber);
+  fill: currentColor;
+}
+.save .note {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--fg-2);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.save .m {
+  margin-top: 3px;
+}
+.scene {
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: var(--r-1);
+  overflow: hidden;
+  background: var(--tint-ink);
+  container-type: inline-size;
+}
+/* A small scene has room for its label only. */
+@container (max-width: 200px) {
+  .scene .hid {
+    display: none;
+  }
+}
+.scene .ph,
+.scene canvas,
+.scene img.real {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scene .lbl {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+}
+.scene .hid {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font: 400 12px var(--mono);
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.65);
+}
+/* The way in: a paper dot, flat, the website's one lit thing. */
+.scene .big {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
+  border-radius: var(--r-round);
+  background: var(--paper);
+  color: var(--on-paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.scene .big svg {
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+}

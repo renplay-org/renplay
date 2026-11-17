@@ -1,4 +1,4 @@
-import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, Sparkles, User } from 'lucide-react'
+import { CloudOff, Heart, Plus, Library as LibraryIcon, LayoutGrid, User } from 'lucide-react'
 import { keptGames, removeKept, useOnline } from '../lib/offline'
 import ChooseArtwork from './ChooseArtwork'
 import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
@@ -14,7 +14,8 @@ import { RoomProvider } from '../lantern/Room'
 import { useArrowFocus } from '../lantern/focus'
 import { useFlightBack, useGoBack } from '../lantern/flight'
 import type { Health } from '@shared/api'
-import { Pill } from '../lantern/controls'
+import { Pill, U } from '../lantern/controls'
+import { Logo } from '../lantern/Logo'
 import { focusSearch, wantSearch } from '../lantern/Search'
 import { isApple } from '../lib/platform'
 import './AppShell.css'
@@ -117,6 +118,20 @@ function useScrollMemory() {
   }, [entry, type])
 }
 
+/** Tells the page's styles that it has scrolled (`data-scrolled` on the document): the header is solid from then on. */
+function useScrolledHeader() {
+  useEffect(() => {
+    const root = document.documentElement
+    const settle = () => root.toggleAttribute('data-scrolled', window.scrollY > 0)
+    settle()
+    window.addEventListener('scroll', settle, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', settle)
+      root.removeAttribute('data-scrolled')
+    }
+  }, [])
+}
+
 /** Where typing goes to a field of its own: a key that is a shortcut elsewhere is not one here. */
 const typesInto = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
 
@@ -178,6 +193,7 @@ function usePadBack() {
 
 function Shell() {
   useScrollMemory()
+  useScrolledHeader()
   usePadBack()
   useSearchShortcut()
   useFlightBack()
@@ -206,15 +222,14 @@ function Shell() {
       <header className="top">
         <div className="top-in">
           <NavLink to="/" className="logo" aria-label="Renplay, the library">
-            <img src="/favicon.svg" alt="" />
-            Renplay
+            <Logo />
           </NavLink>
           <nav className="nav" aria-label="Sections">
             <NavLink to="/" end className={({ isActive }) => (isActive ? 'on' : '')}>
-              Library
+              <U>Library</U>
             </NavLink>
             <NavLink to="/catalog" className={({ isActive }) => (isActive ? 'on' : '')}>
-              Catalog
+              <U>Catalog</U>
             </NavLink>
           </nav>
           <div className="top-r">
@@ -233,13 +248,10 @@ function Shell() {
       </header>
       <main className="rise">
         {data?.demo && !embed && (
-          <p className="notice" role="note" style={{ margin: '12px 16px 0' }}>
-            <Sparkles aria-hidden />
+          <p className="demo-note" role="note">
             <span>
-              This is a demo of Renplay with free games. It starts fresh every few hours, so nothing you do here is kept. The demo has adult games turned off.{' '}
-              <a className="link" href="https://renplay.org/#install">
-                Install your own
-              </a>
+              {data?.demoStatic ? 'This is a demo. Your saves stay in this browser.' : 'This is a demo of Renplay with free games. It starts fresh every few hours, so nothing you do here is kept. The demo has adult games turned off.'}{' '}
+              <a href="https://renplay.org/#install">Install your own</a>
             </span>
           </p>
         )}

@@ -1,0 +1,177 @@
+/* Words, as the website draws them. A tab, a choice and a filter are plain text in Inter, and the chosen one is lit white
+   with a lamp underline: no strip, no fill. The underline is the website's menu line (`.links a` in its stylesheet): exactly
+   the width of the text, never of the padding or an icon, drawn from the left on hover and on the one chosen, and drawn back
+   on the one left. It is the .u inside the word: lantern/controls.tsx puts every label in one, so its box is the text. Under
+   reduced motion the durations are zero, and it simply appears. A tag is a small fact in mono, and facts in a line are
+   separated by a mark that never starts or ends a wrapped line. */
+.u {
+  position: relative;
+}
+.u::before,
+.u::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  top: calc(100% + 2px);
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+  transition: transform var(--t-pane) var(--out);
+}
+/* The lamp is the chosen one's line, and the colour of the word is the hover's. */
+.u::before {
+  height: 2px;
+  background: var(--lamp);
+}
+.u::after {
+  height: 1px;
+  background: currentColor;
+}
+.on > .u::before,
+[aria-current] > .u::before {
+  transform: scaleX(1);
+}
+@media (hover: hover) {
+  :is(.seg > button, .chip, .nav a, .side-nav a, .side-nav button, .gw-tabs button):hover:not(:disabled, .ex) > .u::after {
+    transform: scaleX(1);
+  }
+}
+:is(.seg > button, .chip, .nav a, .side-nav a, .side-nav button, .gw-tabs button):focus-visible > .u::after {
+  transform: scaleX(1);
+}
+.seg {
+  display: flex;
+  gap: 0 22px;
+  flex: none;
+  max-width: 100%;
+}
+.seg > button {
+  /* A word never shrinks below its label: a long group scrolls (.seg.scroll) instead. The control is 44 px at least, the word in it
+     is its text, and so is the line under it. */
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg-3);
+  white-space: nowrap;
+  transition: color var(--t-focus);
+}
+.seg > button:hover:not(:disabled) {
+  color: var(--fg);
+}
+.seg > button.on {
+  color: var(--fg);
+}
+.seg > button:focus-visible {
+  box-shadow: inset 0 0 0 2px #fff;
+  border-radius: var(--r-1);
+}
+.seg.sm > button {
+  font-size: 13px;
+}
+.seg.scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+  position: relative;
+}
+.seg.scroll::-webkit-scrollbar {
+  display: none;
+}
+/* A filter, a tag you can choose: the same words. Included is lit with the underline, left out is struck through. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0;
+  color: var(--fg-3);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex: none;
+  transition: color var(--t-focus);
+}
+.chip:hover {
+  color: var(--fg);
+}
+.chip.ex {
+  color: var(--red);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+.chip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.chip .n {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--fg-4);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.chip.dim:not(.on):not(.ex) {
+  opacity: 0.45;
+}
+/* Facts in a line: tags, and a game's By, state and version. Each carries the mark that comes before it, hung in the
+   space the one before leaves, so the first of every wrapped line has it outside the box, where the box clips it. The
+   clip is sideways only, which leaves a link in the line its full hit area. */
+.tags,
+.sepline {
+  display: flex;
+  flex-wrap: wrap;
+  overflow-x: clip;
+}
+.tags > *,
+.sepline > * {
+  position: relative;
+  padding-right: var(--gap-mark, 24px);
+}
+.tags > *::before,
+.sepline > *::before {
+  content: var(--mark);
+  position: absolute;
+  left: calc(var(--gap-mark, 24px) / -2);
+  transform: translateX(-50%);
+  color: var(--fg-4);
+}
+.tags {
+  --mark: "/";
+  font: 400 13px/1.7 var(--mono);
+  color: var(--fg-3);
+}
+.tags > .dim {
+  color: var(--fg-4);
+}
+.sepline {
+  --mark: "\00b7";
+  --gap-mark: 16px;
+}
+/* A quiet link keeps its faint line, which a touch screen has, and draws the website's line over it on hover and on focus: from
+   the left, the width of the text only (the content box, so not the padding that gives it its hit area). */
+.link-q,
+.src a,
+.frow .link-n,
+.picker .choice .cs a,
+.picker .credit a {
+  background: linear-gradient(currentColor, currentColor) 0 calc(100% - 2px) / 0 1px no-repeat;
+  background-origin: content-box;
+  transition: background-size var(--t-pane) var(--out);
+}
+@media (hover: hover) {
+  :is(.link-q, .src a, .frow .link-n, .picker .choice .cs a, .picker .credit a):hover {
+    background-size: 100% 1px;
+  }
+}
+:is(.link-q, .src a, .frow .link-n, .picker .choice .cs a, .picker .credit a):focus-visible {
+  background-size: 100% 1px;
+}

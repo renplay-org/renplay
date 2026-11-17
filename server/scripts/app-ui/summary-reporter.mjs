@@ -1,6 +1,8 @@
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+const name = (test) => test.titlePath().filter(Boolean).join(' > ')
+
 export default class SummaryReporter {
   onBegin(_config, suite) { this.suite = suite }
   onEnd(result) {
@@ -16,10 +18,13 @@ export default class SummaryReporter {
       const ms = project.allTests().flatMap((t) => t.results).reduce((n, r) => n + r.duration, 0)
       lines.push(`${project.title}: ${(ms / 1000).toFixed(1)} s of test time.`)
     }
-    for (const [kind, list] of [['Failed', failed], ['Flaky', flaky]]) {
-      for (const test of list) lines.push(`${kind}: ${test.titlePath().filter(Boolean).join(' > ')}`)
+    for (const test of failed) lines.push(`Failed: ${name(test)}`)
+    if (flaky.length) {
+      lines.push('', '## Flaky, to fix from the flake hunt', 'Each of these failed, then passed on its retry. They do not fail the pull request.')
+      for (const test of flaky) lines.push(`- ${name(test)}`)
+      // One warning on the run for each, so a pass that needed a retry is seen without opening the summary.
+      if (process.env.GITHUB_ACTIONS) for (const test of flaky) console.log(`::warning title=Flaky test::${name(test).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`)
     }
-    if (flaky.length) lines.push('WARNING: Tests passed only on retry. CI treats this as a failure.')
     if (failed.length || flaky.length) lines.push('Download this job\'s artifact for the JSON report and retained failure traces. No PR screenshots are published.')
     const text = lines.join('\n') + '\n'
     console.log(text)

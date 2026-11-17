@@ -68,7 +68,7 @@ export function enter(root: ParentNode): boolean {
 
 /**
  * Focuses the nearest control in a direction, by where they are on the screen: what lies straight that way
- * wins over what is nearer but off to the side. From a control that is out of view the move starts from the middle
+ * wins over what is nearer but off to the side, and going sideways what is in the same row comes first. From a control that is out of view the move starts from the middle
  * of the screen. False when there is nothing that way.
  */
 export function moveSpatial(direction: Direction, root: ParentNode): boolean {
@@ -86,15 +86,19 @@ export function moveSpatial(direction: Direction, root: ParentNode): boolean {
   const centre = (r: DOMRect) => (vertical ? (sign > 0 ? r.top + r.height / 2 - (origin.top + origin.height / 2) : origin.top + origin.height / 2 - (r.top + r.height / 2)) : sign > 0 ? r.left + r.width / 2 - (origin.left + origin.width / 2) : origin.left + origin.width / 2 - (r.left + r.width / 2))
   let best: HTMLElement | null = null
   let score = Infinity
+  let inBand = false
   for (const el of targets(root)) {
     if (el === current || (current && (el.contains(current) || current.contains(el)))) continue
     const r = el.getBoundingClientRect()
     // Beyond the origin's own middle, or it is not that way at all.
     if (centre(r) <= 4) continue
     const s = Math.max(0, along(r)) + 2 * across(r) + centre(r) * 0.01
-    if (s < score) {
+    // Sideways, what is in the origin's own row (a toolbar's one line) comes before what is merely nearer, in the row below.
+    const band = !vertical && across(r) === 0
+    if ((band && !inBand) || (band === inBand && s < score)) {
       score = s
       best = el
+      inBand = band
     }
   }
   if (!best) return false

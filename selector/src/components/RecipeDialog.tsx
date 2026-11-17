@@ -24,7 +24,7 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
       title="Recipe for the catalog"
       footer={
         <>
-          <span className="mr-auto text-xs text-zinc-500">{data?.sha256Pending ? 'Computing the archive checksum' : `Save as recipes/${file}`}</span>
+          <span className="mr-auto text-xs text-(color:--fg-4)">{data?.sha256Pending ? 'Computing the archive checksum' : `Save as recipes/${file}`}</span>
           <Pill
             variant="q"
             icon={<Download className="size-4" />}
@@ -53,9 +53,9 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
         </>
       }
     >
-      <p className="mb-3 text-sm text-zinc-400">
+      <p className="mb-3 text-sm text-(color:--fg-3)">
         Filled in from this installation. Add the developer, links and what you tested, set the status, then open a pull request on{' '}
-        <a className="text-accent-300 hover:underline" href="https://renplay.org/github/catalog" target="_blank" rel="noreferrer">
+        <a className="text-(color:--pink-3) hover:underline" href="https://renplay.org/github/catalog" target="_blank" rel="noreferrer">
           the catalog on GitHub
         </a>
         .
@@ -63,10 +63,10 @@ export default function RecipeDialog({ game, onClose }: { game: Pick<Game, 'id' 
       {isLoading ? (
         <Spinner />
       ) : (
-        <pre className="max-h-[55vh] overflow-auto rounded-xl bg-black/40 p-4 font-mono text-[12px] leading-relaxed text-zinc-200">{data?.yaml}</pre>
+        <pre className="max-h-[55vh] overflow-auto rounded-(--r-3) bg-[rgba(0,0,0,0.4)] p-4 font-mono text-[12px] leading-relaxed text-(color:--fg-2)">{data?.yaml}</pre>
       )}
       {data?.sha256Pending && (
-        <button onClick={() => void refetch()} className="mt-2 text-xs text-zinc-500 hover:text-zinc-300">
+        <button onClick={() => void refetch()} className="mt-2 text-xs text-(color:--fg-4) hover:text-(color:--fg-2)">
           Refresh
         </button>
       )}

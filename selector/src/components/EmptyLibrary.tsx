@@ -39,7 +39,7 @@ function ContentChoice() {
       </p>
       <div className="starters" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         {options.map((option) => (
-          <button key={option.mode} disabled={!!busy} onClick={() => void choose(option.mode)} className="panel" style={{ textAlign: 'left', minHeight: 44 }}>
+          <button key={option.mode} disabled={!!busy} onClick={() => void choose(option.mode)} className="plate" style={{ textAlign: 'left', minHeight: 44 }}>
             <h2 className="h3">{option.title}</h2>
             <p className="small muted" style={{ marginTop: 8 }}>{busy === option.mode ? 'Saving' : option.hint}</p>
           </button>
@@ -61,7 +61,7 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
     return (
       <section className="empty">
         <h1 className="h1">Your library is empty.</h1>
-        <p className="lead" style={{ marginTop: 12 }}>
+        <p className="lead story" style={{ marginTop: 12 }}>
           Ask an admin to add a game.
         </p>
       </section>
@@ -70,11 +70,11 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
   return (
     <section className="empty">
       <h1 className="h1">Your library is empty.</h1>
-      <p className="lead" style={{ margin: '12px auto 0' }}>
+      <p className="lead story" style={{ margin: '12px auto 0' }}>
         Let us fix that. Start with a story, or add a game you already have.
       </p>
       {starter && (
-        <div className="panel" style={{ marginTop: 26, display: 'flex', gap: 18, textAlign: 'left', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="sect" style={{ marginTop: 26, display: 'flex', gap: 18, textAlign: 'left', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ width: 110, flex: 'none' }}>
             <Frame game={starter} kind="grid" />
           </div>
@@ -100,13 +100,13 @@ export default function EmptyLibrary({ recipes }: { recipes: CatalogGame[] }) {
         </div>
       )}
       <div className="starters">
-        <Link to="/add" className="panel" style={{ textAlign: 'left' }}>
+        <Link to="/add" className="plate" style={{ textAlign: 'left' }}>
           <h2 className="h3">Upload a game you have</h2>
           <p className="small muted" style={{ marginTop: 8 }}>
             Pick its normal PC download. Renplay prepares it for your browser.
           </p>
         </Link>
-        <div className="panel" style={{ textAlign: 'left' }}>
+        <div className="sect" style={{ textAlign: 'left' }}>
           <h2 className="h3">Copy it to the server</h2>
           <p className="small muted" style={{ marginTop: 8 }}>
             Put downloads in the archives folder, then open Add games.

@@ -48,6 +48,103 @@ docker build --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> -t renplay-
 docker run --rm -p 8080:8080 renplay-demo
 ```
 
+## The static demo
+
+The same demo as plain files, with no server behind it. It is built in `static/` and meant for a static host
+(Cloudflare, as a Worker with static assets). A visitor gets one copy of the demo in their own browser:
+
+- Their saves, save history, names, pins, ratings, statuses and play time stay in that browser (IndexedDB) until they
+  clear the site's data. Nobody else sees them, and nothing resets. They are not on other devices.
+- It needs a secure context: https, or `localhost` for trying it. A page that frames the demo must be secure too,
+  and the browser must allow service workers and storage for the site.
+- The banner says "This is a demo. Your saves stay in this browser." with the link to install your own.
+- The library leaves out what needs a server: Keep offline, exporting and importing saves, copying a save to
+  another game and choosing other art (`Me.demoStatic`).
+
+### How it works
+
+`static/sw/stand-in.ts` is a service worker, built to `/sw.js` (the name the library registers). The library and the game's own
+frame are both controlled by it, so the game's save requests reach it too, and they share one origin, so they share one store.
+
+- `answer.ts` answers `/api/`: the session, the guest, games, the catalog (read only), saves with history, names and
+  pins, progress, play time. What it reads of the server's answers is a snapshot made at build time
+  (`/demo/snapshot.json`). Its saves and progress live in a store (`idb.ts` in the browser, `memory-store.ts` in tests).
+- A save's metadata and picture are read in the browser (`zip.ts`), within the server's limits for a save file
+  (`server/src/util/zip.ts`): 2,048 entries, 64 MiB an entry and in all. The whole directory is checked first, and the bytes
+  that come out are counted and stopped at what it declared. The limits of the guest's saves are the server demo's: 2 MB a
+  file, and 32 MB and 1,000 files in all, with the earlier versions counted too (a pinned save keeps every version, so
+  the total is its end), and 3 earlier versions of each unpinned save. Changes to the saves wait for one another.
+- A change from another site is refused (`origin.ts`): a form on another site can send a navigation to `/api/` that
+  this worker answers.
+- Every other route is refused the way the server demo refuses it. What the server demo refuses is one list,
+  `server/src/shared/demo-refusals.ts`, which `accounts/access.ts` and the stand-in both read.
+- A change tells every open page, through `postMessage`, and the page's loader turns it into
+  `renplay:saves-changed`, which the embed bridge already hears. The website's messages (`ready`, `engaged`,
+  `saved`, `nudge`, `refresh`) are the same as the server demo's.
+- The built `index.html` has a small loader that registers the worker and starts the library when the stand-in of the
+  same build says it is ready, since the first request is `/api/me`. A worker that controls the page is not enough: a
+  visitor who has been to the server demo still has its worker, at the same `/sw.js`, until the new one takes over. WebKit sometimes leaves a page uncontrolled: the loader reloads up to 3 times. WebKit's
+  `Blob.stream()` fails in a service worker, so `zip.ts` makes its own stream.
+- The game's page, `game.zip`, the runtime and the streamed files of a build are plain files in `g/<id>/<build>/`. The
+  engine is not copied: the page points at the engines host.
+
+### How it is built
+
+`node demo/static/build.mjs <out> --seed <dir> [--base <url>] [--embedder <origin>]`:
+
+1. Builds the library and the worker. Drops the PDF reader's files, which the demo's games do not use.
+2. `capture.mjs` signs in as the guest on a running demo server (`--base`) and reads its answers, the page of each game
+   and the runtime. It reads only. Each catalog entry keeps only its grid picture, the one the Catalog page shows.
+   The pictures the answers name are the only art copied (`api/art/`).
+3. `snapshot.mjs` writes the files, and takes each game's build files from `--seed`, the demo image's seed stage:
+   `docker buildx build --build-arg IMAGE=<the image the demo was built from> --target games --output type=local,dest=<dir> demo`
+   (see `Dockerfile`). Every seed run installs with a new build name, so the export must be the build the demo image holds: the
+   same image and context make Docker reuse that build.
+4. `headers.mjs` writes `_headers`: `frame-ancestors` for the demo itself and the embedder only (the policy of the
+   server demo), `X-Robots-Tag: noindex` on every answer, `index.html`, `sw.js` and `/demo/*` checked each time,
+   hashed assets and art kept for good. `seo.mjs` gives `index.html` the title "Renplay demo", a description and a
+   robots meta with noindex, and writes a `robots.txt` that lets crawlers in. They are let in on purpose: a page that
+   robots.txt blocks is never fetched, so its noindex is never read, and the address can still be listed. The server
+   demo's image (`Dockerfile`) does the same.
+5. Checks the output against Cloudflare's static asset limits (20,000 files, 25 MiB a file) and fails if it does not fit.
+
+`--embedder` is the one origin the embed bridge talks to and ignores messages from anything else. It is set at build
+time, `https://renplay.org` by default.
+
+To try it, with the demo image running as in "To try a released demo locally" above:
+
+```sh
+docker buildx build --build-arg IMAGE=ghcr.io/renplay-org/renplay:<version> --target games --output type=local,dest=/tmp/demo-seed demo
+node demo/static/build.mjs /tmp/static-demo --seed /tmp/demo-seed --base http://127.0.0.1:8080 --embedder http://localhost:5190
+node server/scripts/app-ui/static-demo-server.mjs /tmp/static-demo 5191    # http://localhost:5191
+```
+
+### Tests
+
+- `server/src/__tests__/demo-static-contract.test.ts` runs the stand-in's `answer()` and a real server in demo mode on
+  the same requests and compares the status and the JSON's shapes. The server has the demo's own recipe and art for The
+  Question and two more catalog games (the seed itself needs a built game and the network). A failing case names the
+  key that differs. The stand-in differs from the server in two places, both said in the test: the upload of compiled caches
+  is taken (the server refuses the guest) and `Me` says `demoStatic`.
+- `demo-static-routes.test.ts` lists every route the server registers and what the static demo does about it
+  (`demo-static-routes.ts`). A new server route fails it until it is classified, and a route that is answered needs a case
+  in the contract test.
+- `demo-static-headers.test.ts` checks the headers.
+- `server/scripts/app-ui/specs/static-demo.spec.mjs` serves the output on `localhost` and, in a test embedder page with
+  the laptop and phone frames, checks that a save made in one frame appears in the other, survives a reload and is not
+  in a second browser; that every request goes to the static server or the engines host and none fail; and that only
+  the embedder can frame the demo. It runs in Chromium and in WebKit at desktop size, and at 390 px, where the game
+  cannot be driven by taps, the save is made with the runtime's own save request. In `mise run test:ui` the
+  demo is built from a demo server with a small stand-in for the engine. `demo.yml` runs it on the real output with
+  `STATIC_DEMO_DIR`, where the real game is played and saved with Q.Save.
+
+### Publishing
+
+`static/wrangler.jsonc` is a Worker with static assets for `demo.renplay.org`, with the single page app fallback
+(an address that is not a file is the library's page). `demo.yml` builds the output after the server demo is
+published, tries it in browsers, and deploys it only when the repository variable `STATIC_DEMO_DEPLOY` is `true`. It
+uses the same `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets as `sites.yml`.
+
 ## Embed the demo
 
 Only a server with `RENPLAY_DEMO=on` enables this mode. Normal installations keep their existing
@@ -91,6 +188,12 @@ When one frame reports `saved`, send `refresh` to the other frame. This uses the
 not browser-local copies. The session cookie stays HTTP-only with `SameSite=Lax`. The production
 website and demo are same-site. For local work, use the same hostname for both origins, such as
 `127.0.0.1` with different ports. Mixing `localhost` and `127.0.0.1` is not same-site.
+
+The static demo is embedded the same way, with the same addresses and messages. The embedder's origin is fixed when it is
+built (`--embedder`), and the bridge ignores messages from any other origin. The saves are the visitor's, in the browser's
+storage for the demo's site, not on a server. The relay below works as it does with the server demo, and no session
+cookie is involved. Outside the website's frames, another open tab of the demo shows a change when it is reloaded or
+focused.
 
 ```js
 const demoOrigin = 'https://demo.renplay.org'

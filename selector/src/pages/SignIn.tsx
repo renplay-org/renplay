@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { Pill } from '../lantern/controls'
+import { Logo } from '../lantern/Logo'
 import { errorText } from '../lantern/ui'
 import { post } from '../lib/api'
 import { signInReturnUrl } from '../lib/sign-in-return'
@@ -17,8 +18,7 @@ export default function SignIn() {
     return (
       <AuthLayout>
         <div className="logo" style={{ justifyContent: 'center', marginBottom: 26 }}>
-          <img src="/favicon.svg" alt="" />
-          Renplay
+          <Logo />
         </div>
         <h1 className="h1 center" style={{ fontSize: 26 }}>Try Renplay</h1>
         <p className="lead center" style={{ margin: '8px auto 0' }}>
@@ -58,11 +58,10 @@ export default function SignIn() {
   return (
     <AuthLayout>
       <div className="logo" style={{ justifyContent: 'center', marginBottom: 26 }}>
-        <img src="/favicon.svg" alt="" />
-        Renplay
+        <Logo />
       </div>
       <h1 className="h1 center" style={{ fontSize: 26 }}>Sign in</h1>
-      <p className="lead center" style={{ margin: '8px auto 0' }}>
+      <p className="lead story center" style={{ margin: '8px auto 0' }}>
         Your games and saves are waiting.
       </p>
       {providers.data?.oidc && (

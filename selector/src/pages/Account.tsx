@@ -165,13 +165,13 @@ export default function Account() {
             </div>
           </AccountSection>
         )}
-        <AccountSection title="Your saves">
+        {!me.demoStatic && <AccountSection title="Your saves">
           <p className="small muted">Export current saves for the games you can see, including shared keys and HTML game data, as one zip. Hidden games’ saves and save history stay on the server.</p>
           <div className="actions">
             <Pill size="sm" href="/api/saves-export">Export all my saves</Pill>
             {!me.demo && <Pill size="sm" to="/import-saves">Import from a computer</Pill>}
           </div>
-        </AccountSection>
+        </AccountSection>}
       </div>
       <Sheet open={!!dialog} onClose={() => { if (!busy) { setDialog(''); setSecret('') } }} title={dialog === 'password' ? 'Change password' : 'New token'}>
         {secret ? (

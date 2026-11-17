@@ -48,6 +48,11 @@ These decide most review comments. Follow them without being asked.
   ellipses in text people read: the interface, server messages and logs, docs, the changelog,
   commit and pull request text. Hyphens in compound words, and semicolons in code, are fine.
   `node scripts/check-copy.mjs` checks the interface, server messages and the changelog in CI.
+- **Lamplight, the one look.** Colours, faces, corners and durations come only from `design/tokens.css`, fonts from
+  `design/fonts.css`, the mark from `design/logo/`. Titles are Fraunces, controls Inter, labels mono. One paper button
+  per screen, and the brand gradient only on the logo, the avatar and the room. The rules are in `design/README.md`.
+  The website's design is the reference: where the app differs from it, the app changes, tiles and corners first.
+  `node scripts/check-design.mjs` checks them in CI: today's exceptions are counted there and only shrink.
 - **Adult games have three levels.** Off (they do not exist for that person), Blurred (they show,
   but no picture of them is ever sent) and Shown, set by the installation, the person's account (an
   admin or a sign-in group), the person and the device. Each layer only narrows the one above. The
@@ -104,11 +109,13 @@ selector/          The library UI: React 19, Vite, Tailwind 4, TanStack Query. B
   src/pages/         Library, Catalog, GamePage, AddGames, Player, Settings, Activity, Account, Users
   src/lantern/       The design system, the only UI kit: Tile, Stage, the room, Sheet, controls (Pill,
                      IconBtn, Bar, Seg, switches), ui.tsx (Spinner, Empty, Confirm, Menu, toasts),
-                     focus, travel
+                     focus, travel, lean (the tile's tilt)
                      (tokens and styles in src/index.css)
   src/components/    AppShell (header, tab bar, footer), AuthGuard, SaveGallery, FileBrowser, ActionMenu
   src/lib/           api.ts (fetching), queries.ts, display.ts (screen geometry), platform.ts (what
                      device and browser this is), format.ts
+design/            Lamplight, the one source of the look: tokens.css, fonts.css and fonts/, grain.webp, logo/mark.svg,
+                     build.mjs (the icons, from the mark) and README.md. The library, the docs and the website import it
 runtime/           Plain ES5-style scripts for the game pages: renplay-runtime.js (Ren'Py) and
                      renplay-html.js (HTML games), each with renplay-player.js, what they share, in
                      front. The server builds them (server/src/play/runtime.ts)
@@ -116,7 +123,9 @@ image/             The image's own files: nginx.conf.template and entrypoint.sh 
 charts/renplay/    The Helm chart
 deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
                      these files (a code block marked file=deploy/<path>), CI checks them (tests/examples.sh)
-demo/              The public demo's image (demo.renplay.org)
+demo/              The public demo: its image (demo.renplay.org), and static/, the same demo as plain files for a static host,
+                     answered in the browser by a service worker (demo/README.md). A new server route needs a line in
+                     server/src/__tests__/demo-static-routes.ts
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
 website/           renplay.org and adult.renplay.org: plain HTML and CSS, built by `build.mjs` (`sh build.sh`) into
@@ -253,7 +262,7 @@ browser ── nginx :8080 ─┬─ /                      library UI (selector
 mise install && mise run install    # tools and npm packages
 mise run dev                        # server on :3999 (data in /tmp/rp) and library on http://localhost:5199
 RENPLAY_BACKEND=https://renplay.example mise run dev:ui   # library against a deployed server
-mise run check                      # everything CI checks, or one part: check:server, check:ui,
+mise run check                      # everything CI checks, or one part: check:server, check:design, check:ui,
                                     # check:docs, check:website, check:layout (layout shift of the website and docs),
                                     # check:chart, check:copy, check:workflows, check:examples
 mise run test                       # server tests only
@@ -268,20 +277,23 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
 
 ## Definition of done
 
-1. `mise run check` passes: type checks (the tests' too), tests, the structure rules and the writing
+1. `mise run check` passes: type checks (the tests' too), tests, the structure rules, the look and the writing
    rule. New behavior has a test (`server/src/__tests__`).
 2. The UI type-checks and builds.
 3. UI changes are looked at on a phone size (WebKit, iPhone) and a desktop size, using
    `npm run screenshots` or Playwright directly. No page errors.
 4. Browser acceptance is `mise run test:ui`, the pinned official Playwright Linux image with Node 24.
-   Native Mac browsers are for quick tries only. The Playwright suite uses one worker, desktop Chromium, and touch
-   WebKit in portrait and landscape. While working, run only the tests a change touches, using
-   `sh scripts/test-ui.sh --warm playwright --grep <behavior>` or `--warm legacy --only <subject>`.
+   Native Mac browsers are for quick tries only. The suite is Playwright Test (`server/scripts/app-ui/specs/`) and the
+   website and docs layout check. Playwright runs up to five workers (three in each WebKit project, and four and two on CI, whose four vCPUs are slower) over five projects: desktop Chromium, touch WebKit in
+   portrait and landscape, desktop WebKit for the static demo, and a phone-sized Chromium for the library's own checks
+   in `specs/chromium/`. A spec says in its first line which projects run it and why (`only()` and `where()`), so a
+   test runs where it shows something new. While working, run only the tests a change touches, using
+   `sh scripts/test-ui.sh --warm playwright --grep <behavior>`. The whole suite has a budget of five minutes.
    Run the whole suite once at the end, in the container, and push only after it passes. Never re-run
    a passing suite to make sure. A doubt about a test is a flake to report, and the **Flake hunt**
    workflow repeats it without retries (by hand, or nightly on `dev`). Stop the warm container with
    `mise run test:ui:stop`. Results and failure traces are in `ui-test-results/`.
-   A retry-only pass warns locally and fails CI. No PR screenshots.
+   A test that passes only on its retry does not fail a pull request: the job summary lists it under "Flaky, to fix from the flake hunt" and CI warns once for each. A test that fails every attempt fails the job, and the nightly flake hunt, which runs without retries, fails on any failure. No PR screenshots.
    Never loosen a test without stopping to report it and getting a maintainer's approval: no removed assertions,
    wider tolerances, added or longer fixed waits, skips, quarantine or changes only to make it pass.
    Moving an assertion needs equivalent or stronger coverage in the new runner, not less coverage.

@@ -1,12 +1,55 @@
 import { defineConfig } from 'astro/config'
 import starlight from '@astrojs/starlight'
 import starlightLinksValidator from 'starlight-links-validator'
+import starlightLlmsTxt from 'starlight-llms-txt'
+import { pageSets } from './scripts/llms-sets.mjs'
 import remarkInclude from './scripts/remark-include.mjs'
 import remarkVersion from './scripts/remark-version.mjs'
 import { unified } from '@astrojs/markdown-remark'
 
+const sidebar = [
+  {
+    label: 'Start here',
+    items: [
+      'start-here/what-is-renplay',
+      'start-here/quick-start',
+      'start-here/adult-games',
+    ],
+  },
+  {
+    label: 'Install',
+    items: [
+      'install/docker',
+      'install/kubernetes',
+      'install/reverse-proxy',
+      'install/truenas',
+      'install/unraid',
+      'install/synology',
+      'install/ugreen',
+      'install/qnap',
+      'install/other-platforms',
+    ],
+  },
+  { label: 'Guides', items: ['guides/adding-games', 'guides/playing', 'guides/dashboards'] },
+  'accounts',
+  'configuration',
+  'telemetry',
+  'upgrading',
+  'stability',
+  'catalog',
+  'engines',
+  'troubleshooting',
+  'faq',
+  {
+    label: 'Developers',
+    items: ['developers/architecture', 'developers/accounts-api', 'developers/contributing'],
+  },
+]
+
 export default defineConfig({
   site: 'https://docs.renplay.org',
+  // The dev server may read design/ (the fonts and tokens), as well as these docs.
+  vite: { server: { fs: { allow: ['.', '../../design'] } } },
   markdown: { processor: unified({ remarkPlugins: [remarkInclude, remarkVersion] }) },
   integrations: [
     starlight({
@@ -38,7 +81,8 @@ export default defineConfig({
       locales: { root: { label: 'English', lang: 'en' } },
       editLink: { baseUrl: 'https://github.com/renplay-org/renplay/edit/dev/docs/site/' },
       lastUpdated: false,
-      customCss: ['./src/styles/renplay.css'],
+      // Lamplight's fonts and tokens come first (design/), and renplay.css maps Starlight's variables to them.
+      customCss: ['../../design/fonts.css', '../../design/tokens.css', './src/styles/renplay.css'],
       head: [
         // Dark unless the reader picked a theme before.
         {
@@ -65,45 +109,15 @@ export default defineConfig({
         { icon: 'github', label: 'GitHub', href: 'https://renplay.org/github' },
         { icon: 'heart', label: 'Support', href: 'https://renplay.org/support' },
       ],
-      plugins: [starlightLinksValidator({ errorOnRelativeLinks: false })],
-      sidebar: [
-        {
-          label: 'Start here',
-          items: [
-            'start-here/what-is-renplay',
-            'start-here/quick-start',
-            'start-here/adult-games',
-          ],
-        },
-        {
-          label: 'Install',
-          items: [
-            'install/docker',
-            'install/kubernetes',
-            'install/reverse-proxy',
-            'install/truenas',
-            'install/unraid',
-            'install/synology',
-            'install/ugreen',
-            'install/qnap',
-            'install/other-platforms',
-          ],
-        },
-        { label: 'Guides', items: ['guides/adding-games', 'guides/playing', 'guides/dashboards'] },
-        'accounts',
-        'configuration',
-        'telemetry',
-        'upgrading',
-        'stability',
-        'catalog',
-        'engines',
-        'troubleshooting',
-        'faq',
-        {
-          label: 'Developers',
-          items: ['developers/architecture', 'developers/accounts-api', 'developers/contributing'],
-        },
+      plugins: [
+        starlightLinksValidator({ errorOnRelativeLinks: false }),
+        // llms.txt, llms-small.txt and llms-full.txt, written from the docs at build time.
+        starlightLlmsTxt({
+          projectName: 'Renplay',
+          customSets: pageSets(sidebar),
+        }),
       ],
+      sidebar,
     }),
   ],
 })

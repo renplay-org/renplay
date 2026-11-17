@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type Ref, type RefObject } from 'react'
 import type { Game } from '@shared/api'
-import { IconBtn, Pill } from '../../lantern/controls'
+import { IconBtn, Pill, U } from '../../lantern/controls'
 import { Spinner } from '../../lantern/ui'
 import type { PDFDocumentProxy } from '../../lib/pdfjs'
 import { isTouchDevice } from '../../lib/platform'
@@ -331,7 +331,7 @@ export function GuideReader({ game, file, onFile, handle }: { game: Game; file: 
         <div className="gw-tabs" role="tablist" aria-label="Walkthroughs">
           {files.map((w) => (
             <button key={w.file} type="button" role="tab" aria-selected={w.file === current.file} className={w.file === current.file ? 'on' : ''} onClick={() => (keepFile(game, w.file), onFile(w.file))}>
-              {w.title}
+              <U>{w.title}</U>
             </button>
           ))}
         </div>
