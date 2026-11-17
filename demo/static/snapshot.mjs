@@ -9,15 +9,15 @@ import { dirname, join } from 'node:path'
 import { capture } from './capture.mjs'
 
 /**
- * @param {{ out: string, base: string, seed: string, embedder: string }} options
+ * @param {{ out: string, base: string, seed: string, embedder: string, fetch?: typeof fetch }} options
  * @returns {Promise<string[]>} the games captured
  */
-export async function writeSnapshot({ out, base, seed, embedder }) {
+export async function writeSnapshot({ out, base, seed, embedder, fetch }) {
   const write = (path, data) => {
     mkdirSync(dirname(join(out, path)), { recursive: true })
     writeFileSync(join(out, path), data)
   }
-  const { snapshot, art, fetchArt, pages, runtime } = await capture({ base, embedder })
+  const { snapshot, art, fetchArt, pages, runtime } = await capture({ base, embedder, fetch })
   for (const url of art) write(url.slice(1), await fetchArt(url))
   write('demo/snapshot.json', JSON.stringify(snapshot))
   if (runtime) write('renplay/runtime.js', runtime)

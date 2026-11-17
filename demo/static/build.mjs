@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto'
 import { readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkArt } from './art.mjs'
 import { headersFor } from './headers.mjs'
 import { ROBOTS_TXT, demoHead } from './seo.mjs'
 import { writeSnapshot } from './snapshot.mjs'
@@ -91,6 +92,8 @@ async function build({ out, seed, base, embedder }) {
 
   // 3. What the demo shows: the answers, the pictures and the games.
   const games = await writeSnapshot({ out, base, seed, embedder })
+  // The stand-in leaves the pictures to the host: one the answers name and the output lacks is a 404 for the visitor.
+  checkArt(out)
 
   // 4. The page that waits for the worker, what search engines read, and the headers.
   const indexPath = join(out, 'index.html')

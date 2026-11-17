@@ -4,6 +4,7 @@
 //
 // The guest is signed in the way the demo's own page does it. One stand-in guest is the same on every visit.
 
+import { artNamed } from './art.mjs'
 import { SNAPSHOT_ROUTES } from './snapshot-routes.mjs'
 
 export const ENGINES = 'https://engines.renplay.org'
@@ -51,7 +52,6 @@ export async function capture({ base, embedder, fetch: request = fetch }) {
     if (saves.slots.length) throw new Error(`${g.id} already has saves: capture from a fresh guest`)
   }
 
-  const art = [...new Set(JSON.stringify([details, routes]).match(/\/api\/art\/[0-9a-f]+\.webp/g) ?? [])]
   const fetchBytes = async (path) => Buffer.from(await (await get(path)).arrayBuffer())
 
   // The page of each Ren'Py game, as the server renders it. The engine comes from engines.renplay.org, which sends CORS.
@@ -66,5 +66,8 @@ export async function capture({ base, embedder, fetch: request = fetch }) {
     runtime ??= await fetchBytes(src[0].match(/src="([^"]+)"/)[1])
     pages.push({ id: g.id, build: g.build, html: page })
   }
-  return { snapshot: { routes, me, games: details }, art, fetchArt: fetchBytes, pages, runtime }
+  const snapshot = { routes, me, games: details }
+  // The art copied is the art the snapshot and the pages name, in any format: nothing more, and nothing less.
+  const art = artNamed(JSON.stringify(snapshot), ...pages.map((p) => p.html))
+  return { snapshot, art, fetchArt: fetchBytes, pages, runtime }
 }
