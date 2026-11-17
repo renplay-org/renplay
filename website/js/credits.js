@@ -2,7 +2,6 @@
 (() => {
 'use strict'
 const { $, $$, still, clamp, hand } = window.Renplay
-const root = document.documentElement
 /* ------------------------------------------------------------------ credits: the roll follows the scroll, lit where the lantern passes
    The roll is scrubbed by the page's own scroll, like a film's credits under your hand: the wheel, a trackpad or a finger moves it up as the
    page goes down and back down as the page comes up. It is not a timer and it holds nothing: the page scrolls as it always does, the roll is
@@ -29,7 +28,6 @@ function creditsInit() {
   // where in the page's scroll the roll is empty (from) and complete (to)
   let from = 0, to = 1
   const measure = () => {
-    if (root.classList.contains('taken')) return // the page is held fixed under the picked-up phone: its numbers would be wrong
     const r = win.getBoundingClientRect()
     const top = r.top + scrollY
     const max = document.documentElement.scrollHeight - innerHeight
