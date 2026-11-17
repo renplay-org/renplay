@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-11-17
+
 ### Added
 
 - The public demo can also be built as plain files for a static host, with no server behind it (`demo/static/`). A service worker in the browser answers what the demo asks of the server, and the visitor's saves, history, names and play progress stay in that browser. It needs https or localhost. A server demo (`RENPLAY_DEMO`) works as before. The demo's notice in the static demo says "This is a demo. Your saves stay in this browser." and the library leaves out what it cannot do without a server: Keep offline, exporting and importing saves, copying a save to another game and choosing other art.
@@ -838,7 +840,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.12.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.13.0...dev
+[4.13.0]: https://github.com/renplay-org/renplay/compare/v4.12.0...v4.13.0
 [4.12.0]: https://github.com/renplay-org/renplay/compare/v4.11.0...v4.12.0
 [4.11.0]: https://github.com/renplay-org/renplay/compare/v4.10.0...v4.11.0
 [4.10.0]: https://github.com/renplay-org/renplay/compare/v4.9.0...v4.10.0
