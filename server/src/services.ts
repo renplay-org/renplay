@@ -3,6 +3,8 @@ import { hashArchive } from './library/archives.js'
 import { ArtStore } from './art/store.js'
 import { Accounts } from './accounts/accounts.js'
 import { SaveBackups } from './saves/backups.js'
+import { LowSpaceWatch } from './system/lowspace.js'
+import { diskSpace } from './util/disk.js'
 import { Builds } from './games/builds.js'
 import { Catalog } from './catalog/catalog.js'
 import type { Config } from './config.js'
@@ -44,6 +46,7 @@ export interface Services {
   catalog: Catalog
   backups: SaveBackups
   telemetry: Telemetry
+  lowSpace: LowSpaceWatch
 }
 
 export async function createServices(cfg: Config): Promise<Services> {
@@ -84,6 +87,7 @@ export async function createServices(cfg: Config): Promise<Services> {
     catalog,
     saveStores,
     backups: new SaveBackups(cfg, db, saveStores),
+    lowSpace: new LowSpaceWatch(cfg.dataDir, diskSpace),
     telemetry: new Telemetry({ cfg, db, catalog, content, accounts, saveStores, version: VERSION }),
   }
   s.jobs.register('import', 'Install', (ctx) => s.telemetry.install(ctx, async () => (await runImport(ctx, s)) as { recipe?: string | null; engine?: string }))

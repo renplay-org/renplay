@@ -10,3 +10,8 @@ export function bytes(n: number | null | undefined): string {
   }
   return `${v >= 100 || i === 0 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`
 }
+
+/** A disk with less than 10 percent or 1 GB free: Settings warns, and the log does once a day. */
+export function lowSpace(disk: { total: number; free: number } | null): boolean {
+  return !!disk && disk.total > 0 && (disk.free < 1e9 || disk.free < disk.total / 10)
+}
