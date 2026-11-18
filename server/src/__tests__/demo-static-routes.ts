@@ -33,7 +33,7 @@ export const DEMO_ROUTES = {
   refused: [
     'DELETE /archives', 'DELETE /games/:id', 'DELETE /games/:id/art/uploads/:upload', 'DELETE /games/:id/download', 'DELETE /games/:id/files/raw',
     'DELETE /games/:id/update-not-now', 'DELETE /games/:id/walkthroughs/:file', 'DELETE /jobs', 'DELETE /me/identities', 'DELETE /me/sessions',
-    'DELETE /me/sessions/:id', 'DELETE /me/tokens/:id', 'DELETE /uploads/:id', 'DELETE /users/:id', 'GET /archives', 'GET /games/:id/files',
+    'DELETE /me/sessions/:id', 'DELETE /me/tokens/:id', 'DELETE /system/storage/saves/:folder', 'DELETE /uploads/:id', 'DELETE /users/:id', 'GET /archives', 'GET /games/:id/files',
     'GET /games/:id/files/raw', 'GET /games/:id/recipe', 'GET /jobs', 'GET /jobs/:id/log', 'GET /me/identities', 'GET /me/sessions', 'GET /me/tokens',
     'GET /metrics', 'GET /system', 'GET /system/backups', 'GET /system/backups/:name', 'GET /system/storage', 'GET /uploads/:id', 'GET /users',
     'GET /users/:id/saves/export', 'POST /', 'POST /:id/copy', 'POST /:id/import', 'POST /:id/save-dir', 'POST /:id/sync', 'POST /:id/sync/download', 'POST /archives/hash',
@@ -42,7 +42,7 @@ export const DEMO_ROUTES = {
     'POST /games/:id/update-not-now', 'POST /games/:id/walkthroughs', 'POST /imports', 'POST /jobs/:id/cancel', 'POST /jobs/:id/move',
     'POST /jobs/:id/pause', 'POST /jobs/:id/resume', 'POST /jobs/:id/retry', 'POST /me/avatar', 'POST /me/claim-owner', 'POST /me/identities/ldap',
     'POST /me/identities/oidc', 'POST /me/password', 'POST /me/tokens', 'POST /system/backups', 'POST /system/engines/refresh', 'POST /system/prune',
-    'POST /system/storage/refresh', 'POST /uploads', 'POST /uploads/:id/complete', 'POST /users', 'POST /users/:id/merge', 'POST /users/:id/password',
+    'POST /system/storage/deleted-saves/:entry/restore', 'POST /system/storage/refresh', 'POST /uploads', 'POST /uploads/:id/complete', 'POST /users', 'POST /users/:id/merge', 'POST /users/:id/password',
     'POST /users/:id/saves/copy', 'POST /users/:id/saves/import', 'PUT /content', 'PUT /defaults', 'PUT /games/:id/files/raw',
     'PUT /games/:id/walkthroughs/:file', 'PUT /me', 'PUT /me/adult', 'PUT /me/pin', 'PUT /me/tags', 'PUT /system/downloads', 'PUT /system/sync',
     'PUT /system/telemetry', 'PUT /uploads/:id', 'PUT /users/:id',

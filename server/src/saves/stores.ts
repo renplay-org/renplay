@@ -4,7 +4,8 @@ import type { Config } from '../config.js'
 import type { Db } from '../db.js'
 import { sha1 } from '../util/fsx.js'
 import { HttpError } from '../util/paths.js'
-import { SaveStore, SHARED_DIRS } from './store.js'
+import { folderKey } from './folders.js'
+import { SaveStore, SHARED_DIRS, isSharedDir } from './store.js'
 
 /** What a person wrote about one of their saves. A save with none of it has no row. */
 export interface SaveNote {
@@ -80,6 +81,37 @@ export class SaveStores {
     }
     this.counted = { at: Date.now(), n }
     return n
+  }
+
+  /** Everyone's ids. */
+  people(): number[] {
+    return (this.db.raw.prepare('SELECT id FROM users ORDER BY id').all() as Array<{ id: number }>).map((u) => u.id)
+  }
+
+  /**
+   * What everyone has in the save folders that are not in `claimed`, one entry for each folder
+   * that holds a save: the people with saves in it, the files, their bytes and the time of the newest.
+   * A folder that differs from a library game's only in capitals, and a shared folder, is not offered:
+   * deleting it is refused too.
+   */
+  async unclaimed(claimed: ReadonlySet<string>): Promise<Array<{ folder: string; people: number; files: number; bytes: number; newest: number }>> {
+    const found = new Map<string, { folder: string; people: number; files: number; bytes: number; newest: number }>()
+    const used = new Set([...claimed].map(folderKey))
+    for (const user of this.people()) {
+      const store = this.of(user)
+      for (const folder of await store.listDirs()) {
+        if (used.has(folderKey(folder)) || isSharedDir(folder)) continue
+        const files = await store.list(folder)
+        if (!files.length) continue
+        const row = found.get(folder) ?? { folder, people: 0, files: 0, bytes: 0, newest: 0 }
+        row.people++
+        row.files += files.length
+        row.bytes += files.reduce((n, f) => n + f.size, 0)
+        row.newest = Math.max(row.newest, ...files.map((f) => f.mtimeMs))
+        found.set(folder, row)
+      }
+    }
+    return [...found.values()]
   }
 
   /** The notes of a person's saves in one folder, by file. */
@@ -165,6 +197,21 @@ export class SaveStores {
   /** A deleted save's name, note and pin go with it, so a new save in the slot starts clean. */
   dropNote(user: number, dir: string, file: string): void {
     this.db.raw.prepare('DELETE FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').run(user, dir, file)
+  }
+
+  /** Everything a person wrote about the saves of one folder goes, as when each of them is deleted. */
+  dropNotes(user: number, dir: string): void {
+    this.db.raw.prepare('DELETE FROM save_meta WHERE user_id = ? AND save_dir = ?').run(user, dir)
+    this.db.raw.prepare('DELETE FROM save_meta_parked WHERE user_id = ? AND save_dir = ?').run(user, dir)
+  }
+
+  /**
+   * Who an account is besides its number, or null when there is none with that number. A database
+   * restored from before an account was made hands its number to the next account, which was
+   * created at another time.
+   */
+  identity(user: number): string | null {
+    return (this.db.raw.prepare('SELECT created_at FROM users WHERE id = ?').get(user) as { created_at: string } | undefined)?.created_at ?? null
   }
 
   /** Gives one person's notes to another, where the other has none for the same file. */

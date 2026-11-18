@@ -12,7 +12,12 @@ export function ago(ts: number | string | null | undefined, relativeOnly = false
   if (abs < 86400) return rtf.format(Math.round(s / 3600), 'hour')
   if (abs < 86400 * 30) return rtf.format(Math.round(s / 86400), 'day')
   if (relativeOnly) return abs < 86400 * 365 ? rtf.format(Math.round(s / (86400 * 30)), 'month') : rtf.format(Math.round(s / (86400 * 365)), 'year')
-  return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  return day(t)
+}
+
+/** A date for people, without the time. */
+export function day(ts: number): string {
+  return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export function dateTime(ts: number | string): string {

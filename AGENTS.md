@@ -36,7 +36,8 @@ These decide most review comments. Follow them without being asked.
   another engine. Unity and Godot web builds still install (the code stays) but are unsupported: never in the catalog,
   the docs, the website or the app's messaging. Status: `docs/site/src/content/docs/engines.md`.
 - **Saves are sacred.** Never delete or rewrite save data as a side effect. Every overwrite and
-  delete keeps history. Uninstall and reinstall leave saves alone.
+  delete keeps history. Uninstall and reinstall leave saves alone. The one deliberate exception is an
+  admin's Delete these saves for a game no longer in the library: they move to `deleted-saves/`, are kept 30 days and can be restored, then are removed.
 - **Works on phones.** Every screen must work at 390 px wide in portrait and in landscape, with
   touch only (no hover). The player respects safe-area insets and has no hover-only controls.
 - **Sentence case, no lowercase starts.** "Renplay" (never "renplay" in UI text or prose; the
@@ -91,7 +92,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/play/          Game pages, the runtimes and the files a game streams
   src/progress/      Each person's progress with each game and their play history
   src/saves/         Everyone's saves: the store with history (store.ts), each person's store, notes
-                     and pins (stores.ts), import, sync codes, backups. savefile.ts reads Ren'Py
+                     and pins (stores.ts), the 30-day trash of removed games' saves (trash.ts), import, sync codes, backups. savefile.ts reads Ren'Py
                      save metadata
   src/recipes/       Your recipes (local.ts), read from the recipes folder
   src/catalog/       Catalog index: recipe matching, linking games to recipes, updates

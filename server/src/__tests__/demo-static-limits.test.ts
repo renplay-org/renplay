@@ -63,6 +63,8 @@ const LIMITED: Record<string, Hand[]> = {
     { method: 'DELETE', path: '/api/users/1' },
     { method: 'POST', path: '/api/system/backups', body: {} },
     { method: 'POST', path: '/api/system/prune', body: {} },
+    { method: 'DELETE', path: '/api/system/storage/saves/Gone-1' },
+    { method: 'POST', path: '/api/system/storage/deleted-saves/2026-12-01T10-00-00.000Z-Gone-1/restore', body: {} },
   ],
   'adding games, mods and files': [
     { method: 'POST', path: '/api/imports', body: {} },

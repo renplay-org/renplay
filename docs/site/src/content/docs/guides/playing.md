@@ -228,6 +228,17 @@ controller is connected, the guide's bar shows these buttons instead of the keys
   save's menu, or with **History** for every save. Each version says why it is there, for example
   "Saved over in the game" or "Deleted here", and has a **Restore** button.
 - Uninstalling or reinstalling a game never deletes saves.
+- Saves of a game that is no longer in the library stay on the server until an admin deletes them.
+  **Settings → Storage → Show what uses space** lists them under "Saves of games no longer in your
+  library", with the people, the size and the newest save. **Delete these saves** moves every person's
+  saves and History of that game into a trash folder, out of the library and out of the daily backups.
+  They stay there for 30 days, listed under "Deleted saves" with the day they go. **Restore** puts them
+  back, as long as nobody has saves or History in that folder again, and only to the same accounts
+  that had them. Their names, notes and pins are not kept. After 30 days Renplay deletes them for
+  good and the space comes back. A game that is still in the library is refused. If Renplay stops
+  while it deletes or restores, the next start puts it right: a deletion is undone and a restore is
+  finished. When something is in the way, the entry says it needs attention and is kept, however old it
+  is, until you move that and restart Renplay.
 - When two devices change the same save without seeing each other's copy, the copy saved later
   stays in the slot and the other is kept in History. The player and the game's saves both say so.
 - Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every

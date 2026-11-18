@@ -6,7 +6,8 @@ import { SourceLabel, LanternSwitch, Bar, Pill } from '../../lantern/controls'
 import { api, del, post, put } from '../../lib/api'
 import { bytes, lowSpace } from '@shared/format'
 import { useSystem } from '../../lib/queries'
-import type { StorageReport } from '@shared/api'
+import { ago, day } from '../../lib/format'
+import type { DeletedSaves, RemovedSaves, StorageReport } from '@shared/api'
 import { Setting, setBy, useRun } from './common'
 import Sheet from '../../lantern/Sheet'
 
@@ -175,6 +176,8 @@ function StorageSheet({ onClose }: { onClose: () => void }) {
               )}
             </section>
           )}
+          {data.removedSaves.length > 0 && <RemovedSavesSection saves={data.removedSaves} run={run} />}
+          {data.deletedSaves.length > 0 && <DeletedSavesSection saves={data.deletedSaves} run={run} />}
           {data.orphans.length > 0 && (
             <section>
               <h3 className="small" style={{ fontWeight: 650, marginBottom: 6 }}>Folders of no game</h3>
@@ -206,5 +209,78 @@ function StorageSheet({ onClose }: { onClose: () => void }) {
         Deletes {confirm?.download?.name}. Reinstalling {confirm?.title} will need the download again. The installed game and its saves are kept.
       </Confirm>
     </Sheet>
+  )
+}
+
+const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`
+
+/** Saves of games that are not in the library: the saves are kept until an admin deletes them, into the trash. */
+function RemovedSavesSection({ saves, run }: { saves: RemovedSaves[]; run: (fn: () => Promise<unknown>, ok: string) => Promise<void> }) {
+  const [confirm, setConfirm] = useState<RemovedSaves | null>(null)
+  return (
+    <section>
+      <h3 className="small" style={{ fontWeight: 650, marginBottom: 6 }}>Saves of games no longer in your library</h3>
+      <p className="xs muted" style={{ marginBottom: 6 }}>Renplay keeps these saves, and the daily backups include them. Deleting them takes them out of the library, and you can restore them here for 30 days.</p>
+      <div className="list tight">
+        {saves.map((r) => (
+          <div key={r.folder} className="row between wrap" style={{ gap: 8, minHeight: 'var(--hit)', padding: '6px 0' }}>
+            <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+              <div style={{ fontWeight: 600 }}>{r.title ?? <code>{r.folder}</code>}</div>
+              <div className="xs muted">
+                {r.title && <><code>{r.folder}</code>, </>}
+                {people(r.people)}, {bytes(r.bytes)}, newest save {ago(r.newest)}
+              </div>
+            </div>
+            <Pill size="sm" variant="q" onClick={() => setConfirm(r)}>
+              Delete these saves
+            </Pill>
+          </div>
+        ))}
+      </div>
+      <Confirm
+        open={!!confirm}
+        onClose={() => setConfirm(null)}
+        danger
+        title={`Delete the saves of ${confirm?.title ?? confirm?.folder ?? 'this game'}?`}
+        confirmLabel="Delete these saves"
+        onConfirm={() => {
+          const r = confirm!
+          setConfirm(null)
+          void run(() => del(`/api/system/storage/saves/${encodeURIComponent(r.folder)}`), 'Saves deleted')
+        }}
+      >
+        Moves the saves of {confirm && people(confirm.people)} ({confirm?.files} {confirm?.files === 1 ? 'file' : 'files'}, {bytes(confirm?.bytes)}) out of the library. You can restore them here for 30 days. After that they are deleted for good.
+      </Confirm>
+    </section>
+  )
+}
+
+/** What an admin deleted, kept 30 days: it can be restored until its time is up. */
+function DeletedSavesSection({ saves, run }: { saves: DeletedSaves[]; run: (fn: () => Promise<unknown>, ok: string) => Promise<void> }) {
+  return (
+    <section>
+      <h3 className="small" style={{ fontWeight: 650, marginBottom: 6 }}>Deleted saves</h3>
+      <p className="xs muted" style={{ marginBottom: 6 }}>Renplay keeps these for 30 days and leaves them out of the daily backups. After that they are deleted for good. A restore puts back every person's saves and History, and only into a folder that is empty.</p>
+      <div className="list tight">
+        {saves.map((d) => (
+          <div key={d.entry} className="row between wrap" style={{ gap: 8, minHeight: 'var(--hit)', padding: '6px 0' }}>
+            <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+              <div style={{ fontWeight: 600 }}>{d.title ?? <code>{d.folder}</code>}</div>
+              <div className="xs muted">
+                {d.title && <><code>{d.folder}</code>, </>}
+                {people(d.people)}, {bytes(d.bytes)}
+              </div>
+              <div className="xs muted">{d.attention ? 'Needs attention, kept until it is put right' : `Deleted on ${day(d.deletedAt)}, removed for good on ${day(d.removeAt)}`}</div>
+              {d.attention && <div className="xs muted">{d.attention}</div>}
+            </div>
+            {!d.attention && (
+              <Pill size="sm" variant="q" onClick={() => void run(() => post(`/api/system/storage/deleted-saves/${encodeURIComponent(d.entry)}/restore`), 'Saves restored')}>
+                Restore
+              </Pill>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }

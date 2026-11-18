@@ -26,7 +26,11 @@ const LARGER = {
  * ones. When the count falls ROOM below it, lower it to match. Raising it takes a one-line reason here, next to the number.
  */
 // 14760: the backup job's guards (room first, sweep, back off) and the low disk warning, which no earlier test covered.
-const TEST_LINES = 14760
+// 15309: the trash for the saves of removed games, which no earlier test covered: the list, the refusals, the move under the save lock, links, History-only people, a restored database, restore, the 30 days and a failed purge.
+// 15457: the review round of that trash: who gets saves back, an entry made whole or not at all, a restore that refuses or rolls back, dropped names, the adult folder in other capitals.
+// 15651: crash recovery of the trash, which no earlier test covered: an interrupted deletion and restore, a second interruption, a conflict that must never expire.
+// 15690: the fresh 30 days for data that stays in an entry after its protection ends, and a crash on the way.
+const TEST_LINES = 15690
 const TEST_ROOM = 100
 
 const problems = []

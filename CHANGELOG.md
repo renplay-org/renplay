@@ -9,6 +9,7 @@ release notes say what).
 
 ### Added
 
+- **Settings → Storage → Show what uses space** lists the saves of games that are no longer in your library, with the people who have saves, their size and the newest save. An admin can choose **Delete these saves** for one game. That moves every person's saves and History out of the library into a trash folder, and out of the daily backups. They are listed under **Deleted saves** for 30 days, and **Restore** puts them back as long as nobody has saves or History in that folder again, and only to the accounts that had them. Their names, notes and pins are not kept. After 30 days they are deleted for good and the space comes back. A game that is still in the library is refused. The same works from a script with an admin token: `DELETE /api/system/storage/saves/<save folder>`, and `POST /api/system/storage/deleted-saves/<entry>/restore`.
 - **Settings** shows a warning under Storage, and the log gets one line a day, when the disk with the data folder has less than 10 percent or 1 GB free.
 
 ### Changed

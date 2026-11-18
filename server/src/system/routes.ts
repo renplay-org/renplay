@@ -4,17 +4,19 @@ import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
 import { parseJson } from '../db.js'
-import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
+import { HttpError, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
+import { NO_SAVES } from '../saves/folders.js'
+import { log } from '../util/log.js'
 import { dirSize } from '../util/fsx.js'
 import { diskSpace } from '../util/disk.js'
 import type { Services } from '../services.js'
-import type { Health, StorageReport, SystemInfo } from '../shared/api.js'
+import type { DeletedSaves, Health, RemovedSaves, RemovedSavesDeleted, SavesMoved, StorageReport, SystemInfo } from '../shared/api.js'
 
 /** Variables whose effect Settings shows, so it can say whether the server sets them. */
 const PROVENANCE = ['RENPLAY_AUTH', 'GAMES_DIR', 'ARCHIVES_DIR', 'DATA_DIR', 'RENPLAY_BACKUP_DIR', 'RENPLAY_CATALOG_URLS', 'RENPLAY_RECIPES_DIR', 'RENPLAY_LOG_LEVEL', 'RENPLAY_SYNC_SERVER', 'RENPLAY_ENGINES_URL', 'RENPLAY_TELEMETRY']
 
 export function createSystemRouter(s: Services): Router {
-  const { cfg, db, jobs, engines, builds, purger, version, content, catalog } = s
+  const { cfg, db, jobs, engines, builds, purger, version, content, catalog, saveStores, saveTrash } = s
   const router = Router({ caseSensitive: true, strict: true })
 
   router.get('/health', (_req, res) => {
@@ -27,13 +29,14 @@ export function createSystemRouter(s: Services): Router {
    * What uses space, game by game (the build played, other builds such as mods, the download), the
    * engines, and folders of no game, with what could be freed. Counted at most once a minute.
    */
-  let storage: { at: number; body: StorageReport; level: string } | null = null
+  type Counted = Omit<StorageReport, 'removedSaves' | 'deletedSaves'>
+  let storage: { at: number; body: Counted; level: string } | null = null
   // One count at a time for each level: a second request waits for the one running.
-  let counting: { level: string; body: Promise<StorageReport> } | null = null
+  let counting: { level: string; body: Promise<Counted> } | null = null
   router.get('/system/storage', async (_req, res) => {
     const level = content.viewerLevel()
     if (storage && storage.level === level && Date.now() - storage.at < 60_000) {
-      res.json(storage.body)
+      res.json({ ...storage.body, removedSaves: await removedSaves(), deletedSaves: await deletedSaves() })
       return
     }
     if (counting?.level !== level) {
@@ -44,7 +47,33 @@ export function createSystemRouter(s: Services): Router {
     }
     const body = await counting.body
     storage = { at: Date.now(), body, level }
-    res.json(body)
+    res.json({ ...body, removedSaves: await removedSaves(), deletedSaves: await deletedSaves() })
+  })
+  /** Saves of games that are not in the library, and the trash. They depend on who asks (Off hides adult games' folders), so they are not part of the counted report. */
+  async function removedSaves(): Promise<RemovedSaves[]> {
+    const found = await saveStores.unclaimed(catalog.librarySaveDirs())
+    const shown = new Set(content.visibleSaveDirs(found.map((f) => f.folder)))
+    return found.filter((f) => shown.has(f.folder)).map((f) => ({ ...f, title: catalog.titleOfSaveDir(f.folder) })).sort((a, b) => b.bytes - a.bytes || a.folder.localeCompare(b.folder))
+  }
+  async function deletedSaves(): Promise<DeletedSaves[]> {
+    const kept = await saveTrash.list()
+    const shown = new Set(content.visibleSaveDirs(kept.map((d) => d.folder)))
+    return kept.filter((d) => shown.has(d.folder)).map((d) => ({ ...d, title: catalog.titleOfSaveDir(d.folder) }))
+  }
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+  // Deleting is for a game that is gone from the library: its saves move to the trash folder, never away from the disk, and stay 30 days.
+  router.delete('/system/storage/saves/:folder', async (req, res) => {
+    const folder = req.params.folder
+    if (!isSaveDirName(folder)) throw new HttpError(400, 'Invalid save folder')
+    if (!content.visibleSaveDirs([folder]).length) throw new HttpError(404, NO_SAVES)
+    const done = await saveTrash.delete(folder, () => catalog.librarySaveDirs())
+    log('saves', `Deleted the saves of ${done.folder}: ${plural(done.files, 'file', 'files')} of ${plural(done.people, 'person', 'people')}, asked by ${s.accounts.current().username}`)
+    res.json(done satisfies RemovedSavesDeleted)
+  })
+  router.post('/system/storage/deleted-saves/:entry/restore', async (req, res) => {
+    const done = await saveTrash.restore(req.params.entry, (folder) => content.visibleSaveDirs([folder]).length > 0)
+    log('saves', `Restored the saves of ${done.folder}: ${plural(done.files, 'file', 'files')} of ${plural(done.people, 'person', 'people')}, asked by ${s.accounts.current().username}`)
+    res.json(done satisfies SavesMoved)
   })
   const archiveAt = (archive: string) => {
     try {
@@ -53,7 +82,7 @@ export function createSystemRouter(s: Services): Router {
       return null
     }
   }
-  async function countStorage(): Promise<StorageReport> {
+  async function countStorage(): Promise<Counted> {
     const games = []
     for (const g of db.allGames().filter((x) => !content.hides(x))) {
       const folders = await readdir(join(cfg.gamesDir, g.id), { withFileTypes: true }).catch(() => [])
@@ -73,7 +102,7 @@ export function createSystemRouter(s: Services): Router {
     const orphanSizes = []
     for (const name of orphans) orphanSizes.push({ name, bytes: (await dirSize(join(cfg.gamesDir, name))).bytes })
     const enginesOut = installed.map((e) => ({ version: e.version, bytes: e.bytes, used: used.has(e.version) }))
-    const body: StorageReport = {
+    const body: Counted = {
       games,
       engines: enginesOut,
       orphans: orphanSizes,
