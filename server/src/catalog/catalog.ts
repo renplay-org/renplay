@@ -383,6 +383,13 @@ export class Catalog {
     return (this.recipes.get(recipeId) ?? this.adult.get(recipeId))?.saveDir ?? ''
   }
 
+  /** Every save folder a library game uses: its own, once the game has told it, and the one its recipe names. */
+  librarySaveDirs(): Set<string> {
+    const dirs = new Set<string>()
+    for (const g of this.db.allGames()) for (const dir of [g.save_dir, this.saveDirOf(g.recipe_id)]) if (dir) dirs.add(dir)
+    return dirs
+  }
+
   /** The name the catalog gives the game that uses a save folder, when this person may see it. */
   titleOfSaveDir(saveDir: string): string | null {
     const recipe = [...this.recipes.values()].find((r) => r.saveDir === saveDir)

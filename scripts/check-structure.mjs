@@ -27,7 +27,8 @@ const LARGER = {
  */
 // 14760: the backup job's guards (room first, sweep, back off) and the low disk warning, which no earlier test covered.
 // 14880: the admin's deletion of removed games' saves, which no earlier test covered: the list, the refusals, History, the backup zip, Off and tokens.
-const TEST_LINES = 14880
+// 15040: the 30 day expiry of the History an admin's deletion made: the clock, the library check, a restart and other History.
+const TEST_LINES = 15040
 const TEST_ROOM = 100
 
 const problems = []

@@ -47,15 +47,9 @@ export function createSystemRouter(s: Services): Router {
     storage = { at: Date.now(), body, level }
     res.json({ ...body, removedSaves: await removedSaves() })
   })
-  /** Every save folder a library game uses: its own, once the game has told it, and the one its recipe names. */
-  const libraryDirs = () => {
-    const dirs = new Set<string>()
-    for (const g of db.allGames()) for (const dir of [g.save_dir, catalog.saveDirOf(g.recipe_id)]) if (dir) dirs.add(dir)
-    return dirs
-  }
   /** Saves of games that are not in the library. They depend on who asks (Off hides adult games' folders), so they are not part of the counted report. */
   async function removedSaves(): Promise<RemovedSaves[]> {
-    const found = await saveStores.unclaimed(libraryDirs())
+    const found = await saveStores.unclaimed(catalog.librarySaveDirs())
     const shown = new Set(content.visibleSaveDirs(found.map((f) => f.folder)))
     return found.filter((f) => shown.has(f.folder)).map((f) => ({ ...f, title: catalog.titleOfSaveDir(f.folder) })).sort((a, b) => b.bytes - a.bytes || a.folder.localeCompare(b.folder))
   }
@@ -65,7 +59,7 @@ export function createSystemRouter(s: Services): Router {
     const folder = req.params.folder
     if (!isSaveDirName(folder)) throw new HttpError(400, 'Invalid save folder')
     if (!content.visibleSaveDirs([folder]).length) throw new HttpError(404, 'No saves of this game were found')
-    if (libraryDirs().has(folder)) throw new HttpError(409, 'This game is still in your library. Remove it from the library first, then delete its saves.')
+    if (catalog.librarySaveDirs().has(folder)) throw new HttpError(409, 'This game is still in your library. Remove it from the library first, then delete its saves.')
     const done = await saveStores.deleteFolder(folder)
     if (!done.files) throw new HttpError(404, 'No saves of this game were found')
     storage = null

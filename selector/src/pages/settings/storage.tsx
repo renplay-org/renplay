@@ -219,7 +219,7 @@ function RemovedSavesSection({ saves, run }: { saves: RemovedSaves[]; run: (fn: 
   return (
     <section>
       <h3 className="small" style={{ fontWeight: 650, marginBottom: 6 }}>Saves of games no longer in your library</h3>
-      <p className="xs muted" style={{ marginBottom: 6 }}>Renplay keeps these saves, and the daily backups include them. Deleting them moves each save to History.</p>
+      <p className="xs muted" style={{ marginBottom: 6 }}>Renplay keeps these saves, and the daily backups include them. Deleting them moves each save to History for 30 days.</p>
       <div className="list tight">
         {saves.map((r) => (
           <div key={r.folder} className="row between wrap" style={{ gap: 8, minHeight: 'var(--hit)', padding: '6px 0' }}>
@@ -248,7 +248,7 @@ function RemovedSavesSection({ saves, run }: { saves: RemovedSaves[]; run: (fn: 
           void run(() => del(`/api/system/storage/saves/${encodeURIComponent(r.folder)}`), 'Saves deleted')
         }}
       >
-        Deletes the saves of {confirm && people(confirm.people)} ({confirm?.files} {confirm?.files === 1 ? 'file' : 'files'}, {bytes(confirm?.bytes)}). Each save moves to History and stays there. If you add the game to your library again, you can restore them from its page. They no longer go into the daily backups.
+        Moves the saves of {confirm && people(confirm.people)} ({confirm?.files} {confirm?.files === 1 ? 'file' : 'files'}, {bytes(confirm?.bytes)}) to History. They stay there for 30 days. If you add the game to your library again in that time, you can restore them from its page. After that they are deleted for good. They no longer go into the daily backups.
       </Confirm>
     </section>
   )
