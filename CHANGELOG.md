@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Added
+
+- **Settings** shows a warning under Storage, and the log gets one line a day, when the disk with the data folder has less than 10 percent or 1 GB free.
+
 ### Changed
 
 - The static demo lets a visitor play and nothing else. Playing The Question, saving, loading, Resume, naming a save, the game's own menu and the Catalog stay. Downloads, deleting saves, Previous versions, pins and notes, favourites, ratings, status, Account and Settings beyond This browser, and adding games are left out of the library and refused if asked for another way. The Catalog says "Install your own Renplay to add games."
@@ -14,6 +18,10 @@ release notes say what).
 - A link to a game's page on renplay.org shows a card with the game's name and cover, made by the website, instead of a picture from the developer's host.
 - The docs have the website's look. Page titles are in the book face and code, paths and labels in the small monospace. The header is the mark and the drawn name with quiet links. Notes are a line in the lamp's colour instead of a filled box, configuration entries and the page links at the end are thin lines instead of filled cards, and code blocks have the website's smaller corners. The home page has a band of the painted room under its title, and the footer is the website's, with the same links and the install guides. The light theme is paper, with the same type and lines.
 - Sharing a docs page shows a card made for the docs, served from `docs.renplay.org`, and every docs page has a description of at least 50 characters. The docs build now checks the titles, descriptions, canonical addresses, the card, the sitemap and the image tag the guides pin.
+
+### Fixed
+
+- Daily backups no longer fill a small disk. Old daily copies are deleted before the new zip is written, so a full set never needs room for one more. When the disk has less room than the last zip needs, Renplay skips the backup, writes nothing and logs what to do: free space, lower `RENPLAY_BACKUP_KEEP`, or set `RENPLAY_BACKUP_DIR` to another disk. After a failed backup it tries again the next day instead of every hour, and a failed run leaves no library database copy. A zip that a stopped server left unfinished is removed at the next start.
 
 ## [4.13.0] - 2026-11-17
 

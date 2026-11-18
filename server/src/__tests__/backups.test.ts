@@ -150,8 +150,12 @@ describe('save backups', () => {
       mkdirSync(join(backupDir, name), { recursive: true })
       blocked.push(name)
     }
+    const copies = () => readdirSync(join(backupDir, 'library'))
+    const library = copies()
     await expect(app.backups.run()).rejects.toThrow()
     expect((await app.backups.info()).error).toBeTruthy()
+    // A failed run leaves no database copy behind, so retries cannot pile them up.
+    expect(copies().filter((n) => !library.includes(n))).toEqual([])
     await new Promise((r) => setTimeout(r, 200))
     for (const name of blocked) rmSync(join(backupDir, name), { recursive: true, force: true })
   })
@@ -160,42 +164,34 @@ describe('save backups', () => {
 describe('save backups on a small disk', () => {
   let root = ''
   let app: App
-  let backupDir = ''
-  let libraryDir = ''
-  // What the fake disk says is free, and what the backup folder held when it was asked.
+  let dir = ''
   let free = 10 ** 12
+  // The zips the backup folder held each time the (fake) disk was asked for its free space.
   const asked: string[][] = []
-  let backups: SaveBackups
+  const zips = () => readdirSync(dir).filter((n) => /^saves-.*\.zip$/.test(n)).sort()
+  const copies = () => readdirSync(join(dir, 'library')).filter((n) => /^library-\d/.test(n)).sort()
+  const age = (path: string, days: number) => utimesSync(path, new Date(Date.now() - days * 24 * 3600_000), new Date(Date.now() - days * 24 * 3600_000))
+  const day = (n: number) => `2026-01-0${n}`
   // A server that has not failed before, as after a restart.
-  const fresh = () => new SaveBackups(loadConfig(), app.db, app.services.saveStores, async () => ({ total: 10 ** 12, free }))
-
-  const zips = () => readdirSync(backupDir).filter((n) => /^saves-.*\.zip$/.test(n)).sort()
-  const copies = () => readdirSync(libraryDir).filter((n) => /^library-\d/.test(n)).sort()
-  const age = (path: string, days: number) => {
-    const t = new Date(Date.now() - days * 24 * 3600_000)
-    utimesSync(path, t, t)
+  const server = (keep = 3) => new SaveBackups({ ...loadConfig(), backupKeep: keep }, app.db, app.services.saveStores, async () => (asked.push(zips()), { total: 10 ** 12, free }))
+  /** Days of backups as earlier runs left them, and a migration copy that must stay. */
+  const seed = (days: number[]) => {
+    rmSync(dir, { recursive: true, force: true })
+    mkdirSync(join(dir, 'library'), { recursive: true })
+    for (const d of days) {
+      writeFileSync(join(dir, `saves-${day(d)}-030000.zip`), 'x'.repeat(100))
+      writeFileSync(join(dir, 'library', `library-${day(d)}T030000.000Z-a.db`), 'old')
+    }
+    writeFileSync(join(dir, 'library', 'library-before-16-to-17-2026-01-01.db'), 'Migration copy')
   }
-  const dayOf = (n: number) => `2026-01-${String(n).padStart(2, '0')}`
 
   beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), 'renplay-backups-small-'))
-    backupDir = join(root, 'elsewhere')
-    libraryDir = join(backupDir, 'library')
-    process.env['DATA_DIR'] = join(root, 'data')
-    process.env['GAMES_DIR'] = join(root, 'games')
-    process.env['RENPLAY_AUTH'] = 'off'
-    process.env['RENPLAY_BACKUP_DIR'] = backupDir
-    process.env['RENPLAY_BACKUP_KEEP'] = '3'
-    process.env['RENPLAY_CATALOG_URLS'] = 'http://127.0.0.1:9/none'
-    process.env['RENPLAY_ENGINES_URL'] = 'http://127.0.0.1:9/none'
-    const cfg = loadConfig()
-    Db.open(cfg.dataDir).close()
-    app = await createApp(cfg, { startJobs: false })
+    dir = join(root, 'elsewhere')
+    Object.assign(process.env, { DATA_DIR: join(root, 'data'), GAMES_DIR: join(root, 'games'), RENPLAY_AUTH: 'off', RENPLAY_BACKUP_DIR: dir, RENPLAY_CATALOG_URLS: 'http://127.0.0.1:9/none', RENPLAY_ENGINES_URL: 'http://127.0.0.1:9/none' })
+    Db.open(loadConfig().dataDir).close()
+    app = await createApp(loadConfig(), { startJobs: false })
     await app.saves.write('Story-1', '1-1-LT1.save', Buffer.from('owner save'))
-    backups = new SaveBackups(cfg, app.db, app.services.saveStores, async () => {
-      asked.push(zips())
-      return { total: 10 ** 12, free }
-    })
   })
   afterEach(() => {
     free = 10 ** 12
@@ -203,118 +199,65 @@ describe('save backups on a small disk', () => {
     vi.restoreAllMocks()
   })
   afterAll(() => {
-    backups?.stop()
     app?.close()
     rmSync(root, { recursive: true, force: true })
-    for (const k of ['DATA_DIR', 'GAMES_DIR', 'RENPLAY_AUTH', 'RENPLAY_BACKUP_DIR', 'RENPLAY_BACKUP_KEEP', 'RENPLAY_CATALOG_URLS', 'RENPLAY_ENGINES_URL']) delete process.env[k]
+    for (const k of ['DATA_DIR', 'GAMES_DIR', 'RENPLAY_AUTH', 'RENPLAY_BACKUP_DIR', 'RENPLAY_CATALOG_URLS', 'RENPLAY_ENGINES_URL']) delete process.env[k]
   })
-
-  /** Days of backups as earlier runs left them, with a migration copy that must stay. */
-  const seed = (days: number[]) => {
-    mkdirSync(libraryDir, { recursive: true })
-    for (const d of days) {
-      writeFileSync(join(backupDir, `saves-${dayOf(d)}-030000.zip`), 'x'.repeat(100))
-      writeFileSync(join(libraryDir, `library-${dayOf(d)}T030000.000Z-a.db`), 'old')
-    }
-    writeFileSync(join(libraryDir, 'library-before-16-to-17-2026-01-01.db'), 'Migration copy')
-  }
 
   it('removes old daily copies before it writes the new zip, so a full set needs no room for one more', async () => {
     seed([1, 2, 3])
-    const name = await backups.run()
-    // When the disk was asked, the folder already held one zip fewer than the number kept.
-    expect(asked[0]).toEqual([`saves-${dayOf(2)}-030000.zip`, `saves-${dayOf(3)}-030000.zip`])
-    expect(zips()).toEqual([`saves-${dayOf(2)}-030000.zip`, `saves-${dayOf(3)}-030000.zip`, name])
+    const name = await server().run()
+    // When the disk was asked, the folder held one zip fewer than the number kept.
+    expect(asked[0]).toEqual([`saves-${day(2)}-030000.zip`, `saves-${day(3)}-030000.zip`])
+    expect(zips()).toEqual([`saves-${day(2)}-030000.zip`, `saves-${day(3)}-030000.zip`, name])
+    expect(copies().some((n) => n.startsWith(`library-${day(1)}`))).toBe(false)
     expect(copies()).toHaveLength(3)
-    expect(copies().some((n) => n.startsWith(`library-${dayOf(1)}`))).toBe(false)
-    expect(readdirSync(libraryDir)).toContain('library-before-16-to-17-2026-01-01.db')
-  })
-
-  it('keeps the newest zip even when only one is kept, until the new one is written', async () => {
-    rmSync(backupDir, { recursive: true, force: true })
+    expect(readdirSync(join(dir, 'library'))).toContain('library-before-16-to-17-2026-01-01.db')
+    // Keeping one, the newest zip stays until the new one is whole.
     seed([1])
-    const cfg = { ...loadConfig(), backupKeep: 1 }
-    const one = new SaveBackups(cfg, app.db, app.services.saveStores, async () => ({ total: 10 ** 12, free }))
-    const name = await one.run()
-    expect(zips()).toEqual([name])
+    expect(zips()).toHaveLength(1)
+    expect(await server(1).run()).toBeTruthy()
+    expect(asked.at(-1)).toHaveLength(1)
+    expect(zips()).toHaveLength(1)
   })
 
-  it('skips the run, says what to do and writes nothing when the disk has no room for another zip', async () => {
-    rmSync(backupDir, { recursive: true, force: true })
+  it('skips a run the disk has no room for, says what to do, writes nothing and tries again only the next day', async () => {
     seed([1, 2])
+    for (const n of zips()) age(join(dir, n), 3)
     const before = { zips: zips(), copies: copies() }
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     free = 50
-    const warn = vi.spyOn(console, 'log').mockImplementation(() => {})
-    await expect(backups.run()).rejects.toThrow(/RENPLAY_BACKUP_KEEP.*RENPLAY_BACKUP_DIR/s)
-    expect(zips()).toEqual(before.zips)
-    expect(copies()).toEqual(before.copies)
-    expect(readdirSync(backupDir).filter((n) => n.endsWith('.part'))).toEqual([])
-    expect((await backups.info()).error).toMatch(/free space/i)
-    const line = warn.mock.calls.map((c) => String(c[0])).find((l) => /Not enough space/i.test(l))
-    expect(line).toMatch(/ warn .*\[backup\]/)
-    expect(line).toMatch(/free space/i)
-  })
-
-  it('does not retry every hour after a failure: the next try is the next day, and leaves no library copy', async () => {
-    rmSync(backupDir, { recursive: true, force: true })
-    seed([1])
-    for (const n of zips()) age(join(backupDir, n), 3)
-    const library = copies()
-    free = 50
-    vi.spyOn(console, 'log').mockImplementation(() => {})
-    const server = fresh()
-    await expect(server.runIfDue()).rejects.toThrow()
-    expect((await server.info()).next).toBeGreaterThan(Date.now() + 23 * 3600_000)
-    // The hourly check finds nothing due, however often it runs.
-    for (let i = 0; i < 3; i++) expect(await server.runIfDue()).toBeNull()
-    expect(copies()).toEqual(library)
-    // A person pressing Back up now once there is room still works, and clears the error.
+    const s = server()
+    await expect(s.runIfDue()).rejects.toThrow(/RENPLAY_BACKUP_KEEP.*RENPLAY_BACKUP_DIR/s)
+    const line = log.mock.calls.map((c) => String(c[0])).find((l) => /Not enough space/.test(l))
+    expect(line).toMatch(/ warn .*\[backup\].*Free space/s)
+    expect((await s.info()).next).toBeGreaterThan(Date.now() + 23 * 3600_000)
+    // The hourly check finds nothing due.
+    for (let i = 0; i < 3; i++) expect(await s.runIfDue()).toBeNull()
+    expect({ zips: zips(), copies: copies() }).toEqual(before)
+    expect(readdirSync(dir).filter((n) => n.endsWith('.part'))).toEqual([])
+    // Back up now works once there is room, and clears the error.
     free = 10 ** 12
-    await server.run()
-    expect((await server.info()).error).toBeNull()
+    await s.run()
+    expect((await s.info()).error).toBeNull()
   })
 
-  it('leaves no library copy behind when writing the zip fails, whichever way it fails', async () => {
-    rmSync(backupDir, { recursive: true, force: true })
+  it('sweeps part files a killed server left behind: old ones at any time, every one at start', async () => {
     seed([1])
-    const library = copies()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const blocked: string[] = []
-    for (let s = 0; s < 4; s++) {
-      const d = new Date(Date.now() + s * 1000)
-      const name = `.saves-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.zip.part`
-      mkdirSync(join(backupDir, name), { recursive: true })
-      blocked.push(name)
-    }
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    for (let i = 0; i < 2; i++) await expect(backups.run()).rejects.toThrow()
-    expect(copies()).toEqual(library)
-    for (const name of blocked) rmSync(join(backupDir, name), { recursive: true, force: true })
-  })
-
-  it('sweeps a part file a killed server left behind, and not one that may still be growing', async () => {
-    rmSync(backupDir, { recursive: true, force: true })
-    seed([1])
-    const stale = join(backupDir, `.saves-${dayOf(1)}-030000.zip.part`)
-    const staleLibrary = join(libraryDir, `.library-${dayOf(1)}T030000.000Z-a.db.part`)
-    const fresh = join(backupDir, `.saves-${dayOf(5)}-030000.zip.part`)
-    for (const f of [stale, staleLibrary, fresh]) writeFileSync(f, 'half')
-    age(stale, 8)
-    age(staleLibrary, 8)
-    await backups.run()
-    expect(() => statSync(stale)).toThrow()
-    expect(() => statSync(staleLibrary)).toThrow()
-    expect(statSync(fresh).size).toBe(4)
-  })
-
-  it('sweeps every part file when the server starts, since no backup can be running then', async () => {
-    const fresh = join(backupDir, `.saves-${dayOf(6)}-030000.zip.part`)
-    writeFileSync(fresh, 'half')
-    backups.start()
+    const old = [join(dir, `.saves-${day(1)}-030000.zip.part`), join(dir, 'library', `.library-${day(1)}T030000.000Z-a.db.part`)]
+    const recent = join(dir, `.saves-${day(5)}-030000.zip.part`)
+    for (const f of [...old, recent]) writeFileSync(f, 'half')
+    for (const f of old) age(f, 8)
+    const s = server()
+    await s.run()
+    for (const f of old) expect(() => statSync(f)).toThrow()
+    // A recent one may still be growing in another process.
+    expect(statSync(recent).size).toBe(4)
+    s.start()
     try {
-      await vi.waitFor(() => expect(() => statSync(fresh)).toThrow())
+      await vi.waitFor(() => expect(() => statSync(recent)).toThrow())
     } finally {
-      backups.stop()
+      s.stop()
     }
   })
 })
