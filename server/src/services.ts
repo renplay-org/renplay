@@ -56,7 +56,7 @@ export async function createServices(cfg: Config): Promise<Services> {
   for (const d of [cfg.dataDir, cfg.walkthroughsDir, cfg.overlaysDir, cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
   // The content mode asks the catalog which save folders are adult; the catalog needs the content mode.
   let catalog: Catalog | null = null
-  const content = new ContentMode(cfg, db, () => catalog?.adultSaveDirs() ?? [])
+  const content = new ContentMode(cfg, db, () => catalog?.adultSaveDirs() ?? [], () => catalog?.safeSaveDirs() ?? [])
   const progress = new ProgressStore(db)
   const saveStores = new SaveStores(cfg, db)
   const art = new ArtStore(cfg, db, content)

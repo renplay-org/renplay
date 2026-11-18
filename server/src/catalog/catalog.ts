@@ -115,6 +115,11 @@ export class Catalog {
     return [...this.adult.values(), ...[...this.recipes.values()].filter((r) => r.nsfw === true)].map((r) => r.saveDir ?? '').filter(Boolean)
   }
 
+  /** The save folders recipes that are not adult name, for ContentMode: a folder known to be safe is never hidden. */
+  safeSaveDirs(): string[] {
+    return [...this.recipes.values()].filter((r) => r.nsfw !== true).map((r) => r.saveDir ?? '').filter(Boolean)
+  }
+
   async init(): Promise<void> {
     const cached = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary; adultGames?: string } | null>(CACHE_KEY, null)
     this.adult = new Map(Object.entries(this.db.getSetting<Record<string, Recipe>>(STUBS_KEY, {})))

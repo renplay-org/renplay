@@ -113,6 +113,17 @@ describe('saves of games no longer in the library', () => {
     await request(app.app).delete('/api/system/storage/saves/Spicy-1').expect(404)
     await request(app.app).put('/api/content').send({ level: 'shown' }).expect(200)
   })
+
+  it('with Off for this device, still lists and deletes the saves of a game a safe recipe names, and hides adult and unknown folders', async () => {
+    await app.services.saveStores.of(1).write('Mystery-1', '1-1-LT1.save', Buffer.alloc(8, 7))
+    await refresh(app)
+    const listed = async (device: string) => ((await request(app.app).get('/api/system/storage').set('x-renplay-adult', device).expect(200)).body.removedSaves as Array<{ folder: string }>).map((r) => r.folder)
+    expect(await listed('shown')).toEqual(['Named-1', 'Mystery-1', 'Spicy-1'])
+    expect(await listed('off')).toEqual(['Named-1'])
+    await request(app.app).delete('/api/system/storage/saves/Spicy-1').set('x-renplay-adult', 'off').expect(404)
+    await request(app.app).delete('/api/system/storage/saves/Mystery-1').set('x-renplay-adult', 'off').expect(404)
+    await request(app.app).delete('/api/system/storage/saves/Named-1').set('x-renplay-adult', 'off').expect(200)
+  })
 })
 
 describe('deleting the saves of a removed game, with sign-in on', () => {
