@@ -33,7 +33,7 @@ export const DEMO_ROUTES = {
   refused: [
     'DELETE /archives', 'DELETE /games/:id', 'DELETE /games/:id/art/uploads/:upload', 'DELETE /games/:id/download', 'DELETE /games/:id/files/raw',
     'DELETE /games/:id/update-not-now', 'DELETE /games/:id/walkthroughs/:file', 'DELETE /jobs', 'DELETE /me/identities', 'DELETE /me/sessions',
-    'DELETE /me/sessions/:id', 'DELETE /me/tokens/:id', 'DELETE /uploads/:id', 'DELETE /users/:id', 'GET /archives', 'GET /games/:id/files',
+    'DELETE /me/sessions/:id', 'DELETE /me/tokens/:id', 'DELETE /system/storage/saves/:folder', 'DELETE /uploads/:id', 'DELETE /users/:id', 'GET /archives', 'GET /games/:id/files',
     'GET /games/:id/files/raw', 'GET /games/:id/recipe', 'GET /jobs', 'GET /jobs/:id/log', 'GET /me/identities', 'GET /me/sessions', 'GET /me/tokens',
     'GET /metrics', 'GET /system', 'GET /system/backups', 'GET /system/backups/:name', 'GET /system/storage', 'GET /uploads/:id', 'GET /users',
     'GET /users/:id/saves/export', 'POST /', 'POST /:id/copy', 'POST /:id/import', 'POST /:id/save-dir', 'POST /:id/sync', 'POST /:id/sync/download', 'POST /archives/hash',

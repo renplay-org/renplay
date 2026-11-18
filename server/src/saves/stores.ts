@@ -82,6 +82,56 @@ export class SaveStores {
     return n
   }
 
+  private everyone(): number[] {
+    return (this.db.raw.prepare('SELECT id FROM users ORDER BY id').all() as Array<{ id: number }>).map((u) => u.id)
+  }
+
+  /**
+   * What everyone has in the save folders that are not in `claimed`, one entry for each folder
+   * that holds a save: the people with saves in it, the files, their bytes and the time of the newest.
+   */
+  async unclaimed(claimed: ReadonlySet<string>): Promise<Array<{ folder: string; people: number; files: number; bytes: number; newest: number }>> {
+    const found = new Map<string, { folder: string; people: number; files: number; bytes: number; newest: number }>()
+    for (const user of this.everyone()) {
+      const store = this.of(user)
+      for (const folder of await store.listDirs()) {
+        if (claimed.has(folder)) continue
+        const files = await store.list(folder)
+        if (!files.length) continue
+        const row = found.get(folder) ?? { folder, people: 0, files: 0, bytes: 0, newest: 0 }
+        row.people++
+        row.files += files.length
+        row.bytes += files.reduce((n, f) => n + f.size, 0)
+        row.newest = Math.max(row.newest, ...files.map((f) => f.mtimeMs))
+        found.set(folder, row)
+      }
+    }
+    return [...found.values()]
+  }
+
+  /**
+   * Deletes everyone's saves in one save folder, each into History as a deleted save goes (kept at
+   * least 30 days, and restored from the game's page once a game uses the folder again). The caller
+   * has checked that no game in the library uses it. The folders every game shares are never touched.
+   */
+  async deleteFolder(folder: string): Promise<{ folder: string; files: number; people: number; bytes: number }> {
+    if ((SHARED_DIRS as readonly string[]).includes(folder)) throw new HttpError(404, 'No saves of this game were found')
+    const done = { folder, files: 0, people: 0, bytes: 0 }
+    for (const user of this.everyone()) {
+      const store = this.of(user)
+      let any = false
+      for (const file of await store.list(folder)) {
+        if (!(await store.remove(folder, file.name, 'user-delete'))) continue
+        if (isSlot(file.name)) this.dropNote(user, folder, file.name)
+        done.files++
+        done.bytes += file.size
+        any = true
+      }
+      if (any) done.people++
+    }
+    return done
+  }
+
   /** The notes of a person's saves in one folder, by file. */
   notes(user: number, dir: string): Map<string, SaveNote> {
     const rows = this.db.raw.prepare('SELECT file, title, note, pinned_at FROM save_meta WHERE user_id = ? AND save_dir = ?').all(user, dir) as unknown as Array<SaveNote & { file: string }>

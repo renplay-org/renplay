@@ -378,6 +378,17 @@ export class Catalog {
     return recipe && /^[a-z0-9-]{1,80}$/.test(recipe.id) && isRenplayHost(recipe._origin ?? '') ? recipe : null
   }
 
+  /** The save folder a recipe names, adult recipes included: a library game's saves are not those of a removed game. */
+  saveDirOf(recipeId: string): string {
+    return (this.recipes.get(recipeId) ?? this.adult.get(recipeId))?.saveDir ?? ''
+  }
+
+  /** The name the catalog gives the game that uses a save folder, when this person may see it. */
+  titleOfSaveDir(saveDir: string): string | null {
+    const recipe = [...this.recipes.values()].find((r) => r.saveDir === saveDir)
+    return recipe && !this.content.hidesRecipe(recipe.nsfw) ? recipe.title : null
+  }
+
   recipe(id: string): Recipe | null {
     const recipe = this.recipes.get(id)
     return recipe && !this.content.hidesRecipe(recipe.nsfw) ? recipe : null

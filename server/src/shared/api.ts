@@ -302,9 +302,17 @@ export interface StorageReport {
   games: Array<{ id: string; title: string; status: string; builds: Array<{ name: string; current: boolean; bytes: number }>; download: { name: string; bytes: number } | null; bytes: number }>
   engines: Array<{ version: string; bytes: number; used: boolean }>
   orphans: Array<{ name: string; bytes: number }>
+  /** Saves of games that are not in the library, biggest first. `title` is the catalog's name for the folder, when it has one. */
+  removedSaves: RemovedSaves[]
   totals: { builds: number; downloads: number; engines: number }
   freeable: { downloads: number; engines: number }
 }
+
+/** Everyone's saves in one save folder that no game in the library uses. `newest` is the time of the latest save, in ms. */
+export interface RemovedSaves { folder: string; title: string | null; people: number; files: number; bytes: number; newest: number }
+
+/** What an admin's deletion of those saves moved to History. */
+export type RemovedSavesDeleted = Pick<RemovedSaves, 'folder' | 'files' | 'people' | 'bytes'>
 
 export interface Session { id: string; label: string; created_at: number; touched_at: number; expires_at: number; current: boolean }
 
