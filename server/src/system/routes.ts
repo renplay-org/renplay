@@ -1,22 +1,14 @@
 import { SYNC_SETTING, syncCodesOn } from '../saves/sync.js'
 import { KEEP_DOWNLOADS, keepDownloads } from '../library/archives.js'
-import { readdir, stat, statfs } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Router } from 'express'
 import { parseJson } from '../db.js'
 import { HttpError, cleanRelPath, safeJoin } from '../util/paths.js'
 import { dirSize } from '../util/fsx.js'
+import { diskSpace } from '../util/disk.js'
 import type { Services } from '../services.js'
 import type { Health, StorageReport, SystemInfo } from '../shared/api.js'
-
-async function disk(path: string) {
-  try {
-    const s = await statfs(path)
-    return { total: s.blocks * s.bsize, free: s.bavail * s.bsize }
-  } catch {
-    return null
-  }
-}
 
 /** Variables whose effect Settings shows, so it can say whether the server sets them. */
 const PROVENANCE = ['RENPLAY_AUTH', 'GAMES_DIR', 'ARCHIVES_DIR', 'DATA_DIR', 'RENPLAY_BACKUP_DIR', 'RENPLAY_CATALOG_URLS', 'RENPLAY_RECIPES_DIR', 'RENPLAY_LOG_LEVEL', 'RENPLAY_SYNC_SERVER', 'RENPLAY_ENGINES_URL', 'RENPLAY_TELEMETRY']
@@ -124,7 +116,7 @@ export function createSystemRouter(s: Services): Router {
         available: available.map((e) => ({ version: e.version, renpy: e.renpy, bytes: Object.values(e.files).reduce((n, f) => n + f.size, 0) })),
         index: cfg.enginesUrl,
       },
-      disk: { games: await disk(cfg.gamesDir), data: await disk(cfg.dataDir) },
+      disk: { games: await diskSpace(cfg.gamesDir), data: await diskSpace(cfg.dataDir) },
       library: {
         games: games.length,
         installed: games.filter((g) => g.status === 'installed').length,
