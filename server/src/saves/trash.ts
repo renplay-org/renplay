@@ -14,7 +14,7 @@ const DAY = 24 * 3600_000
 /** How long the saves an admin deleted wait in the trash for a restore. */
 export const KEPT = 30 * DAY
 
-/** An entry is `<ISO time, colons as hyphens>-<save folder>`: the time is written once, in the name, and nothing rewrites it. */
+/** An entry is `<ISO time, colons as hyphens>-<save folder>`: the time is written once, in the name, and only a recovery that ends an entry's protection while data remains in it writes it again. */
 const ENTRY = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2}\.\d{3})Z-(.+)$/
 const entryName = (at: number, folder: string): string => `${new Date(at).toISOString().replaceAll(':', '-')}-${folder}`
 /** An entry that is still being made has its name behind a dot, which nothing lists, restores or purges. */
@@ -170,9 +170,14 @@ export class SaveTrash {
       conflict = (err as Error).message
     }
     if (conflict) return this.keep(base, name, parsed, hidden, journal, conflict)
-    await removeJournal(base)
-    const gone = await tidy(base)
-    if (hidden && !gone) await this.publish(name, parsed.at, folder)
+    await tidy(base)
+    if ((await readdir(base)).some((n) => n !== basename(journalPath(base)))) {
+      // Data stays that this entry protected, maybe for longer than 30 days: it gets a fresh 30 from now. The name holds the time, so it is renamed while the journal still protects it, and a crash between the two steps leaves the journal.
+      await removeJournal(await this.nameEntry(base, Date.now(), folder))
+    } else {
+      await removeJournal(base)
+      await tidy(base)
+    }
     log('saves', journal.op === 'delete' ? `The deletion of the saves of ${folder} was interrupted. Everything was put back where it was, and they can be deleted again.` : `The restore of the saves of ${folder} was interrupted. It was finished now.`, 'warn')
   }
 
@@ -257,11 +262,16 @@ export class SaveTrash {
   private async publish(hidden: string, at: number, folder: string): Promise<string | null> {
     const path = join(this.dir, hidden)
     if (await tidy(path)) return null
+    return basename(await this.nameEntry(path, at, folder))
+  }
+
+  /** Renames the folder at `path` to the entry name for `at`, or the first millisecond after it that is free. The path it has now. */
+  private async nameEntry(path: string, at: number, folder: string): Promise<string> {
     for (let t = at; ; t++) {
-      const name = entryName(t, folder)
-      if (await lstat(join(this.dir, name)).then(() => true, () => false)) continue
-      await rename(path, join(this.dir, name))
-      return name
+      const to = join(this.dir, entryName(t, folder))
+      if (await lstat(to).then(() => true, () => false)) continue
+      await rename(path, to)
+      return to
     }
   }
 

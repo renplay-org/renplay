@@ -252,7 +252,11 @@ interruption is safe. When a folder it needs is not empty, or the account is not
 entry is named, marked in its journal, listed as needing attention and kept out of the 30-day removal for as
 long as the journal is there, and the log says what to move. A restart after that finishes it. Nothing
 else writes into the trash, so a game that claims the folder later starts from an empty one. The time is the
-entry's name, written once, so no restart or restored database can move it. A daily job hands entries older
+entry's name, written once, so no restart or restored database can move it. The one exception is an entry that
+a journal protected and a start then put right while data remains in it (the person's account is gone, so
+their part was never moved): it is renamed with the time of that start, so what stayed gets a fresh 30 days
+instead of being due at once. The rename happens before the journal is removed, so a crash between them leaves
+the journal, and an entry that ends up empty just disappears. A daily job hands entries older
 than 30 days, whole, to a `Purger` (a rename into `deleted-saves-purge/`, on the same volume, then a low-priority `rm`), and never
 touches `users/`. "Restore" renames an entry back whole or not at all: under the locks of every person it
 checks that both the saves and the History of the folder are missing or empty for each of them, moves

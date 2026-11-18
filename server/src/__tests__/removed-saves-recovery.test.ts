@@ -184,4 +184,43 @@ describe('a deletion or a restore of the saves of a removed game that a crash in
     expect((await c.services.saveStores.of(1).list('F')).map((f) => f.size)).toEqual([2])
     expect((await c.services.saveStores.of(1).history('F')).map((h) => h.size)).toEqual([1])
   })
+
+  it('gives the data left in an entry a fresh 30 days when its protection ends, and a crash on the way keeps the journal', async () => {
+    at(400)
+    const a = await fresh()
+    const deleted = await del(a).expect(200)
+    // The second person's account is gone, so a restore leaves their part in the entry.
+    await request(a.app).delete('/api/users/2').expect(200)
+    const copy = crashAt(a, back(1, 'saves'))
+    await restore(a, deleted.body.entry).expect(200)
+    mkdirSync(join(copy, 'users/1/save-history/F'), { recursive: true })
+    writeFileSync(join(copy, 'users/1/save-history/F/new.save'), 'newer')
+    const b = await boot(copy)
+    at(440)
+    expect(await b.services.saveTrash.purge()).toEqual([])
+    b.close()
+    apps.splice(apps.indexOf(b), 1)
+    rmSync(join(copy, 'users/1/save-history/F/new.save'))
+    // The protection ends at day 40, and the entry is renamed before its journal goes: a crash there leaves the journal.
+    const journaled = join(root, `crashed-${++n}`)
+    fsHooks.afterRename = (from, to) => {
+      if (!(from.endsWith(deleted.body.entry) && to.endsWith('Z-F'))) return
+      fsHooks.afterRename = null
+      cpSync(copy, journaled, { recursive: true })
+    }
+    const c = await boot(copy)
+    const [kept] = await shown(c)
+    expect(kept?.entry).not.toBe(deleted.body.entry)
+    expect(await shown(c)).toHaveLength(1)
+    expect(Date.parse(kept!.entry.slice(0, 24).replace(/T(\d+)-(\d+)-/, 'T$1:$2:'))).toBe(start + 440 * DAY)
+    expect(existsSync(join(copy, 'deleted-saves', kept!.entry, 'journal.json'))).toBe(false)
+    expect(existsSync(join(journaled, 'deleted-saves', kept!.entry, 'journal.json'))).toBe(true)
+    expect((await c.services.saveStores.of(1).list('F')).map((f) => f.size)).toEqual([2])
+    expect(await c.services.saveTrash.purge()).toEqual([])
+    at(469)
+    expect(await c.services.saveTrash.purge()).toEqual([])
+    expect(readFileSync(join(copy, 'deleted-saves', kept!.entry, 'users/2/saves/F/1.save'))).toEqual(save(3))
+    at(471)
+    expect((await c.services.saveTrash.purge()).map((p) => p.folder)).toEqual(['F'])
+  })
 })
