@@ -187,6 +187,21 @@ describe('saves of games no longer in the library', () => {
     await restore(trashed[0]!.entry).expect(200)
     await request(app.app).delete('/api/system/storage/saves/Named-1').set('x-renplay-adult', 'off').expect(200)
   })
+
+  it('hides a folder that differs from an adult recipe’s only in capitals like the folder itself, at an installation at Off', async () => {
+    const variant = '2026-12-01T10-00-00.000Z-spicy-1'
+    mkdirSync(join(trash(), variant, 'users/1/saves/spicy-1'), { recursive: true })
+    writeFileSync(join(trash(), variant, 'users/1/saves/spicy-1/1-1-LT1.save'), 'x')
+    await request(app.app).put('/api/content').send({ level: 'off' }).expect(200)
+    try {
+      expect((await report(app)).deletedSaves.map((d) => d.folder)).not.toContain('spicy-1')
+      await restore(variant).expect(404)
+      await request(app.app).delete('/api/system/storage/saves/spicy-1').expect(404)
+    } finally {
+      await request(app.app).put('/api/content').send({ level: 'shown' }).expect(200)
+    }
+    expect((await report(app)).deletedSaves.map((d) => d.folder)).toContain('spicy-1')
+  })
 })
 
 describe('the saves of a removed game, with sign-in on', () => {
