@@ -36,7 +36,8 @@ These decide most review comments. Follow them without being asked.
   another engine. Unity and Godot web builds still install (the code stays) but are unsupported: never in the catalog,
   the docs, the website or the app's messaging. Status: `docs/site/src/content/docs/engines.md`.
 - **Saves are sacred.** Never delete or rewrite save data as a side effect. Every overwrite and
-  delete keeps history. Uninstall and reinstall leave saves alone.
+  delete keeps history. Uninstall and reinstall leave saves alone. The one deliberate exception is an
+  admin's Delete these saves for a game no longer in the library: its History is kept 30 days, then removed.
 - **Works on phones.** Every screen must work at 390 px wide in portrait and in landscape, with
   touch only (no hover). The player respects safe-area insets and has no hover-only controls.
 - **Sentence case, no lowercase starts.** "Renplay" (never "renplay" in UI text or prose; the

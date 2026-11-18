@@ -4,7 +4,7 @@ import type { SaveStores } from './stores.js'
 
 const DAY = 24 * 3600_000
 
-/** Once a day, deletes for good the History of saves an admin deleted with their game, once its 30 days are over. */
+/** Once a day, deletes for good all the History of a folder whose saves an admin deleted, once its 30 days are over. */
 export class SavesExpiry {
   private timers: NodeJS.Timeout[] = []
 

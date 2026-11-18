@@ -21,8 +21,8 @@ const PARKED_FOR = 14 * 24 * 3600_000
 /** How long the History of an admin's deletion of a removed game's saves waits for the game to be added again. */
 const DELETED_KEPT = 30 * 24 * 3600_000
 const DELETED_KEY = 'deleted_game_saves'
-/** A folder an admin deleted: when the first of its deletions began and when the last ended, in ms. */
-type DeletedFolders = Record<string, { since: number; at: number }>
+/** A folder an admin deleted: when the last deletion ended, in ms. */
+type DeletedFolders = Record<string, number>
 
 /** A save file of the slots: Ren'Py's own, in the save folder itself. */
 const isSlot = (file: string): boolean => file.endsWith('.save') && !file.includes('/')
@@ -123,7 +123,6 @@ export class SaveStores {
   async deleteFolder(folder: string): Promise<{ folder: string; files: number; people: number; bytes: number }> {
     if ((SHARED_DIRS as readonly string[]).includes(folder)) throw new HttpError(404, 'No saves of this game were found')
     const done = { folder, files: 0, people: 0, bytes: 0 }
-    const since = Date.now()
     for (const user of this.everyone()) {
       const store = this.of(user)
       let any = false
@@ -139,25 +138,25 @@ export class SaveStores {
     // The clock lives in the database, so a restart does not reset it.
     if (done.files) {
       const deleted = this.db.getSetting<DeletedFolders>(DELETED_KEY, {})
-      this.db.setSetting(DELETED_KEY, { ...deleted, [folder]: { since: Math.min(since, deleted[folder]?.since ?? since), at: Date.now() } })
+      this.db.setSetting(DELETED_KEY, { ...deleted, [folder]: Date.now() })
     }
     return done
   }
 
   /**
-   * Deletes for good the History that an admin's deletion of a folder made, 30 days after it, when no
-   * game in the library uses the folder. A folder a game uses again keeps its History, as before. Any
-   * other History, even of the same folder, stays.
+   * Deletes for good all the History of a folder an admin deleted, 30 days after the deletion, when no
+   * game in the library uses the folder. A folder a game uses again keeps its History, as before. The
+   * History of other folders stays.
    */
   async expireDeleted(inLibrary: ReadonlySet<string>): Promise<Array<{ folder: string; files: number; bytes: number }>> {
     const deleted = this.db.getSetting<DeletedFolders>(DELETED_KEY, {})
     const swept = []
-    for (const [folder, { since, at }] of Object.entries(deleted)) {
+    for (const [folder, at] of Object.entries(deleted)) {
       if (!inLibrary.has(folder)) {
         if (Date.now() - at < DELETED_KEPT) continue
         const gone = { folder, files: 0, bytes: 0 }
         for (const user of this.everyone()) {
-          const part = await this.of(user).purgeHistory(folder, 'user-delete', since)
+          const part = await this.of(user).purgeHistory(folder)
           gone.files += part.files
           gone.bytes += part.bytes
         }

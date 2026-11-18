@@ -232,8 +232,9 @@ controller is connected, the guide's bar shows these buttons instead of the keys
   **Settings → Storage → Show what uses space** lists them under "Saves of games no longer in your
   library", with the people, the size and the newest save. **Delete these saves** moves every save
   of that game to History. They stay there for 30 days. Add the game to the library again in that
-  time and restore the saves from its page. After 30 days Renplay deletes them for good and the
-  space comes back, unless the game is in the library again by then. A game that is still in the
+  time and restore the saves from its page. After 30 days Renplay deletes all History of that game's
+  saves for good, older versions included, and the space comes back, unless the game is in the
+  library again by then. A game that is still in the
   library is refused.
 - When two devices change the same save without seeing each other's copy, the copy saved later
   stays in the slot and the other is kept in History. The player and the game's saves both say so.

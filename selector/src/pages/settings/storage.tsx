@@ -248,7 +248,7 @@ function RemovedSavesSection({ saves, run }: { saves: RemovedSaves[]; run: (fn: 
           void run(() => del(`/api/system/storage/saves/${encodeURIComponent(r.folder)}`), 'Saves deleted')
         }}
       >
-        Moves the saves of {confirm && people(confirm.people)} ({confirm?.files} {confirm?.files === 1 ? 'file' : 'files'}, {bytes(confirm?.bytes)}) to History. They stay there for 30 days. If you add the game to your library again in that time, you can restore them from its page. After that they are deleted for good. They no longer go into the daily backups.
+        Moves the saves of {confirm && people(confirm.people)} ({confirm?.files} {confirm?.files === 1 ? 'file' : 'files'}, {bytes(confirm?.bytes)}) to History. They stay there for 30 days. If you add the game to your library again in that time, you can restore them from its page. After that all History of this game's saves is deleted for good, older versions too. They no longer go into the daily backups.
       </Confirm>
     </section>
   )

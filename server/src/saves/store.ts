@@ -241,18 +241,13 @@ export class SaveStore {
     return out.sort((a, b) => b.savedAt - a.savedAt)
   }
 
-  /**
-   * Deletes for good the History versions of one folder that went there for `reason` at or after
-   * `since`, and the folders that empties. Versions of any other reason or time stay.
-   */
-  async purgeHistory(saveDir: string, reason: SaveReason, since: number): Promise<{ files: number; bytes: number }> {
+  /** Deletes for good all of one folder's History, whatever put each version there, and reports what it freed. */
+  async purgeHistory(saveDir: string): Promise<{ files: number; bytes: number }> {
     const base = safeJoin(this.historyRoot, this.validated(saveDir))
     const done = { files: 0, bytes: 0 }
     for (const f of await readdir(base).catch(() => [] as string[])) {
       const dir = join(base, f)
       for (const v of await readdir(dir).catch(() => [] as string[])) {
-        const [ts, why] = v.split('__')
-        if (why !== reason || Number(ts) < since) continue
         const size = (await stat(join(dir, v)).catch(() => null))?.size
         if (size === undefined || !(await unlink(join(dir, v)).then(() => true, () => false))) continue
         done.files++
