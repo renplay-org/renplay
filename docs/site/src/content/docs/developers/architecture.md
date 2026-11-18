@@ -37,6 +37,7 @@ Modules below the routes, like the install pipeline, take only the parts they us
 | `/data/job-logs/` | Recent job messages, appended as they happen so interrupted jobs keep their logs |
 | `/data/users/<id>/saves/<save folder>/` | Each person's saves, including shared signing keys and HTML storage. History in `../save-history/` |
 | `/data/saves/`, `/data/save-history/` | Compatibility symlinks to owner 1's folders |
+| `/data/deleted-saves/<ISO time>-<folder>/` | Saves an admin deleted for a removed game, kept 30 days, never in the daily backup |
 | `/data/users-removed/` | Archived removed accounts. Never automatically purged |
 | `/data/overlays/<id>/` | Mods: the user's files layered over a game |
 | `/data/art/` | The art cache: made pictures by content hash, originals in `src/` (`art/store.ts`) |
@@ -234,13 +235,15 @@ like desktop Ren'Py. `saves/stores.ts` makes them and owns where they live, and 
 pins people give their saves. Every overwrite and delete snapshots the previous version in that
 account's `save-history/`. Locks are shared across store instances. Metadata keys include the store root.
 Renplay never deletes saves on uninstall or reinstall. The one exception is an admin's "Delete these
-saves" for a game no longer in the library: `saves/expiry.ts` sweeps all History of that save folder
-(overwrites and earlier deletes too, for every person) daily 30 days after the deletion, only while no
-library game uses the folder and the person has no saves in it again. The time is a `.deleted` file in
-the folder's History, not in the database, so a restart or a restored database cannot move the clock.
-The deletion and the sweep take the same per-folder lock as every save write, and ask again whether a
-library game uses the folder before each file. A link or a folder spelled another way (capitals,
-a shared folder) is refused, and a link in History is removed, never followed. See [Accounts API](/developers/accounts-api/)
+saves" for a game no longer in the library, and it deletes nothing at first: `saves/trash.ts` renames each
+person's `saves/<folder>` and `save-history/<folder>` (History-only people too) into
+`/data/deleted-saves/<ISO time>-<folder>/users/<id>/`, under the same per-folder lock every save write takes,
+and asks again under that lock whether a library game uses the folder. A rename moves a link as a link and
+never follows it. Nothing else writes into the trash, so a game that claims the folder later starts from an
+empty one. The time is the entry's name, written once, so no restart or restored database can move it. A daily
+job removes whole entries older than 30 days with `rm` inside `deleted-saves/` only, and never touches
+`users/`. "Restore" renames an entry back, only into a folder that does not exist or is empty. The daily
+backup zip leaves the trash out, and "What uses space" counts it. See [Accounts API](/developers/accounts-api/)
 for schema 7, migration, sessions, nginx protection and the request-local permission boundary.
 
 ## The catalog

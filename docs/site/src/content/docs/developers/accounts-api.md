@@ -114,10 +114,14 @@ Defaults for everyone, `GET /metrics` (Prometheus text, also at `/metrics`), and
 `GET /system/storage` (counted at most once a minute) and `POST /system/storage/refresh`.
 `GET /system/storage` also lists `removedSaves`: for each save folder that no library game uses, its
 `folder`, the catalog's `title` or `null`, `people`, `files`, `bytes` and the `newest` save in
-milliseconds. `DELETE /system/storage/saves/:folder` deletes everyone's saves in that folder into
-History, where they stay for 30 days. Then a daily sweep deletes all History of that folder for good,
-for every person, only while no library game uses the folder. The route answers `{ folder, files, people, bytes }`. It answers 409 for a folder a library game
-uses, installed or not, and 404 for a folder with no saves, a link, or a shared folder. It is an admin route, so a token of an
+milliseconds. `DELETE /system/storage/saves/:folder` moves everyone's saves and History in that folder
+out of the library into a trash folder, for 30 days, and answers `{ folder, files, people, bytes, entry }`.
+It answers 409 for a folder a library game uses, installed or not, and 404 for a folder with no saves, a
+link, or a shared folder. What the trash holds is `deletedSaves` in the same `GET /system/storage`:
+`entry`, `folder`, `title`, `people`, `files`, `bytes` (History too), `deletedAt` and `removeAt` in
+milliseconds. `POST /system/storage/deleted-saves/:entry/restore` moves an entry back and answers
+`{ folder, files, people, bytes }`. It answers 409 and moves nothing when the folder has saves or History
+again for any of the people, and 404 for an entry that is gone. Both are admin routes, so a token of an
 admin account works, and with `RENPLAY_AUTH=off` the one account is an admin.
 
 ## Route permissions
