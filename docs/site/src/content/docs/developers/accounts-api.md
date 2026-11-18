@@ -121,7 +121,8 @@ link, or a shared folder. What the trash holds is `deletedSaves` in the same `GE
 `entry`, `folder`, `title`, `people`, `files`, `bytes` (History too), `deletedAt` and `removeAt` in
 milliseconds. `POST /system/storage/deleted-saves/:entry/restore` moves an entry back and answers
 `{ folder, files, people, bytes }`. It answers 409 and moves nothing when the folder has saves or History
-again for any of the people, and 404 for an entry that is gone. Both are admin routes, so a token of an
+again for any of the people, or when the account with the recorded id is not the one that had the saves,
+and 404 for an entry that is gone. Both are admin routes, so a token of an
 admin account works, and with `RENPLAY_AUTH=off` the one account is an admin.
 
 ## Route permissions

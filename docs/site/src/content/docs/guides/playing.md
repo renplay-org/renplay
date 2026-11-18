@@ -233,8 +233,9 @@ controller is connected, the guide's bar shows these buttons instead of the keys
   library", with the people, the size and the newest save. **Delete these saves** moves every person's
   saves and History of that game into a trash folder, out of the library and out of the daily backups.
   They stay there for 30 days, listed under "Deleted saves" with the day they go. **Restore** puts them
-  back, as long as the game has no saves or History in that folder again. After 30 days Renplay
-  deletes them for good and the space comes back. A game that is still in the library is refused.
+  back, as long as nobody has saves or History in that folder again, and only to the same accounts
+  that had them. Their names, notes and pins are not kept. After 30 days Renplay deletes them for
+  good and the space comes back. A game that is still in the library is refused.
 - When two devices change the same save without seeing each other's copy, the copy saved later
   stays in the slot and the other is kept in History. The player and the game's saves both say so.
 - Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every

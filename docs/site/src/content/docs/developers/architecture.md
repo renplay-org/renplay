@@ -239,10 +239,18 @@ saves" for a game no longer in the library, and it deletes nothing at first: `sa
 person's `saves/<folder>` and `save-history/<folder>` (History-only people too) into
 `/data/deleted-saves/<ISO time>-<folder>/users/<id>/`, under the same per-folder lock every save write takes,
 and asks again under that lock whether a library game uses the folder. A rename moves a link as a link and
-never follows it. Nothing else writes into the trash, so a game that claims the folder later starts from an
-empty one. The time is the entry's name, written once, so no restart or restored database can move it. A daily
-job removes whole entries older than 30 days with `rm` inside `deleted-saves/` only, and never touches
-`users/`. "Restore" renames an entry back, only into a folder that does not exist or is empty. The daily
+never follows it. The saves' names, notes and pins are dropped, as when a single save is deleted. Each
+person's part records the account's id and when it was created in `users/<id>/account`, because a restored
+older database can give the id to another account. An entry is built under a hidden name (a leading dot)
+and takes its own only when every person is done, so nothing lists, restores or purges it half made. If a
+crash leaves one, the next start gives it its name and logs it: what had moved can be restored. Nothing
+else writes into the trash, so a game that claims the folder later starts from an empty one. The time is the
+entry's name, written once, so no restart or restored database can move it. A daily job hands entries older
+than 30 days, whole, to a `Purger` (a rename into `deleted-saves-purge/`, on the same volume, then a low-priority `rm`), and never
+touches `users/`. "Restore" renames an entry back whole or not at all: under the locks of every person it
+checks that both the saves and the History of the folder are missing or empty for each of them, moves
+everything, and moves it back again if one move fails. A person whose account is not the one recorded
+stays in the trash. A restore and a removal of the same entry never run together. The daily
 backup zip leaves the trash out, and "What uses space" counts it. See [Accounts API](/developers/accounts-api/)
 for schema 7, migration, sessions, nginx protection and the request-local permission boundary.
 

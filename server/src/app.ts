@@ -158,6 +158,7 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
     for (const n of await readdir(cfg.workDir)) await purger.purge(join(cfg.workDir, n))
   } catch {}
   await purger.resume()
+  await services.saveTrash.recover()
   const check = await builds.verify()
   if (check.missing.length) log('library', `Builds missing for ${check.missing.join(', ')}`, 'warn')
   if (check.back.length) log('library', `Builds back for ${check.back.join(', ')}`)

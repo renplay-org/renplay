@@ -199,6 +199,21 @@ export class SaveStores {
     this.db.raw.prepare('DELETE FROM save_meta WHERE user_id = ? AND save_dir = ? AND file = ?').run(user, dir, file)
   }
 
+  /** Everything a person wrote about the saves of one folder goes, as when each of them is deleted. */
+  dropNotes(user: number, dir: string): void {
+    this.db.raw.prepare('DELETE FROM save_meta WHERE user_id = ? AND save_dir = ?').run(user, dir)
+    this.db.raw.prepare('DELETE FROM save_meta_parked WHERE user_id = ? AND save_dir = ?').run(user, dir)
+  }
+
+  /**
+   * Who an account is besides its number, or null when there is none with that number. A database
+   * restored from before an account was made hands its number to the next account, which was
+   * created at another time.
+   */
+  identity(user: number): string | null {
+    return (this.db.raw.prepare('SELECT created_at FROM users WHERE id = ?').get(user) as { created_at: string } | undefined)?.created_at ?? null
+  }
+
   /** Gives one person's notes to another, where the other has none for the same file. */
   mergeNotes(from: number, to: number): void {
     this.db.raw.prepare('INSERT OR IGNORE INTO save_meta (user_id, save_dir, file, title, note, pinned_at, hash) SELECT ?, save_dir, file, title, note, pinned_at, hash FROM save_meta WHERE user_id = ?').run(to, from)

@@ -90,7 +90,7 @@ export async function createServices(cfg: Config): Promise<Services> {
     catalog,
     saveStores,
     backups: new SaveBackups(cfg, db, saveStores),
-    saveTrash: new SaveTrash(join(cfg.dataDir, 'deleted-saves'), saveStores),
+    saveTrash: new SaveTrash(join(cfg.dataDir, 'deleted-saves'), saveStores, new Purger(join(cfg.dataDir, 'deleted-saves-purge'))),
     lowSpace: new LowSpaceWatch(cfg.dataDir, diskSpace),
     telemetry: new Telemetry({ cfg, db, catalog, content, accounts, saveStores, version: VERSION }),
   }
