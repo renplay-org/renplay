@@ -149,7 +149,7 @@ export default function GamePage() {
           Guide
         </Pill>
       )}
-      <FavoriteButton game={game} />
+      {!staticDemo && <FavoriteButton game={game} />}
     </>
   )
 
@@ -226,6 +226,7 @@ const ART_ROWS: Array<[ArtKind, string]> = [['grid', 'Grid'], ['wide', 'Wide'], 
 /** The Details, Walkthroughs and Manage panes: one component, so the shared actions and dialogs stay in one place. */
 function Details({ game, section, onChangeArt }: { game: Game; section: 'details' | 'walkthroughs' | 'manage'; onChangeArt?: (kind: ArtKind) => void }) {
   const admin = useAuth().data?.user.role === 'admin'
+  const staticDemo = useStaticDemo()
   const { data: catalog } = useCatalog()
   const toast = useToast()
   const qc = useQueryClient()
@@ -403,7 +404,7 @@ function Details({ game, section, onChangeArt }: { game: Game; section: 'details
               </Row>
             )}
             {game.source.archive && <Row label="Source">{game.source.archive}</Row>}
-            <Row label="Download">{game.canReinstall ? 'Kept for reinstalling' : 'Not kept. Add the download again to reinstall.'}</Row>
+            {!staticDemo && <Row label="Download">{game.canReinstall ? 'Kept for reinstalling' : 'Not kept. Add the download again to reinstall.'}</Row>}
             {game.installedAt && <Row label="Installed">{capitalize(ago(game.installedAt))}</Row>}
           </div>
         </Card>

@@ -1,307 +1,385 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="home">
 <head>
 {{head}}
+<script>document.documentElement.classList.add('js')</script>
 </head>
 <body>
-<div class="grain"></div>
+
+<!-- The room: one painting, fixed behind the page. The sky in the window and the ink over the room follow the scroll. -->
+<div class="room" id="room" aria-hidden="true">
+  <div class="stage" id="stage">
+    <div class="layer l-sky" id="l-sky">
+      <div class="sky">
+        <picture><source media="(max-aspect-ratio: 1/1)" srcset="/img/room/sky-dusk-tall.webp"><img src="/img/room/sky-dusk-wide.webp" alt="" width="560" height="655" decoding="async"></picture>
+        <picture class="s-evening"><source media="(max-aspect-ratio: 1/1)" data-srcset="/img/room/sky-evening-tall.webp"><img data-src="/img/room/sky-evening-wide.webp" alt="" width="560" height="655" decoding="async"></picture>
+        <picture class="s-night"><source media="(max-aspect-ratio: 1/1)" data-srcset="/img/room/sky-night-tall.webp"><img data-src="/img/room/sky-night-wide.webp" alt="" width="560" height="655" decoding="async"></picture>
+      </div>
+    </div>
+    <div class="layer l-room" id="l-room">
+      <picture>
+        <source media="(max-aspect-ratio: 1/1)" type="image/avif" srcset="/img/room/room-tall.avif">
+        <source media="(max-aspect-ratio: 1/1)" srcset="/img/room/room-tall.webp">
+        <source type="image/avif" srcset="/img/room/room-wide.avif 1600w, /img/room/room-wide-1200.avif 1200w" sizes="100vw">
+        <img class="art" src="/img/room/room-wide.webp" srcset="/img/room/room-wide.webp 1600w, /img/room/room-wide-1200.webp 1200w" sizes="100vw" alt="" width="1600" height="892" fetchpriority="high" decoding="async">
+      </picture>
+    </div>
+    <div class="layer l-fg" id="l-fg">
+      <picture>
+        <source media="(max-aspect-ratio: 1/1)" type="image/avif" srcset="/img/room/fg-tall.avif">
+        <source media="(max-aspect-ratio: 1/1)" srcset="/img/room/fg-tall.webp">
+        <source type="image/avif" srcset="/img/room/fg-wide.avif 1600w, /img/room/fg-wide-1200.avif 1200w" sizes="100vw">
+        <img class="art" src="/img/room/fg-wide.webp" srcset="/img/room/fg-wide.webp 1600w, /img/room/fg-wide-1200.webp 1200w" sizes="100vw" alt="" width="1600" height="892" decoding="async">
+      </picture>
+    </div>
+    <!-- Lit room patches: original painted rims above the glass, furniture light already masked. -->
+    <div class="layer l-screens">
+      <div class="dev" data-dev="laptop"><picture><source type="image/avif"><img alt="" width="641" height="375" decoding="async"></picture></div>
+      <div class="dev" data-dev="tablet"><picture><source type="image/avif"><img alt="" width="343" height="227" decoding="async"></picture></div>
+      <div class="dev" data-dev="phone"><picture><source type="image/avif"><img alt="" width="302" height="202" decoding="async"></picture></div>
+    </div>
+    <div class="stage-grain"></div>
+  </div>
+  <canvas class="motes" id="motes"></canvas>
+</div>
+
+<!-- The lantern: the warm light that follows the hand. Its layer is the window, clipped, so the light can never widen the page. -->
+<div class="light-layer" aria-hidden="true"><div class="light" id="light"></div></div>
 
 {{nav}}
 
-<header class="hero">
-  <div class="aurora"><span></span><span></span><span></span></div>
-  <div class="wrap">
-    <span class="chip"><b>Free</b> Open source and self-hosted</span>
-    <h1>Your Ren’Py games,<br><span class="rotator"><span class="grad-text on">on every screen.</span></span></h1>
-    <p class="sub">Renplay plays <strong>the games you get from itch.io, Patreon and F95zone</strong>, adult and not, in any browser: your computer, your tablet, your phone. Every save lands on your own server, so you start a chapter at your desk and finish it on the couch.</p>
-    <div class="cta">
-      <a class="btn primary" href="#install">Install
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </a>
-      <a class="btn" href="/demo">Try the demo</a>
+<main>
+
+<!-- 1. The first screen: the room, the title, the scene in its box, and the two ways on -->
+<section class="scene" id="top" aria-labelledby="h1">
+  <div class="scene-pad" id="scene" tabindex="0" aria-label="Opening scene. Press Space or Enter, or click, for the next line.">
+    <div class="title">
+      <h1 id="h1"><span class="sr-only">Renplay. </span>Your Ren’Py games, on every screen.</h1>
+      <p class="define">{{definition}} Free and open source.</p>
     </div>
-    <div class="trust">
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>One Docker container</span>
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Your server, your saves</span>
-      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>MIT licensed</span>
-    </div>
-    <div class="stage intro">
-      <div class="laptop">
-        <div class="screen"><img src="/img/desktop-library.webp" alt="The Renplay library in a browser, with a game ready to resume" width="1600" height="1000" fetchpriority="high"></div>
-        <div class="base"></div>
+
+    <div class="dlg" id="dlg">
+      <p class="name">Renplay</p>
+      <!-- Every state of the box sits in the same cell, unseen until its turn, so the box is as tall as its tallest state from the first paint and never grows. -->
+      <div class="box" id="box">
+        <div class="story" id="story" aria-live="polite">
+          <p>Evening. The house is quiet, and the story you started at your desk is still open.</p>
+          <p>Every save went to your own server the moment you made it.</p>
+          <p>So, where do you pick it up?</p>
+        </div>
+        <p class="typed" id="typed" aria-hidden="true"><span class="t"></span></p>
+        <div class="ask" id="ask">
+          <p class="q" aria-hidden="true"></p>
+          <ul class="choices" id="choices" aria-label="Where do you pick it up?">
+            <li><a href="#demo" data-dev="phone"><kbd>1</kbd>The phone</a></li>
+            <li><a href="#demo" data-dev="tablet"><kbd>2</kbd>The tablet</a></li>
+            <li><a href="#demo" data-dev="laptop"><kbd>3</kbd>The laptop</a></li>
+          </ul>
+        </div>
+        <p class="after" id="after">Same line, same place. That is Renplay.</p>
       </div>
-      <div class="phone-land"><img src="/img/phone-player.webp" alt="A visual novel playing on a phone in landscape" width="1400" height="646"></div>
+      <span class="adv" aria-hidden="true">for the next line</span>
+      <button class="replay" id="replay" type="button">Replay</button>
+    </div>
+    <script>
+    // The box is as tall as its tallest state from the first paint: every line is in it as a ghost, and the question's ghost carries the choices.
+    {
+      const box = document.getElementById('box'), lines = [...document.querySelectorAll('#story p')]
+      document.querySelector('#ask .q').textContent = lines[lines.length - 1].textContent.trim()
+      for (const p of [...lines.slice(0, -1), document.getElementById('after')]) box.append(Object.assign(document.createElement('p'), { className: 'ghost', textContent: p.textContent.trim() }))
+    }
+    </script>
+
+    <div class="cta">
+      <a class="btn primary" href="#install">Install</a>
+      <a class="btn" href="https://demo.renplay.org/" target="_blank" rel="noopener">Try the demo</a>
     </div>
   </div>
-</header>
+</section>
 
-<main class="wrap">
-
-  <section id="for">
-    <div class="center reveal">
-      <p class="eyebrow">What it is for</p>
-      <h2>The games you already download.</h2>
-      <p class="lead" style="margin-left:auto;margin-right:auto">Visual novels from itch.io, Patreon and F95zone arrive as a PC download. Renplay turns that download into a game you can open anywhere.</p>
-    </div>
-    <div class="bento three">
-      <div class="tile reveal spot"><h3>Ren’Py first</h3><p>Built for Ren’Py games, new and old. HTML games, like Twine stories, play too, with fewer features.</p></div>
-      <div class="tile reveal spot"><h3>Adult and not</h3><p>Many visual novels are for adults, and Renplay plays them like any other game. They are first-class here, not an afterthought.</p></div>
-      <div class="tile reveal spot"><h3>Off, Blurred or Shown</h3><p>Adult games have three levels: Off, Blurred and Shown. Each person chooses their own, within your limit, and at Blurred their pictures never leave your server.</p></div>
-    </div>
-  </section>
-
-  <section id="why">
-    <div class="center reveal">
-      <p class="eyebrow">Why Renplay</p>
-      <h2>Visual novels shouldn’t be stuck<br>on one computer.</h2>
-      <p class="lead">Ren’Py games ship as desktop downloads. That is fine until you want to read on the train, on the couch, or on the laptop you took on holiday.</p>
-    </div>
-    <div class="versus">
-      <div class="side bad reveal spot">
-        <h3>Without Renplay</h3>
-        <ul>
-          <li><span class="mark">✕</span><span><b>One machine per game.</b> Your phone can’t run the PC version, and the Android build, when there is one, is another big download.</span></li>
-          <li><span class="mark">✕</span><span><b>Saves that stay behind.</b> Progress hides in a folder on one computer. Switch devices and you start over or copy files around.</span></li>
-          <li><span class="mark">✕</span><span><b>Updates are a chore.</b> Download 15 GB again, find the save folder, hope the old saves still load.</span></li>
-          <li><span class="mark">✕</span><span><b>A messy folder of zips.</b> No covers, no overview, no idea which version you have.</span></li>
-        </ul>
+<!-- 2. The catalog: the shelf, a search, the count -->
+<section class="paper s-gallery" id="gallery" aria-labelledby="h-gallery" data-stop="1">
+  <div class="wrap">
+    <header class="sec-head">
+      <div>
+        <p class="label"><i class="lamp"></i>The catalog</p>
+        <h2 id="h-gallery">Tested, and ready to play.</h2>
       </div>
-      <div class="side good reveal spot">
-        <h3>With Renplay</h3>
-        <ul>
-          <li><span class="mark">✓</span><span><b>Every screen plays it.</b> Any modern browser, including phones and tablets, full screen and smooth.</span></li>
-          <li><span class="mark">✓</span><span><b>Saves follow you.</b> Each save is on your server the moment you make it. Tap Resume anywhere.</span></li>
-          <li><span class="mark">✓</span><span><b>Updates in one click.</b> Add the new download. Your saves carry over, and Renplay tells you when a tested update is out.</span></li>
-          <li><span class="mark">✓</span><span><b>A real library.</b> Official art, versions, last played, and one tap back into your story.</span></li>
-        </ul>
+      <div class="lead">
+        <p>Every game here was installed and played in Renplay. The catalog says which download to get from the developer, brings the official art, and sets what the game needs. It never hosts game files.</p>
+        <p class="count"><b>{{count}}</b> games, tested by people who play them. Adult games are at <a href="https://adult.renplay.org/">adult.renplay.org</a>.</p>
       </div>
+    </header>
+    <form class="find" action="/catalog/" method="get" role="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="find-q" type="search" name="q" placeholder="Search by title, developer or tag" autocomplete="off" aria-label="Search the catalog">
+      <button class="btn sm" type="submit">Search</button>
+    </form>
+  </div>
+  <div class="shelf-wrap">
+    <ul class="shelf" id="shelf" tabindex="0" aria-label="{{shelfLabel}} games from the catalog">
+{{shelf}}
+    </ul>
+    <div class="shelf-ctl">
+      <button type="button" id="shelf-prev" aria-label="Earlier games">←</button>
+      <button type="button" id="shelf-next" aria-label="Later games">→</button>
     </div>
-  </section>
+  </div>
+  <div class="wrap">
+    <div class="actions">
+      <a class="btn" href="/catalog/">Browse the catalog</a>
+      <a class="btn" href="/catalog/#request">Request a game</a>
+    </div>
+  </div>
+</section>
 
-  <section id="how">
-    <div class="center reveal">
-      <p class="eyebrow">How it works</p>
-      <h2>Three steps. The first one is a download.</h2>
-    </div>
-    <div class="steps">
-      <div class="step reveal"><div class="n"><span class="grad-text">1</span></div><h3>Add the game</h3><p>Upload the normal PC download, the same zip you would play on Windows, or drop it into a folder.</p></div>
-      <div class="step reveal"><div class="n"><span class="grad-text">2</span></div><h3>Renplay prepares it</h3><p>It unpacks the game, shrinks the images and builds a web version. Once, in a few minutes. No Ren’Py SDK needed.</p></div>
-      <div class="step reveal"><div class="n"><span class="grad-text">3</span></div><h3>Play anywhere</h3><p>Open Renplay on any device and press Play. Your saves sync while you read.</p></div>
-    </div>
-  </section>
-
-  <section id="library">
-    <div class="center reveal">
-      <p class="eyebrow">Your library</p>
-      <h2>Feels like a store you own.</h2>
-      <p class="lead">Every game gets its official art, the developer’s links and the version you have. The first thing you see is the game you were playing.</p>
-    </div>
-    <div class="bento three">
-      <div class="tile reveal spot"><h3>Resume in one tap</h3><p>From your latest save, on any device.</p></div>
-      <div class="tile reveal spot"><h3>Every save kept</h3><p>With earlier versions you can restore.</p></div>
-      <div class="tile reveal spot"><h3>Update notices</h3><p>When a newer tested version of a game is out.</p></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="center reveal">
-      <p class="eyebrow">Everything included</p>
-      <h2>Small touches that add up.</h2>
-    </div>
-    <div class="bento">
-      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4 12a4 4 0 0 0 1 7.9"/><path d="m9 15 3-3 3 3"/><path d="M12 12v9"/></svg></div><h3>Saves you never lose</h3><p>Saves, autosaves and unlocked galleries sync the moment the game writes them. Every overwrite keeps the previous version. If the connection drops, they wait and upload later.</p></div>
-      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/><path d="M4 18l6-6-6-6"/></svg></div><h3>Sequels just work</h3><p>Season two finds season one’s saves, exactly like on desktop.</p></div>
-      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></div><h3>Bring your saves</h3><p>Import saves from the desktop version, export them back, or move them with a Ren’Py Sync code.</p></div>
-      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></div><h3>Mods in the browser</h3><p>Edit scripts or upload a mod. Your changes survive updates.</p></div>
-      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></div><h3>A tested catalog</h3><p>Known games come with their art, links and the settings that work.</p></div>
-      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h3>Private by design</h3><p>Everything runs on your own hardware, in nobody else’s cloud. Once a day it sends a small <a href="https://docs.renplay.org/telemetry/">anonymous report</a> you can turn off, and never your games or saves. Games are prepared without running their code on your server, and every person on it has their own saves, history and level for adult games.</p></div>
-      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg></div><h3>Made for phones</h3><p>Full screen, on iPhone from the home screen and on Android with one tap. It fits your screen, clear of the notch, and follows you when you turn the phone. The screen stays on while you read, and a kept game plays on a plane: saves go up when you land.</p></div>
-      <div class="tile reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h4M8 10v4"/><path d="M15 13h.01M18 11h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6L2 15a3 3 0 0 0 5.1 2.3L9 15h6l1.9 2.3A3 3 0 0 0 22 15l-.7-6.4A4 4 0 0 0 17.3 5z"/></svg></div><h3>A controller works</h3><p>The d-pad moves around your library, and the game plays with Ren’Py’s own buttons.</p></div>
-      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18.5 14a6.5 6.5 0 0 1 3 6"/></svg></div><h3>One tablet, many readers</h3><p>Who is playing? switches person with a PIN, each with their own saves.</p></div>
-      <div class="tile wide reveal spot"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div><h3>Dashboards</h3><p>Prometheus metrics and a Homepage widget show what your server is doing.</p></div>
-    </div>
-    <div class="numbers">
-      <div class="num reveal spot"><b class="grad-text" data-to="60" data-suffix=" fps">60 fps</b><span>Smooth playback in the browser</span></div>
-      <div class="num reveal spot"><b class="grad-text" data-to="10" data-prefix="~" data-suffix=" s">~10 s</b><span>To start a 15 GB game again</span></div>
-      <div class="num reveal spot"><b class="grad-text" data-to="9" data-prefix="Up to " data-suffix="×">Up to 9×</b><span>Smaller images, no visible difference</span></div>
-      <div class="num reveal spot"><b class="grad-text">1</b><span>Container to run it all</span></div>
-    </div>
-  </section>
-
-  <section id="install">
-    <div class="install">
-      <div class="reveal">
-        <p class="eyebrow">Get started</p>
-        <h2>Up and running in a minute.</h2>
-        <p class="lead">If you can run a Docker container, you can run Renplay. Point it at a folder for games and one for your saves.</p>
-        <ol class="after">
-          <li><span>Run the command and open <b>http://localhost:8080</b>. Enter the setup code from <code>docker logs renplay</code> and create your account. Renplay then asks whether to show adult games.</span></li>
-          <li><span>Go to <b>Add games</b> and upload a game’s PC download, then press <b>Install</b> and <b>Play</b>. On your phone, add Renplay to the home screen. The <a href="https://docs.renplay.org/start-here/quick-start/">quick start</a> shows each step.</span></li>
-          <li><span><b>Start with a free game.</b> These are free and safe for work. Get one from its developer, add it, and play.</span></li>
-        </ol>
-        <div class="starters">{{starters}}</div>
-        <div class="cta next"><a class="btn primary" href="https://docs.renplay.org/start-here/quick-start/">Read the install guide</a></div>
-        <ul class="platforms" aria-label="Install guides for each system">
-          <li><a href="https://docs.renplay.org/install/docker/">Docker and Compose</a></li>
-          <li><a href="https://docs.renplay.org/install/kubernetes/">Kubernetes</a></li>
-          <li><a href="https://docs.renplay.org/install/truenas/">TrueNAS</a></li>
-          <li><a href="https://docs.renplay.org/install/unraid/">Unraid</a></li>
-          <li><a href="https://docs.renplay.org/install/synology/">Synology</a></li>
-          <li><a href="https://docs.renplay.org/install/ugreen/">UGREEN</a></li>
-          <li><a href="https://docs.renplay.org/install/qnap/">QNAP</a></li>
-        </ul>
+<!-- 3. The demo: the real Renplay -->
+<section class="paper s-demo" id="demo" aria-labelledby="h-demo" data-stop="2">
+  <div class="wrap">
+    <header class="sec-head">
+      <div>
+        <p class="label"><i class="lamp"></i>Try it</p>
+        <h2 id="h-demo">Try it before you install it.</h2>
       </div>
-      <div class="reveal">
-        <div class="tabs" role="tablist" aria-label="How to run it">
-          <button class="on" role="tab" id="tab-docker" aria-selected="true" aria-controls="pane-docker" data-tab="docker">Docker</button>
-          <button role="tab" id="tab-compose" aria-selected="false" aria-controls="pane-compose" tabindex="-1" data-tab="compose">Docker Compose</button>
+      <div class="lead">
+        <p class="wide-only">This is a real Renplay. Press Play on the laptop, read a little, save. The phone has it the same second, because every save goes to the server the moment you make it.</p>
+        <p class="narrow-only">This is a real Renplay. Tap the phone and it opens full screen, with The Question, Ren’Py’s own sample game, ready to play.</p>
+        <p class="lead-actions"><a class="btn" id="open-demo" href="https://demo.renplay.org/" target="_blank" rel="noopener">Open the demo</a></p>
+      </div>
+    </header>
+
+    <a class="skip" href="#how">Skip the demo</a>
+    <p class="live-label" id="live-label" aria-live="polite"><span class="pulse"></span><span id="live-text">Live. Go on, press Play.</span></p>
+
+    <div class="duo" id="duo">
+      <figure class="dev-wrap laptop-wrap" id="laptop-wrap">
+        <div class="laptop">
+          <div class="lid">
+            <div class="screen" id="laptop-screen">
+              <img class="poster" src="/img/poster/poster-laptop.webp" alt="The Renplay game page for The Question, with its Play button" width="880" height="550" loading="lazy">
+              <iframe id="laptop-frame" title="Renplay on a laptop" data-src="https://demo.renplay.org/game/the-question?embed=laptop" width="880" height="550" allow="fullscreen" loading="lazy" tabindex="-1"></iframe>
+              <p class="wait" role="status">The demo could not be reached just now. <a href="https://demo.renplay.org/" target="_blank" rel="noopener">Open it in its own tab</a>.</p>
+            </div>
+          </div>
+          <div class="base"></div>
         </div>
-        <div class="code" role="tabpanel" id="pane-docker" aria-labelledby="tab-docker" data-pane="docker">
-          <pre tabindex="0"><span class="k">docker</span> run -d --name renplay -p 8080:8080 \
+        <figcaption>The laptop, live</figcaption>
+      </figure>
+
+      <figure class="dev-wrap phone-wrap" id="phone-wrap">
+        <div class="phone" id="phone">
+          <div class="screen" id="phone-screen">
+            <img class="poster" src="/img/poster/poster-phone.webp" alt="The Renplay game page for The Question on a phone" width="390" height="844" loading="lazy">
+            <iframe id="phone-frame" title="Renplay on a phone" data-src="https://demo.renplay.org/game/the-question?embed=phone" width="390" height="844" allow="fullscreen" loading="lazy" tabindex="-1"></iframe>
+            <p class="wait" role="status">The demo could not be reached just now. <a href="https://demo.renplay.org/" target="_blank" rel="noopener">Open it in its own tab</a>.</p>
+          </div>
+          <!-- On a phone the drawn phone is the way in: a tap opens the demo full screen, in its own tab. On a wide screen the frame is live and this link is not shown. -->
+          <a class="pickup" id="pickup" href="https://demo.renplay.org/game/the-question" target="_blank" rel="noopener"><span>Open the demo full screen</span></a>
+        </div>
+        <figcaption id="phone-cap">The phone, live</figcaption>
+      </figure>
+    </div>
+    <script>
+    // Fit while parsing, before this section's first paint, so no font or demo load is needed to know the size.
+    // demo.js uses the same function for viewport and container changes.
+    window.fitRenplayDemo = () => {
+      const duo = document.getElementById('duo')
+      const w = duo.parentElement.clientWidth
+      if (matchMedia('(max-width:860px)').matches) {
+        duo.style.setProperty('--pm', Math.min(0.8, (w - 24) / 390).toFixed(3))
+      } else {
+        const s = Math.min(1, Math.max(.55, w / (880 + 36 + 390 * .77 + 24 + 36)))
+        duo.style.setProperty('--s', s.toFixed(3))
+        duo.style.setProperty('--ps', (.77 * Math.max(s, .8)).toFixed(3))
+      }
+      duo.dataset.fitted = ''
+    }
+    window.fitRenplayDemo()
+    </script>
+    <p class="fine">The demo is a copy of Renplay that runs in your browser. Its saves stay in this browser, nobody else sees them, and nothing can be installed in it.</p>
+    <noscript><p class="fine">The demo needs JavaScript to sit on this page. <a href="https://demo.renplay.org/">Open the demo</a>.</p></noscript>
+  </div>
+</section>
+
+<!-- 4. How it works: three steps, and the numbers -->
+<section class="paper s-how" id="how" aria-labelledby="h-steps" data-stop="2">
+  <div class="wrap">
+    <header class="sec-head">
+      <div>
+        <p class="label"><i class="lamp"></i>How it works</p>
+        <h2 id="h-steps">Three steps. The first one is a download.</h2>
+      </div>
+    </header>
+    <ol class="steps" aria-labelledby="h-steps">
+      <li><h3>Add the game</h3><p>Upload the normal PC download, the same zip you would play on Windows, or drop it into a folder.</p></li>
+      <li><h3>Renplay prepares it</h3><p>It unpacks the game, shrinks the images and builds a web version, once, in a few minutes. No Ren’Py SDK, and the game’s code never runs on your server.</p></li>
+      <li><h3>Play anywhere</h3><p>Open Renplay on any screen and press Play. Your saves sync while you read.</p></li>
+    </ol>
+
+    <!-- The numbers: each one with how it was measured. -->
+    <div class="numbers" id="numbers">
+      <h3 id="h-numbers">Quick to start, light to carry.</h3>
+      <dl aria-labelledby="h-numbers">
+        <div><dt>From Play to the first frame</dt><dd><b>3 s</b><span>The Question on demo.renplay.org, the first time, on a fast connection: 3.2 s in a desktop browser and 2.9 s in an iPhone-sized WebKit window. The median of five runs each.</span></dd></div>
+        <div><dt>Smaller than the download</dt><dd><b>61 MB</b><span>What a browser needs before the first frame, for 16 tested games whose PC download is 1 GB or more (2.0 GB in the middle). The rest streams while you play.</span></dd></div>
+        <div><dt>Back to a game you played before</dt><dd><b>2 s</b><span>The engine and the game are already in your browser, so about 3 KB moves before the first frame. The Question in a desktop browser, the median of five runs.</span></dd></div>
+      </dl>
+      <p class="fine">Measured on 17 November 2026.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5. What you get -->
+<section class="paper s-features" id="features" aria-labelledby="h-features" data-stop="3">
+  <div class="wrap">
+    <header class="sec-head">
+      <div>
+        <p class="label"><i class="lamp"></i>Everything included</p>
+        <h2 id="h-features">What you get.</h2>
+      </div>
+      <p class="lead">Visual novels from itch.io, Patreon and F95zone arrive as a PC download. Renplay turns that download into a game you can open on any screen, and keeps your library, your saves and the people who share it in order.</p>
+    </header>
+    <div class="features">
+      <article class="feature">
+        <h3>Plays what you already own</h3>
+        <p>Games made with Ren’Py 8, and most made with Ren’Py 7, which run on the same engine. HTML games, like Twine stories, play too, with fewer features. Known games come from <a href="/catalog/">a tested catalog</a> with their art and settings.</p>
+      </article>
+      <article class="feature">
+        <h3>Saves with a history</h3>
+        <p>Saves, autosaves and unlocked galleries sync the moment the game writes them. Every overwrite keeps the version before it, and a sequel finds the first season’s saves, as on desktop. Import saves from the desktop version, or move them with a Ren’Py Sync code.</p>
+      </article>
+      <article class="feature">
+        <h3>Phones, offline, a controller</h3>
+        <p>Full screen on iPhone and Android, clear of the notch, with the screen kept awake while you read. Keep a game offline and it plays on a plane, and its saves go up when you land. A controller moves around your library and plays the game.</p>
+      </article>
+      <article class="feature">
+        <h3>Everyone in the house</h3>
+        <p>The games are shared, and saves, favourites and play time belong to each person. Sign in with a local account, OpenID Connect or LDAP, or switch person on the family tablet with a PIN.</p>
+      </article>
+      <article class="feature">
+        <h3>Adult games, on your terms</h3>
+        <p>Many visual novels are for adults, and Renplay plays them like any other game. Each person chooses a level within the limit you set, and at Blurred no picture of them ever leaves your server.</p>
+        <div class="levels" aria-label="The three levels"><span>Off</span><span>Blurred</span><span>Shown</span></div>
+      </article>
+      <article class="feature">
+        <h3>Mods, dashboards, your own hardware</h3>
+        <p>Edit scripts or upload a mod, and it sits beside the game, so updates never touch it. Prometheus metrics and a Homepage widget show what the server is doing. Everything runs on your own hardware, and the one thing it sends is a small <a href="https://docs.renplay.org/telemetry/">anonymous report</a> once a day, which you can turn off.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Install -->
+<section class="paper s-install" id="install" aria-labelledby="h-install" data-stop="4">
+  <div class="wrap install">
+    <div>
+      <p class="label"><i class="lamp"></i>Get started</p>
+      <h2 id="h-install">Up and running in a minute.</h2>
+      <p class="lead">If you can run a Docker container, you can run Renplay. Point it at a folder for games and one for your saves.</p>
+      <ol class="after-steps">
+        <li>Run the command and open <b>http://localhost:8080</b>. Enter the setup code from <code>docker logs renplay</code> and create your account.</li>
+        <li>Go to <b>Add games</b> and upload a game’s PC download, then press <b>Install</b> and <b>Play</b>. The <a href="https://docs.renplay.org/start-here/quick-start/">quick start</a> shows each step.</li>
+      </ol>
+      <ul class="platforms" aria-label="Install guides for each system">
+        <li><a href="https://docs.renplay.org/install/docker/">Docker and Compose</a></li>
+        <li><a href="https://docs.renplay.org/install/kubernetes/">Kubernetes</a></li>
+        <li><a href="https://docs.renplay.org/install/truenas/">TrueNAS</a></li>
+        <li><a href="https://docs.renplay.org/install/unraid/">Unraid</a></li>
+        <li><a href="https://docs.renplay.org/install/synology/">Synology</a></li>
+        <li><a href="https://docs.renplay.org/install/ugreen/">UGREEN</a></li>
+        <li><a href="https://docs.renplay.org/install/qnap/">QNAP</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="tabs" role="tablist" aria-label="How to run it">
+        <button class="on" role="tab" id="tab-docker" aria-selected="true" aria-controls="pane-docker" data-tab="docker" type="button">Docker</button>
+        <button role="tab" id="tab-compose" aria-selected="false" aria-controls="pane-compose" tabindex="-1" data-tab="compose" type="button">Docker Compose</button>
+      </div>
+      <div class="code" role="tabpanel" id="pane-docker" aria-labelledby="tab-docker" data-pane="docker">
+        <pre tabindex="0">docker run -d --name renplay -p 8080:8080 \
   -v ./games:/games \
   -v ./data:/data \
   ghcr.io/renplay-org/renplay:latest</pre>
-          <button class="btn sm copy">Copy</button>
-        </div>
-        <div class="code" role="tabpanel" id="pane-compose" aria-labelledby="tab-compose" data-pane="compose" hidden>
-          <pre tabindex="0"><span class="c"># compose.yaml</span>
-<span class="k">services</span>:
-  <span class="k">renplay</span>:
+        <button class="btn sm copy" type="button">Copy</button>
+      </div>
+      <div class="code" role="tabpanel" id="pane-compose" aria-labelledby="tab-compose" data-pane="compose" hidden>
+        <pre tabindex="0"># compose.yaml
+services:
+  renplay:
     image: ghcr.io/renplay-org/renplay:latest
     ports: ["8080:8080"]
     volumes:
-      - ./games:/games   <span class="c"># games and their downloads</span>
-      - ./data:/data     <span class="c"># saves: back this up</span>
+      - ./games:/games   # games and their downloads
+      - ./data:/data     # saves: back this up
     restart: unless-stopped</pre>
-          <button class="btn sm copy">Copy</button>
-        </div>
-        <p class="fine">The image is <code>ghcr.io/renplay-org/renplay</code>, also <code>renplay/renplay</code> on Docker Hub. Use HTTPS outside your home network. To decide about adult games ahead of time, set <code>RENPLAY_ADULT_GAMES</code> to <code>off</code>, <code>blurred</code> or <code>shown</code>.</p>
+        <button class="btn sm copy" type="button">Copy</button>
       </div>
+      <p class="fine">The image is <code>ghcr.io/renplay-org/renplay</code>, also <code>renplay/renplay</code> on Docker Hub. Use HTTPS outside your home network. Free and open source under the MIT license.</p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <section>
-    <div class="band reveal">
+<!-- 7. Questions -->
+<section class="paper s-faq" id="faq" aria-labelledby="h-faq" data-stop="5">
+  <div class="wrap">
+    <header class="sec-head">
       <div>
-        <p class="eyebrow">The catalog</p>
-        <h2>Games other players already tested.</h2>
-        <p>The community catalog lists games that work in Renplay: which download to get from the developer, its official art, and any settings it needs. It never hosts game files. Got one working? Add it in a pull request.</p>
+        <p class="label"><i class="lamp"></i>Questions</p>
+        <h2 id="h-faq">You might be wondering.</h2>
       </div>
-      <div class="actions">
-        <a class="btn primary" href="/catalog/">Browse the catalog</a>
-        <a class="btn" href="/catalog/#request">Request a game</a>
-        <a class="btn" href="https://github.com/renplay-org/catalog/blob/main/CONTRIBUTING.md">Add one yourself</a>
-      </div>
-    </div>
-  </section>
-
-  <section id="faq">
-    <div class="center reveal">
-      <p class="eyebrow">Questions</p>
-      <h2>Good to know.</h2>
-    </div>
+    </header>
     <div class="faq">
-      <details class="reveal"><summary>Which games work?</summary><p>Games made with Ren’Py 8, and most games made with Ren’Py 7, which run on the same engine. That covers almost every visual novel of the last few years. HTML games, like Twine stories, play too, with fewer features. The catalog lists games that were tested, and most others work too.</p></details>
-      <details class="reveal"><summary>Where do I get the games?</summary><p>From their developers, as you do today: itch.io, Patreon, F95zone, Steam and so on. Renplay uses the normal PC download. Neither Renplay nor its catalog hosts game files.</p></details>
-      <details class="reveal"><summary>Does it need a powerful server?</summary><p>No. Installing a game uses some CPU for a few minutes, and playing is just serving files. Games run in your browser, so a small home server or NAS is plenty. Plan disk space like for the downloads themselves.</p></details>
-      <details class="reveal"><summary>Can I still play on desktop Ren’Py?</summary><p>Yes. Export a game’s saves and they work in the desktop version, and the other way round. Games made with Ren’Py 8.1 or newer can also move saves with a Sync code.</p></details>
-      <details class="reveal"><summary>Does it work without the internet?</summary><p>Yes, once a game is kept. <b>Keep offline</b> on a game’s page stores it in your browser, so it plays on a plane or a train, and the saves you make wait until you are back.</p></details>
-      <details class="reveal"><summary>What about adult games?</summary><p>They work like any other game, and adult games are a big part of what Renplay is for. There are three levels: Off leaves them out completely, Blurred shows them without their pictures, Shown shows everything. A new install asks once, or you set <code>RENPLAY_ADULT_GAMES</code>. Each person chooses their own level within yours, and <b>Hide adult games here</b> covers a screen other people can see. The catalog at renplay.org lists the safe-for-work games, and <a href="https://adult.renplay.org">adult.renplay.org</a> lists every game, adult ones included.</p></details>
-      <details class="reveal"><summary>Is it really free?</summary><p>Yes, free and open source under the MIT license. If it makes your evenings better, you can support it on <a href="/support">Ko-fi</a>.</p></details>
+      <details><summary>Will my games work?</summary><p>Almost certainly, if they were made with Ren’Py 8 or 7, which is most visual novels of the last few years. HTML games such as Twine stories play too, with fewer features. The catalog lists the games people have tested.</p></details>
+      <details><summary>Where do the games come from?</summary><p>From their developers, as now: itch.io, Patreon, Steam, F95zone. Renplay takes the normal PC download. Neither Renplay nor its catalog hosts game files.</p></details>
+      <details><summary>Do I need a big server?</summary><p>No. Installing a game takes some CPU for a few minutes, and playing is just serving files, because the game runs in your browser. A small home server or a NAS is plenty. Plan disk space as for the downloads themselves.</p></details>
+      <details><summary>Can I go back to desktop Ren’Py?</summary><p>Yes. Export a game’s saves and they work in the desktop version, and the other way round. Games made with Ren’Py 8.1 or newer can also move saves with a Sync code.</p></details>
+      <details><summary>Does it play offline?</summary><p>Yes, once a game is kept. <b>Keep offline</b> on a game’s page stores it in your browser, so it plays on a plane or a train, and the saves you make wait until you are back.</p></details>
+      <details><summary>What about adult games?</summary><p>They play like any other game, and many people run Renplay for them. Three levels: Off leaves them out, Blurred shows them without their pictures, Shown shows everything. A new install asks once, or you set <code>RENPLAY_ADULT_GAMES</code>, and each person chooses within your limit. The catalog here lists the safe-for-work games, and <a href="https://adult.renplay.org/">adult.renplay.org</a> lists all of them.</p></details>
+      <details><summary>Is it really free?</summary><p>Yes. Free and open source under the MIT license. If it makes your evenings better, you can support it on <a href="https://ko-fi.com/janpuc">Ko-fi</a>.</p></details>
+      <details><summary>What does it send home?</summary><p>One small anonymous report a day: counts, versions, and how games from the catalog installed and played, by catalog id. Never people, the names of your own games, files or saves. Turn it off in Settings or with <code>RENPLAY_TELEMETRY=off</code>. The <a href="https://docs.renplay.org/telemetry/">telemetry page</a> lists every field.</p></details>
     </div>
-  </section>
-
-  <section class="final">
-    <div class="reveal">
-      <h2>Your stories, <span class="grad-text">wherever you are.</span></h2>
-      <p class="lead" style="margin-left:auto;margin-right:auto">Set up Renplay tonight and pick up where you left off, on any screen.</p>
-      <div class="cta">
-        <a class="btn primary" href="#install">Install</a>
-        <a class="btn" href="/github">Star it on GitHub</a>
-        <a class="btn" href="/support">♥ Support</a>
-      </div>
-    </div>
-  </section>
+  </div>
+</section>
 
 </main>
 
-{{footer}}
+<!-- 8. Credits: the room at night -->
+<footer class="credits" id="credits" aria-labelledby="h-credits">
+  <div class="wrap">
+    <h2 id="h-credits">Your stories, wherever you are.</h2>
+    <div class="roll-window" id="roll-window">
+      <dl class="roll" id="roll">
+        <div><dt>Made by</dt><dd>The Renplay Team</dd></div>
+        <div><dt>Source</dt><dd><a href="https://github.com/renplay-org/renplay">GitHub</a></dd></div>
+        <div><dt>Manual</dt><dd><a href="https://docs.renplay.org/">Docs</a></dd></div>
+        <div><dt>Catalog</dt><dd><a href="/catalog/">Games that work</a></dd></div>
+        <div><dt>Release notes</dt><dd><a href="https://github.com/renplay-org/renplay/releases">Releases</a></dd></div>
+        <div><dt>Support</dt><dd><a href="https://ko-fi.com/janpuc">Ko-fi</a></dd></div>
+        <div><dt>License</dt><dd>MIT</dd></div>
+        <div><dt>Ren’Py</dt><dd>© Tom Rothamel and contributors</dd></div>
+        <div><dt>Games</dt><dd>Belong to their developers</dd></div>
+        <div><dt>Missing one?</dt><dd><a href="/catalog/#request" data-request>Request a game</a></dd></div>
+      </dl>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="#install">Install</a>
+      <a class="btn" href="https://github.com/renplay-org/renplay">Star it on GitHub</a>
+    </div>
+    <nav class="foot-links" aria-label="Renplay">
+      {{footlinks}}
+    </nav>
+    <nav class="foot-links" aria-label="Install guides">
+      {{guides}}
+    </nav>
+    <p class="foot">Renplay is free and open source (MIT), made by the Renplay Team. It is not affiliated with Ren’Py, which is © Tom Rothamel and contributors. Games and their art belong to their developers. Covers are linked from where the catalog found them, such as the developers’ pages, Steam and SteamGridDB, and belong to their makers. The demo shows The Question, Ren’Py’s own sample game.</p>
+  </div>
+</footer>
 
-<script src="/js/menu.js" defer></script>
-<script>
-  // Reveal on scroll.
-  const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) } }), { threshold: 0.12, rootMargin: '0px 0px -40px 0px' })
-  document.querySelectorAll('.reveal').forEach((el, i) => { el.style.transitionDelay = (el.closest('.steps, .bento, .numbers, .versus, .faq') ? (i % 4) * 70 : 0) + 'ms'; io.observe(el) })
-  // Install tabs and copy buttons.
-  const tabs = [...document.querySelectorAll('.tabs button')]
-  const pick = (b) => {
-    tabs.forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', String(x === b)); x.tabIndex = x === b ? 0 : -1 })
-    document.querySelectorAll('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== b.dataset.tab))
-  }
-  tabs.forEach((b) => b.addEventListener('click', () => pick(b)))
-  document.querySelector('.tabs').addEventListener('keydown', (e) => {
-    const to = { ArrowRight: 1, ArrowLeft: -1 }[e.key]
-    if (!to) return
-    const next = tabs[(tabs.indexOf(document.activeElement) + to + tabs.length) % tabs.length]
-    next.focus(); pick(next)
-  })
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
-  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches
-  // Cursor spotlight on cards.
-  document.querySelectorAll('.spot').forEach((el) => el.addEventListener('pointermove', (e) => {
-    const r = el.getBoundingClientRect()
-    el.style.setProperty('--mx', `${e.clientX - r.left}px`)
-    el.style.setProperty('--my', `${e.clientY - r.top}px`)
-  }))
-  // The devices lean towards the cursor.
-  const stage = document.querySelector('.stage'), hero = document.querySelector('.hero')
-  if (stage && fine && !still) {
-    hero.addEventListener('pointermove', (e) => {
-      const x = e.clientX / innerWidth - 0.5, y = e.clientY / innerHeight - 0.5
-      stage.style.transform = `perspective(1600px) rotateY(${x * 6}deg) rotateX(${-y * 4}deg)`
-    })
-    hero.addEventListener('pointerleave', () => (stage.style.transform = ''))
-  }
-  // Headline: the engines Renplay plays, Ren'Py the longest.
-  const rotator = document.querySelector('.rotator')
-  for (const w of ['on your phone.', 'on your laptop.', 'on your tablet.']) rotator.insertAdjacentHTML('beforeend', `<span class="grad-text" aria-hidden="true">${w}</span>`)
-  const words = [...rotator.children]
-  if (words.length > 1 && !still) {
-    let i = 0
-    const next = () => {
-      const prev = words[i]
-      i = (i + 1) % words.length
-      prev.classList.remove('on'); prev.classList.add('out')
-      setTimeout(() => prev.classList.remove('out'), 500)
-      words[i].classList.add('on')
-      setTimeout(next, +words[i].dataset.ms || 2600)
-    }
-    setTimeout(next, +words[0].dataset.ms || 2600)
-  }
-  // Numbers count up when they come into view.
-  const counters = new IntersectionObserver((entries) => entries.forEach((e) => {
-    if (!e.isIntersecting) return
-    counters.unobserve(e.target)
-    const el = e.target, to = +el.dataset.to, pre = el.dataset.prefix ?? '', suf = el.dataset.suffix ?? ''
-    if (still) return
-    // The count never changes the height of the number: a card with text that wraps one way at one value and
-    // another way at the next would move everything under it with each step.
-    el.style.minHeight = `${el.offsetHeight}px`
-    const t0 = performance.now()
-    const tick = (t) => {
-      const k = Math.min(1, (t - t0) / 1200)
-      el.textContent = pre + Math.round(to * (1 - Math.pow(1 - k, 3))) + suf
-      if (k < 1) requestAnimationFrame(tick)
-      else el.style.minHeight = ''
-    }
-    requestAnimationFrame(tick)
-  }), { threshold: 0.6 })
-  document.querySelectorAll('[data-to]').forEach((el) => counters.observe(el))
-  document.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(b.previousElementSibling.innerText)
-    b.textContent = 'Copied'
-    setTimeout(() => (b.textContent = 'Copy'), 1600)
-  }))
-</script>
+<script src="/js/room-data.js"></script>
+<script src="/js/shared.js" defer></script>
+<script src="/js/home.js" defer></script>
+<script src="/js/demo.js" defer></script>
+<script src="/js/shelf.js" defer></script>
+<script src="/js/credits.js" defer></script>
 </body>
 </html>

@@ -1,17 +1,42 @@
 ---
 import Footer from '@astrojs/starlight/components/Footer.astro'
+import logo from '../assets/logo.svg'
+
+// The website's footer links, so every Renplay site ends the same way.
+const links = [
+  ['Home', 'https://renplay.org/'],
+  ['Catalog', 'https://renplay.org/catalog/'],
+  ['Docs', '/'],
+  ['Install', 'https://renplay.org/#install'],
+  ['Try the demo', 'https://demo.renplay.org/'],
+  ['GitHub', 'https://github.com/renplay-org/renplay'],
+  ['Release notes', 'https://github.com/renplay-org/renplay/releases'],
+  ['Request a game', 'https://renplay.org/catalog/#request'],
+  ['Support', 'https://ko-fi.com/janpuc'],
+]
+const guides = [
+  ['Docker and Compose', '/install/docker/'],
+  ['Kubernetes', '/install/kubernetes/'],
+  ['TrueNAS', '/install/truenas/'],
+  ['Unraid', '/install/unraid/'],
+  ['Synology', '/install/synology/'],
+  ['UGREEN', '/install/ugreen/'],
+  ['QNAP', '/install/qnap/'],
+]
 ---
 <Footer />
 <footer class="family-footer">
-  <nav aria-label="Renplay footer">
-    <a href="https://renplay.org">Website</a>
-    <a href="https://renplay.org/docs">Docs</a>
-    <a href="https://renplay.org/catalog">Catalog</a>
-    <a href="https://renplay.org/demo">Try the demo</a>
-    <a href="https://renplay.org/github">GitHub</a>
-    <a href="https://renplay.org/releases">Release notes</a>
-    <a href="https://renplay.org/catalog/request">Request a game</a>
-    <a href="https://renplay.org/support">Support</a>
+  <nav class="row" aria-label="Renplay">
+    <a class="brand" href="https://renplay.org/">
+      <img src={logo.src} width="26" height="26" alt="" aria-hidden="true" />
+      <img class="wordmark wordmark-dark" src="/wordmark.svg" width="3995" height="1260" alt="Renplay" />
+      <img class="wordmark wordmark-light" src="/wordmark-on-paper.svg" width="3995" height="1260" alt="Renplay" />
+    </a>
+    {links.map(([label, href]) => <a href={href}>{label}</a>)}
   </nav>
-  <p>Made by the Renplay Team.</p>
+  <nav class="row guides" aria-label="Install guides">
+    <span>Install guides</span>
+    {guides.map(([label, href]) => <a href={href}>{label}</a>)}
+  </nav>
+  <small>Renplay is free and open source (MIT), made by the Renplay Team. It is not affiliated with Ren’Py, which is © Tom Rothamel and contributors. Games and their art belong to their developers.</small>
 </footer>

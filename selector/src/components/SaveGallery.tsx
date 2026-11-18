@@ -135,26 +135,30 @@ export default function SaveGallery({ game }: { game: Game }) {
           {(close) => (
             <>
               <MenuItem icon={<Play />} disabled={!game.playUrl} onClick={() => { close(); openSave(s.file) }}>Load</MenuItem>
-              <MenuItem icon={<Pin />} onClick={() => { close(); void saveMeta(s, { pinned: !s.pinnedAt }, s.pinnedAt ? 'Unpinned' : 'Pinned. Every previous version is kept.') }}>
-                {s.pinnedAt ? 'Unpin' : 'Pin'}
-              </MenuItem>
-              <MenuItem icon={<PencilLine />} onClick={() => { close(); setEditing({ slot: s, title: s.title ?? '', note: s.note ?? '' }) }}>
-                Name and note
-              </MenuItem>
-              <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.id}/download?file=${encodeURIComponent(s.file)}`))}>
-                Download
-              </MenuItem>
               {!staticDemo && (
-                <MenuItem icon={<Copy />} onClick={() => (close(), setCopying(s))}>
-                  Copy to another game
+                <MenuItem icon={<Pin />} onClick={() => { close(); void saveMeta(s, { pinned: !s.pinnedAt }, s.pinnedAt ? 'Unpinned' : 'Pinned. Every previous version is kept.') }}>
+                  {s.pinnedAt ? 'Unpin' : 'Pin'}
                 </MenuItem>
               )}
-              <MenuItem icon={<History />} onClick={() => (close(), setHistory(s))}>
-                Previous versions
+              <MenuItem icon={<PencilLine />} onClick={() => { close(); setEditing({ slot: s, title: s.title ?? '', note: s.note ?? '' }) }}>
+                {staticDemo ? 'Name' : 'Name and note'}
               </MenuItem>
-              <MenuItem icon={<Trash2 />} danger onClick={() => (close(), setConfirmDelete(s))}>
-                Delete
-              </MenuItem>
+              {!staticDemo && (
+                <>
+                  <MenuItem icon={<Download />} onClick={() => (close(), window.open(`/api/saves/${game.id}/download?file=${encodeURIComponent(s.file)}`))}>
+                    Download
+                  </MenuItem>
+                  <MenuItem icon={<Copy />} onClick={() => (close(), setCopying(s))}>
+                    Copy to another game
+                  </MenuItem>
+                  <MenuItem icon={<History />} onClick={() => (close(), setHistory(s))}>
+                    Previous versions
+                  </MenuItem>
+                  <MenuItem icon={<Trash2 />} danger onClick={() => (close(), setConfirmDelete(s))}>
+                    Delete
+                  </MenuItem>
+                </>
+              )}
             </>
           )}
         </ActionMenu>
@@ -210,9 +214,11 @@ export default function SaveGallery({ game }: { game: Game }) {
             </Pill>
           </>
         )}
-        <Pill size="sm" variant="q" icon={<History />} onClick={() => setHistory('all')}>
-          History
-        </Pill>
+        {!staticDemo && (
+          <Pill size="sm" variant="q" icon={<History />} onClick={() => setHistory('all')}>
+            History
+          </Pill>
+        )}
         {data?.sync && (
           <Pill size="sm" variant="q" icon={<ArrowLeftRight />} onClick={() => setSyncing(true)}>
             Sync code
@@ -224,7 +230,7 @@ export default function SaveGallery({ game }: { game: Game }) {
         <Spinner />
       ) : !slots.length ? (
         <Empty title="No saves yet">
-          Saves you make in the game are stored on the server as soon as you make them. You can also import saves from the desktop version (single <code>.save</code> files or a zip of the save folder).
+          {staticDemo ? 'Saves you make in the game are kept in this browser as soon as you make them.' : <>Saves you make in the game are stored on the server as soon as you make them. You can also import saves from the desktop version (single <code>.save</code> files or a zip of the save folder).</>}
         </Empty>
       ) : (
         <>
@@ -235,30 +241,34 @@ export default function SaveGallery({ game }: { game: Game }) {
         </>
       )}
 
-      <p className="xs muted" style={{ marginTop: 20 }}>
-        Every save is stored on the server. Overwrites and deletes keep a previous version you can restore from History. A pinned save keeps all of them.
-      </p>
+      {!staticDemo && (
+        <p className="xs muted" style={{ marginTop: 20 }}>
+          Every save is stored on the server. Overwrites and deletes keep a previous version you can restore from History. A pinned save keeps all of them.
+        </p>
+      )}
 
       <Sheet
         open={!!editing}
         onClose={() => setEditing(null)}
-        title="Name and note"
+        title={staticDemo ? 'Name' : 'Name and note'}
         footer={
-          <Pill variant="p" onClick={() => { const e = editing!; setEditing(null); void saveMeta(e.slot, { title: e.title, note: e.note }, 'Saved') }}>
+          <Pill variant="p" onClick={() => { const e = editing!; setEditing(null); void saveMeta(e.slot, staticDemo ? { title: e.title } : { title: e.title, note: e.note }, 'Saved') }}>
             Save
           </Pill>
         }
       >
         <div className="stack" style={{ gap: 12 }}>
-          <p className="small muted">Only you see these. The save itself does not change.</p>
+          <p className="small muted">Only you see {staticDemo ? 'this' : 'these'}. The save itself does not change.</p>
           <label className="block small muted-2">
             Name
             <input className="input" style={{ marginTop: 8, width: '100%' }} maxLength={80} placeholder={editing?.slot.name || 'Untitled'} value={editing?.title ?? ''} onChange={(e) => setEditing((x) => (x ? { ...x, title: e.target.value } : x))} />
           </label>
-          <label className="block small muted-2">
-            Note
-            <textarea className="input" style={{ marginTop: 8, width: '100%', minHeight: 96, paddingTop: 10 }} maxLength={500} value={editing?.note ?? ''} onChange={(e) => setEditing((x) => (x ? { ...x, note: e.target.value } : x))} />
-          </label>
+          {!staticDemo && (
+            <label className="block small muted-2">
+              Note
+              <textarea className="input" style={{ marginTop: 8, width: '100%', minHeight: 96, paddingTop: 10 }} maxLength={500} value={editing?.note ?? ''} onChange={(e) => setEditing((x) => (x ? { ...x, note: e.target.value } : x))} />
+            </label>
+          )}
         </div>
       </Sheet>
 

@@ -4,6 +4,7 @@ import SceneCard from '../../components/SceneCard'
 import { Spinner } from '../../lantern/ui'
 import { slotName } from '../../lib/format'
 import { groupSaves, saveLine, saveName } from '../../lib/saves'
+import { useStaticDemo } from '../../lib/auth'
 import { useSaves } from '../../lib/queries'
 
 function SaveRow({ game, save, onLoad }: { game: Game; save: SaveSlot; onLoad: (slot: string) => void }) {
@@ -27,11 +28,12 @@ function SaveRow({ game, save, onLoad }: { game: Game; save: SaveSlot; onLoad: (
  */
 export default function SavesView({ game, onLoad, onManage }: { game: Game; onLoad: (slot: string) => void; onManage: () => void }) {
   const { data, isLoading } = useSaves(game.id)
+  const staticDemo = useStaticDemo()
   const { pinned, recent } = groupSaves((data?.slots ?? []).filter((s) => s.kind !== 'internal' && s.valid))
   return (
     <>
       {isLoading && <Spinner />}
-      {!isLoading && !pinned.length && !recent.length && <p className="pm-note" style={{ paddingLeft: 12 }}>No saves yet. Saves you make in the game are kept on the server as you make them.</p>}
+      {!isLoading && !pinned.length && !recent.length && <p className="pm-note" style={{ paddingLeft: 12 }}>{staticDemo ? 'No saves yet. Saves you make in the game are kept in this browser as you make them.' : 'No saves yet. Saves you make in the game are kept on the server as you make them.'}</p>}
       {pinned.length > 0 && <h3 className="pm-group">Pinned</h3>}
       {pinned.map((s) => <SaveRow key={s.file} game={game} save={s} onLoad={onLoad} />)}
       {pinned.length > 0 && recent.length > 0 && <h3 className="pm-group">Recent</h3>}

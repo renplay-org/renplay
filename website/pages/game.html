@@ -2,28 +2,63 @@
 <html lang="en">
 <head>
 {{head}}
+<script>document.documentElement.classList.add('js')</script>
 </head>
-<body>
-<div class="grain"></div>
+<body class="page">
+{{backdrop}}
 {{nav}}
-<main class="wrap game-page">
-  <a class="crumb" href="/catalog/">← Catalog</a>
-  {{sheet}}
-  <section class="request">
-    <div class="band">
-      <div>
-        <p class="eyebrow">New to Renplay?</p>
-        <h2>Install it, then add this game.</h2>
-        <p>Renplay is a free, self-hosted player for Ren’Py games in the browser. It runs as one Docker container, and your saves stay on your own server.</p>
-      </div>
-      <div class="actions">
-        <a class="btn primary" href="/#install">Install Renplay</a>
-        <a class="btn" href="https://docs.renplay.org/start-here/quick-start/">Read the install guide</a>
+<main class="page-main" id="main">
+  <section class="game-band" id="band" style="{{bandStyle}}">
+    <div class="wrap">
+      <nav aria-label="Breadcrumb"><ol class="crumbs">
+        <li><a class="crumb" href="/">Renplay</a></li>
+        <li><a class="crumb" href="/catalog/">Catalog</a></li>
+        <li><a class="crumb" href="{{path}}" aria-current="page">{{title}}</a></li>
+      </ol></nav>
+      <div class="game-top">
+        {{cover}}
+        <div>
+          <p class="label"><i class="lamp"></i>In the catalog</p>
+          {{headline}}
+        </div>
       </div>
     </div>
   </section>
+  <div class="wrap">
+    <div class="game-body">
+      <div>
+        <section><h2>Play it in Renplay</h2>
+          {{howto}}
+          <p class="fine">New to Renplay? <a href="/#install">Install it</a> first, then follow the steps above. The <a href="https://docs.renplay.org/guides/adding-games/">adding games guide</a> has the details.</p>
+        </section>
+        <section><h2>Versions</h2>
+          <div class="releases">{{releases}}</div>
+          <a class="recipe-link" href="{{recipe}}" target="_blank" rel="noopener">View the recipe on GitHub</a>
+        </section>
+      </div>
+      <div>
+        <section><h2>The facts</h2>{{facts}}</section>
+      </div>
+    </div>
+    <div class="back-shelf"><a class="btn" href="/catalog/">Browse the catalog</a></div>
+    <section class="request">
+      <div class="band">
+        <div>
+          <p class="label"><i class="lamp"></i>New to Renplay?</p>
+          <h2>Install it, then add this game.</h2>
+          <p>Renplay is a free, self-hosted player for Ren’Py games in the browser. It runs as one Docker container, and your saves stay on your own server.</p>
+        </div>
+        <div class="actions">
+          <a class="btn primary" href="/#install">Install Renplay</a>
+          <a class="btn" href="https://docs.renplay.org/start-here/quick-start/">Read the install guide</a>
+        </div>
+      </div>
+    </section>
+  </div>
 </main>
 {{footer}}
-<script src="/js/menu.js" defer></script>
+<script src="/js/room-data.js"></script>
+<script src="/js/shared.js" defer></script>
+<script src="/js/room.js" defer></script>
 </body>
 </html>

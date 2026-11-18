@@ -1,8 +1,14 @@
 # The public demo
 
-[demo.renplay.org](https://demo.renplay.org) lets anyone try Renplay without installing it.
+[demo.renplay.org](https://demo.renplay.org) lets anyone try Renplay without installing it. It is the static demo
+below: the real library and game player as plain files, with each visitor's saves in their own browser.
 
-## What a visitor gets
+The demo image described first (`RENPLAY_DEMO`) is still built and published with each release, as
+`ghcr.io/renplay-org/renplay:demo`, for anyone who wants a demo with a server. The static demo is made from it.
+
+## The demo image
+
+### What a visitor gets
 
 - **Try the demo** signs them in as a shared guest (`RENPLAY_DEMO=on`). There is no account to make.
 - One game to play: **The Question**, Ren'Py's own sample game, without its music. Its art (MIT,
@@ -17,14 +23,14 @@
   until the next fresh start. Tags and the level for adult games cannot be changed.
 - A banner on every page says it is a demo and links to the install guide, except in the website's embed mode.
 
-## How it resets
+### How it resets
 
 Everything is in the image: the installed game, its art, the catalog, the guest. Every start from the
 image is a fresh demo with an empty disk. When visitors keep coming, the demo stops itself after 4
 hours of running, once nobody has asked anything for a minute (health checks do not count), and at
 4 hours and 15 minutes in any case, so it starts fresh again.
 
-## How it is built
+### How it is built
 
 `.github/workflows/demo.yml` runs after each release, or by hand:
 
@@ -35,8 +41,8 @@ hours of running, once nobody has asked anything for a minute (health checks do 
    throwaway admin installs the games with their recipes and makes their art. The admin's password
    is random and never kept, and a demo refuses every sign-in but the guest. The second stage copies
    `/data` and `/games` in and turns the demo on.
-3. The image is pushed as `ghcr.io/renplay-org/renplay:demo`, and the `DEMO_DEPLOY_HOOK` secret
-   starts the demo from it. The image listens on port 8080, with the health check `/api/health`.
+3. The image is pushed as `ghcr.io/renplay-org/renplay:demo`. It listens on port 8080, with the health check
+   `/api/health`.
 
 `make-art.mjs` made The Question's art from the game's own pictures. Run it again to change them.
 
@@ -58,16 +64,58 @@ The same demo as plain files, with no server behind it. It is built in `static/`
 - It needs a secure context: https, or `localhost` for trying it. A page that frames the demo must be secure too,
   and the browser must allow service workers and storage for the site.
 - The banner says "This is a demo. Your saves stay in this browser." with the link to install your own.
-- The library leaves out what needs a server: Keep offline, exporting and importing saves, copying a save to
-  another game and choosing other art (`Me.demoStatic`).
+- A visitor can do what playing needs, and nothing else (see "What a visitor can do" below). The library leaves out the
+  rest (`Me.demoStatic`), and the stand-in refuses it too, so a hand-made request gets the same answer as a button
+  would.
+
+### What a visitor can do
+
+The rule: what playing needs, and nothing else. The demo shows Renplay and a game running, it does not manage a library.
+Each line has its reason. The library hides the control, and the stand-in refuses the request with the demo's words
+("The demo cannot do this. Install your own Renplay to try it."), from the list in `server/src/shared/demo-refusals.ts`.
+
+Kept:
+
+- **Playing The Question**, saving and loading in the game, and Resume. That is the demo.
+- **The game's own saving.** The runtime's writes and deletes of its files, its compiled caches, play time and last
+  played. Ren'Py writes and removes files itself (auto-saves, persistent data), and the runtime would fail without them.
+- **Naming a save**, on the game page and in the game's menu. It is how a visitor sees a save is theirs, and it keeps one
+  small text.
+- **The game's own menu**: sound, full screen, text size, picture fit and the accessibility screen. They are the player's.
+- **Browsing the Catalog**, read only. It is half of what Renplay is. Its sheet says "Install your own Renplay to add
+  games." where the install button would be.
+- **Play history and This browser.** Lighter background, Move cards with the pointer and Keep game cache are per-device
+  display and storage switches, and Keep game cache protects the visitor's saves from the browser clearing them.
+
+Hidden and refused:
+
+- **Every download**: a save's download, Export all, the Account's export, the file browser, mods, the game's log, logs,
+  backups and the game's files. A demo is not a place to take files out, and a visitor's save is no use outside it. The
+  game's own page, `game.zip`, `/api/saves/<id>/raw` and `/boot` stay, since the game loads through them: they are plain
+  files of a free game and the visitor's own saves in their own browser.
+- **Deleting a save, Previous versions and Restore.** Playing does not need them, and the history is a safety net for a
+  library that lives for years, not a demo that lives in a browser. A pin and a note go too (pinned saves keep every
+  version, which only grows what the browser stores). A pin made before this limit stays as it was.
+- **Import, Copy to another game, Sync codes and Export all.** They bring files in or out.
+- **Settings beyond this browser** and the adult level. The demo has no adult games, and the level is the installation's.
+- **Account**: name, picture, password, PIN, sign-ins, sessions and tokens. The guest is not an account.
+- **People, Activity and every admin page**, and adding games: Add games, uploads, the catalog's install buttons, mods,
+  walkthroughs, art. A visitor has no server to add to, and a game the demo does not hold cannot be played.
+- **Favourites, ratings and status.** They did not make the demo feel alive: with one game to play they only gave
+  something to click, and a rating of the one game says nothing. Resume is what shows progress.
+- **Not now**, the update card, the game's developer console and its log. The first two manage a library, the others are
+  for a developer.
+
+What a hand-made request can still reach is what the page itself reads: the visitor's own saves (`raw`, `boot`) and the
+catalog snapshot. Nothing it writes lasts beyond the visitor's own browser, and it can write only what is kept above.
 
 ### How it works
 
 `static/sw/stand-in.ts` is a service worker, built to `/sw.js` (the name the library registers). The library and the game's own
 frame are both controlled by it, so the game's save requests reach it too, and they share one origin, so they share one store.
 
-- `answer.ts` answers `/api/`: the session, the guest, games, the catalog (read only), saves with history, names and
-  pins, progress, play time. What it reads of the server's answers is a snapshot made at build time
+- `answer.ts` answers `/api/`: the session, the guest, games, the catalog (read only), saves with their history (read
+  only), names, play time. What it reads of the server's answers is a snapshot made at build time
   (`/demo/snapshot.json`). Its saves and progress live in a store (`idb.ts` in the browser, `memory-store.ts` in tests).
 - A save's metadata and picture are read in the browser (`zip.ts`), within the server's limits for a save file
   (`server/src/util/zip.ts`): 2,048 entries, 64 MiB an entry and in all. The whole directory is checked first, and the bytes
@@ -76,8 +124,10 @@ frame are both controlled by it, so the game's save requests reach it too, and t
   the total is its end), and 3 earlier versions of each unpinned save. Changes to the saves wait for one another.
 - A change from another site is refused (`origin.ts`): a form on another site can send a navigation to `/api/` that
   this worker answers.
-- Every other route is refused the way the server demo refuses it. What the server demo refuses is one list,
-  `server/src/shared/demo-refusals.ts`, which `accounts/access.ts` and the stand-in both read.
+- Every other write is refused, and so is a save's download. The static demo allows a short list of writes (the game's
+  own saving, a save's name, play time and the guest's sign-in), and what the server demo refuses is one list too:
+  `server/src/shared/demo-refusals.ts`, which `accounts/access.ts` and the stand-in both read. A write that is not in
+  the list is refused with the same words, so a route added to the server is refused here until someone allows it.
 - A change tells every open page, through `postMessage`, and the page's loader turns it into
   `renplay:saves-changed`, which the embed bridge already hears. The website's messages (`ready`, `engaged`,
   `saved`, `nudge`, `refresh`) are the same as the server demo's.
@@ -95,7 +145,7 @@ frame are both controlled by it, so the game's save requests reach it too, and t
 1. Builds the library and the worker. Drops the PDF reader's files, which the demo's games do not use.
 2. `capture.mjs` signs in as the guest on a running demo server (`--base`) and reads its answers, the page of each game
    and the runtime. It reads only. Each catalog entry keeps only its grid picture, the one the Catalog page shows.
-   The pictures the answers name are the only art copied (`api/art/`).
+   The pictures the answers and the game pages name, in any format, are the only art copied (`api/art/`).
 3. `snapshot.mjs` writes the files, and takes each game's build files from `--seed`, the demo image's seed stage:
    `docker buildx build --build-arg IMAGE=<the image the demo was built from> --target games --output type=local,dest=<dir> demo`
    (see `Dockerfile`). Every seed run installs with a new build name, so the export must be the build the demo image holds: the
@@ -106,7 +156,9 @@ frame are both controlled by it, so the game's save requests reach it too, and t
    robots meta with noindex, and writes a `robots.txt` that lets crawlers in. They are let in on purpose: a page that
    robots.txt blocks is never fetched, so its noindex is never read, and the address can still be listed. The server
    demo's image (`Dockerfile`) does the same.
-5. Checks the output against Cloudflare's static asset limits (20,000 files, 25 MiB a file) and fails if it does not fit.
+5. `art.mjs` reads the finished output and fails when its snapshot or a game's page names an `/api/art` file the output
+   lacks. The stand-in leaves pictures to the host, so such a file would be a 404 for the visitor.
+6. Checks the output against Cloudflare's static asset limits (20,000 files, 25 MiB a file) and fails if it does not fit.
 
 `--embedder` is the one origin the embed bridge talks to and ignores messages from anything else. It is set at build
 time, `https://renplay.org` by default.
@@ -128,21 +180,29 @@ node server/scripts/app-ui/static-demo-server.mjs /tmp/static-demo 5191    # htt
   is taken (the server refuses the guest) and `Me` says `demoStatic`.
 - `demo-static-routes.test.ts` lists every route the server registers and what the static demo does about it
   (`demo-static-routes.ts`). A new server route fails it until it is classified, and a route that is answered needs a case
-  in the contract test.
+  in the contract test. A route in `limited` is one the server demo lets its guest do and the static demo refuses on
+  purpose.
+- `demo-static-limits.test.ts` sends a hand-made request for each kind of thing a visitor may not do to the stand-in and
+  checks the refusal and its words, that the demo server does accept the ones in `limited`, that every route of the
+  server that is not answered is refused, and that what playing needs still works.
 - `demo-static-headers.test.ts` checks the headers.
+- `demo-static-art.test.ts` writes a snapshot from a demo server and checks that every picture its answers and pages name is
+  in the output, that the catalog's other formats are dropped, and that the build's check fails on a missing one.
 - `server/scripts/app-ui/specs/static-demo.spec.mjs` serves the output on `localhost` and, in a test embedder page with
   the laptop and phone frames, checks that a save made in one frame appears in the other, survives a reload and is not
   in a second browser; that every request goes to the static server or the engines host and none fail; and that only
   the embedder can frame the demo. It runs in Chromium and in WebKit at desktop size, and at 390 px, where the game
-  cannot be driven by taps, the save is made with the runtime's own save request. In `mise run test:ui` the
+  cannot be driven by taps, the save is made with the runtime's own save request. It also checks that the hidden controls
+  are absent (Not now, favourite, status, rating, a save's Download, Delete, Pin, History and Import, the Account's adult
+  games, the install button) and that a hand-made request for each kind is refused and changes nothing. In `mise run test:ui` the
   demo is built from a demo server with a small stand-in for the engine. `demo.yml` runs it on the real output with
   `STATIC_DEMO_DIR`, where the real game is played and saved with Q.Save.
 
 ### Publishing
 
 `static/wrangler.jsonc` is a Worker with static assets for `demo.renplay.org`, with the single page app fallback
-(an address that is not a file is the library's page). `demo.yml` builds the output after the server demo is
-published, tries it in browsers, and deploys it only when the repository variable `STATIC_DEMO_DEPLOY` is `true`. It
+(an address that is not a file is the library's page). `demo.yml` builds the output from the demo image, tries it
+in browsers, and deploys it when the repository variable `STATIC_DEMO_DEPLOY` is `true`. It
 uses the same `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets as `sites.yml`.
 
 ## Embed the demo

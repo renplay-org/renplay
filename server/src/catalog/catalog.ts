@@ -115,6 +115,11 @@ export class Catalog {
     return [...this.adult.values(), ...[...this.recipes.values()].filter((r) => r.nsfw === true)].map((r) => r.saveDir ?? '').filter(Boolean)
   }
 
+  /** The save folders recipes that are not adult name, for ContentMode: a folder known to be safe is never hidden. */
+  safeSaveDirs(): string[] {
+    return [...this.recipes.values()].filter((r) => r.nsfw !== true).map((r) => r.saveDir ?? '').filter(Boolean)
+  }
+
   async init(): Promise<void> {
     const cached = this.db.getSetting<{ at: number; games: Recipe[]; vocabulary?: Vocabulary; adultGames?: string } | null>(CACHE_KEY, null)
     this.adult = new Map(Object.entries(this.db.getSetting<Record<string, Recipe>>(STUBS_KEY, {})))
@@ -376,6 +381,24 @@ export class Catalog {
   officialRecipe(id: string): Recipe | null {
     const recipe = this.recipes.get(id) ?? this.adult.get(id)
     return recipe && /^[a-z0-9-]{1,80}$/.test(recipe.id) && isRenplayHost(recipe._origin ?? '') ? recipe : null
+  }
+
+  /** The save folder a recipe names, adult recipes included: a library game's saves are not those of a removed game. */
+  saveDirOf(recipeId: string): string {
+    return (this.recipes.get(recipeId) ?? this.adult.get(recipeId))?.saveDir ?? ''
+  }
+
+  /** Every save folder a library game uses: its own, once the game has told it, and the one its recipe names. */
+  librarySaveDirs(): Set<string> {
+    const dirs = new Set<string>()
+    for (const g of this.db.allGames()) for (const dir of [g.save_dir, this.saveDirOf(g.recipe_id)]) if (dir) dirs.add(dir)
+    return dirs
+  }
+
+  /** The name the catalog gives the game that uses a save folder, when this person may see it. */
+  titleOfSaveDir(saveDir: string): string | null {
+    const recipe = [...this.recipes.values()].find((r) => r.saveDir === saveDir)
+    return recipe && !this.content.hidesRecipe(recipe.nsfw) ? recipe.title : null
   }
 
   recipe(id: string): Recipe | null {

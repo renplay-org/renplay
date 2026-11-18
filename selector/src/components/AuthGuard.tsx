@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { ApiError, post } from '../lib/api'
 import { DemoEmbed, demoEmbedMode } from '../lib/demo-embed'
-import { useAuth, useProviders } from '../lib/auth'
+import { useAuth, useProviders, useStaticDemo } from '../lib/auth'
 import { setAdminLighterBackground } from '../lib/backdrop'
 import { useDefaults } from '../lib/queries'
 import { Spinner } from '../lantern/ui'
@@ -32,6 +32,11 @@ export function AuthGuard({ admin = false }: { admin?: boolean }) {
   if (!me.data) return <p className="p-6 text-(color:--fg-2)">Could not reach Renplay. Reload to try again.</p>
   if (admin && me.data.user.role !== 'admin') return <Navigate to="/" replace />
   return <WithDefaults />
+}
+
+/** Pages the static demo leaves out, since a visitor cannot use them: its visitors are taken to the library. */
+export function NotInStaticDemo() {
+  return useStaticDemo() ? <Navigate to="/" replace /> : <Outlet />
 }
 
 /** The signed-in pages, with the admin's defaults applied to this browser. */

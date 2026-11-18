@@ -3,6 +3,7 @@ import { Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Game } from '@shared/api'
 import { post } from '../lib/api'
+import { useStaticDemo } from '../lib/auth'
 import { recipeLinks } from '../lib/links'
 
 /**
@@ -11,9 +12,10 @@ import { recipeLinks } from '../lib/links'
  */
 export default function UpdateCard({ game }: { game: Game }) {
   const qc = useQueryClient()
+  const staticDemo = useStaticDemo()
   const broken = game.recipe?.status === 'broken'
   const update = game.update
-  if (!broken && (!update || game.updateDismissed)) return null
+  if (staticDemo || (!broken && (!update || game.updateDismissed))) return null
   const notNow = async () => {
     await post(`/api/games/${game.id}/update-not-now`)
     void qc.invalidateQueries({ queryKey: ['game', game.id] })

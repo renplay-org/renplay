@@ -57,8 +57,19 @@ must be added again, but their saves are safe in `/data`.
 ### Daily save backups
 
 Once a day Renplay writes a zip of everyone's saves to `/data/backups/saves` and a complete copy of
-`library.db` in its `library/` subfolder. The database copy is safe while Renplay runs. The newest
+`library.db` in its `library/` subfolder. The zip holds the saves as they are now, never their History,
+and never the saves an admin deleted for a removed game, which wait in `/data/deleted-saves` for 30 days. The database copy is safe while Renplay runs. The newest
 14 save zips and 14 daily database copies are kept. Pre-migration copies are not pruned.
+
+Old daily copies are deleted before the new zip is written, so the folder holds one fewer than the
+number kept while the new zip is made and never needs room for one more. If the disk has less free
+space than the last zip and a small margin, Renplay skips that backup, writes nothing and logs a
+warning that says what to do: free space, lower `RENPLAY_BACKUP_KEEP`, or point `RENPLAY_BACKUP_DIR`
+at another disk. After a failed backup it tries again the next day, not every hour. A zip that a
+stopped server left unfinished (a `.part` file) is removed when Renplay starts.
+
+**Settings** shows a warning under Storage, and the log gets a warning once a day, when the disk with
+the data folder has less than 10 percent or 1 GB free.
 
 Set `RENPLAY_BACKUP_DIR` to a folder on another disk or a share to keep these copies apart from
 `/data`, and `RENPLAY_BACKUP_KEEP` for how many daily copies of each kind to keep. Set

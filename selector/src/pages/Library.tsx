@@ -9,6 +9,7 @@ import Carousel from '../lantern/Carousel'
 import SearchField, { Marked, Toolbar, countText, holdPlace, parkResults, useSearchScroll } from '../lantern/Search'
 import { useRoom } from '../lantern/Room'
 import { useHidden } from '../lantern/art'
+import { useStaticDemo } from '../lib/auth'
 import EmptyLibrary from '../components/EmptyLibrary'
 import LibrarySkeleton, { rememberShape } from '../components/LibrarySkeleton'
 import CatalogTags from '../components/CatalogTags'
@@ -109,6 +110,7 @@ function stageMeta(g: Game) {
 /** Resume, the game page, and Not now, which takes the game out of Up next until it is played again. */
 function StageActions({ g }: { g: Game }) {
   const hidden = useHidden(g)
+  const staticDemo = useStaticDemo()
   const qc = useQueryClient()
   const toast = useToast()
   const notNow = async () => {
@@ -135,9 +137,11 @@ function StageActions({ g }: { g: Game }) {
       <Pill variant="s" size="lg" to={`/game/${g.id}`} onClick={(e) => travelToPage(g, hidden, e.currentTarget.closest('.stage')?.querySelector('.cover .frame'))}>
         Game page
       </Pill>
-      <Pill variant="q" size="lg" className="not-now" onClick={() => void notNow()}>
-        Not now
-      </Pill>
+      {!staticDemo && (
+        <Pill variant="q" size="lg" className="not-now" onClick={() => void notNow()}>
+          Not now
+        </Pill>
+      )}
     </>
   )
 }

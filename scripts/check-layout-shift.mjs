@@ -7,7 +7,8 @@
  * scrolls through it to the end, and fails when the shift is above 0.02. Chromium reports it through a
  * PerformanceObserver. WebKit has no Layout Instability API, so there the page measures it the same way itself: every
  * animation frame it compares where each visible element sits in the layout (transforms and scrolling do not count)
- * and adds up the share of the screen that moved times how far, which is the API's own formula.
+ * and adds up the share of the screen that moved times how far, which is the API's own formula (a move within half a second
+ * of an input is left out, as the API leaves it out).
  * Pictures from other hosts are answered with a small grey one, and the catalog's index comes from the catalog (or
  * CATALOG_INDEX_FILE), so the run does not depend on the network's speed. LAYOUT_DEBUG=1 lists what moved.
  * To hunt a page that fails now and then: LAYOUT_ONLY="home" runs the pages whose name starts with it, LAYOUT_RUNS=10
@@ -28,7 +29,7 @@ const dirs = {
 const only = process.env.LAYOUT_ONLY ?? ''
 const runsOf = Math.max(1, Number(process.env.LAYOUT_RUNS) || 1)
 for (const [name, dir] of Object.entries(dirs)) {
-  if (only && !({ website: 'home catalog game', adult: 'adult', docs: 'docs' }[name] ?? '').split(' ').some((n) => only.includes(n))) continue
+  if (only && !({ website: 'home catalog game 404', adult: 'adult', docs: 'docs' }[name] ?? '').split(' ').some((n) => only.includes(n))) continue
   if (!existsSync(dir)) {
     console.error(`Build the ${name} first: sh website/build.sh, and npm run build in docs/site`)
     process.exit(1)
@@ -48,7 +49,11 @@ function serve(root) {
       if (!url.pathname.endsWith('/')) { res.writeHead(301, { location: `${url.pathname}/${url.search}` }).end(); return }
       file = join(file, 'index.html')
     }
-    if (!existsSync(file)) { res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found'); return }
+    if (!existsSync(file)) {
+      // A missing page is the site's own 404 page, with its status, as the host answers.
+      if (existsSync(join(root, '404.html'))) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }); createReadStream(join(root, '404.html')).pipe(res); return }
+      res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found'); return
+    }
     res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream' })
     createReadStream(file).pipe(res)
   })
@@ -78,6 +83,9 @@ function measureInPage() {
     return
   }
   window.__api = 'frame comparison'
+  // As the API does not count a shift that follows an input (hadRecentInput: half a second after a key, a click or a touch), neither does this.
+  let input = -1e9
+  for (const type of ['keydown', 'pointerdown', 'mousedown', 'touchstart']) addEventListener(type, () => { input = performance.now() }, true)
   window.__movers = []
   window.__debug = false
   // Where an element sits in the layout, without transforms and scrolling.
@@ -110,7 +118,7 @@ function measureInPage() {
         if (window.__debug) window.__movers.push(`${el.tagName.toLowerCase()}.${el.className} ${was.join(',')} -> ${x},${y},${w},${h}`)
       }
     }
-    if (moved) {
+    if (moved && performance.now() - input > 500) {
       window.__shift += Math.min(1, moved / (vw * vh)) * (Math.min(far, Math.max(vw, vh)) / Math.max(vw, vh))
       window.__last = performance.now()
     }
@@ -167,8 +175,19 @@ const { server: ds, base: docs } = existsSync(dirs.docs) ? await serve(dirs.docs
 const firstGame = readFileSync(join(dirs.website, 'sitemap.xml'), 'utf8').match(/<loc>https:\/\/renplay\.org\/(catalog\/[a-z0-9-]+\/)<\/loc>/g).map((l) => l.match(/renplay\.org(\/[^<]*)/)[1]).find((p) => p !== '/catalog/')
 const pages = [
   ['home', (p) => p.goto(`${web}/`)],
+  // The scene played to its menu: lines typed, the choice made, the screen woken. The dialogue box keeps its size through all of it.
+  ['home scene played', async (p) => {
+    await p.goto(`${web}/`)
+    await stillFor(p)
+    await p.focus('#scene')
+    for (let i = 0; i < 6; i++) { await p.keyboard.press('Space'); await p.waitForTimeout(150) }
+    await p.keyboard.press('1')
+    await p.waitForTimeout(600)
+    for (let i = 0; i < 3; i++) { await p.keyboard.press('Space'); await p.waitForTimeout(150) }
+  }],
   ['catalog', (p) => p.goto(`${web}/catalog/`)],
   [`game page ${firstGame}`, (p) => p.goto(`${web}${firstGame}`)],
+  ['404', (p) => p.goto(`${web}/not-a-page/`)],
   ['adult catalog after Yes', async (p) => { await p.goto(`${adult}/`); await stillFor(p); await p.click('#yes') }],
   ['docs home', (p) => p.goto(`${docs}/`)],
   ['docs guide', (p) => p.goto(`${docs}/start-here/quick-start/`)],

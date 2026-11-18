@@ -1,15 +1,18 @@
-import { mkdir, readFile, readdir, stat, unlink, utimes } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, stat, unlink, utimes } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { Writable } from 'node:stream'
 import yazl from 'yazl'
 import { sha1, walkFiles, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
+import { folderKey } from './folders.js'
 import { SAVES_ZIP, SAVE_FILE_BYTES, isRenpySave } from './savefile.js'
 import { isZip, readZipEntries } from '../util/zip.js'
 
 const TOKENS_DIR = 'tokens'
 /** Top-level ~/.renpy folders shared by every game: save-signing keys and MultiPersistent data. */
 export const SHARED_DIRS = [TOKENS_DIR, 'persistent'] as const
+/** Whether a folder name is one of the shared folders, whatever its capitals. */
+export const isSharedDir = (name: string): boolean => SHARED_DIRS.some((d) => folderKey(d) === folderKey(name))
 
 /** What a write did to the slot. */
 export type WriteOutcome = 'added' | 'replaced' | 'kept' | 'same'
@@ -69,9 +72,14 @@ export class SaveStore {
 
   resumeWrites(): void { this.acceptingWrites = true }
 
-  /** Serializes operations on one file. */
-  private async locked<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  /**
+   * Serializes the operations on one save folder of this person: a write, a deletion and the move
+   * of the folder out of the live tree (see `withFolder`). Names that differ only in capitals are
+   * one folder on some storage.
+   */
+  private async locked<T>(saveDir: string, fn: () => Promise<T>): Promise<T> {
     if (!this.acceptingWrites) throw new HttpError(409, 'This account is being archived')
+    const key = `${this.root}/${folderKey(saveDir)}`
     const prev = SaveStore.locks.get(key) ?? Promise.resolve()
     const next = prev.catch(() => {}).then(fn)
     SaveStore.locks.set(key, next)
@@ -129,7 +137,7 @@ export class SaveStore {
     if (isJunk(rel)) throw new HttpError(400, 'Refusing temporary file')
     if (data.length > SAVE_FILE_BYTES) throw new HttpError(413, 'Save file too large')
     const full = safeJoin(this.dir(saveDir), rel)
-    return this.locked(full, async () => {
+    return this.locked(saveDir, async () => {
       let old: Buffer | null = null
       let oldMtime = 0
       try {
@@ -173,7 +181,7 @@ export class SaveStore {
   async remove(saveDir: string, name: string, reason: SaveReason = 'delete', base?: number): Promise<boolean | 'changed'> {
     const rel = cleanRelPath(name)
     const full = safeJoin(this.dir(saveDir), rel)
-    return this.locked(full, async () => {
+    return this.locked(saveDir, async () => {
       let old: Buffer
       try {
         old = await readFile(full)
@@ -187,13 +195,21 @@ export class SaveStore {
     })
   }
 
-  private historyDir(saveDir: string, rel: string): string {
-    return safeJoin(safeJoin(this.historyRoot, saveDir), rel.replace(/\//g, '__'))
+  /** Runs `fn` while no save of this folder is written or deleted: the trash moves the folder in it. */
+  withFolder<T>(saveDir: string, fn: () => Promise<T>): Promise<T> {
+    return this.locked(this.validated(saveDir), fn)
   }
 
   private async snapshot(saveDir: string, rel: string, data: Buffer, reason: SaveReason): Promise<void> {
     if (!isSaveDirName(saveDir)) return
-    const dir = this.historyDir(saveDir, rel)
+    // Each path is joined where it is used, and safeJoin refuses a name that leaves the one before it.
+    const folder = safeJoin(this.historyRoot, saveDir)
+    const dir = safeJoin(folder, rel.replace(/\//g, '__'))
+    // A link in History would take the version, and the pruning below, into another game's folder.
+    for (const path of [folder, dir]) {
+      const st = await lstat(path).catch(() => null)
+      if (st && !st.isDirectory()) throw new Error('The History of this save is a link, so Renplay will not write to it')
+    }
     await mkdir(dir, { recursive: true })
     const id = `${Date.now()}__${reason.replace(/[^a-z-]/g, '')}__${sha1(data).slice(0, 10)}`
     await writeFileAtomic(join(dir, id), data)
@@ -309,7 +325,7 @@ export class SaveStore {
    */
   async mergeSecurityKeys(text: string): Promise<number> {
     const path = join(this.root, TOKENS_DIR, 'security_keys.txt')
-    return this.locked(path, async () => {
+    return this.locked(TOKENS_DIR, async () => {
       let current = ''
       try {
         current = await readFile(path, 'utf-8')

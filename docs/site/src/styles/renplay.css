@@ -1,191 +1,242 @@
-/* Lamplight's tokens (design/tokens.css) are loaded before this file: Starlight's variables take their values from
-   them, so the docs, the website and Renplay are one family. A few colours have no token yet. */
+/* Lamplight (design/): the tokens, the three faces and the corners are loaded before this file, and Starlight's variables take
+   their values from them, so the docs, the website and Renplay are one family. The look is the website's: titles in Fraunces,
+   text in Inter, labels and code in JetBrains Mono, hairlines for rows and no filled cards. The light theme is paper (--paper,
+   --on-paper), mixed from the same tokens. */
 :root {
   --sl-font: var(--sans);
+  --sl-font-mono: var(--mono);
   --sl-content-width: 46rem;
   --sl-sidebar-width: 17rem;
-  --sl-text-h1: clamp(2rem, 4vw, 2.8rem);
-  --sl-color-accent-low: #fde3ec;
-  --sl-color-accent: #c2255f;
-  --sl-color-accent-high: #8d1545;
-  --sl-color-text-accent: #a8164f;
-  --rp-gradient: linear-gradient(100deg, var(--pink-2), var(--violet-2));
-  --rp-card: rgb(125 105 145 / .045);
+  --sl-text-h1: clamp(2.2rem, 4.4vw, 3.4rem);
+  --sl-color-accent-low: color-mix(in srgb, var(--pink) 14%, var(--ink));
+  --sl-color-accent: var(--pink);
+  --sl-color-accent-high: var(--pink-2);
+  --sl-color-text-accent: var(--pink-2);
+  --sl-color-text-invert: var(--ink);
+  --rp-lift: color-mix(in srgb, #fff 8%, transparent);
 }
 :root[data-theme='dark'] {
   --sl-color-black: var(--ink);
   --sl-color-gray-6: var(--ink-2);
-  --sl-color-gray-5: #1c1c27; /* --ink-3 is #1c1c26: the docs take it in the pull request that restyles them */
-  --sl-color-gray-4: #2e2e3a;
-  --sl-color-gray-3: var(--fg-4);
-  --sl-color-gray-2: var(--fg-3);
+  --sl-color-gray-5: var(--ink-3);
+  --sl-color-gray-4: var(--fg-4);
+  --sl-color-gray-3: var(--fg-3);
+  --sl-color-gray-2: var(--fg-2);
   --sl-color-gray-1: var(--fg-2);
   --sl-color-white: var(--fg);
   --sl-color-bg: var(--ink);
-  --sl-color-bg-nav: var(--glass);
+  --sl-color-bg-nav: var(--ink);
   --sl-color-bg-sidebar: var(--ink);
-  --sl-color-bg-inline-code: #1c1c27;
-  --sl-color-hairline: #24242f;
-  --sl-color-hairline-light: #1c1c27;
-  --sl-color-hairline-shade: #121219;
-  --sl-color-accent-low: #331a2b;
-  --sl-color-accent: var(--pink);
-  --sl-color-accent-high: var(--pink-2);
-  --sl-color-text-accent: var(--pink-2);
-  --rp-card: rgb(255 255 255 / .025);
+  --sl-color-bg-inline-code: var(--rp-lift);
+  --sl-color-hairline: var(--line);
+  --sl-color-hairline-light: var(--line);
+  --sl-color-hairline-shade: var(--line);
 }
+/* Paper. Text is --on-paper in steps, lines are --on-paper at a low alpha, links and the lamp are the pink and the amber of the
+   dark theme, taken down so they read on a light page. */
 :root[data-theme='light'] {
   color-scheme: light; /* design/tokens.css sets dark, and Starlight's own rule sits in a layer below it */
-  --sl-color-bg: #fcfbfe;
-  --sl-color-bg-nav: rgb(252 251 254 / .94);
-  --sl-color-bg-sidebar: #f7f5fa;
-  --sl-color-gray-6: #f3f0f7;
-  --rp-gradient: linear-gradient(100deg, #ba235b, #6943ce);
+  --rp-bg: color-mix(in srgb, var(--paper-2) 55%, #fff);
+  --sl-color-black: var(--rp-bg);
+  --sl-color-bg: var(--rp-bg);
+  --sl-color-bg-nav: var(--rp-bg);
+  --sl-color-bg-sidebar: color-mix(in srgb, var(--paper) 40%, #fff);
+  --sl-color-white: var(--on-paper);
+  --sl-color-gray-1: color-mix(in srgb, var(--on-paper) 88%, var(--rp-bg));
+  --sl-color-gray-2: color-mix(in srgb, var(--on-paper) 76%, var(--rp-bg));
+  --sl-color-gray-3: color-mix(in srgb, var(--on-paper) 68%, var(--rp-bg));
+  --sl-color-gray-4: color-mix(in srgb, var(--on-paper) 58%, var(--rp-bg));
+  --sl-color-gray-5: color-mix(in srgb, var(--on-paper) 14%, var(--rp-bg));
+  --sl-color-gray-6: color-mix(in srgb, var(--paper) 55%, #fff);
+  --sl-color-bg-inline-code: color-mix(in srgb, var(--on-paper) 7%, transparent);
+  --sl-color-hairline: color-mix(in srgb, var(--on-paper) 14%, transparent);
+  --sl-color-hairline-light: color-mix(in srgb, var(--on-paper) 10%, transparent);
+  --sl-color-hairline-shade: color-mix(in srgb, var(--on-paper) 10%, transparent);
+  --sl-color-accent-low: color-mix(in srgb, var(--pink) 12%, var(--rp-bg));
+  --sl-color-accent: color-mix(in srgb, var(--pink) 70%, var(--on-paper));
+  --sl-color-accent-high: color-mix(in srgb, var(--pink) 50%, var(--on-paper));
+  --sl-color-text-accent: color-mix(in srgb, var(--pink) 60%, var(--on-paper));
+  --sl-color-text-invert: var(--rp-bg);
+  --rp-lift: color-mix(in srgb, var(--on-paper) 6%, transparent);
+  --ring: 0 0 0 2px var(--rp-bg), 0 0 0 4px var(--on-paper);
 }
 body { -webkit-font-smoothing: antialiased; }
-:focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 4px; }
-.header { backdrop-filter: blur(24px) saturate(140%); }
-.docs-header { display: flex; align-items: center; gap: 2rem; height: 100%; }
-.docs-brand { display: flex; align-items: center; gap: .65rem; text-decoration: none; color: var(--sl-color-white); font-size: 1.1rem; white-space: nowrap; }
-.docs-brand img { border-radius: 10px; box-shadow: 0 8px 26px -8px rgb(244 80 138 / .5); }
-/* The drawn wordmark, in the shade the theme asks for. 22 px is the height at which its capitals match a 17 px Inter's. */
-.docs-brand .wordmark { width: auto; height: 22px; border-radius: 0; box-shadow: none; }
-:root[data-theme='dark'] .wordmark-light, :root[data-theme='light'] .wordmark-dark { display: none; }
-.docs-label { border-left: 1px solid var(--sl-color-hairline); padding-left: .7rem; margin-left: .15rem; color: var(--sl-color-gray-2); font-size: .95rem; font-weight: 450; letter-spacing: 0; }
-.docs-search { flex: 1; max-width: 26rem; }
-.docs-links { display: flex; align-items: center; gap: 1.5rem; margin-left: auto; font-size: .85rem; }
-.docs-links a { text-decoration: none; color: var(--sl-color-gray-2); }
-.docs-links a:hover { color: var(--sl-color-white); }
-.docs-theme { font-size: .8rem; }
-.docs-home-menu { display: none; }
-site-search button[data-open-modal] { border-radius: 999px; background: var(--rp-card); border-color: var(--sl-color-hairline); }
+::selection { background: var(--pink); color: #fff; }
+/* Focus is the ring, the same for every control. The transparent outline stays for forced colours. */
+:focus-visible { outline: 2px solid transparent; box-shadow: var(--ring); border-radius: var(--r-1); }
+code, pre, kbd, samp { font-family: var(--mono); }
+/* Labels: small, sentence case, mono. */
+.sidebar-content summary .large, #starlight__on-this-page, #starlight__on-this-page--mobile, .eyebrow, .sl-markdown-content th, .starlight-aside__title, .pagination-links a span, .family-footer .guides span { font: 400 12px/1.3 var(--mono); }
 
-/* A marker, not a filled button: the navigation stays quiet while reading. */
-.sidebar-content { font-size: .84rem; }
-.sidebar-content a { border-radius: 0 6px 6px 0; padding-block: .4rem; }
+/* The header: the mark and the plain wordmark, then quiet links with the website's line under the word. */
+.header { border-bottom: 1px solid var(--sl-color-hairline); }
+.docs-header { display: flex; align-items: center; gap: 1.2rem; height: 100%; }
+.docs-brand { display: flex; align-items: center; gap: .6rem; min-height: 44px; text-decoration: none; color: var(--sl-color-white); white-space: nowrap; }
+.docs-brand img { border-radius: var(--r-2); }
+/* The drawn wordmark, in the shade the theme asks for. */
+.docs-brand .wordmark, .family-footer .wordmark { width: auto; border-radius: 0; }
+.docs-brand .wordmark { height: 23.6px; }
+:root[data-theme='dark'] .wordmark-light, :root[data-theme='light'] .wordmark-dark { display: none; }
+.docs-label { color: var(--sl-color-gray-3); font-size: 1.05rem; }
+.docs-search { flex: 1; max-width: 26rem; }
+.docs-links { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.docs-links a, .docs-home-menu-panel a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; color: var(--sl-color-gray-2); font-size: .94rem; text-decoration: none; background: linear-gradient(currentColor, currentColor) 12px calc(50% + 12px) / 0 1px no-repeat; transition: color var(--t-focus), background-size var(--t-pane) var(--out); }
+.docs-links a:hover, .docs-home-menu-panel a:hover { color: var(--sl-color-white); background-size: calc(100% - 24px) 1px; }
+.docs-theme { font-size: .85rem; }
+.docs-home-menu { display: none; }
+site-search button[data-open-modal] { min-height: 40px; min-width: 40px; border: 1px solid var(--hair); border-radius: var(--r-1); background: transparent; box-shadow: none; }
+site-search button[data-open-modal]:hover { border-color: var(--hair-lit); }
+site-search dialog { border-radius: var(--r-3); }
+.sl-menu-button { min-width: 40px; min-height: 40px; border: 1px solid var(--hair); border-radius: var(--r-1); background: transparent; color: var(--sl-color-white); box-shadow: none; }
+:root[data-theme='light'] .sl-menu-button, :root[data-theme='light'] site-search button[data-open-modal] { border-color: var(--sl-color-hairline); }
+starlight-theme-select select { border-radius: var(--r-1); }
+
+/* The sidebar: words, and the page you are on is lit white with the lamp's bar. Its groups are mono labels. */
+.sidebar-content { font-size: .875rem; }
+.sidebar-content a { border-radius: 0; padding-block: .4rem; color: var(--sl-color-gray-2); }
+.sidebar-content a:hover { color: var(--sl-color-white); }
 .sidebar-content a[aria-current='page'], .sidebar-content a[aria-current='page']:hover {
-  background: linear-gradient(90deg, var(--sl-color-accent-low), transparent);
-  color: var(--sl-color-text-accent); font-weight: 550;
-  box-shadow: inset 2px 0 var(--sl-color-text-accent);
+  background: none; color: var(--sl-color-white); font-weight: 400;
+  box-shadow: inset 2px 0 var(--lamp);
 }
-.sidebar-content .top-level > li + li { margin-top: .35rem; }
-.sidebar-content summary { padding-block: .45rem; }
-.right-sidebar { border-left-color: var(--sl-color-hairline-light); }
-starlight-toc a { font-size: .8rem; }
+:root[data-theme='light'] .sidebar-content a[aria-current='page'] { font-weight: 600; box-shadow: inset 2px 0 var(--sl-color-text-accent); }
+.sidebar-content .large { font-size: inherit; font-weight: 400; color: inherit; }
+.sidebar-content summary .large { color: var(--sl-color-gray-3); }
+.sidebar-content .top-level > li + li { margin-top: .5rem; }
+.sidebar-content summary { padding-block: .4rem; }
+.right-sidebar { border-left-color: var(--sl-color-hairline); }
+#starlight__on-this-page, #starlight__on-this-page--mobile { color: var(--sl-color-gray-3); }
+starlight-toc a, mobile-starlight-toc a { font-size: .8125rem; color: var(--sl-color-gray-3); }
+starlight-toc a:hover, starlight-toc a[aria-current='true'], mobile-starlight-toc a:hover, mobile-starlight-toc a[aria-current='true'] { color: var(--sl-color-white); }
+mobile-starlight-toc .toggle { border-radius: var(--r-1); border-color: var(--hair); background: transparent; }
+mobile-starlight-toc nav { border-bottom: 1px solid var(--sl-color-hairline); }
 .content-panel + .content-panel { border-top: 0; }
+
+/* A page's head: a mono label with the lamp's dot, the title in the book face, then the line under it. */
 .page-heading { padding-top: 1.2rem; }
-.eyebrow { margin: 0 0 .9rem; color: var(--sl-color-text-accent); font-size: .78rem; font-weight: 600; letter-spacing: .025em; }
-.page-heading h1 { margin: 0; font-size: var(--sl-text-h1); color: var(--sl-color-white); line-height: 1.12; letter-spacing: -.045em; font-weight: 750; }
-.page-description { margin: 1rem 0 0; color: var(--sl-color-gray-2); font-size: 1.05rem; line-height: 1.65; max-width: 42rem; }
+.eyebrow { display: flex; align-items: center; gap: .6rem; margin: 0 0 .9rem; color: var(--sl-color-gray-3); letter-spacing: .02em; }
+.eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: var(--r-round); background: var(--lamp); box-shadow: 0 0 7px 0 color-mix(in srgb, var(--lamp) 50%, transparent); flex: none; }
+:root[data-theme='light'] .eyebrow::before { background: var(--sl-color-text-accent); box-shadow: none; }
+.docs-intro { --sl-text-h1: clamp(2.5rem, 5.2vw, 3.9rem); }
+.page-heading h1, .docs-intro h1 { margin: 0; color: var(--sl-color-white); font: 850 var(--sl-text-h1)/1.05 var(--serif); font-variation-settings: 'opsz' var(--opsz-title); letter-spacing: -.02em; }
+.page-description { margin: 1rem 0 0; color: var(--sl-color-gray-2); font-size: 1.125rem; line-height: 1.65; max-width: 42rem; }
+
+/* The page's text */
 .sl-markdown-content { line-height: 1.8; }
-.sl-markdown-content :is(h2,h3,h4) { letter-spacing: -.025em; }
-.sl-markdown-content h2 { font-size: 1.65rem; margin-top: 2.8rem; }
-.sl-markdown-content h3 { font-size: 1.2rem; }
-.sl-markdown-content a:not(:where(.not-content *)) { text-underline-offset: .2em; }
-.sl-markdown-content :not(pre) > code { border: 1px solid var(--sl-color-hairline-light); border-radius: 5px; font-size: .82em; overflow-wrap: anywhere; }
-.sl-markdown-content img { border-radius: 14px; border: 1px solid var(--sl-color-hairline); }
+.sl-markdown-content :is(h2, h3, h4) { color: var(--sl-color-white); font-family: var(--serif); font-weight: 700; letter-spacing: -.01em; }
+.sl-markdown-content h2 { font-size: 1.65rem; margin-top: 2.8rem; line-height: 1.2; }
+.sl-markdown-content h3 { font-size: 1.25rem; line-height: 1.25; }
+.sl-markdown-content h4 { font-size: 1.05rem; }
+.sl-markdown-content a:not(:where(.not-content *)) { text-underline-offset: 3px; }
+.sl-markdown-content :not(pre) > code { border: 0; border-radius: var(--r-1); font-size: .85em; padding: .1em .4em; overflow-wrap: anywhere; }
+.sl-markdown-content blockquote { border-inline-start: 2px solid var(--hair); }
+.sl-markdown-content img { border-radius: var(--r-2); border: 1px solid var(--sl-color-hairline); }
 .sl-markdown-content .phone-shots { display: flex; gap: 1rem; flex-wrap: wrap; }
 .sl-markdown-content .phone-shots img { max-width: 14rem; }
-.sl-markdown-content table { display: block; overflow-x: auto; border: 1px solid var(--sl-color-hairline); border-radius: 12px; font-size: .9rem; }
-.sl-markdown-content :is(th,td) { padding: .85rem 1rem; border-color: var(--sl-color-hairline); }
-.sl-markdown-content th { background: var(--rp-card); font-weight: 600; }
-.sl-markdown-content tr:last-child td { border-bottom: 0; }
+.sl-anchor-link { color: var(--sl-color-gray-3); }
+
+/* A table is hairline rows, its head a mono label. */
+.sl-markdown-content table { display: block; overflow-x: auto; border-top: 1px solid var(--sl-color-hairline); font-size: .9rem; }
+.sl-markdown-content :is(th, td) { padding: .85rem 1rem; border-color: var(--sl-color-hairline); }
+.sl-markdown-content :is(th, td):first-child { padding-inline-start: 0; }
+.sl-markdown-content th { background: none; color: var(--sl-color-gray-3); }
 .sl-markdown-content td:first-child code { overflow-wrap: normal; white-space: nowrap; }
+
+/* A code block is the website's: the room's second ink, a hairline, a small corner. */
 .expressive-code { margin-block: 1.5rem; }
-.sl-markdown-content .config-entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-template-rows: auto 1fr; column-gap: 1.5rem; margin-top: .7rem; padding: 1.1rem 1.3rem; border: 1px solid var(--sl-color-hairline); border-radius: 14px; background: var(--rp-card); scroll-margin-top: 7rem; }
+.expressive-code .frame pre, .expressive-code .frame .header { border-radius: var(--r-2); }
+
+/* An aside is the website's callout: no fill, a bar in the lamp's colour, its title a mono label in the status colour. */
+.sl-markdown-content .starlight-aside { padding: .25rem 0 .25rem 1.1rem; border-inline-start: 2px solid var(--lamp); background: none; color: var(--sl-color-gray-1); }
+:root[data-theme='light'] .sl-markdown-content .starlight-aside { border-inline-start-color: var(--sl-color-text-accent); }
+.starlight-aside__title { }
+.starlight-aside--note, .starlight-aside--tip { --sl-color-asides-text-accent: var(--sl-color-gray-1); }
+.starlight-aside--caution { --sl-color-asides-text-accent: var(--amber); }
+.starlight-aside--danger { --sl-color-asides-text-accent: var(--red); }
+:root[data-theme='light'] .starlight-aside--caution { --sl-color-asides-text-accent: color-mix(in srgb, var(--amber) 45%, var(--on-paper)); }
+:root[data-theme='light'] .starlight-aside--danger { --sl-color-asides-text-accent: color-mix(in srgb, var(--red) 55%, var(--on-paper)); }
+.starlight-aside__content a { color: var(--sl-color-text-accent); }
+
+/* One configuration entry is a hairline row, not a card. */
+.sl-markdown-content .config-entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-template-rows: auto 1fr; column-gap: 1.5rem; margin-top: 0; padding: 1.1rem 0; border-top: 1px solid var(--sl-color-hairline); scroll-margin-top: 7rem; }
 .config-entry > p:first-child { margin: 0; font-size: .95rem; }
 .config-entry > p:first-child code { border: 0; background: none; padding: 0; color: var(--sl-color-text-accent); }
-.sl-markdown-content .config-default { grid-column: 1; grid-row: 2; align-self: start; margin-top: .25rem; color: var(--sl-color-gray-2); font-size: .8rem; }
+.sl-markdown-content .config-default { grid-column: 1; grid-row: 2; align-self: start; margin-top: .25rem; color: var(--sl-color-gray-3); font-size: .8rem; }
 .config-default p { margin: 0; overflow-wrap: anywhere; }
 .sl-markdown-content .config-default code { font-size: .95em; }
 .sl-markdown-content .config-entry > p:last-child { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: .9rem; line-height: 1.7; }
-.pagination-links a { border-radius: 14px; background: var(--rp-card); box-shadow: none; }
 
-/* A compact reference index, distinct from the website's marketing hero. */
-.docs-intro { padding: 2.5rem 0 1.5rem; }
-.docs-intro h1 { font-size: var(--sl-text-h1); letter-spacing: -.04em; line-height: 1.2; margin: 0; }
-.docs-intro p { color: var(--sl-color-gray-2); margin: .8rem 0 1.5rem; }
-.home-search { max-width: 32rem; }
-.home-search site-search button[data-open-modal] { width: 100%; padding: .85rem 1rem; }
-.sl-markdown-content .docs-index { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.5rem; }
-.sl-markdown-content .docs-index a { display: grid; align-content: start; gap: .25rem; margin: 0; padding: 1rem 0; border-top: 1px solid var(--sl-color-hairline); text-decoration: none; }
-.docs-index strong { color: var(--sl-color-white); font-size: .95rem; }
-.docs-index span { color: var(--sl-color-gray-2); font-size: .85rem; line-height: 1.6; }
-.family-footer { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--sl-color-hairline); font-size: .8rem; color: var(--sl-color-gray-2); }
-.family-footer nav { display: flex; flex-wrap: wrap; gap: .75rem 1.2rem; }
-.family-footer a { color: inherit; text-decoration: none; padding-block: .5rem; }
-@media (max-width: 50rem) { .sl-markdown-content .docs-index { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 30rem) { .sl-markdown-content .docs-index { grid-template-columns: 1fr; } }
-/* Keep the landing page text first, with the same palette as the reading pages. */
+.pagination-links a { border: 1px solid var(--sl-color-hairline); border-radius: var(--r-2); background: none; box-shadow: none; transition: border-color var(--t-focus); }
+.pagination-links a:hover { border-color: var(--hair-lit); background: none; }
+.pagination-links a span { color: var(--sl-color-gray-3); }
+.pagination-links .link-title { color: var(--sl-color-white); font: 700 1.2rem/1.3 var(--serif); }
+a[href*='/edit/dev/'] { display: inline-flex; align-items: center; min-height: 40px; min-width: 40px; color: var(--sl-color-gray-3); }
+
+/* The docs home: the title, the line, the search, then the room as a band, and the index as hairline rows. */
 :root:not([data-has-sidebar]) .content-panel { padding-top: 0; }
 :root:not([data-has-sidebar]) .sl-container { max-width: 66rem; }
-.docs-hero { padding: 4.5rem 0 3.5rem; max-width: 50rem; }
-.docs-hero h1 { font-size: clamp(2.7rem, 5.3vw, 4.5rem); font-weight: 800; letter-spacing: -.055em; line-height: 1.06; margin: 0; color: var(--sl-color-white); }
-.gradient-text { background: var(--rp-gradient); background-clip: text; -webkit-background-clip: text; color: transparent; }
-.hero-description { max-width: 38rem; font-size: 1.1rem; color: var(--sl-color-gray-2); line-height: 1.75; margin: 1.5rem 0; }
-.hero-actions { display: flex; gap: 1.6rem; align-items: center; font-size: .95rem; }
-.hero-actions a { text-decoration: none; color: var(--sl-color-white); }
-.hero-actions .primary-link { display: inline-flex; gap: 1.3rem; align-items: center; background: linear-gradient(180deg, #f6609a, #e0306f); color: #fff; border: 1px solid rgb(255 255 255 / .2); border-radius: 12px; padding: .75rem 1.15rem; font-weight: 600; box-shadow: 0 12px 30px -15px #e0306f; }
-.sl-markdown-content .home-heading h2 { margin: 0; font-size: 1.5rem; }
-.sl-markdown-content .home-heading p, .sl-markdown-content .platforms > p { margin-top: .4rem; font-size: .95rem; color: var(--sl-color-gray-2); }
-.sl-markdown-content .path-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1.5rem; }
-.sl-markdown-content .path-card { display: block; margin: 0; padding: 1.4rem; color: var(--sl-color-white); text-decoration: none; border: 1px solid var(--sl-color-hairline); border-radius: 18px; background: linear-gradient(150deg, var(--rp-card), transparent); transition: border-color .2s, background .2s; }
-.sl-markdown-content .path-card:hover { border-color: var(--sl-color-text-accent); background: var(--rp-card); }
-.path-icon { display: inline-grid; place-items: center; width: 2.3rem; height: 2.3rem; border: 1px solid var(--sl-color-hairline); background: var(--sl-color-accent-low); border-radius: 10px; color: var(--sl-color-text-accent); font-size: .75rem; font-weight: 600; }
-.sl-markdown-content .path-card h3 { font-size: 1rem; margin: 1.2rem 0 .5rem; letter-spacing: -.025em; }
-.path-card h3 span { color: var(--sl-color-text-accent); }
-.sl-markdown-content .path-card p { font-size: .85rem; line-height: 1.7; margin: 0; color: var(--sl-color-gray-2); }
+:root:not([data-has-sidebar]) .docs-search { visibility: hidden; }
+.docs-intro { padding: 3.5rem 0 1.5rem; }
+.docs-intro p { margin: 1rem 0 1.5rem; color: var(--sl-color-gray-2); font-size: 1.125rem; line-height: 1.65; max-width: 42rem; }
+.docs-intro a { color: var(--sl-color-text-accent); text-underline-offset: 3px; }
+.home-search { max-width: 32rem; }
+.home-search site-search button[data-open-modal] { width: 100%; padding: .85rem 1rem; }
+.home-search site-search button[data-open-modal] > span { display: block !important; }
+/* The band is a crop of the website's room (a cut across the table and the lamp), veiled to night, with the lamp's light following the pointer. */
+.docs-band { --x: 30%; --y: 50%; position: relative; isolation: isolate; height: clamp(140px, 24vw, 240px); margin: 1rem 0 2rem; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--ink-2); }
+.docs-band picture, .docs-band img { display: block; width: 100%; height: 100%; }
+.docs-band img { object-fit: cover; object-position: 45% 50%; border: 0; border-radius: 0; filter: brightness(.7) saturate(.9); }
+.docs-band::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, var(--ink-2), transparent 35%, transparent 65%, var(--ink)); opacity: .55; pointer-events: none; z-index: 1; }
+.docs-band::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle 240px at var(--x) var(--y), color-mix(in srgb, var(--lamp) 38%, transparent), color-mix(in srgb, var(--pink) 14%, transparent) 50%, transparent 75%); mix-blend-mode: screen; pointer-events: none; z-index: 2; }
+:root[data-theme='light'] .docs-band { border-color: var(--sl-color-hairline); }
+.sl-markdown-content .docs-index { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.5rem; }
+.sl-markdown-content .docs-index a { display: grid; align-content: start; gap: .25rem; margin: 0; padding: 1rem 0; border-top: 1px solid var(--sl-color-hairline); text-decoration: none; }
+.docs-index strong { color: var(--sl-color-white); font: 700 1.05rem/1.3 var(--serif); }
+.docs-index span { color: var(--sl-color-gray-3); font-size: .875rem; line-height: 1.6; }
+.docs-index a:hover strong { text-decoration: underline; text-underline-offset: 3px; }
 .sl-markdown-content .platforms { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--sl-color-hairline); }
-.sl-markdown-content .platforms h2 { margin: 0; font-size: 1.3rem; }
-.sl-markdown-content .platform-links { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
-.sl-markdown-content .platform-links a { padding: .5rem .9rem; margin: 0; border: 1px solid var(--sl-color-hairline); border-radius: 999px; color: var(--sl-color-gray-1); font-size: .85rem; text-decoration: none; background: var(--rp-card); }
-.sl-markdown-content .platform-links a:hover { border-color: var(--sl-color-text-accent); }
-.sl-markdown-content .home-resources { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem; border-top: 1px solid var(--sl-color-hairline); margin-top: 2.5rem; padding-top: 1.5rem; }
-.sl-markdown-content .home-resources a { display: grid; gap: .3rem; margin: 0; text-decoration: none; font-size: .9rem; }
-.home-resources strong { color: var(--sl-color-white); font-weight: 550; }
-.home-resources a > span { color: var(--sl-color-gray-2); font-size: .8rem; }
+.sl-markdown-content .platforms h2 { margin: 0; font-size: 1.4rem; }
+.sl-markdown-content .platform-links { display: flex; flex-wrap: wrap; gap: 0 1.4rem; margin-top: .6rem; }
+.sl-markdown-content .platform-links a { display: inline-flex; align-items: center; min-height: 40px; margin: 0; color: var(--sl-color-gray-1); font-size: .94rem; text-decoration: none; background: linear-gradient(currentColor, currentColor) 0 calc(50% + 12px) / 0 1px no-repeat; transition: background-size var(--t-pane) var(--out); }
+.sl-markdown-content .platform-links a:hover { color: var(--sl-color-white); background-size: 100% 1px; }
+
+/* The footer: the website's, quiet. The brand and the links, the install guides, and the credits. */
+.family-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--sl-color-hairline); }
+.family-footer .row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
+.family-footer .row a { display: inline-flex; align-items: center; min-height: 44px; color: var(--sl-color-gray-2); font-size: .875rem; text-decoration: none; }
+.family-footer .row a:hover { color: var(--sl-color-white); }
+.family-footer .brand { gap: 10px; margin-right: 12px; }
+.family-footer .brand img { border-radius: var(--r-2); }
+.family-footer .brand .wordmark { height: 20.9px; }
+.family-footer .guides { margin-top: 4px; }
+.family-footer .guides span { color: var(--sl-color-gray-3); }
+.family-footer small { display: block; max-width: 72ch; margin-top: .6rem; color: var(--sl-color-gray-3); font-size: .8125rem; line-height: 1.6; }
+
 @media (max-width: 70rem) {
-  .docs-links { gap: 1rem; }
-  .docs-header { gap: 1.2rem; }
-  .sl-markdown-content .path-grid { grid-template-columns: repeat(2,1fr); }
+  .docs-links { gap: 0; }
+  .docs-header { gap: 1rem; }
 }
 @media (max-width: 50rem) {
+  .sl-markdown-content .docs-index { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .docs-links, .docs-theme { display: none; }
   .docs-search { flex: 0; margin-left: auto; }
   .docs-home-menu { display: block; }
-  .docs-home-menu summary { cursor: pointer; padding: .6rem .5rem; font-size: .85rem; }
-  .docs-home-menu-panel { position: absolute; top: calc(var(--sl-nav-height) - 1px); right: 1rem; width: 14rem; padding: 1rem; border: 1px solid var(--sl-color-hairline); border-radius: 12px; background: var(--sl-color-bg-sidebar); box-shadow: 0 16px 40px rgb(0 0 0 / .15); }
+  .docs-home-menu summary { display: inline-flex; align-items: center; min-height: 40px; padding: 0 .9rem; border: 1px solid var(--hair); border-radius: var(--r-1); cursor: pointer; font-size: .9rem; }
+  .docs-home-menu-panel { position: absolute; top: calc(var(--sl-nav-height) - 1px); right: 1rem; width: 14rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--glass-sheet); }
+  :root[data-theme='light'] .docs-home-menu-panel { background: var(--sl-color-bg-sidebar); border-color: var(--sl-color-hairline); }
   .docs-home-menu-panel nav { display: grid; margin-bottom: .75rem; }
-  .docs-home-menu-panel a { padding: .6rem; color: var(--sl-color-white); text-decoration: none; font-size: .9rem; }
+  .docs-home-menu-panel a { padding: 0 .6rem; }
   .docs-header { gap: .8rem; }
-  .docs-brand { font-size: 1rem; gap: .5rem; }
-  .docs-brand img { width: 30px; height: 30px; }
-  .docs-label { font-size: .85rem; padding-left: .5rem; }
+  .docs-brand { gap: .5rem; }
+  .docs-brand .wordmark { height: 20.9px; }
   .page-heading { padding-top: .7rem; }
-  .page-description { font-size: 1rem; }
+  .page-description, .docs-intro p { font-size: 1rem; }
+  .docs-intro { padding-top: 2rem; }
   .sl-markdown-content .config-entry { display: block; }
   .sl-markdown-content .config-entry > p:last-child { margin-top: .65rem; }
-  .docs-hero { padding: 2.8rem 0; }
-  .docs-hero h1 { font-size: clamp(2.45rem, 7.5vw, 3.4rem); }
-  .hero-description { font-size: 1rem; }
+  .sidebar-content a[href], starlight-toc a[href], mobile-starlight-toc a[href] { min-height: 40px; display: flex; align-items: center; }
 }
 @media (max-width: 30rem) {
-  .sl-markdown-content .path-grid, .sl-markdown-content .home-resources { grid-template-columns: 1fr; }
-  .sl-markdown-content .path-card { padding: 1.2rem; }
-  .sl-markdown-content .path-card h3 { margin-top: .8rem; }
-  .sl-markdown-content .config-entry { padding: 1rem; }
-}
-@media (prefers-reduced-motion: reduce) { .sl-markdown-content .path-card { transition: none; } }
-:root:not([data-has-sidebar]) .docs-search { visibility: hidden; }
-
-/* Touch targets of at least 40 px, and a search pill that says what it is on a phone. */
-.docs-links a, .family-footer a, .docs-home-menu-panel a { display: inline-flex; align-items: center; min-height: 40px; }
-.docs-brand { min-height: 40px; }
-.family-footer a { padding-block: 0; }
-site-search button[data-open-modal], a[href*="/edit/dev/"] { min-height: 40px; min-width: 40px; }
-a[href*="/edit/dev/"] { display: inline-flex; align-items: center; }
-.home-search site-search button[data-open-modal] > span { display: block !important; }
-.sl-menu-button { min-width: 40px; min-height: 40px; }
-@media (max-width: 50rem) {
-  .sidebar-content a[href], starlight-toc a[href], mobile-starlight-toc a[href] { min-height: 40px; display: flex; align-items: center; }
+  .sl-markdown-content .docs-index { grid-template-columns: 1fr; }
+  .sl-markdown-content .config-entry { padding-block: 1rem; }
 }

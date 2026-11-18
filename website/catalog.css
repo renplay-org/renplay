@@ -1,118 +1,170 @@
-.page-head { padding: 64px 0 24px; }
-.page-head h1 { font-size: clamp(38px, 6vw, 64px); margin: 10px 0 0; max-width: none; }
-.page-head .lead { margin-top: 14px; }
-.bar { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: center; margin: 18px 0 0; }
-.search { flex: 1 1 280px; position: relative; }
-.search input { width: 100%; height: 46px; border-radius: 14px; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); font: inherit; font-size: 16px; padding: 0 16px 0 44px; outline: none; transition: border-color .2s, background .2s; }
-.search input:focus { border-color: rgb(255 158 192 / .5); background: rgb(255 255 255 / .07); }
-.search svg { position: absolute; left: 15px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--faint); }
-.chip-btn:focus-visible, .game:focus-visible .art { outline: 2px solid rgb(255 158 192 / .7); outline-offset: 2px; }
-.adult-note { margin: 14px 0 0; color: var(--dim); font-size: 15px; }
-.adult-note a, .hash-note a { color: var(--fg); }
-.hash-note { margin: 18px 0 0; padding: 12px 16px; border-radius: 14px; background: rgb(255 255 255 / .05); border: 1px solid var(--line); color: var(--dim); font-size: 15px; }
-/* One row of chips, so the list below never moves when they arrive. A phone scrolls the row sideways. */
-.chip-row { display: flex; gap: 8px; margin-top: 12px; min-height: 40px; overflow-x: auto; scrollbar-width: none; }
-.chip-row::-webkit-scrollbar { display: none; }
-.chip-row.open { flex-wrap: wrap; overflow: visible; }
-.chip-btn { flex: none; font: inherit; font-size: 14px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: rgb(255 255 255 / .04); color: var(--dim); cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
-.chip-btn:hover { color: var(--fg); }
-.chip-btn[aria-pressed="true"] { background: rgb(255 158 192 / .16); border-color: rgb(255 158 192 / .5); color: #fff; }
-.link-btn { font: inherit; font-size: 14px; color: var(--dim); background: none; border: 0; padding: 8px 12px; min-height: 40px; text-decoration: underline; cursor: pointer; }
-.count { color: var(--faint); font-size: 14px; }
-.count-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 22px 0 14px; min-height: 40px; }
-.count-row .link-btn { margin-left: auto; }
+/* The pages other than the home page: the catalog, a game, the adult catalog and the 404 (site.css has the rest). */
+body.page { background: var(--ink); }
+.veil { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(to bottom, color-mix(in srgb, var(--ink) 50%, transparent), color-mix(in srgb, var(--ink) 78%, transparent) 36vh, color-mix(in srgb, var(--ink) 88%, transparent)); }
+.page-main { position: relative; z-index: 2; min-height: 100svh; padding-top: calc(var(--nav-h) + clamp(18px, 4vw, 56px)); }
+.page-main .wrap { position: relative; }
 
-.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 26px 20px; }
-.game { display: block; text-decoration: none; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-.game .art { border-radius: 18px; border: 1px solid var(--line); transition: transform .3s, border-color .3s, box-shadow .3s; }
-.game:hover .art, .game:focus-visible .art { transform: translateY(-4px); border-color: rgb(255 158 192 / .35); box-shadow: 0 24px 60px -24px rgb(0 0 0 / .9); }
-.game:focus-visible { outline: none; }
-.game h3 { margin: 12px 2px 0; font-size: 17px; letter-spacing: -.01em; line-height: 1.25; height: 2.5em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.game .meta { margin: 3px 2px 0; color: var(--dim); font-size: 14px; line-height: 22px; height: 22px; display: flex; gap: 8px; align-items: center; overflow: hidden; }
-.game.skel { cursor: default; }
-.game.skel .art { border-color: transparent; }
+/* page head: a label, the title in Fraunces, a lead */
+.page-head { padding: clamp(8px, 2vw, 24px) 0 clamp(18px, 3vw, 30px); }
+.page-head h1, .page-head .h-like { font-family: var(--serif); font-variation-settings: "opsz" var(--opsz-title); font-weight: 850; letter-spacing: -0.02em; line-height: 1.02; font-size: clamp(40px, 6.4vw, 88px); margin-top: 12px; color: #fff; max-width: 14em; }
+.page-head .lead { margin-top: 16px; }
+.lead a { color: var(--fg); }
+
+/* search and chips */
+.bar { margin: 6px 0 14px; }
+.search { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 4px; border-bottom: 1px solid var(--hair); max-width: 640px; transition: border-color var(--t-pane); }
+.search:focus-within { border-color: var(--lamp); }
+.search svg { width: 20px; height: 20px; color: var(--fg-3); flex: none; }
+.search input { flex: 1; min-width: 0; height: 100%; background: none; border: 0; outline: 0; color: var(--fg); font: 400 16px var(--sans); }
+.search input::placeholder { color: var(--fg-4); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 0 8px; margin-top: 6px; }
+.chip-row:empty { display: none; }
+.chip-btn { min-height: 44px; padding: 0 14px 0 0; margin-right: 6px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--fg-3); font: 500 14px var(--sans); cursor: pointer; transition: color var(--t-pane), border-color var(--t-pane); }
+.chip-btn:hover { color: #fff; }
+.chip-btn[aria-pressed=true] { color: #fff; border-bottom-color: var(--lamp); }
+.note, .adult-note, .hash-note { margin-top: 14px; color: var(--fg-3); font-size: 15px; }
+.note a, .adult-note a, .hash-note a { color: var(--fg); }
+.hash-note[hidden] { display: none; }
+.count-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 22px 0 6px; min-height: 44px; }
+.count { color: var(--fg-3); font: 400 13px var(--mono); }
+.link-btn { min-height: 44px; padding: 0 6px; background: none; border: 0; color: var(--pink-2); font: 600 14px var(--sans); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.link-btn[hidden] { display: none; }
+
+/* the gallery screen at full size */
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--cw, 196px), 1fr)); gap: 40px clamp(14px, 2.2vw, 30px); padding: 30px 0 26px; position: relative; }
+.games::before { content: ""; position: absolute; inset: -60px -4vw -20px; pointer-events: none; background: radial-gradient(60% 40% at 50% 10%, color-mix(in srgb, var(--glow, var(--t2)) 22%, transparent), transparent 70%); transition: background 0.8s; }
+.games .card { position: relative; min-width: 0; }
+.games .card.skel .cover { background: var(--ink-2); box-shadow: none; border-color: var(--line); }
+.games .card.skel h3, .games .card.skel small { color: transparent; }
+.card .meta { display: block; color: var(--fg-4); font-size: 13px; margin-top: 2px; }
+.empty { grid-column: 1 / -1; padding: 40px 0; color: var(--fg-2); font-size: 18px; }
+.empty a { color: var(--pink-2); }
 .end { height: 1px; }
-
-.art { position: relative; aspect-ratio: 2 / 3; background: #15151c; overflow: hidden; }
-.art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-/* A cover of another shape, whole on its own colour, as the app shows it. */
-.art img.whole { object-fit: contain; }
-.art.blurred .tile-title { background: linear-gradient(180deg, transparent 40%, rgb(10 10 15 / .55)); }
-.art .tile-title { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 8% 9%; font-weight: 800; font-size: clamp(20px, 2.1vw, 26px); line-height: 1.12; letter-spacing: -.02em; text-wrap: balance; text-shadow: 0 2px 14px rgb(0 0 0 / .45); }
-.art .tag18 { position: absolute; top: 10px; right: 10px; padding: 2px 8px; border-radius: 8px; background: rgb(0 0 0 / .5); border: 1px solid rgb(255 255 255 / .16); font-size: 12px; font-weight: 700; backdrop-filter: blur(6px); }
-.paid { color: #fcd34d; font-weight: 600; }
-.empty { grid-column: 1 / -1; padding: 60px 20px; text-align: center; color: var(--dim); border: 1px dashed var(--line); border-radius: 20px; }
-
-/* Detail sheet and request dialog */
-dialog { border: 1px solid var(--line); border-radius: 26px; background: #0e0e14; color: var(--fg); padding: 0; width: min(880px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); box-shadow: 0 50px 140px -30px rgb(0 0 0 / .95); }
-dialog::backdrop { background: rgb(4 4 8 / .72); backdrop-filter: blur(6px); }
-dialog[open] { animation: pop .3s cubic-bezier(.2,.7,.2,1); }
-@keyframes pop { from { opacity: 0; transform: translateY(14px) scale(.98); } }
-.sheet { display: grid; grid-template-columns: 300px 1fr; gap: 28px; padding: 28px; }
-.sheet .art { border-radius: 16px; border: 1px solid var(--line); }
-.close:focus { outline: none; }
-.close:focus-visible { outline: 2px solid rgb(255 158 192 / .7); outline-offset: 2px; }
-.close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: rgb(255 255 255 / .06); color: var(--fg); font-size: 20px; cursor: pointer; display: grid; place-items: center; z-index: 2; }
-.sheet h1, .sheet h2 { font-size: 30px; margin: 0; padding-right: 40px; }
-.sheet .by { color: var(--dim); margin-top: 4px; }
-.summary { color: var(--dim); font-size: 15px; margin: 14px 0 0; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.chips span { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / .06); border: 1px solid var(--line); color: var(--dim); }
-.actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-.sheet .sub-h { margin: 26px 0 10px; font-size: 13px; color: var(--faint); font-weight: 650; letter-spacing: .02em; }
-.releases { display: grid; gap: 8px; }
-.rel { padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / .035); border: 1px solid var(--line); }
-.rel .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.rel b { font-size: 15px; }
-.rel .when { color: var(--faint); font-size: 13px; }
-.st { font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
-.st.broken { color: #fca5a5; border-color: rgb(252 165 165 / .3); background: rgb(252 165 165 / .08); }
-.rel .file { margin-top: 6px; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); overflow-wrap: anywhere; }
-.rel .notes { margin-top: 6px; font-size: 14px; color: var(--dim); }
-.how { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: h; color: var(--dim); font-size: 15px; }
-.how li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; }
-.how li::before { counter-increment: h; content: counter(h); width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: linear-gradient(180deg, #f6609a, #d62a68); }
-.how b { color: var(--fg); font-weight: 600; }
-.recipe-link { display: inline-flex; align-items: center; min-height: 40px; margin-top: 10px; color: var(--faint); font-size: 14px; }
-
-.req { padding: 30px; max-width: 560px; }
-.req h2 { font-size: 28px; margin: 0; padding-right: 40px; }
-.req p { color: var(--dim); font-size: 15px; }
-.field { display: grid; gap: 6px; margin-top: 14px; }
-.field span { font-size: 14px; color: var(--dim); }
-.field input { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: rgb(255 255 255 / .05); color: var(--fg); font: inherit; font-size: 16px; padding: 0 14px; outline: none; }
-.field input:focus { border-color: rgb(255 158 192 / .5); }
-.req .note { margin-top: 18px; padding: 12px 14px; border-radius: 14px; background: rgb(255 255 255 / .04); border: 1px solid var(--line); font-size: 14px; color: var(--dim); }
-.req .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-.request { margin-top: 64px; }
-
-/* A game's own page */
-.game-page { padding-top: 40px; }
-.crumb { display: inline-flex; align-items: center; min-height: 40px; color: var(--faint); font-size: 14px; text-decoration: none; margin-bottom: 10px; }
-.crumb:hover { color: var(--fg); }
-.game-page .sheet { padding: 0; }
-.all-games { margin-top: 56px; }
-.all-games summary { font-size: 15px; padding: 14px 0; color: var(--dim); }
-.all-games ul { columns: 3 220px; column-gap: 28px; list-style: none; margin: 0 0 20px; padding: 0; color: var(--dim); font-size: 15px; }
+.all-games { margin: 48px 0 0; color: var(--fg-3); }
+.all-games summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 15px; }
+.all-games ul { columns: 3 220px; column-gap: 28px; list-style: none; padding: 0; margin: 8px 0 20px; font-size: 15px; }
 .all-games li { padding: 4px 0; break-inside: avoid; }
+.all-games a { color: var(--fg-2); }
+/* The first screen of a catalog that was visited before is put back where it was: the page waits for it instead of shifting */
+.restoring .games { visibility: hidden; }
 
-/* The age question of the adult catalog: the whole first screen. */
-.gate { min-height: calc(100dvh - 68px); display: grid; place-items: center; text-align: center; padding: 40px 0; }
-.gate h1 { font-size: clamp(34px, 6vw, 56px); margin: 0; max-width: none; }
-.gate p { color: var(--dim); max-width: 520px; margin: 18px auto 0; }
-.gate .row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
-.gate .btn { height: auto; min-height: 50px; padding-top: 12px; padding-bottom: 12px; white-space: normal; }
-html[data-ok] .gate, html:not([data-ok]) .after-gate, html:not([data-ok]) footer { display: none; }
-/* Back from a game: nothing shows until the list and its place are restored. */
-html.restoring body { visibility: hidden; }
-@media (max-width: 760px) {
-  .sheet { grid-template-columns: 1fr; padding: 20px; gap: 18px; }
-  .sheet .art { max-width: 320px; }
-  dialog { border-radius: 22px; }
-  .req { padding: 22px; }
-  .games { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
-  .game h3 { font-size: 15px; }
-  .game .meta { font-size: 13px; }
-  .game-page { padding-top: 24px; }
-  .art .tile-title { font-size: 17px; }
+/* the card of an adult-catalog game: the cover stays blurred until it is asked for */
+.card .blurred { background: var(--ink-2); }
+.card .blurred img { width: 100%; height: 100%; object-fit: cover; filter: blur(14px); transform: scale(1.2); }
+.card .blurred .tile-title { position: absolute; inset: 0; background: none; }
+.card button.card-btn { width: 100%; text-align: left; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+
+/* the request band, the same on the catalog and on a game's page */
+.request { margin: clamp(56px, 8vw, 96px) 0 clamp(48px, 7vw, 80px); }
+.band { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: center; padding: clamp(24px, 4vw, 40px) 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--line); }
+.band h2 { font-size: clamp(28px, 3.6vw, 44px); margin: 10px 0 12px; }
+.band p { color: var(--fg-2); max-width: 60ch; }
+.band p a { color: var(--fg); }
+.band .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.req { padding: 28px; }
+.req h2 { font-size: 30px; margin: 0 0 12px; padding-right: 44px; }
+.req p { color: var(--fg-2); }
+.field { display: grid; gap: 6px; margin-top: 16px; }
+.field span { font: 400 12px var(--mono); color: var(--fg-3); }
+.field input { min-height: 46px; padding: 0 14px; border-radius: var(--r-1); border: 1px solid var(--hair); background: color-mix(in srgb, #fff 5%, transparent); color: var(--fg); font: 400 16px var(--sans); }
+.field input:focus { outline: none; border-color: var(--lamp); }
+.req .note { font-size: 14px; }
+.req .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+
+/* a game's page: the top band is lit by the game's own tint and avg */
+.game-band { --avg: var(--t3); position: relative; overflow: hidden; isolation: isolate; margin-top: calc(-1 * (var(--nav-h) + clamp(18px, 4vw, 56px))); padding-top: calc(var(--nav-h) + clamp(18px, 4vw, 48px)); padding-bottom: clamp(28px, 5vw, 64px);
+  background: linear-gradient(color-mix(in srgb, var(--ink) 42%, transparent), color-mix(in srgb, var(--ink) 42%, transparent)), radial-gradient(90% 120% at 18% 0%, color-mix(in srgb, var(--tint) 70%, transparent), transparent 62%), radial-gradient(70% 90% at 90% 20%, color-mix(in srgb, var(--avg) 70%, transparent), transparent 70%), linear-gradient(to bottom, color-mix(in srgb, var(--avg) 42%, transparent), transparent); }
+.game-band::before { content: ""; position: absolute; inset: -10%; z-index: -1; background: var(--cover) center / cover; filter: blur(46px) saturate(1.2); opacity: 0.38; transform: scale(1.1); -webkit-mask-image: linear-gradient(#000 55%, transparent 88%); mask-image: linear-gradient(#000 55%, transparent 88%); }
+.game-band::after { content: ""; position: absolute; inset: 0; z-index: -1; background: url(/design/grain.webp); background-size: 256px; opacity: 0.4; mix-blend-mode: soft-light; pointer-events: none; -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
+.crumbs { display: flex; flex-wrap: wrap; gap: 0 10px; margin-bottom: clamp(10px, 2vw, 22px); list-style: none; padding: 0; color: var(--fg-3); font-size: 14px; }
+.crumbs li { display: inline-flex; align-items: center; }
+.crumbs li + li::before { content: "/"; margin-right: 10px; color: var(--fg-4); }
+.crumb { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg-2); font-size: 14px; text-decoration: none; }
+.crumb:hover { color: #fff; }
+.crumbs [aria-current] { color: var(--fg-4); }
+.game-top { display: grid; grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); gap: clamp(24px, 5vw, 64px); align-items: end; }
+.game-cover { position: relative; aspect-ratio: 2 / 3; border-radius: var(--r-2); overflow: hidden; background: var(--tint); border: 1px solid color-mix(in srgb, var(--tint) 60%, #fff 10%); box-shadow: 0 40px 90px -30px var(--tint), 0 0 0 1px color-mix(in srgb, #000 40%, transparent), 0 0 90px -10px color-mix(in srgb, var(--tint) 70%, transparent); }
+.game-cover.whole { background: radial-gradient(120% 90% at 50% 40%, var(--tint), var(--ink)); }
+.game-cover img { width: 100%; height: 100%; object-fit: cover; }
+.game-cover.whole img { object-fit: contain; }
+.game-top h1 { font-size: clamp(40px, 6vw, 84px); color: #fff; margin: 10px 0 0; }
+.by { margin-top: 14px; color: var(--fg-2); font-size: 17px; }
+.summary { margin-top: 14px; font: 400 clamp(19px, 1.8vw, 24px) / 1.45 var(--serif); font-variation-settings: 'opsz' 24; color: var(--fg); max-width: 36em; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px 0; margin-top: 18px; font: 400 13px var(--mono); color: var(--fg-3); }
+.chips span + span::before { content: "/"; margin: 0 12px; color: var(--fg-4); }
+.actions-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.game-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); gap: clamp(28px, 5vw, 72px); padding-top: clamp(36px, 6vw, 72px); }
+.game-body h2, .sub-h { font: 800 clamp(24px, 2.6vw, 32px) / 1.1 var(--serif); font-variation-settings: 'opsz' 72; color: #fff; margin: 0 0 16px; letter-spacing: -0.01em; }
+.game-body section + section { margin-top: clamp(28px, 4vw, 44px); }
+.facts { display: grid; gap: 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--line); }
+.facts div { display: grid; grid-template-columns: minmax(120px, 0.8fr) 1.4fr; gap: 14px; padding: 13px 2px; border-top: 1px solid var(--line); }
+.facts div:first-child { border-top: 0; }
+.facts dt { color: var(--fg-4); font: 400 13px / 1.5 var(--mono); }
+.facts dd { color: var(--fg); font-size: 15px; overflow-wrap: anywhere; }
+.how { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; counter-reset: h; color: var(--fg-2); }
+.how li { display: grid; grid-template-columns: 30px 1fr; gap: 14px; align-items: start; }
+.how li::before { counter-increment: h; content: counter(h); font: 700 26px / 1 var(--serif); font-variation-settings: 'opsz' 72; color: var(--lamp); }
+.how b { color: #fff; font-weight: 600; overflow-wrap: anywhere; }
+.how a { color: var(--fg); }
+.releases { display: grid; gap: 10px; }
+.rel { padding: 14px 0; border-top: 1px solid var(--line); }
+.rel .top { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.rel b { font-size: 16px; }
+.rel .when { color: var(--fg-4); font-size: 13px; }
+.st { font: 400 12px var(--mono); }
+.st.broken { color: var(--red); }
+.rel .file { margin-top: 6px; font: 13px var(--mono); color: var(--fg-3); overflow-wrap: anywhere; }
+.rel .notes { margin-top: 8px; font-size: 14px; color: var(--fg-3); line-height: 1.55; }
+.recipe-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; color: var(--fg-3); font-size: 14px; }
+.back-shelf { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+
+/* the age question: the whole first screen, in the room */
+.gate { min-height: calc(100svh - var(--nav-h) - 24px); display: grid; place-items: center; text-align: center; padding: 24px 0 48px; }
+.gate > div { max-width: 620px; }
+.gate h1 { font-size: clamp(40px, 7vw, 84px); color: #fff; margin-top: 12px; }
+.gate p { color: var(--fg-2); max-width: 520px; margin: 20px auto 0; font-size: clamp(16px, 1.4vw, 18px); }
+.gate .row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 32px; }
+.gate .btn { height: auto; min-height: 52px; padding-top: 12px; padding-bottom: 12px; white-space: normal; text-align: center; }
+html[data-ok] .gate, html:not([data-ok]) .after-gate, html:not([data-ok]) .page-foot { display: none; }
+/* Without JavaScript the age question cannot be answered, and the page says so */
+html:not(.js) .gate .btn.primary { display: none; }
+
+/* the 404: the room at night and a line of dialogue */
+.lost-main { display: grid; align-items: end; min-height: 100svh; padding-bottom: max(28px, env(safe-area-inset-bottom, 0px)); }
+.lost { width: min(760px, 100%); padding: 42px 32px 28px; border-radius: var(--r-3); background: var(--on-ink-hi); border: 1px solid var(--line); box-shadow: 0 20px 60px -16px color-mix(in srgb, #000 70%, transparent); backdrop-filter: blur(12px) saturate(1.1); -webkit-backdrop-filter: blur(12px) saturate(1.1); position: relative; }
+.lost h1 { font-size: clamp(36px, 5.4vw, 64px); color: #fff; }
+.lost h1 span { color: var(--lamp); }
+.lost p { margin-top: 14px; font: 400 clamp(19px, 1.6vw, 21px) / 1.55 var(--serif); font-variation-settings: 'opsz' var(--opsz-text); color: var(--fg); }
+.lost .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.lost-top { align-self: start; text-align: center; padding-top: clamp(8px, 6vh, 60px); }
+.lost-top .code { font: 900 clamp(96px, 22vw, 260px) / 0.9 var(--serif); font-variation-settings: 'opsz' var(--opsz-title); color: transparent; -webkit-text-stroke: 1.5px color-mix(in srgb, #fff 28%, transparent); }
+
+@media (max-width: 860px) {
+  .game-top { grid-template-columns: 1fr; align-items: start; }
+  .game-cover { width: min(62vw, 260px); }
+  .game-body { grid-template-columns: 1fr; }
+  .band { grid-template-columns: 1fr; }
+  .lost { padding: 40px 20px 22px; }
+  .lost .cta .btn { flex: 1 1 100%; }
+  .band .actions .btn { flex: 1 1 100%; }
+  .facts div { grid-template-columns: 1fr; gap: 2px; }
+  .games { --cw: 150px; gap: 30px 14px; }
+  /* the games come sooner: a shorter lead, and each row of chips is one line that moves under the finger, to the screen's edges (More opens it out) */
+  .page-head { padding-bottom: 12px; }
+  .page-head .lead { font-size: 15px; }
+  .chip-row:not(.open) { flex-wrap: nowrap; overflow-x: auto; margin-inline: -18px; padding-inline: 18px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .chip-row:not(.open)::-webkit-scrollbar { display: none; }
+  .chip-row:not(.open) .chip-btn { flex: none; white-space: nowrap; }
+  .count-row { margin-top: 14px; }
 }
+@media (max-height: 520px) and (orientation: landscape) {
+  .lost-top { display: none; }
+  .gate { min-height: 0; padding-top: 8px; }
+  .gate h1 { font-size: 40px; }
+}
+
+/* a game's sheet in the adult catalog */
+.sheet { display: grid; grid-template-columns: minmax(120px, 190px) minmax(0, 1fr); gap: 24px; }
+.sheet h2 { font-size: 30px; padding-right: 44px; }
+.sheet .sheet-cover { align-self: start; perspective: none; }
+@media (max-width: 560px) { .sheet { grid-template-columns: 1fr; } .sheet .sheet-cover { width: min(52vw, 200px); } }

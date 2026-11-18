@@ -36,7 +36,8 @@ These decide most review comments. Follow them without being asked.
   another engine. Unity and Godot web builds still install (the code stays) but are unsupported: never in the catalog,
   the docs, the website or the app's messaging. Status: `docs/site/src/content/docs/engines.md`.
 - **Saves are sacred.** Never delete or rewrite save data as a side effect. Every overwrite and
-  delete keeps history. Uninstall and reinstall leave saves alone.
+  delete keeps history. Uninstall and reinstall leave saves alone. The one deliberate exception is an
+  admin's Delete these saves for a game no longer in the library: they move to `deleted-saves/`, are kept 30 days and can be restored, then are removed.
 - **Works on phones.** Every screen must work at 390 px wide in portrait and in landscape, with
   touch only (no hover). The player respects safe-area insets and has no hover-only controls.
 - **Sentence case, no lowercase starts.** "Renplay" (never "renplay" in UI text or prose; the
@@ -91,7 +92,7 @@ server/            Node 24 + TypeScript (Express 5, node:sqlite, sharp, yauzl). 
   src/play/          Game pages, the runtimes and the files a game streams
   src/progress/      Each person's progress with each game and their play history
   src/saves/         Everyone's saves: the store with history (store.ts), each person's store, notes
-                     and pins (stores.ts), import, sync codes, backups. savefile.ts reads Ren'Py
+                     and pins (stores.ts), the 30-day trash of removed games' saves (trash.ts), import, sync codes, backups. savefile.ts reads Ren'Py
                      save metadata
   src/recipes/       Your recipes (local.ts), read from the recipes folder
   src/catalog/       Catalog index: recipe matching, linking games to recipes, updates
@@ -119,7 +120,8 @@ design/            Lamplight, the one source of the look: tokens.css, fonts.css 
 runtime/           Plain ES5-style scripts for the game pages: renplay-runtime.js (Ren'Py) and
                      renplay-html.js (HTML games), each with renplay-player.js, what they share, in
                      front. The server builds them (server/src/play/runtime.ts)
-image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it)
+image/             The image's own files: nginx.conf.template and entrypoint.sh (in /app/deploy inside it), and README.md,
+                     the overview Docker Hub shows (the release sets it, and it stays short and in the website's voice)
 charts/renplay/    The Helm chart
 deploy/            For people running Renplay: compose.yaml, caddy/, nginx/, kubernetes/. The docs show
                      these files (a code block marked file=deploy/<path>), CI checks them (tests/examples.sh)
@@ -128,13 +130,20 @@ demo/              The public demo: its image (demo.renplay.org), and static/, t
                      server/src/__tests__/demo-static-routes.ts
 docs/              Logo, screenshots, and site/: the docs (Starlight, docs.renplay.org). The Configuration
                      page is generated from server/src/envvars.ts (`npm run gen` in docs/site)
-website/           renplay.org and adult.renplay.org: plain HTML and CSS, built by `build.mjs` (`sh build.sh`) into
-                     dist/ and dist-adult/. The safe-for-work catalog index gives each game a page (pages/game.html)
-                     and /catalog its first screen. The adult catalog is pages/catalog.html built in adult mode (a
-                     build-time setting, never the hostname), behind an age question, noindex. js/catalog-view.js is
-                     what the browser and the build both draw with. NEVER_SHOW_ADULT_COVERS=1 keeps adult covers
-                     blurred. _redirects holds the stable addresses (/docs, /github, /demo, /adult...), www/ the
-                     www.renplay.org redirect
+website/           renplay.org and adult.renplay.org: plain HTML, CSS and a little script, built by `build.mjs` (`sh build.sh`) into
+                     dist/ and dist-adult/. The home page (index.html) is the painted room: the room's paintings and lit
+                     screens in img/, the light and the screens in js/home.js, demo.js, shelf.js, credits.js and shared.js, the scene, the demo in two
+                     frames (https://demo.renplay.org, the static demo, no key), the shelf, install, answers and credits.
+                     The safe-for-work catalog index gives each game a page (pages/game.html), the shelf and /catalog its
+                     first screen. The adult catalog is pages/catalog.html built in adult mode (a build-time setting, never
+                     the hostname), behind an age question, noindex. js/catalog-view.js is what the browser and the build
+                     both draw with. lib/ holds the templates and head tags (render.mjs) and the social cards (og.mjs, with
+                     its own letters in glyphs.mjs and fraunces-card.ttf), made at build time from each game's cover and
+                     name. site.css is shared, home.css is the home page, catalog.css the other pages. Colours, faces,
+                     corners and durations come from design/. NEVER_SHOW_ADULT_COVERS=1 keeps adult covers blurred.
+                     _redirects holds the stable addresses (/github, /demo, /adult...), www/ the www.renplay.org redirect.
+                     `mise run check:website` reads the built files against the findability checklist
+                     (scripts/check-website.mjs), and specs/website.spec.mjs drives it in a browser
 telemetry/         The collector for the daily usage report: a Cloudflare Worker with D1 (telemetry.renplay.org),
                      its tests (`mise run check:telemetry`), deploy.sh. Not part of the image
 tests/             The image's install contract, the chart's tests, the deploy/ examples
@@ -165,6 +174,9 @@ The code was untangled so that a change lands in one place. `scripts/check-struc
   `scripts/check-structure.mjs` at their size: they may only shrink.
 - **Tests test behaviour.** Tests are type-checked (`server/tsconfig.test.json`). Drive the code the
   way it is used (requests, messages, the built runtime), never by cutting its source text apart.
+- **A new test earns its place.** It names the behaviour it protects and fails when that behaviour breaks. Duplicate coverage
+  is removed rather than added, and the total test lines (`TEST_LINES` in `scripts/check-structure.mjs`) only go down: raising
+  the number takes a one-line reason beside it.
 - **Write things once.** A device check goes in `selector/src/lib/platform.ts`, a size for people is
   `bytes` in `shared/format.ts`, a control comes from `lantern/`. Look for the existing one first.
 
@@ -316,8 +328,12 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
   and a read-only root, an install, the upgrade from the newest release and back, the chart on
   kind, deploy/compose.yaml; skipped when nothing in the image or the chart changed), and
   `release-check` on release PRs. Nothing runs on pushes: `dev` only gets what a PR tested.
-  The browser checks run in parallel when their inputs changed. Shared script or workflow changes
-  run all three, and the `Browser suite` summary reports even when all three are skipped.
+  The `changes` job picks what a pull request runs from the files it changes, by the rules in
+  `scripts/ci-select.mjs` (its test holds the edge cases) and says why in the job summary. Texts and
+  the docs run no Playwright, the website runs its own spec, and the app, shared tooling, unknown,
+  deleted and renamed files, releases into `main` and manual runs run everything. The label `ci:full`
+  (then re-run the workflow) or the repository variable `RENPLAY_CI_FULL=true` forces everything. The
+  `Browser suite` summary reports even when every browser job is skipped.
   Superseded runs of the same pull request are cancelled. Upgrades are tested from the newest release.
 - **Workflows:** `release.yml` (push to `main`), `image.yml` (the multi-arch image, called by the
   release and by `edge.yml`), `edge.yml` (by hand: an `edge` image to try a branch on a server),
@@ -328,7 +344,8 @@ tests (vitest runs them without), `npx vitest run src/__tests__/x.test.ts` runs 
   `server/package.json` and `selector/package.json`, moves `Unreleased` into a dated
   `## [X.Y.Z] - YYYY-MM-DD` section, and is squash-merged into `main`. CI checks versions and the
   changelog. `release.yml` then builds the image (`X.Y.Z` and `latest`, GHCR and Docker Hub),
-  publishes and signs the chart, tags `vX.Y.Z` with the changelog section as the GitHub release,
+  sets the Docker Hub overview from `image/README.md` (a refusal does not fail the release), publishes and signs the chart,
+  tags `vX.Y.Z` with the changelog section as the GitHub release,
   deploys the docs and rebuilds the demo. Afterwards `dev` fast-forwards to the release branch. (`main` only gets squashed releases, so it never shares history with `dev`; the
   release branch records it with `git merge -s ours`.)
 - **Cadence:** release when a coherent set of changes is done and verified on a running instance,

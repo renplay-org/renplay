@@ -1,0 +1,301 @@
+/* The home page: the first screen with the scene, the catalog's shelf, the demo, how it works, what you get, install, the questions and the
+   credits (site.css has the rest). Nothing here may be wider than the screen: the page scrolls one way only. */
+/* 1. The first screen */
+.scene { position: relative; z-index: 2; min-height: 100svh; display: block; overflow-x: clip; }
+.scene-pad { position: relative; min-height: 100svh; padding: calc(var(--nav-h) + 22px) max(24px, calc((100vw - 1200px) / 2)) calc(26px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; cursor: default; outline: none; }
+/* The scene takes focus for Space and Enter and shows no ring: the number keys and Space are not a control to outline. Choices and buttons keep theirs. */
+.scene-pad:focus, .scene-pad:focus-visible { outline: none; }
+.scene-pad a, .scene-pad button { cursor: pointer; }
+.title { position: relative; z-index: 3; align-self: flex-start; margin-top: 4vh; margin-left: max(0px, calc(47vw - max(24px, (100vw - 1200px) / 2))); max-width: 560px; text-shadow: 0 2px 24px color-mix(in srgb, #000 65%, transparent); }
+/* a soft shade behind the words, kept inside the first screen (the scene clips sideways) */
+.title::before { content: ""; position: absolute; inset: -60px -80px -50px -60px; z-index: -1; background: radial-gradient(closest-side, color-mix(in srgb, var(--ink) 62%, transparent), transparent); pointer-events: none; }
+h1 { font-size: clamp(40px, 4.4vw, 62px); color: #fff; max-width: 11em; }
+/* What Renplay is, in one sentence, where the first screen can be read without JavaScript and without the scene */
+.define { margin-top: 16px; max-width: 34em; color: var(--fg-2); font-size: clamp(15px, 1.25vw, 17px); line-height: 1.5; }
+/* The two ways on: Install (the one lit button of the screen) and the demo in its own tab. Under the title on a wide screen, under the box on a phone. */
+.cta { position: relative; z-index: 3; display: flex; flex-wrap: wrap; gap: 10px; order: 1; align-self: flex-start; margin: 22px 0 0 max(0px, calc(47vw - max(24px, (100vw - 1200px) / 2))); }
+.cta .btn { min-width: 150px; }
+/* The nav's Install waits while the first screen, which has its own, is in view */
+html.home .nav:not(.solid) > .btn { opacity: 0; pointer-events: none; }
+.nav > .btn { transition: opacity var(--t-pane); }
+
+/* The dialogue box. A visual novel's own parts: the text box, the name plate on its edge, the choices as bars. None of it can be selected. */
+.dlg, .choices, .replay { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.dlg { position: relative; z-index: 4; order: 2; margin-top: auto; width: min(820px, 100%); align-self: center; padding: 26px 30px 34px; border-radius: var(--r-3); background: var(--on-ink-hi); border: 1px solid var(--line); box-shadow: 0 20px 60px -16px color-mix(in srgb, #000 70%, transparent); backdrop-filter: blur(12px) saturate(1.1); -webkit-backdrop-filter: blur(12px) saturate(1.1); }
+/* Every state of the box in one cell: the box is as tall as the tallest and never changes height */
+.box { display: grid; }
+.box > * { grid-area: 1 / 1; }
+.story p, .typed, .after, .ghost, .ask .q { font: 400 clamp(18px, 1.5vw, 21px) / 1.5 var(--serif); font-variation-settings: 'opsz' var(--opsz-text); color: var(--fg); }
+.ghost, .ask .q { visibility: hidden; }
+.scene-pad[data-typing] .typed .t::after { content: ""; display: inline-block; width: 2px; height: 1.05em; margin-left: 3px; vertical-align: -0.15em; background: var(--lamp); animation: blink 1.05s steps(1) infinite; }
+.typed .mark { display: inline-block; width: 0.5em; height: 0.62em; margin-left: 0.4em; vertical-align: -0.02em; background: var(--lamp); clip-path: polygon(0 0, 100% 50%, 0 100%); animation: blink 1.05s steps(1) infinite; }
+.adv { display: none; position: absolute; left: 30px; bottom: 11px; font: 400 12px var(--mono); color: var(--fg-4); opacity: 0; transition: opacity var(--t-room); }
+.js .adv { display: block; }
+.js .scene-pad:not(.seen)[data-scene=line] .adv { opacity: 1; }
+/* the hint names the input at hand: a tap, or a click and the space bar */
+.adv::before { content: 'Tap '; }
+@media (hover: hover) { .adv::before { content: 'Click, or press space, '; } }
+.ask { display: grid; gap: 14px; }
+.choices { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0; margin: 0; visibility: hidden; }
+.choices a { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 0 14px; border-radius: var(--r-1); background: color-mix(in srgb, #fff 5%, transparent); border: 1px solid var(--hair); color: var(--fg); text-decoration: none; font: 500 16px/1.2 var(--serif); font-variation-settings: 'opsz' 18; transition: background var(--t-pane), border-color var(--t-pane), color var(--t-pane); }
+.choices a:hover, .choices a:focus-visible, .choices a.picked { background: color-mix(in srgb, var(--lamp) 13%, transparent); border-color: var(--lamp); color: #fff; }
+.choices a.picked { background: color-mix(in srgb, var(--lamp) 26%, transparent); }
+.choices a:focus:not(:focus-visible) { outline: none; }
+.choices kbd { font: 400 12px var(--mono); color: var(--lamp); min-width: 1ch; }
+.replay { display: none; position: absolute; right: 18px; bottom: 0; background: none; border: 0; color: var(--fg-3); font: 400 12px var(--mono); text-decoration: underline; text-underline-offset: 3px; padding: 0 8px; min-height: 44px; align-items: center; cursor: pointer; }
+.replay:hover { color: #fff; }
+/* Without JavaScript the scene is a plain page: the title, the three lines, the choice as links, the two buttons. */
+html:not(.js) .scene-pad { gap: 28px; }
+html:not(.js) .dlg { margin-top: 0; width: min(880px, 100%); padding-top: 34px; }
+html:not(.js) .box { display: block; }
+html:not(.js) .typed, html:not(.js) .ghost, html:not(.js) .ask .q, html:not(.js) .replay { display: none; }
+html:not(.js) .story p { margin-bottom: 0.5em; }
+html:not(.js) .choices { visibility: visible; margin-top: 8px; }
+html:not(.js) .cta { order: 3; }
+/* Scene states, with JavaScript. The story's paragraphs are for screen readers, the typed line for the eye. */
+.js .typed, .js .after { display: none; }
+.js .story { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.js [data-scene=line] .typed, .js [data-scene=choice] .typed, .js [data-scene=after] .typed { display: block; }
+.js [data-scene=choice] .choices { visibility: visible; }
+.js [data-scene=after]:not([data-typing]) .replay { display: inline-flex; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Paper sections: the same two surfaces, tinted by the hour */
+.paper { position: relative; z-index: 2; padding: clamp(64px, 9vw, 120px) 0; background: var(--sheet, var(--ink)); }
+.paper::after { content: ""; position: absolute; inset: 0; background: url(/design/grain.webp); background-size: 256px; opacity: 0.35; pointer-events: none; mix-blend-mode: soft-light; }
+.paper > * { position: relative; z-index: 1; }
+.s-gallery::after { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40vh); mask-image: linear-gradient(to bottom, transparent 0, #000 40vh); }
+.s-gallery { --sheet: color-mix(in oklab, var(--t1) 10%, var(--ink)); padding-top: clamp(160px, 30vh, 300px); background: linear-gradient(to bottom, transparent 0, var(--sheet) 40vh); }
+.s-demo { --sheet: color-mix(in oklab, var(--t1) 11%, var(--ink)); }
+.s-how { --sheet: color-mix(in oklab, var(--t2) 12%, var(--ink)); }
+.s-features { --sheet: color-mix(in oklab, var(--t2) 12%, var(--ink)); }
+.s-install { --sheet: color-mix(in oklab, var(--t3) 14%, var(--ink)); }
+.s-faq { --sheet: color-mix(in oklab, var(--t3) 14%, var(--ink)); padding-top: 0; padding-bottom: clamp(24px, 3vw, 40px); background: linear-gradient(to bottom, var(--sheet) calc(100% - 40vh), color-mix(in oklab, var(--t3) 14%, var(--ink)) 100%); }
+.sec-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: end; margin-bottom: clamp(28px, 4vw, 48px); }
+.sec-head .lead { align-self: end; }
+.lead p + p { margin-top: 12px; }
+.lead-actions { margin-top: 18px; }
+.skip { position: absolute; left: -9999px; top: auto; }
+.skip:focus { position: static; display: inline-block; margin-bottom: 12px; }
+.narrow-only { display: none; }
+
+/* 2. The catalog: the shelf and the search */
+.find { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 4px; border-bottom: 1px solid var(--hair); max-width: 640px; margin: 4px 0 8px; transition: border-color var(--t-pane); }
+.find:focus-within { border-color: var(--lamp); }
+.find svg { width: 20px; height: 20px; color: var(--fg-3); flex: none; }
+.find input { flex: 1; min-width: 0; height: 100%; background: none; border: 0; outline: 0; color: var(--fg); font: 400 16px var(--sans); }
+/* the keyboard sees where it is: the underline itself turns to the lamp */
+.find input:focus-visible { box-shadow: 0 1px 0 var(--lamp); }
+.find input::placeholder { color: var(--fg-4); }
+.find .btn { flex: none; }
+.shelf-wrap { --tint: var(--t2); position: relative; margin-top: 8px; overflow-x: clip; }
+.shelf-wrap::before { content: ""; position: absolute; inset: -120px 0 -80px; pointer-events: none; background: radial-gradient(48% 60% at var(--shelf-x, 50%) 56%, color-mix(in srgb, var(--tint) 34%, transparent), transparent 72%); transition: --shelf-x var(--t-room) var(--out), --tint 0.8s; }
+.shelf { position: relative; z-index: 1; list-style: none; padding: 36px max(24px, calc((100vw - 1200px) / 2)) 56px; margin: 0; display: flex; gap: clamp(14px, 2vw, 26px); overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: max(24px, calc((100vw - 1200px) / 2)); scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.shelf::-webkit-scrollbar { display: none; }
+.shelf.dragging { scroll-snap-type: none; cursor: grabbing; }
+.shelf.dragging * { pointer-events: none; }
+.js .shelf { cursor: grab; }
+.shelf .card { flex: none; scroll-snap-align: start; width: clamp(168px, 17vw, 224px); }
+.shelf-ctl { display: none; position: absolute; right: max(24px, calc((100vw - 1200px) / 2)); top: -58px; gap: 8px; }
+.js .shelf-ctl { display: flex; }
+.shelf-ctl button { width: 44px; height: 44px; border-radius: var(--r-1); border: 1px solid var(--hair); background: transparent; color: var(--fg); font-size: 18px; cursor: pointer; transition: background var(--t-pane), border-color var(--t-pane); }
+.shelf-ctl button:hover { background: color-mix(in srgb, #fff 8%, transparent); border-color: var(--hair-lit); }
+.count { margin-top: 14px; color: var(--fg-3); font-size: 15px; }
+.count b { color: #fff; font: 800 20px var(--serif); }
+.count a { color: var(--fg); }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.s-gallery .actions { margin-top: 8px; }
+
+/* 3. The demo: two real Renplays on a wide screen, a phone to tap on a phone */
+.live-label { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; font: 400 14px/1.4 var(--mono); color: var(--fg-2); min-height: 22px; }
+/* Without scripts the demo cannot run, so the page does not call it live: the posters and their link stand alone. */
+html:not(.js) .live-label { display: none; }
+.pulse { width: 9px; height: 9px; border-radius: var(--r-round); background: var(--pink); box-shadow: 0 0 0 0 color-mix(in srgb, var(--pink) 60%, transparent); animation: pulse 2s infinite; flex: none; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--pink) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pink) 0%, transparent); } }
+.duo { --s: 0.88; --ps: 0.72; display: grid; grid-template-columns: auto auto; justify-content: center; align-items: end; gap: 0 clamp(16px, 3vw, 48px); position: relative; }
+/* The page fits the devices while it parses, so they appear at their final size, never at a fallback size. */
+.js .duo:not([data-fitted]) { visibility: hidden; }
+.dev-wrap { position: relative; margin: 0; }
+.dev-wrap figcaption { margin-top: 12px; font: 400 12px var(--mono); color: var(--fg-4); text-align: center; }
+.laptop { width: calc(880px * var(--s) + 36px * var(--s)); }
+.laptop .lid { padding: 14px 14px 18px; border-radius: var(--r-device-lid); background: linear-gradient(var(--ink-3), var(--ink-2)); border: 1px solid color-mix(in srgb, #fff 14%, transparent); box-shadow: 0 40px 90px -30px color-mix(in srgb, #000 80%, transparent), 0 0 60px -20px color-mix(in srgb, var(--pink) 30%, transparent); }
+.laptop .base { height: 14px; margin: 0 -3%; border-radius: var(--r-device-base); background: linear-gradient(var(--ink-3), var(--ink-2)); border: 1px solid color-mix(in srgb, #fff 12%, transparent); border-top: 0; position: relative; }
+.laptop .base::before { content: ""; position: absolute; left: 50%; top: 0; width: 18%; height: 5px; margin-left: -9%; border-radius: var(--r-device-notch); background: var(--ink); }
+.screen { position: relative; overflow: hidden; background: var(--ink); border-radius: var(--r-2); }
+.screen iframe, .screen .poster { position: absolute; left: 0; top: 0; max-width: none; border: 0; transform-origin: 0 0; background: var(--ink); }
+.laptop .screen { width: calc(880px * var(--s)); height: calc(550px * var(--s)); }
+.laptop .screen iframe, .laptop .screen .poster { width: 880px; height: 550px; transform: scale(var(--s)); }
+.phone { position: relative; padding: 12px; border-radius: var(--r-device-phone); background: linear-gradient(var(--ink-3), var(--ink-2)); border: 1px solid color-mix(in srgb, #fff 16%, transparent); box-shadow: 0 40px 90px -30px color-mix(in srgb, #000 80%, transparent), 0 0 60px -20px color-mix(in srgb, var(--violet) 35%, transparent); width: calc(390px * var(--ps) + 24px); }
+.phone .screen { width: calc(390px * var(--ps)); height: calc(844px * var(--ps)); border-radius: var(--r-device-phone-glass); }
+.phone .screen iframe, .phone .screen .poster { width: 390px; height: 844px; transform: scale(var(--ps)); }
+.screen iframe { opacity: 0; transition: opacity var(--t-room) var(--out); }
+.screen .poster { transition: opacity var(--t-room) var(--out); }
+.screen.ready iframe { opacity: 1; }
+.screen.ready .poster { opacity: 0; pointer-events: none; }
+.screen .wait { position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 10px 14px; border-radius: var(--r-1); background: var(--on-ink-hi); border: 1px solid var(--line); font-size: 13px; color: var(--fg-2); display: none; }
+.screen .wait a { color: var(--fg); }
+.screen.late .wait { display: block; }
+.screen:not(.ready) .poster { filter: saturate(0.8) brightness(0.8); }
+.phone, .laptop .lid { transition: box-shadow var(--t-room) var(--out); }
+.duo.flash .phone { box-shadow: 0 40px 90px -30px color-mix(in srgb, #000 80%, transparent), 0 0 90px -4px color-mix(in srgb, var(--lamp) 70%, transparent); }
+/* the way into the demo on a phone: the drawn phone is a link. On a wide screen the frame is live and the link is not there. */
+.pickup { display: none; position: absolute; inset: 0; z-index: 3; border-radius: inherit; color: transparent; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.pickup span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.pickup:focus-visible { outline: 2px solid var(--pink-2); outline-offset: 4px; }
+
+/* 4. How it works: the steps and the numbers */
+.steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3vw, 44px); counter-reset: step; }
+.steps li { border-top: 1px solid var(--hair); padding-top: 18px; counter-increment: step; }
+.steps li::before { content: counter(step); display: block; font: 800 clamp(34px, 4vw, 48px) / 1 var(--serif); font-variation-settings: 'opsz' 72; color: var(--lamp); margin-bottom: 10px; }
+.steps h3, .feature h3, .numbers h3 { font: 800 clamp(22px, 2.2vw, 28px) / 1.15 var(--serif); font-variation-settings: 'opsz' 72; color: #fff; margin-bottom: 8px; letter-spacing: -0.01em; }
+.steps p, .feature p { color: var(--fg-2); max-width: 46ch; }
+.numbers { margin-top: clamp(48px, 7vw, 88px); }
+.numbers h3 { font-size: clamp(26px, 3vw, 38px); margin-bottom: 18px; }
+.numbers dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3vw, 44px); margin: 0; }
+.numbers dl > div { border-top: 1px solid var(--hair); padding-top: 16px; }
+.numbers dt { font: 400 13px var(--mono); color: var(--fg-3); }
+.numbers dd { margin: 8px 0 0; }
+.numbers dd b { display: block; font: 800 clamp(40px, 4.6vw, 56px) / 1 var(--serif); font-variation-settings: 'opsz' 72; color: #fff; letter-spacing: -0.02em; }
+.numbers dd span { display: block; margin-top: 10px; color: var(--fg-3); font-size: 14px; line-height: 1.5; max-width: 34ch; }
+/* until the measurements come, the figures are quiet */
+.numbers[data-pending] dd b { font-size: 24px; color: var(--fg-4); font-weight: 600; }
+
+/* 5. What you get */
+.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(28px, 4vw, 56px) clamp(24px, 3vw, 44px); }
+.feature { border-top: 1px solid var(--line); padding-top: 18px; }
+.feature h3 { font-size: clamp(20px, 1.8vw, 24px); }
+.levels { display: flex; flex-wrap: wrap; gap: 4px 0; margin-top: 12px; font: 400 13px var(--mono); color: var(--fg-3); }
+.levels span + span::before { content: "/"; margin: 0 12px; color: var(--fg-4); }
+.feature a { color: var(--fg); text-decoration-color: color-mix(in srgb, var(--pink-2) 50%, transparent); }
+
+/* 6. Install */
+.install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 72px); align-items: start; }
+.install .lead { margin-top: 16px; }
+.after-steps { margin: 20px 0 0 1.2em; color: var(--fg-2); max-width: 56ch; }
+.after-steps li { margin-bottom: 8px; }
+.platforms { list-style: none; padding: 0; margin-top: 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0 24px; max-width: 520px; }
+.platforms a { display: flex; align-items: center; min-height: 44px; border-top: 1px solid var(--line); color: var(--fg-2); text-decoration: none; font-size: 14px; }
+.platforms a:hover { color: #fff; border-top-color: var(--lamp); }
+.tabs { display: flex; gap: 22px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.tabs button { min-height: 44px; padding: 0; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg-3); font: 600 14px var(--sans); cursor: pointer; }
+.tabs button.on { color: #fff; border-bottom-color: var(--lamp); }
+.code { position: relative; border-radius: var(--r-2); background: color-mix(in srgb, var(--ink) 70%, transparent); border: 1px solid var(--line); }
+.code pre { padding: 20px; overflow-x: auto; font-size: 13.5px; line-height: 1.7; color: var(--fg-2); padding-right: 96px; }
+.code .copy { position: absolute; right: 12px; top: 12px; }
+.code[hidden] { display: none; }
+/* With no JavaScript both commands are one under the other, and no tab is needed */
+html:not(.js) .tabs { display: none; }
+html:not(.js) .code[hidden] { display: block; }
+html:not(.js) .code .copy { display: none; }
+html:not(.js) .code pre { padding-right: 20px; }
+html:not(.js) .code + .code { margin-top: 12px; }
+
+/* 7. Questions */
+.faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 clamp(28px, 5vw, 72px); align-items: start; }
+.faq details { border-top: 1px solid var(--hair); }
+.faq summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 10px 0; cursor: pointer; list-style: none; font: 700 clamp(17px, 1.5vw, 20px) / 1.3 var(--serif); font-variation-settings: 'opsz' 36; color: #fff; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; flex: none; font: 400 20px var(--mono); color: var(--lamp); }
+.faq details[open] summary::after { content: "\2212"; }
+.faq details p { padding: 0 0 20px; color: var(--fg-2); max-width: 58ch; }
+.faq details a { color: var(--fg); text-decoration-color: color-mix(in srgb, var(--pink-2) 50%, transparent); }
+
+/* 8. Credits: the room at night */
+.credits { position: relative; z-index: 2; padding: clamp(40px, 6vh, 72px) 0 48px; text-align: center; background: linear-gradient(to bottom, color-mix(in oklab, var(--t3) 14%, var(--ink)) 0, transparent 42vh); }
+.credits h2 { font-size: clamp(36px, 5.6vw, 68px); max-width: 14em; margin-inline: auto; text-shadow: 0 2px 30px color-mix(in srgb, #000 70%, transparent); }
+.roll-window { position: relative; width: min(560px, 100%); margin: 36px auto 30px; overflow: hidden; -webkit-mask-image: linear-gradient(transparent 0, #000 8%, #000 92%, transparent 100%); mask-image: linear-gradient(transparent 0, #000 8%, #000 92%, transparent 100%); }
+.roll { display: flex; flex-direction: column; gap: 14px; padding: 6px 8px; margin: 0; }
+.roll > div { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; text-align: left; align-items: baseline; opacity: calc(0.5 + var(--lit, 1) * 0.5); transition: opacity var(--t-focus); }
+.roll dt { text-align: right; font: 400 13px var(--mono); color: var(--fg-4); }
+.roll dd { margin: 0; font: 400 18px / 1.3 var(--serif); font-variation-settings: 'opsz' 18; color: var(--fg); }
+.roll a { color: var(--fg); text-decoration-color: color-mix(in srgb, var(--pink-2) 50%, transparent); }
+.js .roll { transform: translate3d(0, 100%, 0); will-change: transform; } /* credits.js draws it by the scroll */
+.credits .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 0; order: 0; align-self: auto; }
+.credits .cta .btn:not(.primary) { background: var(--room-shade); }
+.foot { max-width: 60ch; margin: 44px auto 0; padding: 18px 0 0; border-top: 1px solid var(--line); color: var(--fg-3); font-size: 13px; line-height: 1.6; }
+.foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 20px; margin: 28px auto 0; max-width: 60ch; }
+.foot-links a { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg-2); text-decoration: none; font-size: 14px; }
+.foot-links a:hover { color: #fff; }
+
+/* Narrow screens */
+@media (max-width: 1100px) {
+  .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .sec-head, .install, .faq { grid-template-columns: minmax(0, 1fr); }
+  .steps, .numbers dl { grid-template-columns: minmax(0, 1fr); }
+  .features { grid-template-columns: minmax(0, 1fr); }
+  /* the box sits on the floor of the painting, clear of the home indicator and the browser's bar (the scene is 100svh tall) */
+  .scene-pad { padding: calc(var(--nav-h) + 10px) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .title { margin-top: 0; margin-left: 0; max-width: 100%; }
+  .title::before { inset: -30px -16px -30px -16px; }
+  h1 { font-size: clamp(34px, 9.6vw, 42px); max-width: 9.5em; }
+  .define { font-size: 14px; max-width: 26em; margin-top: 10px; }
+  .dlg { width: 100%; padding: 20px 18px 30px; min-height: 0; }
+  .adv { left: 18px; bottom: 7px; }
+  .story p, .typed, .after, .ghost, .ask .q { font-size: 17px; line-height: 1.45; }
+  .ask { gap: 10px; }
+  .choices { gap: 6px; }
+  .choices a { min-height: 44px; padding: 0 8px; font-size: 14px; }
+  .choices kbd { display: none; }
+  .name { left: 16px; }
+  .replay { right: 8px; }
+  /* the two ways on, under the box, each the width of the screen's half */
+  .cta { order: 3; align-self: stretch; margin: 12px 0 0; gap: 8px; }
+  .cta .btn { flex: 1 1 0; min-width: 0; }
+  .s-gallery { padding-top: clamp(100px, 20vh, 200px); }
+  .find { height: 52px; }
+  /* the keyboard's Search key sends it; without a script the button stays, since there is no other hint */
+  .js .find .btn { display: none; }
+  /* the demo on a phone: the drawn phone, a picture, and a tap opens the real thing full screen */
+  .wide-only { display: none; }
+  .narrow-only { display: block; }
+  .live-label { display: none; }
+  .duo { grid-template-columns: 1fr; justify-items: center; gap: 14px; }
+  .laptop-wrap { display: none; }
+  .phone { --ps: var(--pm, 0.8); }
+  .pickup { display: block; }
+  .phone .screen { pointer-events: none; }
+  .phone .screen .poster { filter: none; }
+  .actions .btn { flex: 1 1 100%; }
+  .shelf .card { width: 44vw; }
+  .shelf-ctl { display: none !important; }
+}
+@media (max-width: 480px) {
+  .wrap { width: calc(100% - 36px); }
+  .install .code pre { font-size: 12.5px; padding: 54px 16px 18px; }
+}
+/* A short phone (an iPhone SE): the painting hangs higher still and the box is tighter */
+@media (max-aspect-ratio: 1/1) and (max-width: 480px) and (max-height: 700px) {
+  .stage { top: -8vh; transform: translate(-50%, 0); }
+  .scene-pad { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .dlg { padding: 16px 16px 26px; }
+  .story p, .typed, .after, .ghost, .ask .q { font-size: 16px; line-height: 1.4; }
+  .define { display: none; }
+}
+/* A phone on its side: the same scene, tighter, and it scrolls if it must */
+@media (max-height: 520px) and (orientation: landscape) {
+  .scene-pad { padding-top: calc(var(--nav-h) + 8px); }
+  .define { display: none; }
+  h1 { font-size: 30px; }
+  .title { margin-left: 0; max-width: 60%; }
+  .title::before { inset: -20px; }
+  /* the box keeps to the right, so the phone on the sofa at the left of the wide painting stays in view */
+  .dlg { padding: 14px 20px 26px; margin-top: 14px; width: min(820px, 72%); align-self: flex-end; }
+  .scene-pad { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .story p, .typed, .after, .ghost, .ask .q { font-size: 16px; }
+  .adv { display: none !important; }
+  .ask { gap: 8px; }
+  .choices a { min-height: 44px; padding: 0 10px; font-size: 14px; }
+  .cta { order: 3; margin: 10px 0 0; align-self: flex-end; }
+  .cta .btn { min-width: 0; }
+}
+/* No lean, no light drift, no typewriter, no roll */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  .js .roll { transform: none !important; }
+  .typed .mark, .typed .t::after { animation: none; }
+}
+@media (scripting: none) {
+  .js .roll { transform: none; }
+}

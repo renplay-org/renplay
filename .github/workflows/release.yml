@@ -60,6 +60,27 @@ jobs:
     secrets:
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
+  # Docker Hub shows its own overview, not the README. This sets it from image/README.md. Nothing needs this
+  # job, and continue-on-error keeps a refusal (a token without the permission to edit the repository) from
+  # failing the release. The step then shows a failure and the release still goes out.
+  dockerhub-description:
+    needs: version
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: renplay/renplay
+          short-description: Self-hosted Ren’Py player for the browser, with saves on your server.
+          readme-filepath: image/README.md
+
   chart:
     needs: [version, image]
     runs-on: ubuntu-24.04
@@ -143,6 +164,5 @@ jobs:
     with:
       version: ${{ needs.version.outputs.version }}
     secrets:
-      DEMO_DEPLOY_HOOK: ${{ secrets.DEMO_DEPLOY_HOOK }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

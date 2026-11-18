@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'astro/config'
 import starlight from '@astrojs/starlight'
 import starlightLinksValidator from 'starlight-links-validator'
@@ -6,6 +7,10 @@ import { pageSets } from './scripts/llms-sets.mjs'
 import remarkInclude from './scripts/remark-include.mjs'
 import remarkVersion from './scripts/remark-version.mjs'
 import { unified } from '@astrojs/markdown-remark'
+
+// The browser bar's colour is the room's ink, read from the tokens so it cannot drift from them.
+const ink = /--ink:\s*(#[0-9a-f]{6})/i.exec(readFileSync(new URL('../../design/tokens.css', import.meta.url), 'utf8'))[1]
+const card = 'https://docs.renplay.org/og.jpg'
 
 const sidebar = [
   {
@@ -65,9 +70,10 @@ export default defineConfig({
       expressiveCode: {
         themes: ['github-dark', 'github-light'],
         styleOverrides: {
-          borderRadius: '14px',
+          borderRadius: 'var(--r-2)',
           borderColor: 'var(--sl-color-hairline)',
           codeBackground: 'var(--sl-color-gray-6)',
+          codeFontFamily: 'var(--mono)',
           codeFontSize: '0.85rem',
           codePaddingBlock: '1.1rem',
           frames: { shadowColor: 'transparent' },
@@ -89,14 +95,15 @@ export default defineConfig({
           tag: 'script',
           content: "try{if(!localStorage.getItem('starlight-theme'))localStorage.setItem('starlight-theme','dark')}catch(e){}",
         },
-        { tag: 'meta', attrs: { name: 'theme-color', content: '#07070a' } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: ink } },
         { tag: 'meta', attrs: { property: 'og:site_name', content: 'Renplay docs' } },
-        { tag: 'meta', attrs: { property: 'og:image', content: 'https://renplay.org/img/og.jpg' } },
+        { tag: 'meta', attrs: { property: 'og:image', content: card } },
+        { tag: 'meta', attrs: { property: 'og:image:type', content: 'image/jpeg' } },
         { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
         { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
-        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'Renplay: your Ren’Py games on every screen' } },
+        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'Renplay: install Renplay and play your Ren’Py games. The docs for running it on your own server.' } },
         { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
-        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://renplay.org/img/og.jpg' } },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: card } },
         { tag: 'link', attrs: { rel: 'icon', href: '/favicon.ico', sizes: '16x16 32x32 48x48' } },
         { tag: 'link', attrs: { rel: 'icon', href: '/favicon-48.png', type: 'image/png', sizes: '48x48' } },
         { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' } },

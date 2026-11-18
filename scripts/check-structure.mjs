@@ -20,6 +20,19 @@ const LARGER = {
   'server/src/art/store.ts': 839,
 }
 
+/**
+ * Lines of test code (the server's tests, the browser specs and the layout check), counted the way the size budget counts.
+ * The ceiling is today's count with a little room, and it only goes down: a new test is paid for by removing duplicate
+ * ones. When the count falls ROOM below it, lower it to match. Raising it takes a one-line reason here, next to the number.
+ */
+// 14760: the backup job's guards (room first, sweep, back off) and the low disk warning, which no earlier test covered.
+// 15309: the trash for the saves of removed games, which no earlier test covered: the list, the refusals, the move under the save lock, links, History-only people, a restored database, restore, the 30 days and a failed purge.
+// 15457: the review round of that trash: who gets saves back, an entry made whole or not at all, a restore that refuses or rolls back, dropped names, the adult folder in other capitals.
+// 15651: crash recovery of the trash, which no earlier test covered: an interrupted deletion and restore, a second interruption, a conflict that must never expire.
+// 15690: the fresh 30 days for data that stays in an entry after its protection ends, and a crash on the way.
+const TEST_LINES = 15690
+const TEST_ROOM = 100
+
 const problems = []
 const rel = (p) => relative(root, p)
 
@@ -151,6 +164,16 @@ for (const [p, max] of Object.entries(LARGER)) {
   } catch {
     problems.push(`${p} is gone: remove it from LARGER in scripts/check-structure.mjs`)
   }
+}
+
+// ---- the test-line ceiling -----------------------------------------------------------------------
+
+{
+  const testCode = [...walk(join(SERVER, '__tests__')), ...walk(join(root, 'server/scripts/app-ui/specs')), join(root, 'scripts/check-layout-shift.mjs')]
+    .filter((p) => /\.(ts|tsx|js|mjs)$/.test(p))
+  const lines = testCode.reduce((sum, p) => sum + readFileSync(p, 'utf8').split('\n').length - 1, 0)
+  if (lines > TEST_LINES) problems.push(`The tests have ${lines} lines, more than ${TEST_LINES}. A new test names the behaviour it protects, and pays for its lines by removing duplicate coverage. Raising TEST_LINES needs a one-line reason beside it.`)
+  else if (lines < TEST_LINES - TEST_ROOM) problems.push(`The tests shrank to ${lines} lines: lower TEST_LINES in scripts/check-structure.mjs to match (${lines + TEST_ROOM / 2} leaves a little room).`)
 }
 
 if (problems.length) {

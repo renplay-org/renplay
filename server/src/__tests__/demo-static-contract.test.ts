@@ -73,7 +73,6 @@ describe('the static demo answers what the demo server answers', () => {
   let cookie = ''
   let stand: (req: Request) => Promise<Response>
   let saveA: Buffer, saveB: Buffer
-  let versionId = ''
 
   beforeAll(async () => {
     server = await demoServer()
@@ -124,11 +123,6 @@ describe('the static demo answers what the demo server answers', () => {
     { route: 'GET /:id/history', method: 'GET', path: `${TQ}/history` },
   ]
   const progress: Case[] = [
-    { route: 'PUT /games/:id/favorite', method: 'PUT', path: '/api/games/the-question/favorite', body: { on: true } },
-    { route: 'PUT /games/:id/status', method: 'PUT', path: '/api/games/the-question/status', body: { status: 'playing' } },
-    { route: 'PUT /games/:id/rating', method: 'PUT', path: '/api/games/the-question/rating', body: { rating: 4 } },
-    { route: 'POST /games/:id/not-now', method: 'POST', path: '/api/games/the-question/not-now', body: {} },
-    { route: 'DELETE /games/:id/not-now', method: 'DELETE', path: '/api/games/the-question/not-now' },
     { route: 'POST /games/:id/played', method: 'POST', path: '/api/games/the-question/played', body: {} },
     { route: 'POST /games/:id/play-time', method: 'POST', path: '/api/games/the-question/play-time', body: { seconds: 20 } },
     { route: 'GET /games/:id', method: 'GET', path: '/api/games/the-question' },
@@ -147,25 +141,13 @@ describe('the static demo answers what the demo server answers', () => {
     await compare({ route: 'GET /:id/boot', method: 'GET', path: `${TQ}/boot` })
     await compare({ route: 'GET /:id/raw', method: 'GET', path: `${TQ}/raw?path=${AGAIN}` })
     await compare({ route: 'GET /:id/screenshot', method: 'GET', path: `${TQ}/screenshot?file=1-1-LT1.save` })
-    await compare({ route: 'GET /:id/download', method: 'GET', path: `${TQ}/download?file=1-1-LT1.save` })
-    await compare({ route: 'PUT /:id/meta', method: 'PUT', path: `${TQ}/meta?file=1-1-LT1.save`, body: { title: 'Before the question', note: 'A note', pinned: true } })
+    await compare({ route: 'PUT /:id/meta', method: 'PUT', path: `${TQ}/meta?file=1-1-LT1.save`, body: { title: 'Before the question' } })
     await compare({ route: 'GET /:id', method: 'GET', path: TQ })
     await compare({ route: 'GET /games/:id', method: 'GET', path: '/api/games/the-question' })
-    await compare({ route: 'POST /:id/save-dir', method: 'POST', path: `${TQ}/save-dir`, body: { saveDir: 'the_question-7' } })
     const history = (await compare({ route: 'GET /:id/history', method: 'GET', path: `${TQ}/history?file=1-1-LT1.save` })) as { versions: Array<{ id: string }> }
     expect(history.versions.length).toBe(1)
-    versionId = history.versions[0]!.id
   })
-  it('saves: restoring an earlier version, deleting a slot, and the game deleting a file', async () => {
-    const standHistory = (await (await standIn({ route: '', method: 'GET', path: `${TQ}/history` })).json()) as { versions: Array<{ id: string }> }
-    expect(standHistory.versions.length).toBe(1)
-    const both = async (c: Case, id: string) => {
-      const [a, b] = await Promise.all([fetch(server.base + c.path, { method: c.method, headers: { cookie, origin: server.base, 'content-type': 'application/json' }, body: JSON.stringify({ id }) }), standIn({ ...c, body: { id: standHistory.versions[0]!.id } })])
-      expect(b.status).toBe(a.status)
-      expect(differences(shape(await a.json()), shape(await b.json()))).toEqual([])
-    }
-    await both({ route: 'POST /:id/history/restore', method: 'POST', path: `${TQ}/history/restore` }, versionId)
-    await compare({ route: 'DELETE /:id/slot', method: 'DELETE', path: `${TQ}/slot?file=1-1-LT1.save` })
+  it('saves: the game deleting a file', async () => {
     await compare({ route: 'PUT /:id/file', method: 'PUT', path: `${TQ}/file?path=the_question-7/2-1.save`, raw: saveA })
     await compare({ route: 'DELETE /:id/file', method: 'DELETE', path: `${TQ}/file?path=the_question-7/2-1.save` })
     await compare({ route: 'GET /:id/history', method: 'GET', path: `${TQ}/history` })
@@ -181,6 +163,7 @@ describe('the static demo answers what the demo server answers', () => {
       { route: 'POST /:id/import', method: 'POST', path: `${TQ}/import`, body: {} },
       { route: 'POST /:id/sync', method: 'POST', path: `${TQ}/sync`, body: {} },
       { route: 'POST /:id/copy', method: 'POST', path: `${TQ}/copy`, body: {} },
+      { route: 'POST /:id/save-dir', method: 'POST', path: `${TQ}/save-dir`, body: { saveDir: 'the_question-7' } },
     ]
     for (const c of refused) {
       const [a, b] = await Promise.all([real(c), standIn(c)])
@@ -205,7 +188,7 @@ describe('the static demo answers what the demo server answers', () => {
   })
   it('the cases cover every route the stand-in answers', () => {
     const covered = new Set([...reads, ...progress].map((c) => c.route))
-    for (const route of ['PUT /games/:id/cache', 'PUT /:id/file', 'GET /:id/raw', 'GET /:id/screenshot', 'GET /:id/download', 'PUT /:id/meta', 'POST /:id/save-dir', 'POST /:id/history/restore', 'DELETE /:id/slot', 'DELETE /:id/file']) covered.add(route)
+    for (const route of ['PUT /games/:id/cache', 'PUT /:id/file', 'GET /:id/raw', 'GET /:id/screenshot', 'PUT /:id/meta', 'DELETE /:id/file']) covered.add(route)
     expect([...covered].sort()).toEqual([...ANSWERED].sort())
   })
 })

@@ -60,7 +60,8 @@ export default function Account() {
         </div>
       </header>
       <nav className="acct-nav" aria-label="Account pages">
-        <Link to="/history" className={admin ? '' : 'full'}><History /> Play history</Link>
+        <Link to="/history" className={admin || me.demoStatic ? '' : 'full'}><History /> Play history</Link>
+        {me.demoStatic && <Link to="/settings"><Settings /> This browser</Link>}
         {admin && (
           <>
             <Link to="/settings"><Settings /> Settings</Link>
@@ -88,10 +89,10 @@ export default function Account() {
         </section>
       )}
       <div className="grid2" style={{ marginTop: 22, alignItems: 'start' }}>
-        <AccountSection title="Adult games">
+        {!me.demoStatic && <AccountSection title="Adult games">
           <p className="small muted">What you see of adult games, on every device. Games that are not adult are never affected.</p>
           <AdultChoice />
-        </AccountSection>
+        </AccountSection>}
         {!me.demo && (
           <AccountSection title="Profile">
             <form onSubmit={(e) => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(() => put('/api/me', { name: form.get('name') }), 'Display name saved') }} className="stack">

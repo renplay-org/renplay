@@ -94,9 +94,9 @@ description = "The library in a browser: the Playwright specs in server/scripts/
 run = "sh scripts/test-ui.sh playwright"
 
 ["check:docs"]
-description = "Docs build, with the configuration page, every link and llms.txt checked"
+description = "Docs build, with the configuration page, every link, llms.txt and the search engine basics checked"
 dir = "docs/site"
-run = ["npm run check:config", "npm run build", "npm run check:llms"]
+run = ["npm run check:config", "npm run build", "npm run check:llms", "npm run check:seo"]
 
 ["check:website"]
 description = "Website build, with every local link and picture checked"
@@ -119,7 +119,7 @@ run = [
 
 ["check:workflows"]
 description = "GitHub workflows: actionlint and zizmor"
-run = ["node --test scripts/browser-suites.test.mjs scripts/ui-workspace.test.mjs scripts/check-design.test.mjs scripts/noindex-host.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
+run = ["node --test scripts/ci-select.test.mjs scripts/ui-workspace.test.mjs scripts/check-design.test.mjs scripts/noindex-host.test.mjs", "actionlint", "zizmor --persona regular --min-severity medium .github/workflows"]
 
 ["check:telemetry"]
 description = "The telemetry collector: type check, tests on a local D1, and a dry run of the deploy"

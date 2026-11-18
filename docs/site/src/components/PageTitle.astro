@@ -1,8 +1,17 @@
 ---
-const { entry } = Astro.locals.starlightRoute
+const { entry, sidebar } = Astro.locals.starlightRoute
+
+/** The label of the sidebar group the page is in, if any. */
+const groupOf = (entries: typeof sidebar): string | undefined => {
+  for (const item of entries) {
+    if (item.type !== 'group') continue
+    if (item.entries.some((e) => (e.type === 'link' ? e.isCurrent : groupOf([e])))) return item.label
+  }
+}
+const section = groupOf(sidebar) ?? 'Docs'
 ---
 <div class="page-heading">
-  <p class="eyebrow">Renplay documentation</p>
+  <p class="eyebrow">{section}</p>
   <h1 id="_top">{entry.data.title}</h1>
   <p class="page-description">{entry.data.description}</p>
 </div>

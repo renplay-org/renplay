@@ -6,6 +6,8 @@ import { walkFiles } from '../util/fsx.js'
 import { log, stamp } from '../util/log.js'
 import { bytes } from '../shared/format.js'
 import { copyDatabase } from '../util/database.js'
+import { diskSpace } from '../util/disk.js'
+import type { DiskSpace } from '../util/disk.js'
 import type { Config } from '../config.js'
 import type { Db } from '../db.js'
 import type { SaveStores } from './stores.js'
@@ -14,6 +16,15 @@ import type { BackupInfo } from '../shared/api.js'
 const DAY = 24 * 3600_000
 /** saves-YYYY-MM-DD-HHMMSS.zip, or HHMM as the first backups were named. */
 const NAME = /^saves-(\d{4}-\d{2}-\d{2}-\d{4}(?:\d{2})?)\.zip$/
+/** What a backup being written is called until it is whole. */
+const PART = /^\..+\.part$/
+/** A backup of saves takes minutes. A part file this old belongs to a server that was killed. */
+const STALE_PART = 6 * 3600_000
+/** Room left over after the next zip, so the disk is not filled to the last byte. */
+const MARGIN = 64 << 20
+
+/** The run was skipped because the disk has no room for it. Nothing was written. */
+class NoRoom extends Error {}
 
 /**
  * Daily backups: everyone's saves (not their history) and a consistent copy of the library database.
@@ -23,11 +34,14 @@ export class SaveBackups {
   private running: Promise<string> | null = null
   private error: string | null = null
   private timer: NodeJS.Timeout | null = null
+  /** When the last run failed, so the hourly check waits a day before it tries again. */
+  private failedAt: number | null = null
 
   constructor(
     private readonly cfg: Config,
     private readonly db: Db,
     private readonly saveStores: SaveStores,
+    private readonly space: (path: string) => Promise<DiskSpace | null> = diskSpace,
   ) {}
 
   get dir(): string | null {
@@ -36,6 +50,8 @@ export class SaveBackups {
 
   start(): void {
     if (!this.dir) return
+    // No backup of this server is running yet, so every part file in the folders is a leftover.
+    void this.sweep(0)
     const check = () => void this.runIfDue().catch(() => {})
     setTimeout(check, 60_000).unref()
     this.timer = setInterval(check, 3600_000)
@@ -74,7 +90,7 @@ export class SaveBackups {
     const newest = (await this.libraryFiles())[0]
     const library = newest ? { path: join(this.libraryDir, newest.name), size: newest.size, at: newest.at } : null
     const last = files[0]?.at ?? null
-    return { dir: this.dir, keep: this.cfg.backupKeep, files, library, last, next: this.dir ? (last ? last + DAY : Date.now()) : null, running: !!this.running, error: this.error }
+    return { dir: this.dir, keep: this.cfg.backupKeep, files, library, last, next: this.dir ? Math.max(last ? last + DAY : Date.now(), this.failedAt ? this.failedAt + DAY : 0) : null, running: !!this.running, error: this.error }
   }
 
   async runIfDue(): Promise<string | null> {
@@ -90,6 +106,30 @@ export class SaveBackups {
     return this.running
   }
 
+  /** Removes part files older than `olderThan` ms from the backup folder and its library folder. */
+  private async sweep(olderThan: number): Promise<void> {
+    for (const folder of [this.dir!, this.libraryDir]) {
+      for (const entry of await readdir(folder, { withFileTypes: true }).catch(() => [])) {
+        if (!entry.isFile() || !PART.test(entry.name)) continue
+        const path = join(folder, entry.name)
+        const st = await stat(path).catch(() => null)
+        if (!st || Date.now() - st.mtimeMs < olderThan) continue
+        await rm(path, { force: true }).catch(() => {})
+        log('backup', `Removed ${entry.name}, a backup that was never finished`)
+      }
+    }
+  }
+
+  /** Removes daily save zips beyond the newest `keep`. Copies from before a migration are never touched. */
+  private async pruneZips(keep: number): Promise<void> {
+    for (const old of (await this.files()).slice(keep)) await rm(join(this.dir!, old.name), { force: true })
+  }
+
+  private async pruneLibrary(keep: number): Promise<void> {
+    const daily = (await this.libraryFiles()).filter((f) => !f.name.startsWith('library-before-')).sort((a, b) => b.name.localeCompare(a.name))
+    for (const old of daily.slice(keep)) await rm(join(this.libraryDir, old.name), { force: true })
+  }
+
   private async write(): Promise<string> {
     const dir = this.dir!
     const name = `saves-${stamp().replace(' ', '-').replaceAll(':', '')}.zip`
@@ -97,7 +137,17 @@ export class SaveBackups {
     let out: ReturnType<typeof createWriteStream> | null = null
     try {
       await mkdir(dir, { recursive: true })
-      const library = copyDatabase(this.db.raw, this.libraryDir)
+      await this.sweep(STALE_PART)
+      // Make room first, so a full set never needs space for one more. The newest zip stays until the
+      // new one is whole, also when only one is kept.
+      const newest = (await this.files())[0]
+      await this.pruneZips(Math.max(this.cfg.backupKeep - 1, 1))
+      await this.pruneLibrary(Math.max(this.cfg.backupKeep - 1, 1))
+      const need = (newest?.size ?? 0) + ((await this.libraryFiles())[0]?.size ?? 0) + MARGIN
+      const free = (await this.space(dir))?.free
+      if (free !== undefined && free < need) {
+        throw new NoRoom(`Not enough space for a backup: ${bytes(free)} is free in ${dir} and about ${bytes(need)} is needed. Free space, lower RENPLAY_BACKUP_KEEP (now ${this.cfg.backupKeep}), or point RENPLAY_BACKUP_DIR at another disk.`)
+      }
       const zip = new yazl.ZipFile()
       // A full disk or an unwritable folder rejects this while files are still being added: it is
       // awaited below, and handled now so it never goes unhandled.
@@ -122,10 +172,12 @@ export class SaveBackups {
       zip.end()
       await done
       await rename(temp, join(dir, name))
-      for (const old of (await this.files()).slice(this.cfg.backupKeep)) await rm(join(dir, old.name), { force: true })
-      const daily = (await this.libraryFiles()).filter((f) => !f.name.startsWith('library-before-')).sort((a, b) => b.name.localeCompare(a.name))
-      for (const old of daily.slice(this.cfg.backupKeep)) await rm(join(this.libraryDir, old.name), { force: true })
+      // The database copy comes after the zip, so a run that fails leaves none behind.
+      const library = copyDatabase(this.db.raw, this.libraryDir)
+      await this.pruneZips(this.cfg.backupKeep)
+      await this.pruneLibrary(this.cfg.backupKeep)
       this.error = null
+      this.failedAt = null
       log('backup', `Library database backed up: ${library}`)
       log('backup', `Saves backed up: ${name}, ${count} ${count === 1 ? 'file' : 'files'}, ${bytes((await stat(join(dir, name))).size)}`)
       return name
@@ -133,7 +185,9 @@ export class SaveBackups {
       ;(out as ReturnType<typeof createWriteStream> | null)?.destroy()
       await rm(temp, { force: true }).catch(() => {})
       this.error = (e as Error).message
-      log('backup', `Saves not backed up: ${this.error}`, 'error')
+      this.failedAt = Date.now()
+      if (e instanceof NoRoom) log('backup', this.error, 'warn')
+      else log('backup', `Saves not backed up: ${this.error}`, 'error')
       throw e
     }
   }

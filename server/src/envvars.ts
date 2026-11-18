@@ -208,7 +208,7 @@ export const ENV_VARS: readonly EnvVar[] = [
     group: 'Images and saves',
     kind: 'number',
     fallback: 14,
-    description: 'Daily save zips and daily library database copies kept, counted separately. Older daily copies are deleted. Copies before numbered database migrations are kept until you remove them.',
+    description: 'Daily save zips and daily library database copies kept, counted separately. Older daily copies are deleted before a new backup is written, so the folder never needs room for one more than this number. A backup is skipped, with a warning in the log, when the disk has less room than the last zip needs. Copies before numbered database migrations are kept until you remove them.',
   },
   {
     name: 'RENPLAY_KEEPALIVE_URL',

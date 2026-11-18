@@ -2,20 +2,25 @@
 import Search from '@astrojs/starlight/components/Search.astro'
 import ThemeSelect from '@astrojs/starlight/components/ThemeSelect.astro'
 import logo from '../assets/logo.svg'
+
+// The website's header links, with the website first.
+const links = [
+  ['Website', 'https://renplay.org/'],
+  ['Catalog', 'https://renplay.org/catalog/'],
+  ['GitHub', 'https://github.com/renplay-org/renplay'],
+  ['Support', 'https://ko-fi.com/janpuc'],
+]
 ---
 <div class="docs-header">
   <a class="docs-brand" href="/">
-    <img src={logo.src} width="32" height="32" alt="" />
-    <img class="wordmark wordmark-dark" src="/wordmark.svg" height="22" alt="Renplay" />
-    <img class="wordmark wordmark-light" src="/wordmark-on-paper.svg" height="22" alt="Renplay" />
+    <img class="mark" src={logo.src} width="30" height="30" alt="" />
+    <img class="wordmark wordmark-dark" src="/wordmark.svg" width="3995" height="1260" alt="Renplay" />
+    <img class="wordmark wordmark-light" src="/wordmark-on-paper.svg" width="3995" height="1260" alt="Renplay" />
     <span class="docs-label">Docs</span>
   </a>
   <div class="docs-search"><Search /></div>
   <nav class="docs-links" aria-label="Renplay sites">
-    <a href="https://renplay.org">Website <span aria-hidden="true">↗</span></a>
-    <a href="https://renplay.org/catalog">Catalog</a>
-    <a href="https://renplay.org/github">GitHub</a>
-    <a href="https://renplay.org/support">Support</a>
+    {links.map(([label, href]) => <a href={href}>{label}</a>)}
   </nav>
   <div class="docs-theme"><ThemeSelect /></div>
   {!Astro.locals.starlightRoute.hasSidebar && (
@@ -23,10 +28,7 @@ import logo from '../assets/logo.svg'
       <summary>Menu</summary>
       <div class="docs-home-menu-panel">
         <nav aria-label="Renplay sites, menu">
-          <a href="https://renplay.org">Website ↗</a>
-          <a href="https://renplay.org/catalog">Catalog</a>
-          <a href="https://renplay.org/github">GitHub</a>
-          <a href="https://renplay.org/support">Support</a>
+          {links.map(([label, href]) => <a href={href}>{label}</a>)}
         </nav>
         <ThemeSelect />
       </div>

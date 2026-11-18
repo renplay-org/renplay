@@ -193,9 +193,10 @@ test('a form on another site cannot change the visitor\'s progress', async ({ co
       await attacker.close()
     }
     expect(await progress()).toEqual(unchanged)
-    // The demo's own pages still change it.
-    expect(await laptop.evaluate(() => fetch('/api/games/the-question/not-now', { method: 'POST' }).then((r) => r.status))).toBe(200)
-    expect((await progress())[0]).not.toBeNull()
+    // The demo's own pages still change what playing needs, and not the rest.
+    expect(await laptop.evaluate(() => fetch('/api/games/the-question/not-now', { method: 'POST' }).then((r) => r.status))).toBe(403)
+    expect(await laptop.evaluate(() => fetch('/api/games/the-question/played', { method: 'POST' }).then((r) => r.status))).toBe(200)
+    expect((await progress())[1]).not.toBeNull()
   } finally {
     await new Promise((done) => other.close(done))
   }
@@ -219,14 +220,140 @@ test('a returning visitor whose browser still has the server demo\'s worker is a
     writeFileSync(file, standIn)
     demo.delays.set('/sw.js', 2500)
     demo.requests.length = 0
+    demo.answers.length = 0
     await page.goto(demo.origin)
     await expect(page.locator('.card[data-id="the-question"]')).toBeVisible({ timeout: 30000 })
-    // Every answer came from the stand-in: the old worker would have asked the host, which has no such file.
-    expect(demo.requests.filter((path) => path.startsWith('/api/'))).toEqual([])
+    // Every answer came from the stand-in: the old worker would have asked the host, which has no such file. The pictures
+    // are the exception: the stand-in leaves them to the host, which has each as a file.
+    const picture = (path) => /^\/api\/(art|avatars)\//.test(path)
+    expect(demo.requests.filter((path) => path.startsWith('/api/') && !picture(path))).toEqual([])
+    await expect.poll(() => demo.answers.filter((a) => picture(a.path)).length).toBe(demo.requests.filter(picture).length)
+    expect(demo.answers.filter((a) => picture(a.path) && a.status !== 200)).toEqual([])
     expect(errors).toEqual([])
   } finally {
     demo.delays.clear()
     writeFileSync(file, standIn)
     await context.close()
   }
+})
+
+/** The runtime's own request to save a file, from the demo's own page. */
+async function saveHere(page) {
+  const bytes = [...(await renpySave('A shared scene', Math.floor(Date.now() / 1000)))]
+  return page.evaluate(async (data) => {
+    const { game } = await (await fetch('/api/games/the-question')).json()
+    await fetch('/api/games/the-question/played', { method: 'POST' })
+    return (await fetch(`/api/saves/the-question/file?path=${game.saveDir}/1-1-LT1.save`, { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: new Uint8Array(data) })).status
+  }, bytes)
+}
+
+/** The demo as a visitor opens it on its own address, with the library loaded. */
+async function visit(page, path = '/') {
+  await page.goto(demo.origin + path)
+  await expect(page.getByRole('link', { name: 'Catalog', exact: true }).first()).toBeVisible({ timeout: 30000 })
+  // Leaving a page with a request in flight is an error of the page, not of the demo.
+  await page.waitForLoadState('networkidle')
+}
+
+const REFUSAL = 'The demo cannot do this. Install your own Renplay to try it.'
+
+test('a visitor can play and name a save, and the library leaves out the rest', async ({ page }) => {
+  test.setTimeout(real ? 240000 : 90000)
+  const errors = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await visit(page)
+  expect(await saveHere(page)).toBe(200)
+  await page.reload()
+  // The library: Resume stays, Not now goes.
+  await expect(page.getByRole('link', { name: 'Resume', exact: true }).first()).toBeVisible({ timeout: 15000 })
+  await expect(page.getByRole('button', { name: 'Not now' })).toHaveCount(0)
+  // The game page: no favourite, status or rating, and no download or delete in a save's menu.
+  await page.getByRole('link', { name: 'Game page' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Your progress' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /favourites/i })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Status' })).toHaveCount(0)
+  await expect(page.getByRole('radio', { name: '3 of 5' })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Saves' }).click()
+  for (const name of ['History', 'Import', 'Export all', 'Sync code']) await expect(page.getByRole('button', { name, exact: true }).or(page.getByRole('link', { name, exact: true }))).toHaveCount(0)
+  await page.getByRole('button', { name: 'Save actions' }).first().click()
+  await expect(page.getByRole('button', { name: 'Load', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Name', exact: true })).toBeVisible()
+  for (const name of ['Pin', 'Unpin', 'Name and note', 'Download', 'Copy to another game', 'Previous versions', 'Delete']) await expect(page.getByRole('button', { name, exact: true }), name).toHaveCount(0)
+  // Naming a save stays.
+  await page.getByRole('button', { name: 'Name', exact: true }).click()
+  await expect(page.getByLabel('Note')).toHaveCount(0)
+  await page.getByRole('textbox', { name: 'Name' }).fill('Before the question')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Before the question')).toBeVisible()
+  // The catalog is read only: it says where to add games, and has no button to.
+  await page.getByRole('link', { name: 'Catalog', exact: true }).first().click()
+  await page.locator('a[href^="/catalog?game="]').first().click()
+  await expect(page.getByText('to add games.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Add the download' })).toHaveCount(0)
+  // Account and settings keep what is this browser's own.
+  await visit(page, '/account')
+  await expect(page.getByRole('link', { name: 'Play history' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'This browser' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Adult games' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Your saves' })).toHaveCount(0)
+  await visit(page, '/settings')
+  await expect(page.getByRole('switch', { name: 'Move cards with the pointer' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Blurred', exact: true })).toHaveCount(0)
+  // Pages that are not for a visitor lead back to the library.
+  for (const path of ['/import-saves', '/add', '/activity', '/settings/users']) {
+    await visit(page, path)
+    expect(new URL(page.url()).pathname, path).toBe('/')
+  }
+  expect(errors).toEqual([])
+})
+
+test('a hand-made request for anything but playing is refused, and changes nothing', async ({ page }) => {
+  test.setTimeout(real ? 240000 : 90000)
+  await visit(page)
+  expect(await saveHere(page)).toBe(200)
+  const state = () => page.evaluate(async () => {
+    const { game } = await (await fetch('/api/games/the-question')).json()
+    const saves = await (await fetch('/api/saves/the-question')).json()
+    const history = await (await fetch('/api/saves/the-question/history')).json()
+    return { favoriteAt: game.favoriteAt, rating: game.rating, playStatus: game.playStatus, notNowAt: game.notNowAt, saves: saves.slots.map((x) => [x.file, x.title, x.note, x.pinnedAt]), versions: history.versions.length }
+  })
+  const before = await state()
+  expect(before.saves.length).toBe(1)
+  const file = before.saves[0][0]
+  const TQ = '/api/saves/the-question', GAME = '/api/games/the-question'
+  const hands = [
+    ['downloads', 'GET', `${TQ}/download?file=${file}`],
+    ['favourites', 'PUT', `${GAME}/favorite`, { on: true }],
+    ['ratings', 'PUT', `${GAME}/rating`, { rating: 5 }],
+    ['status', 'PUT', `${GAME}/status`, { status: 'finished' }],
+    ['Not now', 'POST', `${GAME}/not-now`, {}],
+    ['deleting a save', 'DELETE', `${TQ}/slot?file=${file}`],
+    ['restoring history', 'POST', `${TQ}/history/restore`, { id: 'x' }],
+    ['a note', 'PUT', `${TQ}/meta?file=${file}`, { note: 'A note' }],
+    ['a pin', 'PUT', `${TQ}/meta?file=${file}`, { pinned: true }],
+    ['importing', 'POST', `${TQ}/import`, {}],
+    ['sync codes', 'POST', `${TQ}/sync`, {}],
+    ['the account', 'PUT', '/api/me', { name: 'x' }],
+    ['the adult level', 'PUT', '/api/me/adult', { level: 'shown' }],
+    ['tokens', 'POST', '/api/me/tokens', { name: 'x' }],
+    ['people', 'POST', '/api/users', {}],
+    ['adding games', 'POST', '/api/imports', {}],
+    ['backups', 'POST', '/api/system/backups', {}],
+    ['defaults for everyone', 'PUT', '/api/defaults', {}],
+  ]
+  const answers = await page.evaluate((list) => Promise.all(list.map(async ([kind, method, path, body]) => {
+    const r = await fetch(path, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+    return [kind, r.status, (await r.json()).error]
+  })), hands)
+  expect(answers).toEqual(hands.map(([kind]) => [kind, 403, REFUSAL]))
+  expect(await state()).toEqual(before)
+  // Reads that would hand a file over have nothing to give.
+  const reads = await page.evaluate((list) => Promise.all(list.map(async (path) => (await fetch(path)).status)), ['/api/saves-export', `${TQ}/export`, `${GAME}/files`, '/api/jobs/1/log', '/api/system/backups/x.zip'])
+  expect(reads.every((status) => status === 403 || status === 404)).toBe(true)
+  // What playing needs still works.
+  const kept = await page.evaluate(async () => [
+    (await fetch('/api/games/the-question/play-time', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"seconds":5}' })).status,
+    (await fetch('/api/saves/the-question/boot')).status,
+  ])
+  expect(kept).toEqual([200, 200])
 })

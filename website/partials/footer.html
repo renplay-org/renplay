@@ -1,16 +1,13 @@
-<footer>
+<footer class="page-foot">
   <div class="wrap">
-    <div class="row">
-      <a class="brand" href="{{site}}/"><img src="/logo.svg" alt="" width="26" height="26" style="border-radius:8px">Renplay</a>
-      <a href="{{site}}/">Website</a>
-      <a href="{{site}}/docs">Docs</a>
-      <a href="{{site}}/catalog/">Catalog</a>
-      <a href="{{site}}/demo">Try the demo</a>
-      <a href="{{site}}/github">GitHub</a>
-      <a href="{{site}}/releases">Release notes</a>
-      <a href="{{site}}/catalog/#request" data-request>Request a game</a>
-      <a href="{{site}}/support">Support</a>
-    </div>
+    <nav class="row" aria-label="Renplay">
+      <a class="brand" href="{{site}}/"><img src="/logo.svg" alt="" aria-hidden="true" width="26" height="26"><img class="wordmark" src="/design/logo/wordmark.svg" alt="Renplay" width="3995" height="1260"></a>
+      {{footlinks}}
+    </nav>
+    <nav class="row guides" aria-label="Install guides">
+      <span>Install guides</span>
+      {{guides}}
+    </nav>
     <small>{{footnote}}</small>
   </div>
 </footer>

@@ -1,8 +1,12 @@
 import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import { hashArchive } from './library/archives.js'
 import { ArtStore } from './art/store.js'
 import { Accounts } from './accounts/accounts.js'
 import { SaveBackups } from './saves/backups.js'
+import { SaveTrash } from './saves/trash.js'
+import { LowSpaceWatch } from './system/lowspace.js'
+import { diskSpace } from './util/disk.js'
 import { Builds } from './games/builds.js'
 import { Catalog } from './catalog/catalog.js'
 import type { Config } from './config.js'
@@ -43,7 +47,9 @@ export interface Services {
   art: ArtStore
   catalog: Catalog
   backups: SaveBackups
+  saveTrash: SaveTrash
   telemetry: Telemetry
+  lowSpace: LowSpaceWatch
 }
 
 export async function createServices(cfg: Config): Promise<Services> {
@@ -51,7 +57,7 @@ export async function createServices(cfg: Config): Promise<Services> {
   for (const d of [cfg.dataDir, cfg.walkthroughsDir, cfg.overlaysDir, cfg.internalDir, cfg.workDir, cfg.archivesDir, cfg.uploadsDir, cfg.enginesDir, cfg.purgeDir]) await mkdir(d, { recursive: true })
   // The content mode asks the catalog which save folders are adult; the catalog needs the content mode.
   let catalog: Catalog | null = null
-  const content = new ContentMode(cfg, db, () => catalog?.adultSaveDirs() ?? [])
+  const content = new ContentMode(cfg, db, () => catalog?.adultSaveDirs() ?? [], () => catalog?.safeSaveDirs() ?? [])
   const progress = new ProgressStore(db)
   const saveStores = new SaveStores(cfg, db)
   const art = new ArtStore(cfg, db, content)
@@ -84,6 +90,8 @@ export async function createServices(cfg: Config): Promise<Services> {
     catalog,
     saveStores,
     backups: new SaveBackups(cfg, db, saveStores),
+    saveTrash: new SaveTrash(join(cfg.dataDir, 'deleted-saves'), saveStores, new Purger(join(cfg.dataDir, 'deleted-saves-purge'))),
+    lowSpace: new LowSpaceWatch(cfg.dataDir, diskSpace),
     telemetry: new Telemetry({ cfg, db, catalog, content, accounts, saveStores, version: VERSION }),
   }
   s.jobs.register('import', 'Install', (ctx) => s.telemetry.install(ctx, async () => (await runImport(ctx, s)) as { recipe?: string | null; engine?: string }))

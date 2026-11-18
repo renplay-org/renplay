@@ -1,6 +1,7 @@
 import { viewer } from '../accounts/context.js'
 import type { Config } from '../config.js'
 import type { Db, GameRow } from '../db.js'
+import { folderKey } from '../saves/folders.js'
 import { HttpError, assertSlug } from '../util/paths.js'
 import { lowestLevel, parseAdultLevel, type AdultLevel } from '../shared/levels.js'
 
@@ -14,11 +15,12 @@ const KEY = 'adult_level'
  * shows everything until the admin chooses.
  */
 export class ContentMode {
-  /** `adultSaveDirs` lists the save folders adult recipes name: the catalog knows them (services.ts). */
+  /** `adultSaveDirs` lists the save folders adult recipes name, `safeSaveDirs` those the other recipes name: the catalog knows them (services.ts). */
   constructor(
     private readonly cfg: Config,
     private readonly db: Db,
     private readonly adultSaveDirs: () => Iterable<string> = () => [],
+    private readonly safeSaveDirs: () => Iterable<string> = () => [],
   ) {}
 
   /** The server's configuration decides; Settings cannot change it. */
@@ -74,17 +76,19 @@ export class ContentMode {
   /**
    * The save folders this person may see, out of `dirs`. Off leaves out every folder of an adult
    * game: an installed one's, one an adult recipe names, and, when games without a recipe count as
-   * adult for this person, any folder no game in the library claims. Nothing is moved or deleted.
+   * adult for this person, any folder no game in the library claims and no safe recipe names.
+   * Nothing is moved or deleted.
    */
   visibleSaveDirs(dirs: Iterable<string>): string[] {
     if (this.viewerLevel() !== 'off') return [...dirs]
     const games = this.db.allGames()
-    const hidden = new Set(this.adultSaveDirs())
-    for (const g of games) if (g.save_dir && this.hides(g)) hidden.add(g.save_dir)
-    for (const g of games) if (g.save_dir && !this.hides(g)) hidden.delete(g.save_dir)
+    // Folders are compared as `folderKey` does: one that differs from a hidden name only in capitals is the same folder on some storage.
+    const hidden = new Set([...this.adultSaveDirs()].map(folderKey))
+    for (const g of games) if (g.save_dir && this.hides(g)) hidden.add(folderKey(g.save_dir))
+    for (const g of games) if (g.save_dir && !this.hides(g)) hidden.delete(folderKey(g.save_dir))
     const restricted = this.hides({ adult: 0, recipe_id: '' })
-    const claimed = new Set(games.map((g) => g.save_dir).filter(Boolean))
-    return [...dirs].filter((d) => !hidden.has(d) && (!restricted || claimed.has(d)))
+    const known = new Set([...games.map((g) => g.save_dir).filter(Boolean), ...this.safeSaveDirs()].map(folderKey))
+    return [...dirs].filter((d) => !hidden.has(folderKey(d)) && (!restricted || known.has(folderKey(d))))
   }
 
   /** A library game as this person may see it, by its id from a request. */

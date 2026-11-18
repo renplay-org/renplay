@@ -7,6 +7,25 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.14.0] - 2026-11-18
+
+### Added
+
+- **Settings → Storage → Show what uses space** lists the saves of games that are no longer in your library, with the people who have saves, their size and the newest save. An admin can choose **Delete these saves** for one game. That moves every person's saves and History out of the library into a trash folder, and out of the daily backups. They are listed under **Deleted saves** for 30 days, and **Restore** puts them back as long as nobody has saves or History in that folder again, and only to the accounts that had them. Their names, notes and pins are not kept. After 30 days they are deleted for good and the space comes back. A game that is still in the library is refused. The same works from a script with an admin token: `DELETE /api/system/storage/saves/<save folder>`, and `POST /api/system/storage/deleted-saves/<entry>/restore`.
+- **Settings** shows a warning under Storage, and the log gets one line a day, when the disk with the data folder has less than 10 percent or 1 GB free.
+
+### Changed
+
+- The static demo lets a visitor play and nothing else. Playing The Question, saving, loading, Resume, naming a save, the game's own menu and the Catalog stay. Downloads, deleting saves, Previous versions, pins and notes, favourites, ratings, status, Account and Settings beyond This browser, and adding games are left out of the library and refused if asked for another way. The Catalog says "Install your own Renplay to add games."
+- renplay.org and adult.renplay.org have the new look. The home page is a painted room whose three screens wake under your hand. Its first screen is a short title, an opening scene in a box that keeps one height, and two buttons: Install and Try the demo. Then come the catalog, with a search and a count of tested games, the real demo on a laptop and a phone, how it works with a place for measured numbers, what you get, the install commands and the questions people ask. Demo in the header opens demo.renplay.org. On a phone the page scrolls only up and down, and the demo's phone opens the demo full screen. The catalog, each game's page, the age question and the page that is not found follow the same look.
+- A link to a game's page on renplay.org shows a card with the game's name and cover, made by the website, instead of a picture from the developer's host.
+- The docs have the website's look. Page titles are in the book face and code, paths and labels in the small monospace. The header is the mark and the drawn name with quiet links. Notes are a line in the lamp's colour instead of a filled box, configuration entries and the page links at the end are thin lines instead of filled cards, and code blocks have the website's smaller corners. The home page has a band of the painted room under its title, and the footer is the website's, with the same links and the install guides. The light theme is paper, with the same type and lines.
+- Sharing a docs page shows a card made for the docs, served from `docs.renplay.org`, and every docs page has a description of at least 50 characters. The docs build now checks the titles, descriptions, canonical addresses, the card, the sitemap and the image tag the guides pin.
+
+### Fixed
+
+- Daily backups no longer fill a small disk. Old daily copies are deleted before the new zip is written, so a full set never needs room for one more. When the disk has less room than the last zip needs, Renplay skips the backup, writes nothing and logs what to do: free space, lower `RENPLAY_BACKUP_KEEP`, or set `RENPLAY_BACKUP_DIR` to another disk. After a failed backup it tries again the next day instead of every hour, and a failed run leaves no library database copy. A zip that a stopped server left unfinished is removed at the next start.
+
 ## [4.13.0] - 2026-11-17
 
 ### Added
@@ -840,7 +859,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.13.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.14.0...dev
+[4.14.0]: https://github.com/renplay-org/renplay/compare/v4.13.0...v4.14.0
 [4.13.0]: https://github.com/renplay-org/renplay/compare/v4.12.0...v4.13.0
 [4.12.0]: https://github.com/renplay-org/renplay/compare/v4.11.0...v4.12.0
 [4.11.0]: https://github.com/renplay-org/renplay/compare/v4.10.0...v4.11.0

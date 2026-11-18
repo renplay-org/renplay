@@ -37,6 +37,7 @@ Modules below the routes, like the install pipeline, take only the parts they us
 | `/data/job-logs/` | Recent job messages, appended as they happen so interrupted jobs keep their logs |
 | `/data/users/<id>/saves/<save folder>/` | Each person's saves, including shared signing keys and HTML storage. History in `../save-history/` |
 | `/data/saves/`, `/data/save-history/` | Compatibility symlinks to owner 1's folders |
+| `/data/deleted-saves/<ISO time>-<folder>/` | Saves an admin deleted for a removed game, kept 30 days, never in the daily backup |
 | `/data/users-removed/` | Archived removed accounts. Never automatically purged |
 | `/data/overlays/<id>/` | Mods: the user's files layered over a game |
 | `/data/art/` | The art cache: made pictures by content hash, originals in `src/` (`art/store.ts`) |
@@ -233,7 +234,35 @@ unreachable.
 like desktop Ren'Py. `saves/stores.ts` makes them and owns where they live, and the names, notes and
 pins people give their saves. Every overwrite and delete snapshots the previous version in that
 account's `save-history/`. Locks are shared across store instances. Metadata keys include the store root.
-Renplay never deletes saves on uninstall or reinstall. See [Accounts API](/developers/accounts-api/)
+Renplay never deletes saves on uninstall or reinstall. The one exception is an admin's "Delete these
+saves" for a game no longer in the library, and it deletes nothing at first: `saves/trash.ts` renames each
+person's `saves/<folder>` and `save-history/<folder>` (History-only people too) into
+`/data/deleted-saves/<ISO time>-<folder>/users/<id>/`, under the same per-folder lock every save write takes,
+and asks again under that lock whether a library game uses the folder. A rename moves a link as a link and
+never follows it. The saves' names, notes and pins are dropped, as when a single save is deleted. Each
+person's part records the account's id and when it was created in `users/<id>/account`, because a restored
+older database can give the id to another account. An entry is built under a hidden name (a leading dot)
+and takes its own only when every person is done, so nothing lists, restores or purges it half made. A
+deletion and a restore each write `journal.json` in the entry before their first rename (written atomically:
+a temp file, fsync, rename), with the direction, each person's account and every move in order, and remove it
+after the last. At start, before the server takes save writes and before any removal can run, `recover()`
+reads each journal under the folder locks: an interrupted deletion is rolled back, so it did nothing and the
+admin can delete again, and an interrupted restore is finished. Each step looks at what is where, so a second
+interruption is safe. When a folder it needs is not empty, or the account is not the same, nothing moves: the
+entry is named, marked in its journal, listed as needing attention and kept out of the 30-day removal for as
+long as the journal is there, and the log says what to move. A restart after that finishes it. Nothing
+else writes into the trash, so a game that claims the folder later starts from an empty one. The time is the
+entry's name, written once, so no restart or restored database can move it. The one exception is an entry that
+a journal protected and a start then put right while data remains in it (the person's account is gone, so
+their part was never moved): it is renamed with the time of that start, so what stayed gets a fresh 30 days
+instead of being due at once. The rename happens before the journal is removed, so a crash between them leaves
+the journal, and an entry that ends up empty just disappears. A daily job hands entries older
+than 30 days, whole, to a `Purger` (a rename into `deleted-saves-purge/`, on the same volume, then a low-priority `rm`), and never
+touches `users/`. "Restore" renames an entry back whole or not at all: under the locks of every person it
+checks that both the saves and the History of the folder are missing or empty for each of them, moves
+everything, and moves it back again if one move fails. A person whose account is not the one recorded
+stays in the trash. A restore and a removal of the same entry never run together. The daily
+backup zip leaves the trash out, and "What uses space" counts it. See [Accounts API](/developers/accounts-api/)
 for schema 7, migration, sessions, nginx protection and the request-local permission boundary.
 
 ## The catalog

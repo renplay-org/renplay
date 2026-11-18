@@ -8,15 +8,15 @@ these from here and nowhere else.
 |---|---|
 | The library (`selector/`) | `src/index.css` imports `fonts.css` and `tokens.css`. Vite emits the fonts as hashed files, and the Dockerfile copies this folder into the build |
 | The demo | It is the library with `RENPLAY_DEMO` on, so it needs nothing of its own |
-| The docs (`docs/site/`) | `astro.config.mjs` lists both files first in `customCss`, and `src/styles/renplay.css` maps Starlight's variables to the tokens |
-| The website (`website/`) | `build.mjs` copies `tokens.css`, `fonts.css`, `fonts/` and `grain.webp` into `/design/` of each site, and every page links the two stylesheets before `site.css` |
+| The docs (`docs/site/`) | `astro.config.mjs` lists both files first in `customCss`, and `src/styles/renplay.css` maps Starlight's variables to the tokens, with no literal of its own. The light theme is paper, mixed from `--paper` and `--on-paper` |
+| The website (`website/`) | `build.mjs` copies `tokens.css`, `fonts.css`, `fonts/`, `grain.webp` and the wordmark into `/design/` of each site, and the mark as `/logo.svg`. Every page links the two stylesheets before `site.css` |
 | The game page (`runtime/`) | It loads no file from here. A colour it paints is a literal with its token's name in a comment |
 
 The art is the light, ink is the room, and the person holds a lamp.
 
-**The website is the reference.** Its stylesheets and the shelf's script (`website/prototypes-2/` in the plans, copied to
-`design-system/reference/`) say what the look is: corners, the game card, the type. Where the app differs, the app
-changes, not the website.
+**The website is the reference.** Its stylesheets and the shelf's script (`website/site.css`, `home.css`, `catalog.css` and
+`js/shelf.js`) say what the look is: corners, the game card, the type. Where the app differs, the app changes, not the
+website.
 
 ## The rules
 
