@@ -1,13 +1,14 @@
 import { lstat, mkdir, readFile, readdir, rename, rmdir, unlink, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { bytes } from '../shared/format.js'
 import type { DeletedSaves } from '../shared/api.js'
-import { walkFiles } from '../util/fsx.js'
+import { presence, walkFiles } from '../util/fsx.js'
 import type { Purger } from '../util/purge.js'
 import { log } from '../util/log.js'
 import { HttpError, isSaveDirName } from '../util/paths.js'
 import { IN_LIBRARY, NO_SAVES, folderKey, type LibraryDirs } from './folders.js'
 import type { SaveStores } from './stores.js'
+import { readJournal, removeJournal, writeJournal, journalPath, type Journal, type Move } from './trash-journal.js'
 
 const DAY = 24 * 3600_000
 /** How long the saves an admin deleted wait in the trash for a restore. */
@@ -32,6 +33,10 @@ const HISTORY = 'save-history'
 const GONE = 'These saves are no longer in the trash'
 const FOREIGN = 'These saves belonged to an account that is not the one with that number now. Renplay does not give them to another account.'
 const BLOCKED = 'Nothing was restored because the game has saves or History in that folder again. Renplay does not mix them.'
+const ATTENTION = 'Renplay could not finish this after it was interrupted, because folders it needs are not empty. Nothing is deleted. Move or remove what is in the way, then restart Renplay.'
+
+/** A move failed and what had moved could not be put back: the journal stays, so the next start finishes it. */
+class Stuck extends HttpError {}
 
 /** Removes the folders under `path` that hold nothing, `path` too, and nothing else. True when `path` is gone. */
 async function pruneEmpty(path: string): Promise<boolean> {
@@ -104,22 +109,88 @@ export class SaveTrash {
   }
 
   /**
-   * At start: a deletion a crash interrupted left an entry under its hidden name. What had moved is
-   * kept: it becomes a normal entry, restorable and removed 30 days after it was made, and the rest
-   * is still where it was. Then it goes on with the removals the purger had not finished.
+   * At start, before anything writes a save or removes an entry: puts right what a crash interrupted,
+   * using the journal each deletion and restore writes before its first rename. A deletion is rolled
+   * back, so it did nothing and the admin can delete again. A restore is finished. When the folders it
+   * needs are not free it stays as it is, listed as needing attention and never removed for good. An
+   * entry made under a hidden name without a journal had everything moved already and is named. Then it
+   * goes on with the removals the purger had not finished.
    */
   async recover(): Promise<void> {
     for (const e of await readdir(this.dir, { withFileTypes: true }).catch(() => [])) {
-      const parsed = e.isDirectory() && e.name.startsWith(HIDDEN) ? parseEntry(e.name.slice(HIDDEN.length)) : null
+      const hidden = e.name.startsWith(HIDDEN)
+      const parsed = e.isDirectory() ? parseEntry(hidden ? e.name.slice(HIDDEN.length) : e.name) : null
       if (!parsed) continue
       try {
-        const name = await this.publish(e.name, parsed.at, parsed.folder)
-        if (name) log('saves', `The deletion of the saves of ${parsed.folder} was interrupted. What had moved is in the trash and can be restored, the rest is still where it was.`, 'warn')
+        await this.exclusive(e.name, () => this.recoverEntry(e.name, parsed, hidden))
       } catch (err) {
-        log('saves', `Could not finish the interrupted deletion of the saves of ${parsed.folder}, which stays as it is: ${(err as Error).message}`, 'warn')
+        log('saves', `Could not finish the interrupted work on the saves of ${parsed.folder}, which stay as they are: ${(err as Error).message}`, 'warn')
       }
     }
     await this.purger.resume()
+  }
+
+  private async recoverEntry(name: string, parsed: { at: number; folder: string }, hidden: boolean): Promise<void> {
+    const base = join(this.dir, name)
+    const { folder } = parsed
+    let journal: Journal | null
+    try {
+      journal = await readJournal(base)
+    } catch {
+      return this.keep(base, name, parsed, hidden, null, 'its journal cannot be read')
+    }
+    if (!journal) {
+      // Everything moved and only the name is missing.
+      if (hidden && (await this.publish(name, parsed.at, folder))) log('saves', `The deletion of the saves of ${folder} was interrupted after everything moved. They are in the trash and can be restored.`, 'warn')
+      return
+    }
+    // Both ways end the same: what is in the entry goes to the live tree. A deletion is undone from the last move, a restore goes on from the first.
+    const order = journal.op === 'delete' ? [...journal.people].reverse().map((p) => ({ ...p, moves: [...p.moves].reverse() })) : journal.people
+    const todo: Array<{ from: string; to: string }> = []
+    let conflict = null as string | null
+    try {
+      await this.underLocks([...new Set(journal.people.map((p) => p.user))].sort((a, b) => a - b), folder, async () => {
+        for (const p of order) {
+          if ((this.stores.identity(p.user) ?? '') !== p.account) return void (conflict = `the account with the number ${p.user} is not the one that had these saves`)
+          for (const m of p.moves) {
+            const from = this.kept(base, m)
+            const at = await presence(from)
+            if (at === false) continue
+            const to = this.liveOf(m)
+            if (at === null || (await occupied(to))) return void (conflict = `${to} is not empty`)
+            todo.push({ from, to })
+          }
+        }
+        for (const t of todo) {
+          await mkdir(dirname(t.to), { recursive: true })
+          await rename(t.from, t.to)
+        }
+      })
+    } catch (err) {
+      conflict = (err as Error).message
+    }
+    if (conflict) return this.keep(base, name, parsed, hidden, journal, conflict)
+    await removeJournal(base)
+    const gone = await tidy(base)
+    if (hidden && !gone) await this.publish(name, parsed.at, folder)
+    log('saves', journal.op === 'delete' ? `The deletion of the saves of ${folder} was interrupted. Everything was put back where it was, and they can be deleted again.` : `The restore of the saves of ${folder} was interrupted. It was finished now.`, 'warn')
+  }
+
+  /** Leaves an entry that could not be put right as it is, marks it so nothing removes it, and says what to do. */
+  private async keep(base: string, name: string, parsed: { at: number; folder: string }, hidden: boolean, journal: Journal | null, why: string): Promise<void> {
+    // A journal that cannot be read stays as it is, and still keeps the entry.
+    if (journal) await writeJournal(base, { ...journal, attention: ATTENTION })
+    if (hidden) await this.publish(name, parsed.at, parsed.folder)
+    log('saves', `The ${journal?.op === 'delete' ? 'deletion' : 'work'} on the saves of ${parsed.folder} was interrupted and Renplay could not put it right by itself, because ${why}. Nothing was deleted, and the entry stays in the trash for good until it is put right. Move or remove what is in the way, then restart Renplay.`, 'warn')
+  }
+
+  private kept(base: string, m: Move): string {
+    return join(base, 'users', String(m.user), m.sub, m.name)
+  }
+
+  private liveOf(m: Move): string {
+    const store = this.stores.of(m.user)
+    return join(m.sub === SAVES ? store.root : store.historyRoot, m.name)
   }
 
   private async entries(): Promise<Array<{ name: string; at: number; folder: string }>> {
@@ -137,9 +208,19 @@ export class SaveTrash {
     const out: DeletedSaves[] = []
     for (const e of await this.entries()) {
       const { files, people, size } = await this.measure(join(this.dir, e.name))
-      out.push({ entry: e.name, folder: e.folder, title: null, people, files, bytes: size, deletedAt: e.at, removeAt: e.at + KEPT })
+      out.push({ entry: e.name, folder: e.folder, title: null, people, files, bytes: size, deletedAt: e.at, removeAt: e.at + KEPT, attention: await this.attention(e.name) })
     }
     return out.sort((a, b) => b.deletedAt - a.deletedAt || a.folder.localeCompare(b.folder))
+  }
+
+  /** Why an entry needs an admin, or null. A journal that is there while nothing works on the entry was left by an interruption. */
+  private async attention(name: string): Promise<string | null> {
+    try {
+      const journal = await readJournal(join(this.dir, name))
+      return journal ? (journal.attention ?? (this.busy.has(name) ? null : ATTENTION)) : null
+    } catch {
+      return ATTENTION
+    }
   }
 
   private async measure(path: string): Promise<{ files: number; people: number; size: number }> {
@@ -196,44 +277,66 @@ export class SaveTrash {
     const matched = (await this.stores.unclaimed(claimed)).find((f) => f.folder === folder)?.folder
     if (!matched) throw new HttpError(404, NO_SAVES)
     const { hidden, at } = await this.create(matched)
+    const base = join(this.dir, hidden)
+    const journal: Journal = { op: 'delete', people: [] }
     const done = { folder: matched, files: 0, people: 0, bytes: 0, entry: '' }
     try {
       for (const user of this.stores.people()) {
-        const moved = await this.stores.of(user).withFolder(matched, () => this.moveOut(user, matched, join(this.dir, hidden, 'users', String(user)), inLibrary))
+        const moved = await this.stores.of(user).withFolder(matched, () => this.moveOut(user, matched, base, journal, inLibrary))
         if (moved.files) done.people++
         done.files += moved.files
         done.bytes += moved.bytes
       }
     } catch (e) {
+      // Stuck keeps its journal: the next start puts it right. Any other stop leaves what moved whole, so it is an entry.
+      if (e instanceof Stuck) throw e
+      await removeJournal(base).catch(() => {})
       await this.publish(hidden, at, matched).catch((err) => log('saves', `Could not name the saves of ${matched} that moved: ${(err as Error).message}`, 'warn'))
       throw e
     }
+    await removeJournal(base)
     done.entry = (await this.publish(hidden, at, matched)) ?? ''
     return done
   }
 
-  /** One person's folder, under its lock: the saves, and the History, which may be all they have. */
-  private async moveOut(user: number, name: string, to: string, inLibrary: LibraryDirs): Promise<{ files: number; bytes: number }> {
+  /**
+   * One person's folder, under its lock: the saves, and the History, which may be all they have. The
+   * journal says what is about to move before anything does, and a move that fails puts back what moved.
+   */
+  private async moveOut(user: number, name: string, base: string, journal: Journal, inLibrary: LibraryDirs): Promise<{ files: number; bytes: number }> {
     const store = this.stores.of(user)
-    const plan = []
+    const to = join(base, 'users', String(user))
+    const plan: Move[] = []
     for (const [sub, root] of [[SAVES, store.root], [HISTORY, store.historyRoot]] as const) {
       // A link is moved as the link it is (rename never follows one), but a link is not a folder of saves.
       const found = (await readdir(root, { withFileTypes: true }).catch(() => [])).find((e) => e.name === name && (e.isDirectory() || (sub === HISTORY && e.isSymbolicLink())))
-      if (found) plan.push({ sub, from: join(root, found.name), name: found.name })
+      if (found) plan.push({ user, sub, name: found.name })
     }
     const saves = plan.some((p) => p.sub === SAVES) ? await store.list(name) : []
     if (plan.length) {
       await mkdir(to, { recursive: true })
-      await writeFile(join(to, ACCOUNT), this.stores.identity(user) ?? '')
-    }
-    for (const p of plan) {
-      await mkdir(join(to, p.sub), { recursive: true })
-      // The check and the rename follow each other with nothing waited for in between.
+      const account = this.stores.identity(user) ?? ''
+      await writeFile(join(to, ACCOUNT), account)
+      journal.people.push({ user, account, moves: plan })
+      await writeJournal(base, journal)
+      for (const p of plan) await mkdir(join(to, p.sub), { recursive: true })
+      // Asked once for the person, under the lock, and the first rename follows with nothing waited for in between.
       if ([...inLibrary()].some((dir) => folderKey(dir) === folderKey(name))) throw new HttpError(409, IN_LIBRARY)
-      await rename(p.from, join(to, p.sub, p.name))
-      // What a person wrote about these saves goes with them, as it does when one save is deleted.
-      if (p.sub === SAVES) this.stores.dropNotes(user, name)
     }
+    const moved: Move[] = []
+    try {
+      for (const p of plan) {
+        await rename(this.liveOf(p), this.kept(base, p))
+        moved.push(p)
+      }
+    } catch (e) {
+      const stuck: string[] = []
+      for (const m of moved.reverse()) await rename(this.kept(base, m), this.liveOf(m)).catch(() => stuck.push(this.liveOf(m)))
+      if (stuck.length) throw new Stuck(500, `Deleting stopped part way and these folders could not be put back, so they are in the trash now and the next start puts them back: ${stuck.join(', ')}`)
+      throw e
+    }
+    // What a person wrote about these saves goes with them, as it does when one save is deleted.
+    if (plan.some((p) => p.sub === SAVES)) this.stores.dropNotes(user, name)
     return { files: saves.length, bytes: saves.reduce((n, f) => n + f.size, 0) }
   }
 
@@ -253,7 +356,9 @@ export class SaveTrash {
     const base = join(this.dir, entry.name)
     // The entry may have been removed while this waited.
     if (!(await lstat(base).then((st) => st.isDirectory(), () => false))) throw new HttpError(404, GONE)
-    const people: Array<{ user: number; dirs: Array<{ sub: string; from: string; to: string }>; files: number; bytes: number }> = []
+    // A journal here is left from an interruption that a start could not put right.
+    if ((await presence(journalPath(base))) !== false) throw new HttpError(409, ATTENTION)
+    const people: Array<{ user: number; dirs: Array<{ sub: 'saves' | 'save-history'; from: string; to: string }>; files: number; bytes: number }> = []
     let foreign = false
     for (const id of (await readdirIfThere(join(base, 'users'))).map((e) => e.name).sort((a, b) => Number(a) - Number(b))) {
       const user = Number(id)
@@ -291,6 +396,9 @@ export class SaveTrash {
         const store = this.stores.of(p.user)
         for (const root of [store.root, store.historyRoot]) if (await occupied(join(root, entry.folder))) throw new HttpError(409, BLOCKED)
       }
+      // What is about to move is written down first: a crash part way is finished at the next start.
+      const journal: Journal = { op: 'restore', people: people.map((p) => ({ user: p.user, account: this.stores.identity(p.user) ?? '', moves: p.dirs.map((d) => ({ user: p.user, sub: d.sub, name: basename(d.to) })) })) }
+      await writeJournal(base, journal)
       const moved: Array<{ from: string; to: string }> = []
       try {
         for (const d of people.flatMap((p) => p.dirs)) {
@@ -301,9 +409,11 @@ export class SaveTrash {
       } catch (e) {
         const stuck: string[] = []
         for (const m of moved.reverse()) await rename(m.to, m.from).catch(() => stuck.push(m.to))
-        if (stuck.length) throw new HttpError(500, `Restoring stopped part way and these folders could not be put back in the trash, so they are in the library now: ${stuck.join(', ')}`)
+        if (stuck.length) throw new Stuck(500, `Restoring stopped part way and these folders could not be put back in the trash, so they are in the library now and the next start finishes the restore: ${stuck.join(', ')}`)
+        await removeJournal(base)
         throw e
       }
+      await removeJournal(base)
       await tidy(base)
       return { folder: entry.folder, files: people.reduce((n, p) => n + p.files, 0), people: people.filter((p) => p.files).length, bytes: people.reduce((n, p) => n + p.bytes, 0) }
     })
@@ -334,6 +444,11 @@ export class SaveTrash {
             throw err
           })
           if (!st?.isDirectory() || dirname(resolve(path)) !== resolve(this.dir)) return null
+          // Never while a journal says something was interrupted: that entry waits for an admin however old it is.
+          if ((await presence(journalPath(path))) !== false) {
+            log('saves', `The saves of ${e.folder} are more than 30 days in the trash but are kept, because their deletion or restore was interrupted and not put right. Move or remove what is in the way, then restart Renplay.`, 'warn')
+            return null
+          }
           const { files, size } = await this.measure(path)
           await this.purger.purge(path)
           return { files, size }

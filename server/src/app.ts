@@ -119,7 +119,6 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
   app.use(createPlayRouter(services))
 
   if (opts.startJobs !== false) backups.start()
-  if (opts.startJobs !== false) services.saveTrash.start()
   if (opts.startJobs !== false) telemetry.start()
   if (opts.startJobs !== false) lowSpace.start()
   app.use('/api', createSystemRouter(services))
@@ -158,7 +157,9 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
     for (const n of await readdir(cfg.workDir)) await purger.purge(join(cfg.workDir, n))
   } catch {}
   await purger.resume()
+  // Before anything writes a save (the server listens after this returns) and before the 30-day removal can run.
   await services.saveTrash.recover()
+  if (opts.startJobs !== false) services.saveTrash.start()
   const check = await builds.verify()
   if (check.missing.length) log('library', `Builds missing for ${check.missing.join(', ')}`, 'warn')
   if (check.back.length) log('library', `Builds back for ${check.back.join(', ')}`)

@@ -270,11 +270,14 @@ function DeletedSavesSection({ saves, run }: { saves: DeletedSaves[]; run: (fn: 
                 {d.title && <><code>{d.folder}</code>, </>}
                 {people(d.people)}, {bytes(d.bytes)}
               </div>
-              <div className="xs muted">Deleted on {day(d.deletedAt)}, removed for good on {day(d.removeAt)}</div>
+              <div className="xs muted">{d.attention ? 'Needs attention, kept until it is put right' : `Deleted on ${day(d.deletedAt)}, removed for good on ${day(d.removeAt)}`}</div>
+              {d.attention && <div className="xs muted">{d.attention}</div>}
             </div>
-            <Pill size="sm" variant="q" onClick={() => void run(() => post(`/api/system/storage/deleted-saves/${encodeURIComponent(d.entry)}/restore`), 'Saves restored')}>
-              Restore
-            </Pill>
+            {!d.attention && (
+              <Pill size="sm" variant="q" onClick={() => void run(() => post(`/api/system/storage/deleted-saves/${encodeURIComponent(d.entry)}/restore`), 'Saves restored')}>
+                Restore
+              </Pill>
+            )}
           </div>
         ))}
       </div>

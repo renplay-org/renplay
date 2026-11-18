@@ -11,7 +11,7 @@ import { readZipEntries } from '../util/zip.js'
 import { signInFixture, site } from './sign-in-fixture.js'
 
 interface Listed { folder: string; title: string | null; people: number; files: number; bytes: number; newest: number }
-interface InTrash { entry: string; folder: string; title: string | null; people: number; files: number; bytes: number; deletedAt: number; removeAt: number }
+interface InTrash { entry: string; folder: string; title: string | null; people: number; files: number; bytes: number; deletedAt: number; removeAt: number; attention: string | null }
 const report = async (app: App, headers: Record<string, string> = {}) => (await request(app.app).get('/api/system/storage').set(headers).expect(200)).body as { removedSaves: Listed[]; deletedSaves: InTrash[] }
 const removed = async (app: App) => (await report(app)).removedSaves
 const refresh = (app: App) => request(app.app).post('/api/system/storage/refresh').expect(200)
@@ -116,7 +116,7 @@ describe('saves of games no longer in the library', () => {
     await refresh(app)
     const { removedSaves, deletedSaves } = await report(app)
     expect(removedSaves.map((r) => r.folder)).toEqual(['Named-1'])
-    expect(deletedSaves).toEqual([{ entry: '2026-12-01T10-00-00.000Z-Gone-1', folder: 'Gone-1', title: null, people: 2, files: 3, bytes: 181 + 100, deletedAt: start, removeAt: start + 30 * DAY }])
+    expect(deletedSaves).toEqual([{ entry: '2026-12-01T10-00-00.000Z-Gone-1', folder: 'Gone-1', title: null, people: 2, files: 3, bytes: 181 + 100, deletedAt: start, removeAt: start + 30 * DAY, attention: null }])
     const name = await app.backups.run()
     const entries = await readZipEntries(join(root, 'backups', name), () => true, { ...SAVES_ZIP, totalBytes: 64 << 20 })
     expect([...entries.keys()].filter((n) => /Gone-1|save-history|deleted/.test(n))).toEqual([])
@@ -189,18 +189,27 @@ describe('saves of games no longer in the library', () => {
   })
 
   it('hides a folder that differs from an adult recipe’s only in capitals like the folder itself, at an installation at Off', async () => {
+    // Both would otherwise work: a live folder to delete, and an entry of the first account that restores into an empty folder.
     const variant = '2026-12-01T10-00-00.000Z-spicy-1'
     mkdirSync(join(trash(), variant, 'users/1/saves/spicy-1'), { recursive: true })
     writeFileSync(join(trash(), variant, 'users/1/saves/spicy-1/1-1-LT1.save'), 'x')
+    writeFileSync(join(trash(), variant, 'users/1/account'), app.services.saveStores.identity(1)!)
+    // The folder of the earlier test is gone, so this one is named in capitals as written, also on storage that ignores them.
+    for (const sub of ['saves', 'save-history']) rmSync(live(1, sub, 'Spicy-1'), { recursive: true, force: true })
+    await mine().write('spicy-1', '1-1-LT1.save', save(9))
     await request(app.app).put('/api/content').send({ level: 'off' }).expect(200)
     try {
       expect((await report(app)).deletedSaves.map((d) => d.folder)).not.toContain('spicy-1')
+      expect((await removed(app)).map((r) => r.folder)).not.toContain('spicy-1')
       await restore(variant).expect(404)
       await request(app.app).delete('/api/system/storage/saves/spicy-1').expect(404)
     } finally {
       await request(app.app).put('/api/content').send({ level: 'shown' }).expect(200)
     }
     expect((await report(app)).deletedSaves.map((d) => d.folder)).toContain('spicy-1')
+    await request(app.app).delete('/api/system/storage/saves/spicy-1').expect(200)
+    await restore(variant).expect(200)
+    expect(readFileSync(live(1, 'saves', 'spicy-1', '1-1-LT1.save'), 'utf8')).toBe('x')
   })
 })
 

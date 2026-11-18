@@ -341,18 +341,20 @@ describe('deleting the saves of removed games safely', () => {
       const deleting = del('Whole-1').then((r) => r)
       await hold.entered
       expect(await listed('Whole-1')).toEqual([])
-      expect(readdirSync(trash()).filter((n) => n.includes('Whole-1'))).toHaveLength(1)
-      await restore(`2026-12-11T10-00-00.000Z-Whole-1`).expect(404)
+      const [pending] = readdirSync(trash()).filter((n) => n.includes('Whole-1'))
+      // The name it will have once it is whole: not restorable before.
+      await restore(pending!.slice(1)).expect(404)
       hold.release()
       const done = await deleting
       expect(done.status).toBe(200)
+      expect(done.body.entry).toBe(pending!.slice(1))
       expect(await listed('Whole-1')).toEqual([expect.objectContaining({ folder: 'Whole-1', people: 2, files: 2 })])
       await restore(done.body.entry).expect(200)
       expect((await mine().list('Whole-1')).length + (await theirs().list('Whole-1')).length).toBe(2)
       expect(entryOf('Whole-1')).toEqual([])
     })
 
-    it('is completed, whatever moved, as an entry at the next start after a crash, and nothing is purged early', async () => {
+    it('is neither listed nor removed for good while it is being made, however old its name says it is', async () => {
       at(720)
       await mine().write('Crash-1', '1-1-LT1.save', save(12))
       await theirs().write('Crash-1', '1-1-LT1.save', save(13))
@@ -362,15 +364,11 @@ describe('deleting the saves of removed games safely', () => {
       cpSync(trash(), join(root, 'crashed'), { recursive: true })
       hold.release()
       await deleting
-      const restarted = new SaveTrash(join(root, 'crashed'), app.services.saveStores, app.services.purger)
-      expect(await listed('Crash-1', restarted)).toEqual([])
+      const copied = new SaveTrash(join(root, 'crashed'), app.services.saveStores, app.services.purger)
+      expect(await listed('Crash-1', copied)).toEqual([])
       at(760)
-      expect((await restarted.purge()).filter((p) => p.folder === 'Crash-1')).toEqual([])
+      expect((await copied.purge()).filter((p) => p.folder === 'Crash-1')).toEqual([])
       expect(readdirSync(join(root, 'crashed')).some((n) => n.includes('Crash-1'))).toBe(true)
-      const lines = [vi.spyOn(console, 'warn').mockImplementation(() => {}), vi.spyOn(console, 'log').mockImplementation(() => {})]
-      await restarted.recover()
-      expect(lines.flatMap((l) => l.mock.calls).some((c) => String(c[0]).includes('interrupted') && String(c[0]).includes('Crash-1'))).toBe(true)
-      expect(await listed('Crash-1', restarted)).toEqual([expect.objectContaining({ folder: 'Crash-1', people: 1, files: 1 })])
     })
 
     it('waits for a restore under way before it removes the entry for good', async () => {

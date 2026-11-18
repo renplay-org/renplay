@@ -318,7 +318,7 @@ export type SavesMoved = Pick<RemovedSaves, 'folder' | 'files' | 'people' | 'byt
 export type RemovedSavesDeleted = SavesMoved & { entry: string }
 
 /** One deletion in the trash: the saves are `files`, `bytes` is everything it holds, History too. Times are in ms. */
-export interface DeletedSaves { entry: string; folder: string; title: string | null; people: number; files: number; bytes: number; deletedAt: number; removeAt: number }
+export interface DeletedSaves { entry: string; folder: string; title: string | null; people: number; files: number; bytes: number; deletedAt: number; removeAt: number; attention: string | null }
 
 export interface Session { id: string; label: string; created_at: number; touched_at: number; expires_at: number; current: boolean }
 
