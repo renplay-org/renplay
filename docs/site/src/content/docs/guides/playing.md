@@ -228,6 +228,11 @@ controller is connected, the guide's bar shows these buttons instead of the keys
   save's menu, or with **History** for every save. Each version says why it is there, for example
   "Saved over in the game" or "Deleted here", and has a **Restore** button.
 - Uninstalling or reinstalling a game never deletes saves.
+- Saves of a game that is no longer in the library stay on the server until an admin deletes them.
+  **Settings → Storage → Show what uses space** lists them under "Saves of games no longer in your
+  library", with the people, the size and the newest save. **Delete these saves** moves every save
+  of that game to History, where it stays. Add the game to the library again and restore the saves
+  from its page. A game that is still in the library is refused.
 - When two devices change the same save without seeing each other's copy, the copy saved later
   stays in the slot and the other is kept in History. The player and the game's saves both say so.
 - Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every

@@ -112,6 +112,12 @@ the save backups: `GET /system/backups`, `POST /system/backups` (back up now) an
 `GET /system/backups/:name`, `PUT /system/sync` with `{ on }` for Sync codes, `PUT /defaults` for
 Defaults for everyone, `GET /metrics` (Prometheus text, also at `/metrics`), and the storage view:
 `GET /system/storage` (counted at most once a minute) and `POST /system/storage/refresh`.
+`GET /system/storage` also lists `removedSaves`: for each save folder that no library game uses, its
+`folder`, the catalog's `title` or `null`, `people`, `files`, `bytes` and the `newest` save in
+milliseconds. `DELETE /system/storage/saves/:folder` deletes everyone's saves in that folder into
+History and answers `{ folder, files, people, bytes }`. It answers 409 for a folder a library game
+uses, installed or not, and 404 for a folder with no saves. It is an admin route, so a token of an
+admin account works, and with `RENPLAY_AUTH=off` the one account is an admin.
 
 ## Route permissions
 

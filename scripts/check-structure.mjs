@@ -26,7 +26,8 @@ const LARGER = {
  * ones. When the count falls ROOM below it, lower it to match. Raising it takes a one-line reason here, next to the number.
  */
 // 14760: the backup job's guards (room first, sweep, back off) and the low disk warning, which no earlier test covered.
-const TEST_LINES = 14760
+// 14880: the admin's deletion of removed games' saves, which no earlier test covered: the list, the refusals, History, the backup zip, Off and tokens.
+const TEST_LINES = 14880
 const TEST_ROOM = 100
 
 const problems = []

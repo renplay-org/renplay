@@ -57,7 +57,8 @@ must be added again, but their saves are safe in `/data`.
 ### Daily save backups
 
 Once a day Renplay writes a zip of everyone's saves to `/data/backups/saves` and a complete copy of
-`library.db` in its `library/` subfolder. The database copy is safe while Renplay runs. The newest
+`library.db` in its `library/` subfolder. The zip holds the saves as they are now, never their History,
+so saves an admin deleted for a removed game are not in it. The database copy is safe while Renplay runs. The newest
 14 save zips and 14 daily database copies are kept. Pre-migration copies are not pruned.
 
 Old daily copies are deleted before the new zip is written, so the folder holds one fewer than the
