@@ -200,15 +200,13 @@ export class SaveStore {
     return this.locked(this.validated(saveDir), fn)
   }
 
-  private historyDir(saveDir: string, rel: string): string {
-    return safeJoin(safeJoin(this.historyRoot, saveDir), rel.replace(/\//g, '__'))
-  }
-
   private async snapshot(saveDir: string, rel: string, data: Buffer, reason: SaveReason): Promise<void> {
     if (!isSaveDirName(saveDir)) return
-    const dir = this.historyDir(saveDir, rel)
+    // Each path is joined where it is used, and safeJoin refuses a name that leaves the one before it.
+    const folder = safeJoin(this.historyRoot, saveDir)
+    const dir = safeJoin(folder, rel.replace(/\//g, '__'))
     // A link in History would take the version, and the pruning below, into another game's folder.
-    for (const path of [join(this.historyRoot, saveDir), dir]) {
+    for (const path of [folder, dir]) {
       const st = await lstat(path).catch(() => null)
       if (st && !st.isDirectory()) throw new Error('The History of this save is a link, so Renplay will not write to it')
     }
