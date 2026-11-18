@@ -54,7 +54,7 @@ export interface App {
 
 export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {}): Promise<App> {
   const services = await createServices(cfg)
-  const { db, content, accounts, art, catalog, jobs, builds, engines, purger, backups, telemetry, version } = services
+  const { db, content, accounts, art, catalog, jobs, builds, engines, purger, backups, telemetry, lowSpace, version } = services
 
   const app = express()
   app.disable('x-powered-by')
@@ -120,6 +120,7 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
 
   if (opts.startJobs !== false) backups.start()
   if (opts.startJobs !== false) telemetry.start()
+  if (opts.startJobs !== false) lowSpace.start()
   app.use('/api', createSystemRouter(services))
   app.use('/api', createDefaultsRouter(services))
   app.use('/api', createJobsRouter(services))
@@ -179,5 +180,5 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
     ]
   }
 
-  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(OWNER_ID), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), telemetry.stop(), db.close()) }
+  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(OWNER_ID), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), lowSpace.stop(), telemetry.stop(), db.close()) }
 }

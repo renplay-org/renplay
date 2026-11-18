@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { HardDrive } from 'lucide-react'
+import { HardDrive, AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
 import { Confirm, Spinner, errorText, useToast } from '../../lantern/ui'
 import { SourceLabel, LanternSwitch, Bar, Pill } from '../../lantern/controls'
 import { api, del, post, put } from '../../lib/api'
-import { bytes } from '@shared/format'
+import { bytes, lowSpace } from '@shared/format'
 import { useSystem } from '../../lib/queries'
 import type { StorageReport } from '@shared/api'
 import { Setting, setBy, useRun } from './common'
@@ -40,6 +40,12 @@ export function StoragePanel() {
         </h2>
         <div className="list">
           <div className="stack" style={{ gap: 14 }}>
+            {lowSpace(sys.disk.data) && (
+              <p className="notice amber" role="status" style={{ borderTop: 0, padding: 0 }}>
+                <AlertTriangle aria-hidden />
+                The disk with the data folder is nearly full. Saves, the library database and backups need room to be written. Free space, or move the data folder to a bigger disk.
+              </p>
+            )}
             <DiskBar label="Games volume" disk={sys.disk.games} />
             <DiskBar label="Data (saves, database)" disk={sys.disk.data} />
             <p className="small muted">

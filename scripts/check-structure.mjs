@@ -25,7 +25,8 @@ const LARGER = {
  * The ceiling is today's count with a little room, and it only goes down: a new test is paid for by removing duplicate
  * ones. When the count falls ROOM below it, lower it to match. Raising it takes a one-line reason here, next to the number.
  */
-const TEST_LINES = 14650
+// 14760: the backup job's guards (room first, sweep, back off) and the low disk warning, which no earlier test covered.
+const TEST_LINES = 14760
 const TEST_ROOM = 100
 
 const problems = []
