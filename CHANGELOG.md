@@ -7,6 +7,8 @@ release notes say what).
 
 ## [Unreleased]
 
+## [4.14.0] - 2026-11-18
+
 ### Added
 
 - **Settings → Storage → Show what uses space** lists the saves of games that are no longer in your library, with the people who have saves, their size and the newest save. An admin can choose **Delete these saves** for one game. That moves every person's saves and History out of the library into a trash folder, and out of the daily backups. They are listed under **Deleted saves** for 30 days, and **Restore** puts them back as long as nobody has saves or History in that folder again, and only to the accounts that had them. Their names, notes and pins are not kept. After 30 days they are deleted for good and the space comes back. A game that is still in the library is refused. The same works from a script with an admin token: `DELETE /api/system/storage/saves/<save folder>`, and `POST /api/system/storage/deleted-saves/<entry>/restore`.
@@ -857,7 +859,8 @@ The first release since 0.1: a rebuild of the whole app.
 
 - First release: a game selector and the build and test pipelines.
 
-[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.13.0...dev
+[Unreleased]: https://github.com/renplay-org/renplay/compare/v4.14.0...dev
+[4.14.0]: https://github.com/renplay-org/renplay/compare/v4.13.0...v4.14.0
 [4.13.0]: https://github.com/renplay-org/renplay/compare/v4.12.0...v4.13.0
 [4.12.0]: https://github.com/renplay-org/renplay/compare/v4.11.0...v4.12.0
 [4.11.0]: https://github.com/renplay-org/renplay/compare/v4.10.0...v4.11.0
