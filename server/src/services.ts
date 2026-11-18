@@ -1,9 +1,10 @@
 import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import { hashArchive } from './library/archives.js'
 import { ArtStore } from './art/store.js'
 import { Accounts } from './accounts/accounts.js'
 import { SaveBackups } from './saves/backups.js'
-import { SavesExpiry } from './saves/expiry.js'
+import { SaveTrash } from './saves/trash.js'
 import { LowSpaceWatch } from './system/lowspace.js'
 import { diskSpace } from './util/disk.js'
 import { Builds } from './games/builds.js'
@@ -46,7 +47,7 @@ export interface Services {
   art: ArtStore
   catalog: Catalog
   backups: SaveBackups
-  savesExpiry: SavesExpiry
+  saveTrash: SaveTrash
   telemetry: Telemetry
   lowSpace: LowSpaceWatch
 }
@@ -89,7 +90,7 @@ export async function createServices(cfg: Config): Promise<Services> {
     catalog,
     saveStores,
     backups: new SaveBackups(cfg, db, saveStores),
-    savesExpiry: new SavesExpiry(saveStores, () => catalog.librarySaveDirs()),
+    saveTrash: new SaveTrash(join(cfg.dataDir, 'deleted-saves'), saveStores),
     lowSpace: new LowSpaceWatch(cfg.dataDir, diskSpace),
     telemetry: new Telemetry({ cfg, db, catalog, content, accounts, saveStores, version: VERSION }),
   }

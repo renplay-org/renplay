@@ -4,8 +4,8 @@ import type { Config } from '../config.js'
 import type { Db } from '../db.js'
 import { sha1 } from '../util/fsx.js'
 import { HttpError } from '../util/paths.js'
-import { folderKey, type LibraryDirs } from './folders.js'
-import { SaveStore, SHARED_DIRS } from './store.js'
+import { folderKey } from './folders.js'
+import { SaveStore, SHARED_DIRS, isSharedDir } from './store.js'
 
 /** What a person wrote about one of their saves. A save with none of it has no row. */
 export interface SaveNote {
@@ -18,9 +18,6 @@ const NO_NOTE: SaveNote = { title: '', note: '', pinned_at: '' }
 
 /** How long a name waits for its save to turn up under another file name. */
 const PARKED_FOR = 14 * 24 * 3600_000
-
-/** How long the History of an admin's deletion of a removed game's saves waits for the game to be added again. */
-const DELETED_KEPT = 30 * 24 * 3600_000
 
 /** A save file of the slots: Ren'Py's own, in the save folder itself. */
 const isSlot = (file: string): boolean => file.endsWith('.save') && !file.includes('/')
@@ -86,22 +83,24 @@ export class SaveStores {
     return n
   }
 
-  private everyone(): number[] {
+  /** Everyone's ids. */
+  people(): number[] {
     return (this.db.raw.prepare('SELECT id FROM users ORDER BY id').all() as Array<{ id: number }>).map((u) => u.id)
   }
 
   /**
    * What everyone has in the save folders that are not in `claimed`, one entry for each folder
    * that holds a save: the people with saves in it, the files, their bytes and the time of the newest.
+   * A folder that differs from a library game's only in capitals, and a shared folder, is not offered:
+   * deleting it is refused too.
    */
   async unclaimed(claimed: ReadonlySet<string>): Promise<Array<{ folder: string; people: number; files: number; bytes: number; newest: number }>> {
     const found = new Map<string, { folder: string; people: number; files: number; bytes: number; newest: number }>()
-    // A folder that differs from a library game's only in capitals is not offered: deleting it is refused too.
     const used = new Set([...claimed].map(folderKey))
-    for (const user of this.everyone()) {
+    for (const user of this.people()) {
       const store = this.of(user)
       for (const folder of await store.listDirs()) {
-        if (used.has(folderKey(folder))) continue
+        if (used.has(folderKey(folder)) || isSharedDir(folder)) continue
         const files = await store.list(folder)
         if (!files.length) continue
         const row = found.get(folder) ?? { folder, people: 0, files: 0, bytes: 0, newest: 0 }
@@ -113,49 +112,6 @@ export class SaveStores {
       }
     }
     return [...found.values()]
-  }
-
-  /**
-   * Deletes everyone's saves in one save folder, each into History as a deleted save goes (kept at
-   * least 30 days, and restored from the game's page once a game uses the folder again). Each person's
-   * folder is deleted under the lock of their saves, and `inLibrary` is asked again before every file
-   * (see `SaveStore.removeFolder`), so a game added meanwhile keeps what is left.
-   */
-  async deleteFolder(folder: string, inLibrary: LibraryDirs): Promise<{ folder: string; files: number; people: number; bytes: number }> {
-    const done = { folder, files: 0, people: 0, bytes: 0 }
-    for (const user of this.everyone()) {
-      const files = await this.of(user).removeFolder(folder, inLibrary, (file) => {
-        if (isSlot(file)) this.dropNote(user, folder, file)
-      })
-      if (files.length) done.people++
-      done.files += files.length
-      done.bytes += files.reduce((n, f) => n + f.size, 0)
-    }
-    return done
-  }
-
-  /**
-   * Deletes for good the History of each folder an admin deleted, 30 days after the deletion (the day
-   * is noted in the folder's History, see `SaveStore.purgeHistory`, where the folder's lock and the
-   * checks are). What could not be deleted is reported in `failed` and tried again at the next call.
-   */
-  async expireDeleted(inLibrary: LibraryDirs): Promise<{ swept: Array<{ folder: string; files: number; bytes: number }>; failed: Array<{ folder: string; error: string }> }> {
-    const swept = new Map<string, { folder: string; files: number; bytes: number }>()
-    const failed: Array<{ folder: string; error: string }> = []
-    for (const user of this.everyone()) {
-      const store = this.of(user)
-      for (const folder of await store.deletedFolders()) {
-        try {
-          const gone = await store.purgeHistory(folder, { due: (at) => Date.now() - at >= DELETED_KEPT, inLibrary })
-          if (!gone) continue
-          const total = swept.get(folder) ?? { folder, files: 0, bytes: 0 }
-          swept.set(folder, { folder, files: total.files + gone.files, bytes: total.bytes + gone.bytes })
-        } catch (e) {
-          failed.push({ folder, error: (e as Error).message })
-        }
-      }
-    }
-    return { swept: [...swept.values()], failed }
   }
 
   /** The notes of a person's saves in one folder, by file. */

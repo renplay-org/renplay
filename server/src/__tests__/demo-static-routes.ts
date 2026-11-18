@@ -42,7 +42,7 @@ export const DEMO_ROUTES = {
     'POST /games/:id/update-not-now', 'POST /games/:id/walkthroughs', 'POST /imports', 'POST /jobs/:id/cancel', 'POST /jobs/:id/move',
     'POST /jobs/:id/pause', 'POST /jobs/:id/resume', 'POST /jobs/:id/retry', 'POST /me/avatar', 'POST /me/claim-owner', 'POST /me/identities/ldap',
     'POST /me/identities/oidc', 'POST /me/password', 'POST /me/tokens', 'POST /system/backups', 'POST /system/engines/refresh', 'POST /system/prune',
-    'POST /system/storage/refresh', 'POST /uploads', 'POST /uploads/:id/complete', 'POST /users', 'POST /users/:id/merge', 'POST /users/:id/password',
+    'POST /system/storage/deleted-saves/:entry/restore', 'POST /system/storage/refresh', 'POST /uploads', 'POST /uploads/:id/complete', 'POST /users', 'POST /users/:id/merge', 'POST /users/:id/password',
     'POST /users/:id/saves/copy', 'POST /users/:id/saves/import', 'PUT /content', 'PUT /defaults', 'PUT /games/:id/files/raw',
     'PUT /games/:id/walkthroughs/:file', 'PUT /me', 'PUT /me/adult', 'PUT /me/pin', 'PUT /me/tags', 'PUT /system/downloads', 'PUT /system/sync',
     'PUT /system/telemetry', 'PUT /uploads/:id', 'PUT /users/:id',

@@ -304,6 +304,8 @@ export interface StorageReport {
   orphans: Array<{ name: string; bytes: number }>
   /** Saves of games that are not in the library, biggest first. `title` is the catalog's name for the folder, when it has one. */
   removedSaves: RemovedSaves[]
+  /** What an admin deleted and the trash still holds, newest first, each until `removeAt`. */
+  deletedSaves: DeletedSaves[]
   totals: { builds: number; downloads: number; engines: number }
   freeable: { downloads: number; engines: number }
 }
@@ -311,8 +313,12 @@ export interface StorageReport {
 /** Everyone's saves in one save folder that no game in the library uses. `newest` is the time of the latest save, in ms. */
 export interface RemovedSaves { folder: string; title: string | null; people: number; files: number; bytes: number; newest: number }
 
-/** What an admin's deletion of those saves moved to History. */
-export type RemovedSavesDeleted = Pick<RemovedSaves, 'folder' | 'files' | 'people' | 'bytes'>
+/** What an admin's deletion of those saves moved into the trash (`entry` names it there), and what a restore moved back. */
+export type SavesMoved = Pick<RemovedSaves, 'folder' | 'files' | 'people' | 'bytes'>
+export type RemovedSavesDeleted = SavesMoved & { entry: string }
+
+/** One deletion in the trash: the saves are `files`, `bytes` is everything it holds, History too. Times are in ms. */
+export interface DeletedSaves { entry: string; folder: string; title: string | null; people: number; files: number; bytes: number; deletedAt: number; removeAt: number }
 
 export interface Session { id: string; label: string; created_at: number; touched_at: number; expires_at: number; current: boolean }
 

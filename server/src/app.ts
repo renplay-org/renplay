@@ -119,7 +119,7 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
   app.use(createPlayRouter(services))
 
   if (opts.startJobs !== false) backups.start()
-  if (opts.startJobs !== false) services.savesExpiry.start()
+  if (opts.startJobs !== false) services.saveTrash.start()
   if (opts.startJobs !== false) telemetry.start()
   if (opts.startJobs !== false) lowSpace.start()
   app.use('/api', createSystemRouter(services))
@@ -181,5 +181,5 @@ export async function createApp(cfg: Config, opts: { startJobs?: boolean } = {})
     ]
   }
 
-  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(OWNER_ID), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), services.savesExpiry.stop(), lowSpace.stop(), telemetry.stop(), db.close()) }
+  return { app, services, db, jobs, builds, engines, saves: services.saveStores.of(OWNER_ID), accounts, catalog, purger, backups, summary, close: () => (catalog.stop(), backups.stop(), services.saveTrash.stop(), lowSpace.stop(), telemetry.stop(), db.close()) }
 }
