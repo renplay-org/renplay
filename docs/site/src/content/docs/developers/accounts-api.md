@@ -119,10 +119,11 @@ out of the library into a trash folder, for 30 days, and answers `{ folder, file
 It answers 409 for a folder a library game uses, installed or not, and 404 for a folder with no saves, a
 link, or a shared folder. What the trash holds is `deletedSaves` in the same `GET /system/storage`:
 `entry`, `folder`, `title`, `people`, `files`, `bytes` (History too), `deletedAt` and `removeAt` in
-milliseconds. `POST /system/storage/deleted-saves/:entry/restore` moves an entry back and answers
+milliseconds, and `attention`, a sentence when a restart could not finish an interrupted deletion or restore
+(the entry is then kept and cannot be restored) and `null` otherwise. `POST /system/storage/deleted-saves/:entry/restore` moves an entry back and answers
 `{ folder, files, people, bytes }`. It answers 409 and moves nothing when the folder has saves or History
 again for any of the people, or when the account with the recorded id is not the one that had the saves,
-and 404 for an entry that is gone. Both are admin routes, so a token of an
+and 404 for an entry that is gone. It also answers 409 for an entry that needs attention. Both are admin routes, so a token of an
 admin account works, and with `RENPLAY_AUTH=off` the one account is an admin.
 
 ## Route permissions

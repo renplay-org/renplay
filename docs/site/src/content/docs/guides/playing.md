@@ -235,7 +235,10 @@ controller is connected, the guide's bar shows these buttons instead of the keys
   They stay there for 30 days, listed under "Deleted saves" with the day they go. **Restore** puts them
   back, as long as nobody has saves or History in that folder again, and only to the same accounts
   that had them. Their names, notes and pins are not kept. After 30 days Renplay deletes them for
-  good and the space comes back. A game that is still in the library is refused.
+  good and the space comes back. A game that is still in the library is refused. If Renplay stops
+  while it deletes or restores, the next start puts it right: a deletion is undone and a restore is
+  finished. When something is in the way, the entry says it needs attention and is kept, however old it
+  is, until you move that and restart Renplay.
 - When two devices change the same save without seeing each other's copy, the copy saved later
   stays in the slot and the other is kept in History. The player and the game's saves both say so.
 - Give a save your own name and a note, or **Pin** it, from its menu. A pinned save keeps every

@@ -242,8 +242,15 @@ and asks again under that lock whether a library game uses the folder. A rename 
 never follows it. The saves' names, notes and pins are dropped, as when a single save is deleted. Each
 person's part records the account's id and when it was created in `users/<id>/account`, because a restored
 older database can give the id to another account. An entry is built under a hidden name (a leading dot)
-and takes its own only when every person is done, so nothing lists, restores or purges it half made. If a
-crash leaves one, the next start gives it its name and logs it: what had moved can be restored. Nothing
+and takes its own only when every person is done, so nothing lists, restores or purges it half made. A
+deletion and a restore each write `journal.json` in the entry before their first rename (written atomically:
+a temp file, fsync, rename), with the direction, each person's account and every move in order, and remove it
+after the last. At start, before the server takes save writes and before any removal can run, `recover()`
+reads each journal under the folder locks: an interrupted deletion is rolled back, so it did nothing and the
+admin can delete again, and an interrupted restore is finished. Each step looks at what is where, so a second
+interruption is safe. When a folder it needs is not empty, or the account is not the same, nothing moves: the
+entry is named, marked in its journal, listed as needing attention and kept out of the 30-day removal for as
+long as the journal is there, and the log says what to move. A restart after that finishes it. Nothing
 else writes into the trash, so a game that claims the folder later starts from an empty one. The time is the
 entry's name, written once, so no restart or restored database can move it. A daily job hands entries older
 than 30 days, whole, to a `Purger` (a rename into `deleted-saves-purge/`, on the same volume, then a low-priority `rm`), and never
