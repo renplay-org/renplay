@@ -236,7 +236,11 @@ account's `save-history/`. Locks are shared across store instances. Metadata key
 Renplay never deletes saves on uninstall or reinstall. The one exception is an admin's "Delete these
 saves" for a game no longer in the library: `saves/expiry.ts` sweeps all History of that save folder
 (overwrites and earlier deletes too, for every person) daily 30 days after the deletion, only while no
-library game uses the folder. The time is in the `deleted_game_saves` setting, so a restart keeps the clock. See [Accounts API](/developers/accounts-api/)
+library game uses the folder and the person has no saves in it again. The time is a `.deleted` file in
+the folder's History, not in the database, so a restart or a restored database cannot move the clock.
+The deletion and the sweep take the same per-folder lock as every save write, and ask again whether a
+library game uses the folder before each file. A link or a folder spelled another way (capitals,
+a shared folder) is refused, and a link in History is removed, never followed. See [Accounts API](/developers/accounts-api/)
 for schema 7, migration, sessions, nginx protection and the request-local permission boundary.
 
 ## The catalog

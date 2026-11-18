@@ -1,15 +1,18 @@
-import { mkdir, readFile, readdir, rmdir, stat, unlink, utimes } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, stat, unlink, utimes } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { Writable } from 'node:stream'
 import yazl from 'yazl'
 import { sha1, walkFiles, writeFileAtomic } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
+import { CLAIMED, DELETED_MARKER, IN_LIBRARY, NO_SAVES, folderKey, parseDeletedAt, removeTree, sameFolder, type LibraryDirs } from './folders.js'
 import { SAVES_ZIP, SAVE_FILE_BYTES, isRenpySave } from './savefile.js'
 import { isZip, readZipEntries } from '../util/zip.js'
 
 const TOKENS_DIR = 'tokens'
 /** Top-level ~/.renpy folders shared by every game: save-signing keys and MultiPersistent data. */
 export const SHARED_DIRS = [TOKENS_DIR, 'persistent'] as const
+/** Whether a folder name is one of the shared folders, whatever its capitals. */
+const isSharedDir = (name: string): boolean => SHARED_DIRS.some((d) => folderKey(d) === folderKey(name))
 
 /** What a write did to the slot. */
 export type WriteOutcome = 'added' | 'replaced' | 'kept' | 'same'
@@ -69,9 +72,13 @@ export class SaveStore {
 
   resumeWrites(): void { this.acceptingWrites = true }
 
-  /** Serializes operations on one file. */
-  private async locked<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  /**
+   * Serializes the operations on one save folder of this person: a write, a deletion, and the
+   * purge of its History. Names that differ only in capitals are one folder on some storage.
+   */
+  private async locked<T>(saveDir: string, fn: () => Promise<T>): Promise<T> {
     if (!this.acceptingWrites) throw new HttpError(409, 'This account is being archived')
+    const key = `${this.root}/${folderKey(saveDir)}`
     const prev = SaveStore.locks.get(key) ?? Promise.resolve()
     const next = prev.catch(() => {}).then(fn)
     SaveStore.locks.set(key, next)
@@ -129,7 +136,7 @@ export class SaveStore {
     if (isJunk(rel)) throw new HttpError(400, 'Refusing temporary file')
     if (data.length > SAVE_FILE_BYTES) throw new HttpError(413, 'Save file too large')
     const full = safeJoin(this.dir(saveDir), rel)
-    return this.locked(full, async () => {
+    return this.locked(saveDir, async () => {
       let old: Buffer | null = null
       let oldMtime = 0
       try {
@@ -173,7 +180,7 @@ export class SaveStore {
   async remove(saveDir: string, name: string, reason: SaveReason = 'delete', base?: number): Promise<boolean | 'changed'> {
     const rel = cleanRelPath(name)
     const full = safeJoin(this.dir(saveDir), rel)
-    return this.locked(full, async () => {
+    return this.locked(saveDir, async () => {
       let old: Buffer
       try {
         old = await readFile(full)
@@ -185,6 +192,71 @@ export class SaveStore {
       await unlink(full)
       return true
     })
+  }
+
+  /**
+   * Deletes every save of a folder of a game gone from the library, each into History as a deleted
+   * save goes, and notes the day in the folder's History: the 30 days are counted from it. Under the
+   * folder's lock, it must be a plain folder of this person's (see `plainFolder`), and before every
+   * file no library game may use it. `removed` hears of each file.
+   */
+  async removeFolder(saveDir: string, inLibrary: LibraryDirs, removed: (name: string) => void): Promise<SaveFile[]> {
+    this.validated(saveDir)
+    return this.locked(saveDir, async () => {
+      if (!(await this.plainFolder(saveDir, inLibrary))) return []
+      const gone: SaveFile[] = []
+      let marked = false
+      for (const file of await this.list(saveDir)) {
+        this.refuseIfUsed(saveDir, inLibrary)
+        const full = safeJoin(this.dir(saveDir), cleanRelPath(file.name))
+        let old: Buffer
+        try {
+          old = await readFile(full)
+        } catch {
+          continue
+        }
+        if (!marked) {
+          await writeFileAtomic(join(safeJoin(this.historyRoot, saveDir), DELETED_MARKER), String(Date.now()))
+          marked = true
+        }
+        await this.snapshot(saveDir, file.name, old, 'user-delete')
+        this.refuseIfUsed(saveDir, inLibrary)
+        await unlink(full)
+        removed(file.name)
+        gone.push(file)
+      }
+      return gone
+    })
+  }
+
+  private refuseIfUsed(saveDir: string, inLibrary: LibraryDirs): void {
+    if (isSharedDir(saveDir)) throw new HttpError(404, NO_SAVES)
+    for (const dir of inLibrary()) if (folderKey(dir) === folderKey(saveDir)) throw new HttpError(409, IN_LIBRARY)
+  }
+
+  /**
+   * Whether this person has the folder as a plain folder: listed under exactly this name (a link or
+   * another spelling is not), not the same place on disk as a shared or a library folder, and its
+   * History not a link. A folder they do not have is no problem: false.
+   */
+  private async plainFolder(saveDir: string, inLibrary: LibraryDirs): Promise<boolean> {
+    this.refuseIfUsed(saveDir, inLibrary)
+    const entry = (await readdir(this.root, { withFileTypes: true }).catch(() => [])).find((e) => e.name === saveDir)
+    if (!entry?.isDirectory()) return false
+    for (const other of [...SHARED_DIRS, ...inLibrary()]) {
+      if (!(await sameFolder(this.root, saveDir, other))) continue
+      throw new HttpError(isSharedDir(other) ? 404 : 409, isSharedDir(other) ? NO_SAVES : IN_LIBRARY)
+    }
+    const history = await lstat(safeJoin(this.historyRoot, saveDir)).catch(() => null)
+    if (history && !history.isDirectory()) throw new HttpError(409, 'The History of this folder is a link, so Renplay will not delete from it.')
+    return true
+  }
+
+  /** The folders an admin's deletion left History in for this person: those with a day noted. */
+  async deletedFolders(): Promise<string[]> {
+    const noted = async (dir: string) => lstat(join(this.historyRoot, dir, DELETED_MARKER)).then((st) => st.isFile(), () => false)
+    const dirs = (await readdir(this.historyRoot, { withFileTypes: true }).catch(() => [])).filter((e) => e.isDirectory() && isSaveDirName(e.name) && !isSharedDir(e.name))
+    return (await Promise.all(dirs.map(async (e) => ((await noted(e.name)) ? e.name : '')))).filter(Boolean)
   }
 
   private historyDir(saveDir: string, rel: string): string {
@@ -241,22 +313,48 @@ export class SaveStore {
     return out.sort((a, b) => b.savedAt - a.savedAt)
   }
 
-  /** Deletes for good all of one folder's History, whatever put each version there, and reports what it freed. */
-  async purgeHistory(saveDir: string): Promise<{ files: number; bytes: number }> {
+  /**
+   * Deletes for good all of one folder's History, whatever put each version there, once an admin's
+   * deletion of the folder is `due` (given the day noted in its History), no game in the library
+   * uses the folder and this person has no saves in it again. All is decided under the folder's
+   * lock, and the library is asked again before each file. A folder a game uses keeps its History
+   * and loses its note. Returns what it freed, or null when it left everything. A link is removed,
+   * never followed. What could not be deleted is an error, and the day stays noted until the rest is
+   * gone, so the next try finds it.
+   */
+  async purgeHistory(saveDir: string, rule: { due: (deletedAt: number) => boolean; inLibrary: LibraryDirs }): Promise<{ files: number; bytes: number } | null> {
     const base = safeJoin(this.historyRoot, this.validated(saveDir))
-    const done = { files: 0, bytes: 0 }
-    for (const f of await readdir(base).catch(() => [] as string[])) {
-      const dir = join(base, f)
-      for (const v of await readdir(dir).catch(() => [] as string[])) {
-        const size = (await stat(join(dir, v)).catch(() => null))?.size
-        if (size === undefined || !(await unlink(join(dir, v)).then(() => true, () => false))) continue
-        done.files++
-        done.bytes += size
+    return this.locked(saveDir, async () => {
+      const here = await lstat(base).catch((e: NodeJS.ErrnoException) => {
+        if (e.code === 'ENOENT') return null
+        throw e
+      })
+      if (!here || isSharedDir(saveDir)) return null
+      if (!here.isDirectory()) throw new Error('its History is a link')
+      const marker = join(base, DELETED_MARKER)
+      const used = () => [...rule.inLibrary()].some((dir) => folderKey(dir) === folderKey(saveDir))
+      if (used()) {
+        await unlink(marker).catch(() => {})
+        return null
       }
-      await rmdir(dir).catch(() => {})
-    }
-    await rmdir(base).catch(() => {})
-    return done
+      const at = parseDeletedAt(await readFile(marker, 'utf-8').catch(() => ''))
+      if (at === null || !rule.due(at) || (await this.list(saveDir)).length) return null
+      const done = { files: 0, bytes: 0 }
+      const failed: string[] = []
+      // A game that claims the folder meanwhile stops it, before the next file.
+      const before = () => {
+        if (used()) throw CLAIMED
+      }
+      try {
+        for (const name of await readdir(base)) if (name !== DELETED_MARKER) await removeTree(join(base, name), done, failed, before)
+        if (!failed.length) await removeTree(base, { files: 0, bytes: 0 }, failed, before)
+      } catch (e) {
+        if (e === CLAIMED) return null
+        throw e
+      }
+      if (failed.length) throw new Error(`${failed.length} could not be deleted, the first: ${failed[0]}`)
+      return done
+    })
   }
 
   /** Versions kept by the conflict rule since a time, newest first, read from History's names alone. */
@@ -327,7 +425,7 @@ export class SaveStore {
    */
   async mergeSecurityKeys(text: string): Promise<number> {
     const path = join(this.root, TOKENS_DIR, 'security_keys.txt')
-    return this.locked(path, async () => {
+    return this.locked(TOKENS_DIR, async () => {
       let current = ''
       try {
         current = await readFile(path, 'utf-8')

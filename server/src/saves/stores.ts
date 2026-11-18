@@ -4,6 +4,7 @@ import type { Config } from '../config.js'
 import type { Db } from '../db.js'
 import { sha1 } from '../util/fsx.js'
 import { HttpError } from '../util/paths.js'
+import { folderKey, type LibraryDirs } from './folders.js'
 import { SaveStore, SHARED_DIRS } from './store.js'
 
 /** What a person wrote about one of their saves. A save with none of it has no row. */
@@ -20,9 +21,6 @@ const PARKED_FOR = 14 * 24 * 3600_000
 
 /** How long the History of an admin's deletion of a removed game's saves waits for the game to be added again. */
 const DELETED_KEPT = 30 * 24 * 3600_000
-const DELETED_KEY = 'deleted_game_saves'
-/** A folder an admin deleted: when the last deletion ended, in ms. */
-type DeletedFolders = Record<string, number>
 
 /** A save file of the slots: Ren'Py's own, in the save folder itself. */
 const isSlot = (file: string): boolean => file.endsWith('.save') && !file.includes('/')
@@ -98,10 +96,12 @@ export class SaveStores {
    */
   async unclaimed(claimed: ReadonlySet<string>): Promise<Array<{ folder: string; people: number; files: number; bytes: number; newest: number }>> {
     const found = new Map<string, { folder: string; people: number; files: number; bytes: number; newest: number }>()
+    // A folder that differs from a library game's only in capitals is not offered: deleting it is refused too.
+    const used = new Set([...claimed].map(folderKey))
     for (const user of this.everyone()) {
       const store = this.of(user)
       for (const folder of await store.listDirs()) {
-        if (claimed.has(folder)) continue
+        if (used.has(folderKey(folder))) continue
         const files = await store.list(folder)
         if (!files.length) continue
         const row = found.get(folder) ?? { folder, people: 0, files: 0, bytes: 0, newest: 0 }
@@ -117,55 +117,45 @@ export class SaveStores {
 
   /**
    * Deletes everyone's saves in one save folder, each into History as a deleted save goes (kept at
-   * least 30 days, and restored from the game's page once a game uses the folder again). The caller
-   * has checked that no game in the library uses it. The folders every game shares are never touched.
+   * least 30 days, and restored from the game's page once a game uses the folder again). Each person's
+   * folder is deleted under the lock of their saves, and `inLibrary` is asked again before every file
+   * (see `SaveStore.removeFolder`), so a game added meanwhile keeps what is left.
    */
-  async deleteFolder(folder: string): Promise<{ folder: string; files: number; people: number; bytes: number }> {
-    if ((SHARED_DIRS as readonly string[]).includes(folder)) throw new HttpError(404, 'No saves of this game were found')
+  async deleteFolder(folder: string, inLibrary: LibraryDirs): Promise<{ folder: string; files: number; people: number; bytes: number }> {
     const done = { folder, files: 0, people: 0, bytes: 0 }
     for (const user of this.everyone()) {
-      const store = this.of(user)
-      let any = false
-      for (const file of await store.list(folder)) {
-        if (!(await store.remove(folder, file.name, 'user-delete'))) continue
-        if (isSlot(file.name)) this.dropNote(user, folder, file.name)
-        done.files++
-        done.bytes += file.size
-        any = true
-      }
-      if (any) done.people++
-    }
-    // The clock lives in the database, so a restart does not reset it.
-    if (done.files) {
-      const deleted = this.db.getSetting<DeletedFolders>(DELETED_KEY, {})
-      this.db.setSetting(DELETED_KEY, { ...deleted, [folder]: Date.now() })
+      const files = await this.of(user).removeFolder(folder, inLibrary, (file) => {
+        if (isSlot(file)) this.dropNote(user, folder, file)
+      })
+      if (files.length) done.people++
+      done.files += files.length
+      done.bytes += files.reduce((n, f) => n + f.size, 0)
     }
     return done
   }
 
   /**
-   * Deletes for good all the History of a folder an admin deleted, 30 days after the deletion, when no
-   * game in the library uses the folder. A folder a game uses again keeps its History, as before. The
-   * History of other folders stays.
+   * Deletes for good the History of each folder an admin deleted, 30 days after the deletion (the day
+   * is noted in the folder's History, see `SaveStore.purgeHistory`, where the folder's lock and the
+   * checks are). What could not be deleted is reported in `failed` and tried again at the next call.
    */
-  async expireDeleted(inLibrary: ReadonlySet<string>): Promise<Array<{ folder: string; files: number; bytes: number }>> {
-    const deleted = this.db.getSetting<DeletedFolders>(DELETED_KEY, {})
-    const swept = []
-    for (const [folder, at] of Object.entries(deleted)) {
-      if (!inLibrary.has(folder)) {
-        if (Date.now() - at < DELETED_KEPT) continue
-        const gone = { folder, files: 0, bytes: 0 }
-        for (const user of this.everyone()) {
-          const part = await this.of(user).purgeHistory(folder)
-          gone.files += part.files
-          gone.bytes += part.bytes
+  async expireDeleted(inLibrary: LibraryDirs): Promise<{ swept: Array<{ folder: string; files: number; bytes: number }>; failed: Array<{ folder: string; error: string }> }> {
+    const swept = new Map<string, { folder: string; files: number; bytes: number }>()
+    const failed: Array<{ folder: string; error: string }> = []
+    for (const user of this.everyone()) {
+      const store = this.of(user)
+      for (const folder of await store.deletedFolders()) {
+        try {
+          const gone = await store.purgeHistory(folder, { due: (at) => Date.now() - at >= DELETED_KEPT, inLibrary })
+          if (!gone) continue
+          const total = swept.get(folder) ?? { folder, files: 0, bytes: 0 }
+          swept.set(folder, { folder, files: total.files + gone.files, bytes: total.bytes + gone.bytes })
+        } catch (e) {
+          failed.push({ folder, error: (e as Error).message })
         }
-        swept.push(gone)
       }
-      delete deleted[folder]
     }
-    this.db.setSetting(DELETED_KEY, deleted)
-    return swept
+    return { swept: [...swept.values()], failed }
   }
 
   /** The notes of a person's saves in one folder, by file. */

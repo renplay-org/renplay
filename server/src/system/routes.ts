@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { Router } from 'express'
 import { parseJson } from '../db.js'
 import { HttpError, cleanRelPath, isSaveDirName, safeJoin } from '../util/paths.js'
+import { IN_LIBRARY } from '../saves/folders.js'
 import { log } from '../util/log.js'
 import { dirSize } from '../util/fsx.js'
 import { diskSpace } from '../util/disk.js'
@@ -59,8 +60,8 @@ export function createSystemRouter(s: Services): Router {
     const folder = req.params.folder
     if (!isSaveDirName(folder)) throw new HttpError(400, 'Invalid save folder')
     if (!content.visibleSaveDirs([folder]).length) throw new HttpError(404, 'No saves of this game were found')
-    if (catalog.librarySaveDirs().has(folder)) throw new HttpError(409, 'This game is still in your library. Remove it from the library first, then delete its saves.')
-    const done = await saveStores.deleteFolder(folder)
+    if (catalog.librarySaveDirs().has(folder)) throw new HttpError(409, IN_LIBRARY)
+    const done = await saveStores.deleteFolder(folder, () => catalog.librarySaveDirs())
     if (!done.files) throw new HttpError(404, 'No saves of this game were found')
     storage = null
     counting = null

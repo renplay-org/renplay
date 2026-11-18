@@ -25,8 +25,9 @@ export class SavesExpiry {
   }
 
   async sweep(): Promise<Array<{ folder: string; files: number; bytes: number }>> {
-    const swept = await this.saveStores.expireDeleted(this.libraryDirs())
+    const { swept, failed } = await this.saveStores.expireDeleted(() => this.libraryDirs())
     for (const s of swept) log('saves', `Deleted the History of the saves of ${s.folder} for good: ${s.files} ${s.files === 1 ? 'file' : 'files'}, ${bytes(s.bytes)} freed`)
+    for (const f of failed) log('saves', `Could not delete all the History of the saves of ${f.folder}, so it stays and is tried again at the next sweep: ${f.error}`, 'warn')
     return swept
   }
 }
