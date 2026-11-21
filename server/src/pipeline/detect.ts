@@ -106,12 +106,13 @@ export interface GameMeta {
 }
 
 /**
- * The Ren'Py version: `version = '8.3.4.24120703'` in renpy/vc_version.py, or
+ * The Ren'Py version: `version = '8.3.4.24120703'` in renpy/vc_version.py (`u'7.8.7.25031702'` in
+ * Ren'Py 7.5 to 7.8), or
  * for Ren'Py 7 and older, whose vc_version.py only has `vc_version = 320`,
  * `version_tuple = (7, 3, 2, vc_version)` from renpy/__init__.py.
  */
 export function renpyVersionFromVc(vc: string, init?: string, python?: 2 | 3): string | undefined {
-  const m = vc.match(/^version\s*=\s*['"]([^'"]+)['"]/m)
+  const m = vc.match(/^version\s*=\s*[uU]?['"]([^'"]+)['"]/m)
   if (m) return m[1]
   // Ren'Py 7.4 to 8.0 define it twice, for Python 2 (7.x) and Python 3 (8.x). Which one a game
   // runs depends on the Python it ships (pythonOf); without that, the Python 3 one.

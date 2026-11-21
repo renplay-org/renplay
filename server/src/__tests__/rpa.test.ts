@@ -1,14 +1,17 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import yazl from 'yazl'
 import { createWriteStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import { openZip, type SourceEntry } from '../pipeline/archive.js'
-import { detectLayout } from '../pipeline/project.js'
+import type { JobContext } from '../jobs/manager.js'
+import { ImageProcessor, defaultImagePolicy } from '../pipeline/optimize.js'
+import { PackWriter } from '../pipeline/pack.js'
+import { detectLayout, extractProject } from '../pipeline/project.js'
 import { readRpaIndex, splitRpa, streamRpaFile } from '../pipeline/rpa.js'
 
 /** Minimal protocol-2 pickle writer for {str: [(int, int, bytes)]}. */
@@ -184,6 +187,34 @@ describe('RPA streaming split', () => {
     const src = await openZip(zip)
     expect(detectLayout(src.entries)).toBeNull()
     src.close()
+  })
+
+  it('keeps a Ren\'Py 6 game\'s own archived theme picture over the one its download ships', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rpa-common-'))
+    const zip = await zipOf({
+      'OldGame-1.0-pc/game/script.rpyc': Buffer.from('script'),
+      'OldGame-1.0-pc/game/images.rpa': buildRpa({ '_theme_glow/g_box.png': Buffer.from('own, archived') }),
+      'OldGame-1.0-pc/common/_theme_glow/g_box.png': Buffer.from('shipped'),
+      'OldGame-1.0-pc/common/_theme_glow/g_frame.png': Buffer.from('shipped frame'),
+    }, false)
+    const src = await openZip(zip)
+    const assets = new PackWriter(join(dir, 'assets.pack'))
+    const packed = new PackWriter(join(dir, 'zip.pack'))
+    const process = vi.spyOn(ImageProcessor.prototype, 'process').mockImplementation(async (data) => ({ data, changed: false, placeholder: null }))
+    const ctx: JobContext = { id: 'test', params: {}, signal: new AbortController().signal, progress() {}, log() {}, checkAbort() {} }
+    try {
+      await extractProject(src, 'OldGame-1.0-pc/', dir, defaultImagePolicy(), 4, ctx, [], { assets, zip: packed, skip: new Set() })
+      await Promise.all([assets.close(), packed.close()])
+      const read = (name: string) => {
+        const [pack, at] = packed.index.has(name) ? [packed, packed.index.get(name)!] : [assets, assets.index.get(name)!]
+        return readFileSync(pack.path).subarray(at[0], at[0] + at[1]).toString()
+      }
+      expect([read('_theme_glow/g_box.png'), read('_theme_glow/g_frame.png')]).toEqual(['own, archived', 'shipped frame'])
+    } finally {
+      process.mockRestore()
+      src.close()
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

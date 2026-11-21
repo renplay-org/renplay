@@ -91,6 +91,12 @@ export interface ExtractTargets {
 
 const SKIP_GAME = [/^cache\//i, /^saves\//i, /\.rpyb$/i, /(^|\/)\.ds_store$/i, /(^|\/)thumbs\.db$/i, /\.bak$/i]
 const KEEP_ROOT = /^(progressive_download\.txt|web-icon\.png)$/i
+/**
+ * Pictures of the themes and frames Ren'Py 6 kept in its common folder (theme.glow's
+ * _theme_glow/g_box.png and the like). Ren'Py 8 dropped them, so a game that uses them gets the
+ * ones its own download ships, in its game folder, where Ren'Py looks first.
+ */
+const OLD_COMMON = /^(?:renpy\/)?common\/(_(?:theme_[^/]+|roundrect|outline|compat|layout)\/[^/]+\.(?:png|jpe?g|gif|webp))$/i
 
 /** A build's presplash picture, by its file name or the end of its path. */
 export function isPresplash(path: string): boolean {
@@ -138,6 +144,7 @@ export async function extractProject(
   const gameEntries: Array<{ rel: string; e: SourceEntry }> = []
   const rpas: Array<{ rel: string; e: SourceEntry }> = []
   const rpycs: Array<{ rel: string; e: SourceEntry }> = []
+  const oldCommon: Array<{ rel: string; e: SourceEntry }> = []
   let total = 0
   const skipped = (g: string) => SKIP_GAME.some((r) => r.test(g)) || isExcluded(g) || targets.skip.has(g) || written.has(g.toLowerCase())
 
@@ -150,6 +157,8 @@ export async function extractProject(
       continue
     }
     if (!rel.startsWith('game/')) {
+      const old = OLD_COMMON.exec(rel)
+      if (old) oldCommon.push({ rel: old[1]!, e })
       if (KEEP_ROOT.test(rel) || (!rel.includes('/') && isPresplash(rel))) {
         await pipeline(await e.open(), createWriteStream(join(dest, rel)))
       }
@@ -174,6 +183,9 @@ export async function extractProject(
     gameEntries.push({ rel: g, e })
     total += e.size
   }
+  // Games made with Ren'Py 7 and later never use the old themes.
+  if (Number(meta.renpyVersion?.split('.')[0]) >= 7) oldCommon.length = 0
+  for (const x of oldCommon) total += x.e.size
 
   let done = 0
   let reported = Date.now()
@@ -237,8 +249,7 @@ export async function extractProject(
     stats.files++
   }
 
-  // Phase A: loose files. They take precedence over archive contents.
-  for (const { rel: g, e } of gameEntries) {
+  const writeLoose = async (g: string, e: SourceEntry) => {
     ctx.checkAbort()
     noteFile(g)
     stats.bytesIn += e.size
@@ -261,6 +272,9 @@ export async function extractProject(
     }
     tick(e.size, g)
   }
+
+  // Phase A: loose files. They take precedence over archive contents.
+  for (const { rel: g, e } of gameEntries) await writeLoose(g, e)
 
   // Phase B: archives, in name order. The first archive holding a name wins.
   rpas.sort((a, b) => a.rel.localeCompare(b.rel))
@@ -343,6 +357,9 @@ export async function extractProject(
     tick(e.size - reported, archiveRel)
     stats.archivesSplit++
   }
+
+  // Last, the old common pictures the game has no file of its own for, loose or archived.
+  for (const { rel: g, e } of oldCommon) if (!skipped(g)) await writeLoose(g, e)
 
   await limiter.drain()
   ctx.log(`Prepared ${placeholders.size} streaming placeholders`)

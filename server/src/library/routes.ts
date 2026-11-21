@@ -5,7 +5,7 @@ import { pipeline } from 'node:stream/promises'
 import { Router } from 'express'
 import { KEEP_DOWNLOADS, archiveIdentity, publishUpload } from './archives.js'
 import { parseJson, type GameSource } from '../db.js'
-import { INSPECT_VERSION, enqueueImport, inspectArchive } from '../pipeline/import.js'
+import { INSPECT_VERSION, enqueueImport, existingGame, inspectArchive } from '../pipeline/import.js'
 import type { Archive, ArchiveInfo, ArchivesResponse, InspectResponse, UploadStarted } from '../shared/api.js'
 import { exists, newId } from '../util/fsx.js'
 import { HttpError, cleanRelPath, isSlug, safeJoin } from '../util/paths.js'
@@ -69,6 +69,7 @@ export function createLibraryRouter(deps: Services): Router {
         // Off: an adult game does not exist, so its download does not appear in Add games.
         if (match && deps.content.hidesRecipe(match.recipe.nsfw)) return null
         if (hiddenSources.has(f.rel) && !installedBy.has(f.rel)) return null
+        const existing = existingGame(db, undefined, match?.recipe.id, info?.saveDir, info?.title)
         return {
           path: f.rel,
           name: basename(f.rel),
@@ -88,7 +89,7 @@ export function createLibraryRouter(deps: Services): Router {
                 nsfw: match.recipe.nsfw ?? false,
               }
             : null,
-          existingGame: [match ? db.gameByRecipe(match.recipe.id) : null, info?.saveDir ? db.gameBySaveDir(info.saveDir) : null].find((g) => g && !deps.content.hides(g))?.id ?? null,
+          existingGame: existing && !deps.content.hides(existing) ? existing.id : null,
         }
       }).filter((a) => a !== null),
     } satisfies ArchivesResponse)
@@ -109,7 +110,7 @@ export function createLibraryRouter(deps: Services): Router {
       sha256: prev && prev.size === st.size && prev.mtime_ms === Math.floor(st.mtimeMs) ? prev.sha256 : '',
       info: JSON.stringify(info),
     })
-    const existing = info.saveDir ? db.gameBySaveDir(info.saveDir) : null
+    const existing = existingGame(db, undefined, undefined, info.saveDir, info.title)
     res.json({ info, existingGame: existing && !deps.content.hides(existing) ? existing.id : null } satisfies InspectResponse)
   })
 
