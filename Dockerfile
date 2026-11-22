@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-bookworm-slim AS build
+FROM node:24-trixie-slim AS build
 WORKDIR /src
 
 COPY selector/package.json selector/package-lock.json selector/
@@ -15,14 +15,18 @@ RUN cd selector && npm run build
 COPY server/ server/
 RUN cd server && npm run build && npm prune --omit=dev
 
-FROM node:24-bookworm-slim
+FROM node:24-trixie-slim
 # nginx serves the games volume; libarchive-tools (bsdtar) unpacks 7z/rar
 # archives. Ren'Py engines come prebuilt from renplay-org/engines.
 # jemalloc avoids glibc retaining fragmented sharp/libvips image allocations.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools curl ca-certificates libjemalloc2 util-linux \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nginx-light gettext-base libarchive-tools curl ca-certificates libjemalloc2 util-linux \
  && ln -s /usr/lib/*-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so.2 \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled /var/log/nginx \
+    /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-* \
  && mkdir -p /app
 
 WORKDIR /app

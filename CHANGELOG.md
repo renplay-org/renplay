@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Fixed
+
+- The container image now builds on Debian 13 (trixie) with OS security updates applied and leaves out unused build tools (`npm`, `corepack` and `yarn`) at runtime, clearing all fixable critical and high vulnerabilities in the image.
+
 ## [4.14.0] - 2026-11-18
 
 ### Added
