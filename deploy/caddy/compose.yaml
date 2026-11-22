@@ -13,6 +13,7 @@ services:
     container_name: renplay
     restart: unless-stopped
     environment:
+      RENPLAY_INSTALL: compose
       RENPLAY_PUBLIC_URL: https://renplay.example.com
       # Caddy, then the nginx inside the image.
       RENPLAY_TRUSTED_HOPS: "2"

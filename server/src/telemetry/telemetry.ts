@@ -170,7 +170,8 @@ export class Telemetry {
         signal: AbortSignal.timeout(15_000),
       })
       await res.body?.cancel().catch(() => {})
-      log('telemetry', `Sent the report for ${day} (${res.status})`, 'debug')
+      if (res.ok) log('telemetry', `Sent the report for ${day} (${res.status})`, 'debug')
+      else log('telemetry', `The collector refused the report for ${day} (${res.status})`, 'info')
     } catch (error) {
       log('telemetry', `Could not send the report: ${(error as Error).message}`, 'debug')
     }

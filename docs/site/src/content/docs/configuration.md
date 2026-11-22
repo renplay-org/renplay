@@ -834,7 +834,7 @@ Default: `source`
 
 </div>
 
-The image and the chart set this to image or chart, so the usage report can count how Renplay was installed. Leave it alone.
+The image, Compose file and chart set this to image, compose or chart, so the usage report can count how Renplay was installed. Leave it alone.
 
 </div>
 
