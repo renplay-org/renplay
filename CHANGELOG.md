@@ -9,7 +9,7 @@ release notes say what).
 
 ### Changed
 
-- The example Docker Compose file (`deploy/compose.yaml`) sets `RENPLAY_INSTALL=compose` so the anonymous usage report counts Compose installs separately from plain Docker runs.
+- The example Docker Compose files (`deploy/compose.yaml` and `deploy/caddy/compose.yaml`) set `RENPLAY_INSTALL=compose` so the anonymous usage report counts Compose installs separately from plain Docker runs.
 
 ### Fixed
 
