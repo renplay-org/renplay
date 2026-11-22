@@ -294,6 +294,23 @@ describe('telemetry schedule', () => {
     await a.services.telemetry.send()
     expect(sends()).toBe(2)
   })
+
+  it('logs a non-2xx collector answer at info with its status and keeps 2xx at debug', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime('2026-11-10T12:00:00Z')
+    const a = await start()
+    const lines = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const telemetryLines = () => lines.mock.calls.map((c) => String(c[0])).filter((l) => l.includes('[telemetry]'))
+    await a.services.telemetry.send()
+    expect(telemetryLines()).toEqual([])
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL, init: RequestInit = {}) => {
+      requests.push({ url: String(url), init })
+      return new Response('bad report', { status: 400 })
+    }))
+    vi.setSystemTime('2026-11-11T12:00:00Z')
+    await a.services.telemetry.send()
+    expect(telemetryLines()).toEqual([expect.stringMatching(/ info .*\[telemetry\].*2026-11-10 \(400\)/)])
+  })
 })
 
 describe('the User-Agent of requests to renplay.org', () => {

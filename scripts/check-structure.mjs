@@ -31,7 +31,8 @@ const LARGER = {
 // 15651: crash recovery of the trash, which no earlier test covered: an interrupted deletion and restore, a second interruption, a conflict that must never expire.
 // 15690: the fresh 30 days for data that stays in an entry after its protection ends, and a crash on the way.
 // 15762: admin Settings tab switching (General, This browser, About), which no earlier browser spec covered.
-const TEST_LINES = 15762
+// 15779: logging non-2xx telemetry collector answers at info while keeping 2xx at debug.
+const TEST_LINES = 15779
 const TEST_ROOM = 100
 
 const problems = []
