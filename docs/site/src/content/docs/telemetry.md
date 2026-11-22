@@ -34,7 +34,7 @@ to you, your server's address or your accounts. It only lets the collector count
 |---|---|
 | `version` | The Renplay version |
 | `arch` | `arm64` or `x64` |
-| `install` | How Renplay was installed: `image` (Docker, with or without Compose), `chart`, `source` or `demo` |
+| `install` | How Renplay was installed: `image` (plain Docker), `compose` (Docker Compose), `chart`, `source` or `demo` |
 | `auth` | `off`, `password`, `oidc`, `ldap` or `mixed` |
 | `adultInstall` | The installation's adult games level: `off`, `blurred` or `shown` |
 | `uptimeDays` | Days since this start |

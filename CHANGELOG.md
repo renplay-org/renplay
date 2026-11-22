@@ -7,6 +7,10 @@ release notes say what).
 
 ## [Unreleased]
 
+### Changed
+
+- The example Docker Compose file (`deploy/compose.yaml`) sets `RENPLAY_INSTALL=compose` so the anonymous usage report counts Compose installs separately from plain Docker runs.
+
 ### Fixed
 
 - In Settings, the **This browser** section now appears only on its own tab instead of also showing under **General** and **About**.

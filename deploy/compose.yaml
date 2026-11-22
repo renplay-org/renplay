@@ -11,6 +11,8 @@ services:
     image: ghcr.io/renplay-org/renplay:4.14.0
     container_name: renplay
     restart: unless-stopped
+    environment:
+      RENPLAY_INSTALL: compose
     ports:
       - "8080:8080"
     volumes:
