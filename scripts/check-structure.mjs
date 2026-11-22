@@ -30,7 +30,8 @@ const LARGER = {
 // 15457: the review round of that trash: who gets saves back, an entry made whole or not at all, a restore that refuses or rolls back, dropped names, the adult folder in other capitals.
 // 15651: crash recovery of the trash, which no earlier test covered: an interrupted deletion and restore, a second interruption, a conflict that must never expire.
 // 15690: the fresh 30 days for data that stays in an entry after its protection ends, and a crash on the way.
-const TEST_LINES = 15690
+// 15762: admin Settings tab switching (General, This browser, About), which no earlier browser spec covered.
+const TEST_LINES = 15762
 const TEST_ROOM = 100
 
 const problems = []

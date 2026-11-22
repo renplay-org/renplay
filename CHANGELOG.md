@@ -9,6 +9,7 @@ release notes say what).
 
 ### Fixed
 
+- In Settings, the **This browser** section now appears only on its own tab instead of also showing under **General** and **About**.
 - The container image now builds on Debian 13 (trixie) with OS security updates applied and leaves out unused build tools (`npm`, `corepack` and `yarn`) at runtime, clearing all fixable critical and high vulnerabilities in the image.
 
 ## [4.14.0] - 2026-11-18

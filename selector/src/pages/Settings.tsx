@@ -57,7 +57,7 @@ function AdminSettings({ auth, userName }: { auth: boolean; userName: string }) 
             <CatalogPanel />
             <DefaultsForEveryone />
           </div>
-          <section className={`${section === 'browser' ? '' : 'hidden'} panel stack`} style={{ gap: 14 }}>
+          <section className={section === 'browser' ? 'panel stack' : 'hidden'} style={{ gap: 14 }}>
             <h2 className="h3">This browser</h2>
             <LighterBackground />
             <CardMotion />
